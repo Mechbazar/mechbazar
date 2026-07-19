@@ -2,7 +2,7 @@
   "expo": {
     "name": "MechBazar Seller",
     "slug": "mechbazar-seller",
-    "owner": "mech-bazar-99",
+    "owner": "tanu40647",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -29,7 +29,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "0dcdf1a9-857c-4455-87d6-69a4453f0b91"
+        "projectId": "efe1c4a0-a9da-4fca-b0e5-7a38d52b5d87"
       }
     }
   }

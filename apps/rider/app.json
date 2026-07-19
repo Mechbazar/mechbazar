@@ -2,7 +2,7 @@
   "expo": {
     "name": "MechBazar Rider",
     "slug": "mechbazar-rider",
-    "owner": "mech-bazar-99",
+    "owner": "tanu40647",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -36,7 +36,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "3bc90278-55ad-4ce5-879c-a78b8f6d9d54"
+        "projectId": "24743753-b753-4044-ad4f-edaa6584d005"
       }
     }
   }
