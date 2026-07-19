@@ -3,10 +3,11 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { ProductsScreen } from '../screens/ProductsScreen';
 import { OrdersScreen } from '../screens/OrdersScreen';
+import { InventoryScreen } from '../screens/InventoryScreen';
 import { WalletScreen } from '../screens/WalletScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { colors } from '@mechbazar/shared';
-import { Home, Package, ShoppingBag, Wallet, User } from 'lucide-react-native';
+import { Home, Package, ShoppingBag, Warehouse, Wallet, User } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
 
@@ -36,8 +37,13 @@ export const TabNavigator = () => {
         component={OrdersScreen} 
         options={{ tabBarIcon: ({ color, size }) => <ShoppingBag color={color} size={size} /> }}
       />
-      <Tab.Screen 
-        name="Wallet" 
+      <Tab.Screen
+        name="Inventory"
+        component={InventoryScreen}
+        options={{ tabBarIcon: ({ color, size }) => <Warehouse color={color} size={size} /> }}
+      />
+      <Tab.Screen
+        name="Wallet"
         component={WalletScreen} 
         options={{ tabBarIcon: ({ color, size }) => <Wallet color={color} size={size} /> }}
       />

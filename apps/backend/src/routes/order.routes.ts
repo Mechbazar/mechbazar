@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createOrder, getMyOrders, getAllOrders, getOrderById, assignRider, updateAdminOrderStatus } from '../controllers/order.controller';
+import { createOrder, getMyOrders, getAllOrders, getOrderById, assignRider, updateAdminOrderStatus, cancelMyOrder } from '../controllers/order.controller';
 import { authenticate, authorize } from '../middlewares/auth';
 import { Role } from '@prisma/client';
 
@@ -24,6 +24,10 @@ router.post('/', authenticate, createOrder);
 // Endpoint: GET /api/orders/my-orders
 // Description: Fetch orders for the authenticated customer
 router.get('/my-orders', authenticate, getMyOrders);
+
+// Endpoint: PATCH /api/orders/:id/cancel
+// Description: Customer self-cancel, only while the order hasn't been picked up yet
+router.patch('/:id/cancel', authenticate, cancelMyOrder);
 
 // Admin Endpoints
 router.get('/all', authenticate, authorize(admins), getAllOrders);

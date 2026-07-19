@@ -2,12 +2,15 @@ import React from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors, Typography } from '@mechbazar/shared';
-import { Layers, Store, Users, Navigation, Car, Tag, Image, CreditCard, Warehouse, Settings, ChevronRight, Wrench, ClipboardList } from 'lucide-react-native';
+import { Layers, Store, Users, Navigation, Car, Tag, Image, CreditCard, Warehouse, Settings, ChevronRight, Wrench, ClipboardList, Clock3, Package, Bell, Bike } from 'lucide-react-native';
 
 const MENU = [
+  { label: 'Notifications', screen: 'Notifications', icon: Bell },
   { label: 'Categories', screen: 'Categories', icon: Layers },
   { label: 'Service Bookings', screen: 'ServiceBookings', icon: ClipboardList },
   { label: 'Service Categories', screen: 'ServiceCategories', icon: Layers },
+  { label: 'Service Packages', screen: 'ServicePackages', icon: Package },
+  { label: 'Service Time Slots', screen: 'ServiceTimeSlots', icon: Clock3 },
   { label: 'Technicians', screen: 'Technicians', icon: Wrench },
   { label: 'Vendors', screen: 'Vendors', icon: Store },
   { label: 'Customers', screen: 'Customers', icon: Users },
@@ -15,7 +18,9 @@ const MENU = [
   { label: 'Vehicle Master', screen: 'VehicleMaster', icon: Car },
   { label: 'Coupons', screen: 'Coupons', icon: Tag },
   { label: 'Banners & CMS', screen: 'Banners', icon: Image },
-  { label: 'Payouts', screen: 'Payouts', icon: CreditCard },
+  { label: 'Payouts (Vendor)', screen: 'Payouts', icon: CreditCard },
+  { label: 'Payouts (Rider)', screen: 'RiderPayouts', icon: Bike },
+  { label: 'Payouts (Technician)', screen: 'TechnicianPayouts', icon: Wrench },
   { label: 'Inventory', screen: 'Inventory', icon: Warehouse },
   { label: 'Settings', screen: 'Settings', icon: Settings },
 ] as const;

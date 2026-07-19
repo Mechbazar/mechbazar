@@ -175,15 +175,45 @@ export default function OrderHistoryScreen() {
     }
   };
 
-  // No customer-cancel API exists for product orders, so route the request to
-  // support instead of pretending a cancel happened.
-  const handleCancelOrder = () => {
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  const handleCancelOrder = (orderId: string) => {
     Alert.alert(
       'Cancel order',
-      'Order cancellation is handled by our support team. Reach out and we\'ll take care of it.',
+      'Are you sure you want to cancel this order? This cannot be undone.',
       [
-        { text: 'Close', style: 'cancel' },
-        { text: 'Get Help', onPress: () => (navigation as any).navigate('HelpCenter') },
+        { text: 'Keep Order', style: 'cancel' },
+        {
+          text: 'Cancel Order',
+          style: 'destructive',
+          onPress: async () => {
+            setCancellingId(orderId);
+            try {
+              const response = await fetch(`${API_BASE_URL}/orders/${orderId}/cancel`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token || ''}` },
+              });
+              const data = await response.json();
+              if (!response.ok) {
+                Alert.alert(
+                  'Cannot Cancel',
+                  data.error || 'This order can no longer be cancelled. Please contact support.',
+                  [
+                    { text: 'Close', style: 'cancel' },
+                    { text: 'Get Help', onPress: () => (navigation as any).navigate('HelpCenter') },
+                  ]
+                );
+                return;
+              }
+              setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: data.status } : o)));
+            } catch (error) {
+              console.error('Failed to cancel order', error);
+              Alert.alert('Error', 'Could not reach the server. Please try again.');
+            } finally {
+              setCancellingId(null);
+            }
+          },
+        },
       ]
     );
   };
@@ -194,7 +224,7 @@ export default function OrderHistoryScreen() {
     const productImage = resolveImageUrl(firstProduct?.images?.[0]);
     const moreCount = (item.items?.length || 0) - 1;
     const expanded = expandedOrderId === item.id;
-    const cancellable = item.status === 'PLACED' || item.status === 'RECEIVED' || item.status === 'ACCEPTED';
+    const cancellable = item.status === 'PLACED' || item.status === 'ACCEPTED' || item.status === 'PACKING';
 
     return (
       <View style={styles.orderCard}>
@@ -261,8 +291,12 @@ export default function OrderHistoryScreen() {
             <Text style={styles.outlineBtnText}>Buy Again</Text>
           </TouchableOpacity>
           {cancellable && (
-            <TouchableOpacity style={styles.dangerBtn} onPress={handleCancelOrder}>
-              <Text style={styles.dangerBtnText}>Cancel</Text>
+            <TouchableOpacity
+              style={[styles.dangerBtn, cancellingId === item.id && { opacity: 0.6 }]}
+              disabled={cancellingId === item.id}
+              onPress={() => handleCancelOrder(item.id)}
+            >
+              <Text style={styles.dangerBtnText}>{cancellingId === item.id ? 'Cancelling…' : 'Cancel'}</Text>
             </TouchableOpacity>
           )}
         </View>

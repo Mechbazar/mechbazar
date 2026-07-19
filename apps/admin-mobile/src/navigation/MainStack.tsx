@@ -19,6 +19,13 @@ import { CouponsScreen } from '../screens/CouponsScreen';
 import { BannersScreen } from '../screens/BannersScreen';
 import { PayoutsScreen } from '../screens/PayoutsScreen';
 import { PayoutDetailScreen } from '../screens/PayoutDetailScreen';
+import { RiderPayoutsScreen } from '../screens/RiderPayoutsScreen';
+import { RiderPayoutDetailScreen } from '../screens/RiderPayoutDetailScreen';
+import { TechnicianPayoutsScreen } from '../screens/TechnicianPayoutsScreen';
+import { TechnicianPayoutDetailScreen } from '../screens/TechnicianPayoutDetailScreen';
+import { ServicePackagesScreen } from '../screens/ServicePackagesScreen';
+import { ServiceTimeSlotsScreen } from '../screens/ServiceTimeSlotsScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { InventoryScreen } from '../screens/inventory/InventoryScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 
@@ -54,6 +61,13 @@ export const MainStack = () => {
       <Stack.Screen name="Banners" component={BannersScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Payouts" component={PayoutsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="PayoutDetail" component={PayoutDetailScreen} options={{ title: 'Payout Details' }} />
+      <Stack.Screen name="RiderPayouts" component={RiderPayoutsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="RiderPayoutDetail" component={RiderPayoutDetailScreen} options={{ title: 'Rider Payout Details' }} />
+      <Stack.Screen name="TechnicianPayouts" component={TechnicianPayoutsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="TechnicianPayoutDetail" component={TechnicianPayoutDetailScreen} options={{ title: 'Technician Payout Details' }} />
+      <Stack.Screen name="ServicePackages" component={ServicePackagesScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="ServiceTimeSlots" component={ServiceTimeSlotsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Inventory" component={InventoryScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
     </Stack.Navigator>

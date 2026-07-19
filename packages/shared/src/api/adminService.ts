@@ -232,13 +232,80 @@ export const adminService = {
     return response.data;
   },
 
-  // Payouts / Settlements
+  // Payouts / Settlements (vendor)
   getSettlements: async () => {
     const response = await apiClient.get('/vendors/settlements');
     return response.data;
   },
   updateSettlementStatus: async (id: string, data: { status: string; transactionId?: string }) => {
     const response = await apiClient.patch(`/vendors/settlements/${id}/status`, data);
+    return response.data;
+  },
+
+  // Payouts / Settlements (rider)
+  getRiderSettlements: async () => {
+    const response = await apiClient.get('/riders/settlements');
+    return response.data;
+  },
+  updateRiderSettlementStatus: async (id: string, data: { status: string; transactionId?: string }) => {
+    const response = await apiClient.patch(`/riders/settlements/${id}/status`, data);
+    return response.data;
+  },
+
+  // Payouts / Settlements (technician)
+  getTechnicianSettlements: async () => {
+    const response = await apiClient.get('/technicians/settlements');
+    return response.data;
+  },
+  updateTechnicianSettlementStatus: async (id: string, data: { status: string; transactionId?: string }) => {
+    const response = await apiClient.patch(`/technicians/settlements/${id}/status`, data);
+    return response.data;
+  },
+
+  // Service Packages
+  getServicePackages: async () => {
+    const response = await apiClient.get('/services/packages');
+    return response.data;
+  },
+  createServicePackage: async (data: any) => {
+    const response = await apiClient.post('/services/packages', data);
+    return response.data;
+  },
+  updateServicePackage: async (id: string, data: any) => {
+    const response = await apiClient.put(`/services/packages/${id}`, data);
+    return response.data;
+  },
+  deleteServicePackage: async (id: string) => {
+    const response = await apiClient.delete(`/services/packages/${id}`);
+    return response.data;
+  },
+
+  // Service Time Slots
+  getTimeSlots: async () => {
+    const response = await apiClient.get('/services/time-slots');
+    return response.data;
+  },
+  createTimeSlot: async (data: any) => {
+    const response = await apiClient.post('/services/time-slots', data);
+    return response.data;
+  },
+  updateTimeSlot: async (id: string, data: any) => {
+    const response = await apiClient.put(`/services/time-slots/${id}`, data);
+    return response.data;
+  },
+  deleteTimeSlot: async (id: string) => {
+    const response = await apiClient.delete(`/services/time-slots/${id}`);
+    return response.data;
+  },
+
+  // Notifications -- same generic endpoint the web NotificationBell uses,
+  // keyed on the authenticated admin's own user id via the JWT.
+  getNotifications: async () => {
+    const response = await apiClient.get('/customers/notifications');
+    return response.data;
+  },
+  markNotificationRead: async (id: string) => {
+    const response = await apiClient.patch(`/customers/notifications/${id}/read`, {});
     return response.data;
   },
 

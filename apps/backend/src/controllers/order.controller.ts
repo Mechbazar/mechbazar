@@ -490,6 +490,64 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
   }
 };
 
+// Statuses a customer can still back out of themselves. Once a rider has
+// physically picked up the package (PICKUP/ON_THE_WAY/DELIVERED) this is no
+// longer safe to self-serve -- the app routes those to support instead.
+const CUSTOMER_CANCELLABLE_STATUSES: OrderStatus[] = [OrderStatus.PLACED, OrderStatus.ACCEPTED, OrderStatus.PACKING];
+
+// Customer-initiated cancel, scoped to orders actually owned by the calling
+// user (never trusts a client-supplied userId). Mirrors updateAdminOrderStatus's
+// restock-on-close logic, plus a wallet refund for anything already paid
+// online (COD has nothing to refund since no money changed hands yet).
+export const cancelMyOrder = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = String(req.params.id);
+
+    const existing = await prisma.order.findFirst({
+      where: { id, userId: req.user!.userId },
+      include: { items: { include: { product: true } }, payment: true },
+    });
+    if (!existing) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    if (!CUSTOMER_CANCELLABLE_STATUSES.includes(existing.status)) {
+      return res.status(400).json({ error: `Order can no longer be self-cancelled (current status: ${existing.status}). Please contact support.` });
+    }
+
+    const order = await prisma.$transaction(async (tx) => {
+      await restoreOrderStock(tx, existing.items, req.user!.userId, id);
+
+      if (existing.payment && existing.payment.method !== 'COD' && existing.payment.status === 'SUCCESS') {
+        await tx.user.update({
+          where: { id: req.user!.userId },
+          data: { wallet: { increment: existing.payment.amount } },
+        });
+        await tx.payment.update({
+          where: { id: existing.payment.id },
+          data: { status: 'REFUNDED' },
+        });
+      }
+
+      return tx.order.update({
+        where: { id },
+        data: { status: OrderStatus.CANCELLED, deliveryPartnerId: null },
+      });
+    });
+
+    notifyUser(
+      existing.userId,
+      'Order cancelled',
+      `Your order #${id.slice(0, 8)} has been cancelled.`,
+      { orderId: id, status: order.status }
+    );
+
+    res.status(200).json(order);
+  } catch (error: any) {
+    console.error('Error cancelling order:', error.message);
+    res.status(500).json({ error: 'Failed to cancel order' });
+  }
+};
+
 // Rider-driven status update, scoped to deliveries actually assigned to the
 // calling rider (never trusts a client-supplied riderId). Mirrors the
 // ownership-check pattern used by vendor.controller.ts's updateMyProduct.
