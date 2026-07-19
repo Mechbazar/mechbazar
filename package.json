@@ -1,0 +1,39 @@
+{
+  "name": "mechbazar-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/admin",
+    "apps/admin-mobile",
+    "apps/seller-mobile",
+    "apps/rider",
+    "apps/mechanic",
+    "apps/vendor",
+    "packages/shared"
+  ],
+  "dependencies": {
+    "expo": "~57.0.6",
+    "react": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-svg": "15.15.4"
+  },
+  "scripts": {
+    "dev": "concurrently -n backend,mobile,admin,vendor -c blue,green,yellow,magenta \"npm:dev:backend\" \"npm:dev:mobile\" \"npm:dev:admin\" \"npm:dev:vendor\"",
+    "backend": "npm run dev:backend",
+    "frontend": "npm run dev:mobile",
+    "start": "npm --prefix apps/backend run start",
+    "dev:backend": "npm --prefix apps/backend run dev",
+    "dev:mobile": "npm --prefix apps/mobile run start",
+    "dev:admin": "npm --prefix apps/admin run dev",
+    "dev:vendor": "npm --prefix apps/vendor run dev",
+    "dev:rider": "npm --prefix apps/rider run start",
+    "dev:mechanic": "npm --prefix apps/mechanic run start",
+    "dev:admin-mobile": "npm --prefix apps/admin-mobile run start",
+    "dev:seller-mobile": "npm --prefix apps/seller-mobile run start",
+    "install:all": "npm install --legacy-peer-deps && npm --prefix apps/backend install && npm --prefix apps/mobile install --legacy-peer-deps"
+  },
+  "devDependencies": {
+    "@expo/ngrok": "^4.1.3",
+    "concurrently": "^9.1.2"
+  }
+}

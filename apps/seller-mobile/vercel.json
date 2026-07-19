@@ -1,0 +1,8 @@
+{
+  "installCommand": "npm install",
+  "buildCommand": "npm run build:web --workspace=seller-mobile",
+  "outputDirectory": "apps/seller-mobile/dist",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}

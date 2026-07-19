@@ -1,0 +1,27 @@
+{
+  "name": "@mechbazar/shared",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./web": "./src/components/web/index.ts",
+    "./theme": "./src/theme/index.ts"
+  },
+  "dependencies": {
+    "axios": "^1.18.1",
+    "@tanstack/react-query": "^5.101.2",
+    "react-native": "0.86.0",
+    "expo-secure-store": "~57.0.1"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*",
+    "lucide-react": "*"
+  },
+  "peerDependenciesMeta": {
+    "react-native": { "optional": true },
+    "lucide-react": { "optional": true }
+  }
+}

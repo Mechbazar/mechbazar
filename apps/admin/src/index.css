@@ -1,0 +1,90 @@
+@import "tailwindcss";
+@config "../../../packages/shared/src/tailwind.config.ts";
+
+@theme {
+  /* Brand accent matches the real customer app (apps/mobile) palette;
+     admin shell uses a light surface theme. */
+  --color-brand-primary: #E23B22;
+  --color-brand-secondary: #F5A300;
+  --color-brand-accent: #C0362C;
+  --color-brand-dark: #f3f4f6;
+  --color-brand-light: #111827;
+  --color-brand-panel: #ffffff;
+  --color-brand-border: #e5e7eb;
+  --color-brand-text: #111827;
+  --color-brand-muted: #6b7280;
+}
+
+@layer base {
+  body {
+    @apply bg-neutral-50 text-neutral-900 font-sans;
+  }
+  
+  /* Custom Scrollbar for Light Theme */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #f3f4f6;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #E23B22;
+  }
+}
+
+@layer utilities {
+  .admin-light .bg-neutral-950,
+  .admin-light .bg-neutral-900,
+  .admin-light .bg-neutral-800 {
+    background-color: #ffffff;
+  }
+
+  .admin-light .border-neutral-900,
+  .admin-light .border-neutral-800,
+  .admin-light .border-neutral-700 {
+    border-color: #e5e7eb;
+  }
+
+  .admin-light .text-white,
+  .admin-light .text-neutral-100,
+  .admin-light .text-neutral-200,
+  .admin-light .text-neutral-300,
+  .admin-light .text-neutral-400 {
+    color: #111827;
+  }
+
+  .admin-light .text-neutral-500 {
+    color: #6b7280;
+  }
+
+  .admin-light .hover\:bg-neutral-900:hover,
+  .admin-light .hover\:bg-neutral-800:hover,
+  .admin-light .hover\:bg-brand-dark\/50:hover,
+  .admin-light .hover\:bg-brand-dark\/30:hover {
+    background-color: #f3f4f6;
+  }
+
+  .admin-light .bg-brand-dark,
+  .admin-light .bg-brand-dark\/50 {
+    background-color: #f8fafc;
+  }
+
+  .admin-light .border-brand-border {
+    border-color: #e5e7eb;
+  }
+
+  .admin-light .text-brand-light,
+  .admin-light .text-brand-text,
+  .admin-light .text-brand-dark {
+    color: #111827;
+  }
+
+  .admin-light .text-brand-muted {
+    color: #6b7280;
+  }
+}

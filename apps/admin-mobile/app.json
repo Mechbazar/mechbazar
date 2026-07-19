@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "MechBazar Admin",
+    "slug": "mechbazar-admin",
+    "owner": "mech-bazar-99",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mechbazar.admin"
+    },
+    "android": {
+      "package": "com.mechbazar.admin",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-status-bar"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d40165e9-ea70-4977-aa2a-794dc834e124"
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "d88b51d3-e345-40ff-928c-45ba22515eca"
+      }
+    },
+    "android": {
+      "package": "com.tanu40647.mechbazarworkspace"
+    }
+  }
+}

@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: mechbazar_db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mechbazar
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - mechbazar_net
+
+  redis:
+    image: redis:alpine
+    container_name: mechbazar_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - mechbazar_net
+
+  backend:
+    build:
+      context: ./apps/backend
+    container_name: mechbazar_backend
+    ports:
+      - "5005:5005"
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - PORT=5005
+      - DATABASE_URL=postgresql://postgres:password@postgres:5432/mechbazar?schema=public
+      - DIRECT_URL=postgresql://postgres:password@postgres:5432/mechbazar?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=supersecretkey123
+      - ALLOW_DEV_OTP_BYPASS=true
+    volumes:
+      - ./apps/backend/uploads:/app/uploads
+    networks:
+      - mechbazar_net
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+    container_name: mechbazar_admin
+    ports:
+      - "3000:80"
+    networks:
+      - mechbazar_net
+
+  vendor:
+    build:
+      context: .
+      dockerfile: apps/vendor/Dockerfile
+    container_name: mechbazar_vendor
+    ports:
+      - "3001:80"
+    networks:
+      - mechbazar_net
+
+volumes:
+  pgdata:
+
+networks:
+  mechbazar_net:

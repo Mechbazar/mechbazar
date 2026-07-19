@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+.expo/
+*.tsbuildinfo
+
+# Environment files — never commit real env values (examples are allowed)
+.env
+.env.*
+!.env.example
+
+# Vercel local project links (CLI metadata, per-machine)
+.vercel/
+
+# Native build outputs & signing keys
+android/
+ios/
+*.keystore
+*.jks
+
+# Runtime data — user uploads & KYC documents must never be committed
+uploads/
+private-uploads/
+
+# Secrets
+firebaseServiceAccount.json
+
+# Logs & local artifacts
+*.log
+*.log.err
+*.orig.*
+.DS_Store
+qr-codes/
+MECHBAZAR/

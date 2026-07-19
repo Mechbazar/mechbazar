@@ -1,0 +1,41 @@
+openapi: 3.0.0
+info:
+  title: MechBazar API
+  description: Quick Commerce Automotive Parts App API
+  version: 1.0.0
+servers:
+  - url: https://mechbazar-backend.vercel.app
+    description: Production (Vercel)
+  - url: http://localhost:5001
+    description: Local server
+paths:
+  /api/vehicles/manufacturers:
+    get:
+      summary: Get all vehicle manufacturers
+      responses:
+        '200':
+          description: A list of manufacturers
+  /api/vehicles/models:
+    get:
+      summary: Get models by manufacturer
+      parameters:
+        - in: query
+          name: manufacturerId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A list of models
+  /api/products:
+    get:
+      summary: Get products
+      parameters:
+        - in: query
+          name: vehicleId
+          schema:
+            type: string
+          description: Filter by vehicle compatibility
+      responses:
+        '200':
+          description: A list of products
