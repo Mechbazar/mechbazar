@@ -483,10 +483,11 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
     res.status(201).json({ message: 'Booking placed successfully', booking });
   } catch (error: any) {
     if (error instanceof BookingError) {
+      console.warn(`[booking] rejected ${error.status} (user ${req.user?.userId}): ${error.message}`);
       return res.status(error.status).json({ error: error.message });
     }
-    console.error('Service booking error:', error.message);
-    res.status(500).json({ error: error.message || 'Internal server error' });
+    console.error(`[booking] create failed (user ${req.user?.userId}, body ${JSON.stringify(req.body)}):`, error);
+    res.status(500).json({ error: 'Failed to create booking. Please try again.' });
   }
 };
 

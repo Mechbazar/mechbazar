@@ -131,10 +131,10 @@ export default function ServiceBookingScreen() {
     setError(null);
 
     const { booking, error: err } = await createServiceBooking(token, {
-      // Garage vehicles are client-only (Date.now()-based ids, never synced to
-      // a backend UserVehicle row -- see Phase 1 notes), so there's no real id
-      // to link here. Vehicle details travel as the snapshot fields below instead.
-      userVehicleId: null,
+      // Garage vehicles now live on the backend (real UserVehicle rows), so the
+      // booking links to the row; the snapshot fields below still travel so the
+      // booking survives the vehicle later being edited.
+      userVehicleId: selectedGarageVehicle.id,
       vehicleType: category.vehicleType,
       vehicleBrand: selectedGarageVehicle.brand,
       vehicleModel: selectedGarageVehicle.model,

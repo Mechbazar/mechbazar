@@ -12,6 +12,7 @@ export interface AuthRequest extends Request {
 export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.warn(`[auth] 401 no token: ${req.method} ${req.originalUrl}`);
     return res.status(401).json({ error: 'Unauthorized: No token provided' });
   }
 
@@ -21,6 +22,7 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
     req.user = decoded;
     next();
   } catch (error) {
+    console.warn(`[auth] 401 invalid/expired token: ${req.method} ${req.originalUrl}`);
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });
   }
 };

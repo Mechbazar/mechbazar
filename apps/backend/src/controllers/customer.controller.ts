@@ -325,7 +325,7 @@ export const getMyVehicles = async (req: AuthRequest, res: Response): Promise<vo
     });
     res.status(200).json(vehicles);
   } catch (error) {
-    console.error('Error fetching vehicles:', error);
+    console.error(`[garage] GET vehicles failed (user ${req.user?.userId}):`, error);
     res.status(500).json({ error: 'Failed to fetch vehicles' });
   }
 };
@@ -363,7 +363,7 @@ export const createMyVehicle = async (req: AuthRequest, res: Response): Promise<
 
     res.status(201).json(vehicle);
   } catch (error) {
-    console.error('Error creating vehicle:', error);
+    console.error(`[garage] create vehicle failed (user ${req.user?.userId}, body ${JSON.stringify(req.body)}):`, error);
     res.status(500).json({ error: 'Failed to create vehicle' });
   }
 };
@@ -408,7 +408,7 @@ export const updateMyVehicle = async (req: AuthRequest, res: Response): Promise<
 
     res.status(200).json(vehicle);
   } catch (error) {
-    console.error('Error updating vehicle:', error);
+    console.error(`[garage] update vehicle ${req.params.id} failed (user ${req.user?.userId}):`, error);
     res.status(500).json({ error: 'Failed to update vehicle' });
   }
 };
@@ -423,13 +423,22 @@ export const deleteMyVehicle = async (req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    const inUse = await prisma.serviceBooking.count({ where: { userVehicleId: id } });
-    if (inUse > 0) {
-      res.status(400).json({ error: 'Cannot delete a vehicle that has service bookings against it.' });
+    // Block deletion only while a booking is still in flight. Finished/cancelled
+    // bookings keep their vehicle details via the snapshot fields, so the link
+    // can be dropped and the vehicle removed without losing history.
+    const activeBookings = await prisma.serviceBooking.count({
+      where: { userVehicleId: id, status: { notIn: ['COMPLETED', 'CANCELLED', 'REJECTED'] } },
+    });
+    if (activeBookings > 0) {
+      console.warn(`[garage] delete blocked, vehicle ${id} has ${activeBookings} active booking(s) (user ${userId})`);
+      res.status(400).json({ error: 'This vehicle has an active service booking. Complete or cancel it first.' });
       return;
     }
 
-    await prisma.userVehicle.delete({ where: { id } });
+    await prisma.$transaction([
+      prisma.serviceBooking.updateMany({ where: { userVehicleId: id }, data: { userVehicleId: null } }),
+      prisma.userVehicle.delete({ where: { id } }),
+    ]);
 
     if (existing.isDefault) {
       const next = await prisma.userVehicle.findFirst({ where: { userId }, orderBy: { id: 'desc' } });
@@ -440,7 +449,7 @@ export const deleteMyVehicle = async (req: AuthRequest, res: Response): Promise<
 
     res.status(200).json({ message: 'Vehicle deleted' });
   } catch (error) {
-    console.error('Error deleting vehicle:', error);
+    console.error(`[garage] delete vehicle ${req.params.id} failed (user ${req.user?.userId}):`, error);
     res.status(500).json({ error: 'Failed to delete vehicle' });
   }
 };
