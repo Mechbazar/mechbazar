@@ -285,11 +285,15 @@ model Address {
 // =======================
 
 model Manufacturer {
-  id       String    @id @default(uuid())
-  name     String    @unique
+  id       String      @id @default(uuid())
+  name     String
+  type     VehicleType @default(CAR)
   logo     String?
   models   Model[]
   vehicles Vehicle[]
+
+  // Honda/BMW/Suzuki sell both cars and bikes, so a brand is one row per type
+  @@unique([name, type])
 }
 
 model Model {
@@ -342,11 +346,12 @@ model UserVehicle {
   id                 String  @id @default(uuid())
   userId             String
   user               User    @relation(fields: [userId], references: [id])
-  // Manufacturer/Model/Variant taxonomy has no CAR/BIKE column and is unseeded
-  // in production, so a garage vehicle can't reliably be required to link to a
-  // real Vehicle row today -- snapshotted directly here instead, same reasoning
-  // and same field shape as ServiceBooking's vehicleType/vehicleBrand/vehicleModel
-  // snapshot fields. vehicleId stays optional for once the taxonomy is seeded.
+  // Manufacturer/Model/Variant taxonomy is now seeded (see prisma/seed-vehicle-master.ts),
+  // but garage vehicles still snapshot brand/model/etc. as plain strings rather than a
+  // required Vehicle FK, same shape as ServiceBooking's vehicleType/vehicleBrand/vehicleModel
+  // snapshot fields -- keeps a garage entry valid even for combinations (e.g. a variant/year
+  // pairing) the taxonomy doesn't have an exact Vehicle row for. vehicleId stays optional,
+  // populated opportunistically when a matching row exists.
   vehicleId          String?
   vehicle            Vehicle? @relation(fields: [vehicleId], references: [id])
   vehicleType        VehicleType

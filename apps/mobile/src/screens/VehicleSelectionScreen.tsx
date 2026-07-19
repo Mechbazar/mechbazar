@@ -41,6 +41,8 @@ export default function VehicleSelectionScreen() {
   const [brands, setBrands] = useState<any[]>([]);
   const [models, setModels] = useState<any[]>([]);
   const [variants, setVariants] = useState<any[]>([]);
+  const [isLoadingBrands, setIsLoadingBrands] = useState(true);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
 
   // Selections
   const [selectedBrand, setSelectedBrand] = useState<{id: string, name: string} | null>(null);
@@ -59,15 +61,24 @@ export default function VehicleSelectionScreen() {
   const indicatorPosition = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    fetchManufacturers().then(data => {
+    let cancelled = false;
+    setIsLoadingBrands(true);
+    setBrands([]);
+    fetchManufacturers(vehicleType === VehicleType.CAR ? 'CAR' : 'BIKE').then(data => {
+      if (cancelled) return;
       setBrands(data);
+      setIsLoadingBrands(false);
     });
-  }, []);
+    return () => { cancelled = true; };
+  }, [vehicleType]);
 
   useEffect(() => {
     if (selectedBrand) {
+      setIsLoadingModels(true);
+      setModels([]);
       fetchModels(selectedBrand.id).then(data => {
         setModels(data);
+        setIsLoadingModels(false);
       });
     }
   }, [selectedBrand]);
@@ -160,6 +171,20 @@ export default function VehicleSelectionScreen() {
             onChangeText={setSearchQuery}
           />
         </View>
+        {isLoadingBrands ? (
+          <View style={styles.centerState}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.centerStateText}>Loading brands...</Text>
+          </View>
+        ) : filtered.length === 0 ? (
+          <View style={styles.centerState}>
+            <Text style={styles.centerStateText}>
+              {searchQuery
+                ? `No brands match "${searchQuery}"`
+                : 'Could not load brands. Please check your connection and try again.'}
+            </Text>
+          </View>
+        ) : (
         <FlatList
           data={filtered}
           keyExtractor={item => item.id}
@@ -181,6 +206,7 @@ export default function VehicleSelectionScreen() {
             </TouchableOpacity>
           )}
         />
+        )}
       </View>
     );
   };
@@ -208,6 +234,18 @@ export default function VehicleSelectionScreen() {
           />
         </View>
 
+        {isLoadingModels ? (
+          <View style={styles.centerState}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.centerStateText}>Loading models...</Text>
+          </View>
+        ) : filtered.length === 0 ? (
+          <View style={styles.centerState}>
+            <Text style={styles.centerStateText}>
+              {searchQuery ? `No models match "${searchQuery}"` : 'No models found for this brand.'}
+            </Text>
+          </View>
+        ) : (
         <FlatList
           data={filtered}
           keyExtractor={item => item.id}
@@ -231,15 +269,24 @@ export default function VehicleSelectionScreen() {
             </TouchableOpacity>
           )}
         />
+        )}
       </View>
     );
   };
 
   const renderDetailsBottomSheet = () => {
-    const years = ['2019', '2020', '2021', '2022', '2023', '2024'];
-    const fuels = ['Petrol', 'Diesel', 'EV', 'CNG'];
-    const engines = ['Standard', 'Turbo', '1000cc', '1500cc'];
-    const transmissions = ['Manual', 'Automatic', 'AMT'];
+    const currentYear = new Date().getFullYear();
+    const years = Array.from({ length: currentYear - 2007 }, (_, i) => String(currentYear - i));
+    const isCar = vehicleType === VehicleType.CAR;
+    const fuels = isCar
+      ? ['Petrol', 'Diesel', 'CNG', 'Electric', 'Hybrid']
+      : ['Petrol', 'Electric'];
+    const engines = isCar
+      ? ['Under 1.0L', '1.0L - 1.2L', '1.2L - 1.5L', '1.5L - 2.0L', 'Above 2.0L', 'Turbo']
+      : ['Under 125cc', '125cc - 160cc', '160cc - 250cc', '250cc - 500cc', 'Above 500cc'];
+    const transmissions = isCar
+      ? ['Manual', 'Automatic', 'AMT', 'CVT', 'DCT']
+      : ['Manual', 'Automatic (Scooter)'];
     const trims = variants.map(v => v.name);
 
     const renderDropdown = (label: string, value: string, options: string[], onSelect: (val: string) => void) => (
@@ -344,6 +391,8 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 20, fontWeight: '700', color: colors.textDark },
 
   listContainer: { paddingBottom: 20 },
+  centerState: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
+  centerStateText: { marginTop: 12, fontSize: 15, color: colors.textLight, textAlign: 'center' },
   listItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.white, padding: 16, borderRadius: 12, marginBottom: 10, elevation: 1, shadowColor: '#000', shadowOpacity: 0.05, shadowOffset: { width: 0, height: 2 }, shadowRadius: 4 },
   listItemText: { fontSize: 16, fontWeight: '500', color: colors.textDark },
   listItemChevron: { fontSize: 20, color: colors.textLight },

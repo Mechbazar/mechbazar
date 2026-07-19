@@ -75,9 +75,10 @@ export const fetchBanners = async (type: VehicleType): Promise<any[]> => {
   }
 };
 
-export const fetchManufacturers = async (): Promise<any[]> => {
+export const fetchManufacturers = async (type?: 'CAR' | 'BIKE'): Promise<any[]> => {
   try {
-    const res = await fetch(`${API_BASE_URL}/vehicles/manufacturers`);
+    const query = type ? `?type=${type}` : '';
+    const res = await fetch(`${API_BASE_URL}/vehicles/manufacturers${query}`);
     if (!res.ok) return [];
     return await res.json();
   } catch (err) {

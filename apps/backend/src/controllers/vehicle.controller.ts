@@ -3,7 +3,15 @@ import prisma from '../config/prisma';
 
 export const getManufacturers = async (req: Request, res: Response) => {
   try {
-    const manufacturers = await prisma.manufacturer.findMany();
+    const { type } = req.query;
+    const vehicleType = typeof type === 'string' ? type.toUpperCase() : undefined;
+    if (vehicleType && vehicleType !== 'CAR' && vehicleType !== 'BIKE') {
+      return res.status(400).json({ error: 'type must be CAR or BIKE' });
+    }
+    const manufacturers = await prisma.manufacturer.findMany({
+      where: vehicleType ? { type: vehicleType as 'CAR' | 'BIKE' } : undefined,
+      orderBy: { name: 'asc' },
+    });
     res.json(manufacturers);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch manufacturers' });
@@ -18,6 +26,7 @@ export const getModels = async (req: Request, res: Response) => {
     }
     const models = await prisma.model.findMany({
       where: { manufacturerId: String(manufacturerId) },
+      orderBy: { name: 'asc' },
     });
     res.json(models);
   } catch (error) {
@@ -33,6 +42,7 @@ export const getVariants = async (req: Request, res: Response) => {
     }
     const variants = await prisma.variant.findMany({
       where: { modelId: String(modelId) },
+      orderBy: { name: 'asc' },
     });
     res.json(variants);
   } catch (error) {
