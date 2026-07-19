@@ -1,9 +1,11 @@
 import admin from '../config/firebase';
-import redisClient from '../config/redis';
+import prisma from '../config/prisma';
 import crypto from 'crypto';
 
 const isDevOtpBypassAllowed = () => process.env.ALLOW_DEV_OTP_BYPASS === 'true';
 const getOtpProvider = () => process.env.OTP_PROVIDER || 'TEST';
+
+const OTP_TTL_SECONDS = 300;
 
 export class OtpVerificationError extends Error {}
 
@@ -13,17 +15,22 @@ const hashOtp = (otp: string): string => {
 };
 
 /**
- * Generates a local 6-digit OTP, stores its hash in Redis with a 5-minute TTL,
- * and logs it clearly to the console for testing.
+ * Generates a local 6-digit OTP, stores its hash in the PhoneOtp table with a
+ * 5-minute expiry, and logs it clearly to the console for testing.
+ *
+ * Stored in Postgres rather than Redis: production runs on serverless Vercel
+ * where no Redis is provisioned, and the database is the only store that is
+ * always available.
  */
 export const generateAndSendOtp = async (phone: string): Promise<{ otp: string; expiredInSeconds: number }> => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  const hashed = hashOtp(otp);
-  const key = `otp:${phone}`;
+  const otpHash = hashOtp(otp);
+  const expiresAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000);
 
-  // Store in Redis (TTL: 5 minutes = 300 seconds)
-  await redisClient.set(key, hashed, {
-    EX: 300
+  await prisma.phoneOtp.upsert({
+    where: { phone },
+    update: { otpHash, expiresAt },
+    create: { phone, otpHash, expiresAt },
   });
 
   console.log(`
@@ -35,11 +42,12 @@ export const generateAndSendOtp = async (phone: string): Promise<{ otp: string; 
 ========================================
   `);
 
-  return { otp, expiredInSeconds: 300 };
+  return { otp, expiredInSeconds: OTP_TTL_SECONDS };
 };
 
 /**
- * Shared verification method. Validates OTP via Redis (in TEST mode) or Firebase (in PRODUCTION mode).
+ * Shared verification method. Validates OTP via the PhoneOtp table (in TEST
+ * mode) or Firebase (in PRODUCTION mode).
  */
 export const verifyOtpAndResolvePhone = async (phone: string, otp: string): Promise<string> => {
   const normalizedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
@@ -56,19 +64,21 @@ export const verifyOtpAndResolvePhone = async (phone: string, otp: string): Prom
 
   const provider = getOtpProvider();
   if (provider === 'TEST') {
-    const key = `otp:${phone}`;
-    const storedHash = await redisClient.get(key);
-    
-    if (!storedHash) {
+    const record = await prisma.phoneOtp.findUnique({ where: { phone } });
+
+    if (!record || record.expiresAt < new Date()) {
+      if (record) {
+        await prisma.phoneOtp.delete({ where: { phone } }).catch(() => {});
+      }
       throw new OtpVerificationError('OTP expired or not requested');
     }
 
-    if (hashOtp(otp) !== storedHash) {
+    if (hashOtp(otp) !== record.otpHash) {
       throw new OtpVerificationError('Invalid OTP code');
     }
 
     // Clean up used OTP
-    await redisClient.del(key);
+    await prisma.phoneOtp.delete({ where: { phone } }).catch(() => {});
     return normalizedPhone;
   }
 

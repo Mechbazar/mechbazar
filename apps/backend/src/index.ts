@@ -36,6 +36,11 @@ import fs from 'fs';
 
 const app = express();
 
+// Behind Vercel's proxy the client IP arrives via X-Forwarded-For; without
+// this, express-rate-limit rejects the header and rate-limits all traffic
+// as a single client.
+app.set('trust proxy', 1);
+
 // Middlewares
 app.use(compression());
 app.use(express.json());
