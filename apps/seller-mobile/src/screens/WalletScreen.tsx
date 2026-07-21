@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Alert, Modal } from 'react-native';
 import { colors, Typography, Card, Button, Input, vendorService, Loader } from '@mechbazar/shared';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Wallet as WalletIcon, ArrowDownCircle, ArrowUpCircle } from 'lucide-react-native';
+import { Wallet as WalletIcon, ArrowDownCircle } from 'lucide-react-native';
 
 export const WalletScreen = () => {
   const queryClient = useQueryClient();
@@ -28,8 +28,8 @@ export const WalletScreen = () => {
   const handleWithdraw = () => {
     const num = parseFloat(amount);
     if (!num || num <= 0) return Alert.alert('Error', 'Enter a valid amount');
-    if (num > (walletData?.balance || 0)) return Alert.alert('Error', 'Insufficient balance');
-    
+    if (num > (walletData?.walletBalance || 0)) return Alert.alert('Error', 'Insufficient balance');
+
     withdrawMutation.mutate(num);
   };
 
@@ -42,29 +42,29 @@ export const WalletScreen = () => {
           <WalletIcon color={colors.warning} size={32} style={{marginRight: 12}} />
           <View>
             <Typography variant="caption">Available Balance</Typography>
-            <Typography variant="h1">₹ {walletData?.balance?.toFixed(2) || '0.00'}</Typography>
+            <Typography variant="h1">₹ {walletData?.walletBalance?.toFixed(2) || '0.00'}</Typography>
           </View>
         </View>
         <Button title="Withdraw" onPress={() => setModalVisible(true)} style={{marginTop: 16}} />
       </View>
 
-      <Typography variant="h3" style={{padding: 16, paddingBottom: 8}}>Recent Transactions</Typography>
+      <Typography variant="h3" style={{padding: 16, paddingBottom: 8}}>Payout Requests</Typography>
       <FlatList
-        data={walletData?.transactions || []}
+        data={walletData?.settlements || []}
         keyExtractor={item => item.id}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
         contentContainerStyle={{ padding: 16 }}
-        ListEmptyComponent={<Typography variant="body" style={{textAlign:'center', marginTop:20}}>No transactions yet.</Typography>}
+        ListEmptyComponent={<Typography variant="body" style={{textAlign:'center', marginTop:20}}>No payout requests yet.</Typography>}
         renderItem={({ item }) => (
           <Card style={styles.txCard}>
             <View style={{flexDirection:'row', alignItems:'center'}}>
-              {item.type === 'CREDIT' ? <ArrowUpCircle color={colors.success} size={24} /> : <ArrowDownCircle color={colors.danger} size={24} />}
+              <ArrowDownCircle color={item.status === 'FAILED' ? colors.danger : colors.textSecondary} size={24} />
               <View style={{flex:1, marginLeft: 12}}>
-                <Typography variant="body">{item.description || item.type}</Typography>
-                <Typography variant="caption" style={{color: colors.textSecondary}}>{new Date(item.date).toLocaleString()}</Typography>
+                <Typography variant="body">Payout Request</Typography>
+                <Typography variant="caption" style={{color: colors.textSecondary}}>{item.status} • {new Date(item.date).toLocaleString()}</Typography>
               </View>
-              <Typography variant="h3" style={{color: item.type === 'CREDIT' ? colors.success : colors.text}}>
-                {item.type === 'CREDIT' ? '+' : '-'}₹{item.amount}
+              <Typography variant="h3" style={{color: colors.text}}>
+                -₹{item.amount}
               </Typography>
             </View>
           </Card>
@@ -74,7 +74,7 @@ export const WalletScreen = () => {
       <Modal visible={modalVisible} animationType="slide" presentationStyle="formSheet">
         <View style={styles.modalContainer}>
           <Typography variant="h2" style={{marginBottom: 16}}>Request Payout</Typography>
-          <Typography variant="body" style={{marginBottom: 24}}>Available Balance: ₹{walletData?.balance || 0}</Typography>
+          <Typography variant="body" style={{marginBottom: 24}}>Available Balance: ₹{walletData?.walletBalance || 0}</Typography>
           
           <Input 
             label="Amount (₹)" 

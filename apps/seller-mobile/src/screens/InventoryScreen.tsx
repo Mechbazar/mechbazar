@@ -7,8 +7,8 @@ import { useQuery } from '@tanstack/react-query';
 type Filter = 'all' | 'low' | 'out';
 
 const getStockStatus = (inv: any): { label: string; variant: 'danger' | 'warning' | 'success'; icon: any } => {
-  if (inv.availableQty === 0) return { label: 'Out of Stock', variant: 'danger', icon: AlertTriangle };
-  if (inv.availableQty < inv.reorderLevel) return { label: 'Low Stock', variant: 'warning', icon: TrendingDown };
+  if (inv.availableStock === 0) return { label: 'Out of Stock', variant: 'danger', icon: AlertTriangle };
+  if (inv.availableStock < inv.reorderLevel) return { label: 'Low Stock', variant: 'warning', icon: TrendingDown };
   return { label: 'In Stock', variant: 'success', icon: CheckCircle };
 };
 
@@ -20,12 +20,12 @@ export const InventoryScreen = () => {
     queryFn: vendorService.getInventory,
   });
 
-  const lowCount = inventory.filter((i: any) => i.availableQty < i.reorderLevel && i.availableQty > 0).length;
-  const outCount = inventory.filter((i: any) => i.availableQty === 0).length;
+  const lowCount = inventory.filter((i: any) => i.availableStock < i.reorderLevel && i.availableStock > 0).length;
+  const outCount = inventory.filter((i: any) => i.availableStock === 0).length;
 
   const filtered = inventory.filter((inv: any) => {
-    if (filter === 'low') return inv.availableQty < inv.reorderLevel && inv.availableQty > 0;
-    if (filter === 'out') return inv.availableQty === 0;
+    if (filter === 'low') return inv.availableStock < inv.reorderLevel && inv.availableStock > 0;
+    if (filter === 'out') return inv.availableStock === 0;
     return true;
   });
 
@@ -82,11 +82,11 @@ export const InventoryScreen = () => {
               </View>
               <View style={styles.statsRow}>
                 <View>
-                  <Typography variant="h3">{inv.availableQty}</Typography>
+                  <Typography variant="h3">{inv.availableStock}</Typography>
                   <Typography variant="caption" style={{ color: colors.textSecondary }}>Available</Typography>
                 </View>
                 <View>
-                  <Typography variant="h3">{inv.reservedQty ?? 0}</Typography>
+                  <Typography variant="h3">{inv.reservedStock ?? 0}</Typography>
                   <Typography variant="caption" style={{ color: colors.textSecondary }}>Reserved</Typography>
                 </View>
                 <View>

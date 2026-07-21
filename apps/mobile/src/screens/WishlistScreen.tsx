@@ -147,7 +147,7 @@ export default function WishlistScreen() {
               <Text style={styles.emptySubtitle}>Tap the heart icon on spare parts to save them here for later.</Text>
               <TouchableOpacity
                 style={styles.shopBtn}
-                onPress={() => navigation.navigate('Categories')}
+                onPress={() => navigation.navigate('MainTabs', { screen: 'Categories' })}
               >
                 <Text style={styles.shopBtnText}>Explore Products</Text>
               </TouchableOpacity>

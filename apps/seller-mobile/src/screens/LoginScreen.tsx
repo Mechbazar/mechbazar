@@ -24,7 +24,7 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
 
       if (data.token) {
         await SecureStore.setItemAsync('token', data.token);
-        dispatch(setAuth({ token: data.token, user: data.vendor }));
+        dispatch(setAuth({ token: data.token, user: data.user }));
       } else {
         Alert.alert('Login Failed', 'No token received from server');
       }

@@ -78,7 +78,15 @@ export default function MechanicDetailScreen() {
   };
 
   const handleBookVisit = () => {
-    navigation.navigate('ServiceBooking', { preselectedMechanic: { name, avatar, rating } });
+    // There's no "book a general visit" endpoint -- a booking always needs a
+    // specific service package. Send the user to pick one instead of a dead
+    // end (ServiceBookingScreen requires a packageId it never had here, and
+    // silently discarded the mechanic preference besides).
+    Alert.alert(
+      'Choose a service',
+      `Pick a service to book with ${name}.`,
+      [{ text: 'OK', onPress: () => navigation.navigate('MainTabs', { screen: 'Services' }) }]
+    );
   };
 
   return (

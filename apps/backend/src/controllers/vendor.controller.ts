@@ -243,7 +243,7 @@ export const addMyProduct = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const { name, description, mrp, price, stock, categoryId, brandId, oemNumber, partNumber } = req.body;
+    const { name, description, mrp, price, stock, categoryId, brandId, oemNumber, partNumber, images } = req.body;
 
     if (!categoryId || !brandId) {
       res.status(400).json({ error: 'Category and Brand are required fields' });
@@ -273,6 +273,7 @@ export const addMyProduct = async (req: Request, res: Response): Promise<void> =
         stock: parseInt(stock, 10),
         oemNumber,
         partNumber,
+        images: Array.isArray(images) ? images : [],
         vehicleType: category.vehicleType,
         status: 'APPROVED', // No admin approval required
       }

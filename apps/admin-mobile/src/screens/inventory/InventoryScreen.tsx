@@ -24,7 +24,7 @@ export const InventoryScreen = () => {
     <View style={styles.container}>
       <Typography variant="h2" style={{ padding: 16, paddingBottom: 8 }}>Inventory System</Typography>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.segmentRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.segmentScroll} contentContainerStyle={styles.segmentRow}>
         {SEGMENTS.map((s) => (
           <TouchableOpacity key={s.key} style={[styles.segment, active === s.key && styles.segmentActive]} onPress={() => setActive(s.key)}>
             <s.icon color={active === s.key ? '#fff' : colors.textSecondary} size={16} />
@@ -45,7 +45,8 @@ export const InventoryScreen = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  segmentRow: { paddingHorizontal: 16, gap: 8, marginBottom: 8 },
+  segmentScroll: { flexGrow: 0, flexShrink: 0 },
+  segmentRow: { paddingHorizontal: 16, gap: 8, marginBottom: 8, alignItems: 'center' },
   segment: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, backgroundColor: colors.surfaceHover },
   segmentActive: { backgroundColor: colors.primary },
 });

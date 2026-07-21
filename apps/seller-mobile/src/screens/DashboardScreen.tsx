@@ -1,12 +1,12 @@
 import React from 'react';
-import { View, ScrollView, StyleSheet, RefreshControl } from 'react-native';
+import { View, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 import { colors, Typography, Card, Loader, vendorService } from '@mechbazar/shared';
 import { Package, IndianRupee, ShoppingCart, Wallet } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 
-export const DashboardScreen = () => {
+export const DashboardScreen = ({ navigation }: { navigation: any }) => {
   const user = useSelector((state: RootState) => state.auth.user);
   
   const { data: stats, isLoading, refetch, isRefetching } = useQuery({
@@ -30,26 +30,34 @@ export const DashboardScreen = () => {
       <Typography variant="h2" style={styles.title}>Welcome back, {user?.name || 'Seller'}!</Typography>
       
       <View style={styles.grid}>
-        <Card style={styles.statCard}>
-          <IndianRupee color={colors.primary} size={24} />
-          <Typography variant="h3" style={{ marginTop: 8 }}>₹ {stats?.totalRevenue?.toFixed(2) || '0.00'}</Typography>
-          <Typography variant="caption">Total Revenue</Typography>
-        </Card>
-        <Card style={styles.statCard}>
-          <ShoppingCart color={colors.info} size={24} />
-          <Typography variant="h3" style={{ marginTop: 8 }}>{stats?.totalOrders || 0}</Typography>
-          <Typography variant="caption">Total Orders</Typography>
-        </Card>
-        <Card style={styles.statCard}>
-          <Package color={colors.success} size={24} />
-          <Typography variant="h3" style={{ marginTop: 8 }}>{stats?.totalProducts || 0} ({stats?.lowStockProducts || 0} low)</Typography>
-          <Typography variant="caption">Live Products</Typography>
-        </Card>
-        <Card style={styles.statCard}>
-          <Wallet color={colors.warning} size={24} />
-          <Typography variant="h3" style={{ marginTop: 8 }}>₹ {stats?.walletBalance?.toFixed(2) || '0.00'}</Typography>
-          <Typography variant="caption">Wallet Balance</Typography>
-        </Card>
+        <TouchableOpacity style={styles.statCardWrap} activeOpacity={0.7} onPress={() => navigation.navigate('Orders')}>
+          <Card style={styles.statCard}>
+            <IndianRupee color={colors.primary} size={24} />
+            <Typography variant="h3" style={{ marginTop: 8 }}>₹ {stats?.totalRevenue?.toFixed(2) || '0.00'}</Typography>
+            <Typography variant="caption">Total Revenue</Typography>
+          </Card>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.statCardWrap} activeOpacity={0.7} onPress={() => navigation.navigate('Orders')}>
+          <Card style={styles.statCard}>
+            <ShoppingCart color={colors.info} size={24} />
+            <Typography variant="h3" style={{ marginTop: 8 }}>{stats?.totalOrders || 0}</Typography>
+            <Typography variant="caption">Total Orders</Typography>
+          </Card>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.statCardWrap} activeOpacity={0.7} onPress={() => navigation.navigate('Products')}>
+          <Card style={styles.statCard}>
+            <Package color={colors.success} size={24} />
+            <Typography variant="h3" style={{ marginTop: 8 }}>{stats?.totalProducts || 0} ({stats?.lowStockProducts || 0} low)</Typography>
+            <Typography variant="caption">Live Products</Typography>
+          </Card>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.statCardWrap} activeOpacity={0.7} onPress={() => navigation.navigate('Wallet')}>
+          <Card style={styles.statCard}>
+            <Wallet color={colors.warning} size={24} />
+            <Typography variant="h3" style={{ marginTop: 8 }}>₹ {stats?.walletBalance?.toFixed(2) || '0.00'}</Typography>
+            <Typography variant="caption">Wallet Balance</Typography>
+          </Card>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -69,9 +77,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
-  statCard: {
+  statCardWrap: {
     width: '48%',
     marginBottom: 16,
+  },
+  statCard: {
     alignItems: 'center',
     paddingVertical: 24,
   }

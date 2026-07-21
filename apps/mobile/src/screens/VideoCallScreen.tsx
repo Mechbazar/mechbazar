@@ -98,7 +98,7 @@ export default function VideoCallScreen() {
           text: 'Book Visit Now', 
           onPress: () => {
             navigation.goBack();
-            navigation.navigate('Services');
+            navigation.navigate('MainTabs', { screen: 'Services' });
           },
           style: 'default'
         }

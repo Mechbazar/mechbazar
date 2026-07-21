@@ -266,6 +266,13 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       return order;
     });
 
+    notifyUser(
+      user.id,
+      'Order placed',
+      `Your order #${newOrder.id.slice(0, 8)} has been placed successfully.`,
+      { orderId: newOrder.id, status: newOrder.status }
+    );
+
     res.status(201).json({
       message: 'Order placed successfully',
       order: newOrder

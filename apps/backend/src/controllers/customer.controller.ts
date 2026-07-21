@@ -124,7 +124,13 @@ export const createMyAddress = async (req: AuthRequest, res: Response): Promise<
     });
 
     res.status(201).json(address);
-  } catch (error) {
+  } catch (error: any) {
+    // P2003 here means the token's userId has no matching User row -- a stale
+    // session left over from a DB reseed, not a real server error.
+    if (error?.code === 'P2003') {
+      res.status(401).json({ error: 'Session expired, please log in again' });
+      return;
+    }
     console.error('Error creating address:', error);
     res.status(500).json({ error: 'Failed to create address' });
   }

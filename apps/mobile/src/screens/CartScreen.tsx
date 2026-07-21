@@ -121,7 +121,8 @@ export default function CartScreen() {
 
       if (response.ok) {
         dispatch(clearCart());
-        navigation.navigate('Orders' as never);
+        alert('Order placed successfully!');
+        (navigation as any).navigate('MainTabs', { screen: 'Orders' });
       } else {
         alert(data.error || 'Failed to place order');
       }

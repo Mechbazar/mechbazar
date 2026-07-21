@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Image, Alert, Share, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Image, Alert, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { HeaderCartButton } from '../components/HeaderCartButton';
@@ -150,31 +150,6 @@ export default function OrderHistoryScreen() {
     (navigation as any).navigate('Cart');
   };
 
-  const handleShareInvoice = async (order: any) => {
-    const shortId = order.id.split('-')[0].toUpperCase();
-    const lines = [
-      `MechBazar — Order Invoice`,
-      `Order #${shortId}`,
-      `Date: ${new Date(order.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
-      ``,
-      `Items:`,
-      ...(order.items || []).map((oi: any) => `• ${oi.product?.name || 'Item'} x${oi.quantity} — ₹${oi.price * oi.quantity}`),
-      ``,
-      `Subtotal: ₹${order.totalAmount}`,
-      ...(order.discountAmount ? [`Discount: -₹${order.discountAmount}`] : []),
-      `Delivery: ₹${order.deliveryFee ?? 0}`,
-      `Total: ₹${order.finalAmount}`,
-      ``,
-      ...(order.payment ? [`Payment: ${order.payment.method} (${order.payment.status})`] : []),
-      ...(order.address ? [`Deliver to: ${order.address.line1}, ${order.address.city} ${order.address.pincode}`] : []),
-    ];
-    try {
-      await Share.share({ title: `MechBazar Order #${shortId}`, message: lines.join('\n') });
-    } catch {
-      // user dismissed the share sheet -- nothing to do
-    }
-  };
-
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const handleCancelOrder = (orderId: string) => {
@@ -284,7 +259,7 @@ export default function OrderHistoryScreen() {
           <TouchableOpacity style={styles.outlineBtn} onPress={() => setExpandedOrderId(expanded ? null : item.id)}>
             <Text style={styles.outlineBtnText}>{expanded ? 'Hide Details' : 'View Details'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.outlineBtn} onPress={() => handleShareInvoice(item)}>
+          <TouchableOpacity style={styles.outlineBtn} onPress={() => (navigation as any).navigate('OrderInvoice', { order: item })}>
             <Text style={styles.outlineBtnText}>Invoice</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.outlineBtn} onPress={() => handleBuyAgain(item)}>
