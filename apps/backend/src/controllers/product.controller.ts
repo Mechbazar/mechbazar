@@ -152,7 +152,7 @@ export const getProductById = async (req: Request, res: Response) => {
 
 export const createProduct = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, category, oem, price, mrp, stock, vehicleType, vendorId } = req.body;
+    const { name, category, oem, price, mrp, b2bPrice, lowStockThreshold, stock, vehicleType, vendorId } = req.body;
 
     const vendor = await resolveVendorForWrite(req, vendorId);
     if (!vendor) {
@@ -187,6 +187,8 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
         stock: Number(stock) || 0,
         oemNumber: oem || null,
         vehicleType: resolvedVehicleType,
+        b2bPrice: b2bPrice !== undefined && b2bPrice !== '' ? Number(b2bPrice) : null,
+        ...(lowStockThreshold !== undefined && lowStockThreshold !== '' && { lowStockThreshold: Number(lowStockThreshold) }),
       },
     });
 
@@ -286,7 +288,7 @@ export const bulkCreateProducts = async (req: AuthRequest, res: Response): Promi
 export const updateProduct = async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
-    const { name, category, oemNumber, partNumber, price, mrp, stock, status, images, vehicleType } = req.body;
+    const { name, category, oemNumber, partNumber, price, mrp, b2bPrice, lowStockThreshold, stock, status, images, vehicleType } = req.body;
 
     // A category rename/reassignment must resolve against the *new* vehicleType
     // if one was also provided in this same request, since Category is unique
@@ -315,6 +317,11 @@ export const updateProduct = async (req: Request, res: Response) => {
         mrp: mrp ? Number(mrp) : undefined,
         stock: stock !== undefined ? Number(stock) : undefined,
         status,
+        // Empty string means the admin cleared the field in the UI -- persist that as
+        // "no B2B price" rather than leaving the previous value in place. Undefined
+        // (field absent from the request) means don't touch it.
+        b2bPrice: b2bPrice !== undefined ? (b2bPrice === '' ? null : Number(b2bPrice)) : undefined,
+        lowStockThreshold: lowStockThreshold !== undefined && lowStockThreshold !== '' ? Number(lowStockThreshold) : undefined,
         ...(images && { images }),
         ...(vehicleType !== undefined && { vehicleType: normalizeVehicleType(vehicleType) }),
         ...categoryData

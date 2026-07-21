@@ -179,7 +179,7 @@ export default function Products() {
       p.vendor?.storeName?.toLowerCase().includes(searchQuery.toLowerCase());
       
     if (statusFilter && statusFilter === 'PENDING') return matchesSearch && p.status === 'PENDING';
-    if (statusFilter && statusFilter === 'LOW_STOCK') return matchesSearch && p.stock < 50;
+    if (statusFilter && statusFilter === 'LOW_STOCK') return matchesSearch && p.stock < (p.lowStockThreshold || 10);
     return matchesSearch;
   });
 
@@ -238,7 +238,7 @@ export default function Products() {
           onClick={() => setStatusFilter('LOW_STOCK')}
         >
           <p className="text-neutral-400 text-sm font-medium">Low Stock Alerts</p>
-          <p className="text-3xl font-bold text-danger-500 mt-2">{products.filter(p => p.stock < 50).length}</p>
+          <p className="text-3xl font-bold text-danger-500 mt-2">{products.filter(p => p.stock < (p.lowStockThreshold || 10)).length}</p>
         </Card>
       </div>
 
@@ -292,6 +292,9 @@ export default function Products() {
                   <td className="p-5">
                     <div className="text-neutral-100 font-bold">₹{p.price}</div>
                     <div className="text-neutral-400 text-xs line-through">₹{p.mrp}</div>
+                    {p.b2bPrice != null && (
+                      <div className="text-primary-500 text-xs font-semibold mt-0.5">B2B: ₹{p.b2bPrice}</div>
+                    )}
                   </td>
                   <td className="p-5">
                     <Badge variant={p.stock > (p.lowStockThreshold || 10) ? 'success' : 'danger'} className="!rounded-full">

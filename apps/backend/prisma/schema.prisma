@@ -415,6 +415,8 @@ model Product {
   status      String   @default("APPROVED") // PENDING, APPROVED, REJECTED
   vehicleType        VehicleType  @default(CAR)
   discountPrice      Float?
+  b2bPrice           Float?
+  lowStockThreshold  Int      @default(10)
   isFeatured         Boolean  @default(false)
   isDeal             Boolean  @default(false)
   salesCount         Int      @default(0)

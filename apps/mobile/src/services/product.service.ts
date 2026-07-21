@@ -181,7 +181,7 @@ export const mapBackendProduct = (p: any, opts?: { vehicleType?: VehicleType; ca
     isB2B: p.type === 'B2B',
     moq: p.moq || 1,
     category: p.category?.name || opts?.categoryFallback || 'Unknown',
-    stockStatus: p.stock > 0 ? (p.stock > 10 ? 'In Stock' : 'Limited Stock') : 'Out of Stock',
+    stockStatus: p.stock > 0 ? (p.stock > (p.lowStockThreshold ?? 10) ? 'In Stock' : 'Limited Stock') : 'Out of Stock',
     rating: 4.5,
     reviewsCount: p.reviews?.length || 0,
     vehicleType: opts?.vehicleType ?? (p.vehicleType === 'BIKE' ? VehicleType.BIKE : VehicleType.CAR),

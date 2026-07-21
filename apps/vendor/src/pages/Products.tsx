@@ -9,7 +9,7 @@ import {
 import { Button, Badge, Dialog, Input, Loader } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
 
-const emptyForm = { name: '', description: '', mrp: '', price: '', stock: '', categoryId: '', brandId: '', oemNumber: '', partNumber: '' };
+const emptyForm = { name: '', description: '', mrp: '', price: '', b2bPrice: '', stock: '', lowStockThreshold: '10', categoryId: '', brandId: '', oemNumber: '', partNumber: '' };
 
 export default function Products() {
   const { token } = useSelector((state: RootState) => state.auth);
@@ -52,7 +52,7 @@ export default function Products() {
   const openAdd = () => { setEditingProduct(null); setFormData({ ...emptyForm }); setShowAddModal(true); };
   const openEdit = (p: any) => {
     setEditingProduct(p);
-    setFormData({ name: p.name, description: p.description || '', mrp: p.mrp, price: p.price, stock: p.stock, categoryId: p.categoryId || '', brandId: p.brandId || '', oemNumber: p.oemNumber || '', partNumber: p.partNumber || '' });
+    setFormData({ name: p.name, description: p.description || '', mrp: p.mrp, price: p.price, b2bPrice: p.b2bPrice?.toString() || '', stock: p.stock, lowStockThreshold: p.lowStockThreshold?.toString() || '10', categoryId: p.categoryId || '', brandId: p.brandId || '', oemNumber: p.oemNumber || '', partNumber: p.partNumber || '' });
     setShowAddModal(true);
   };
 
@@ -193,9 +193,12 @@ export default function Products() {
                   <td className="p-4">
                     <div className="text-sm font-bold text-white">₹{Number(product.price).toLocaleString('en-IN')}</div>
                     <div className="text-xs text-gray-400 line-through">MRP: ₹{Number(product.mrp).toLocaleString('en-IN')}</div>
+                    {product.b2bPrice != null && (
+                      <div className="text-xs text-brand-secondary font-semibold mt-0.5">B2B: ₹{Number(product.b2bPrice).toLocaleString('en-IN')}</div>
+                    )}
                   </td>
                   <td className="p-4">
-                    <span className={`font-bold text-sm ${product.stock > 10 ? 'text-green-400' : product.stock > 0 ? 'text-yellow-400' : 'text-red-400'}`}>
+                    <span className={`font-bold text-sm ${product.stock > (product.lowStockThreshold ?? 10) ? 'text-green-400' : product.stock > 0 ? 'text-yellow-400' : 'text-red-400'}`}>
                       {product.stock} units
                     </span>
                   </td>
@@ -226,6 +229,10 @@ export default function Products() {
               <div className="grid grid-cols-2 gap-4">
                 <Input label="MRP (₹)" type="number" min="0" required value={formData.mrp} onChange={(e) => setFormData({...formData, mrp: e.target.value})} />
                 <Input label="Selling Price (₹)" type="number" min="0" required value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="B2B Wholesale Price (₹)" type="number" min="0" value={formData.b2bPrice} onChange={(e) => setFormData({...formData, b2bPrice: e.target.value})} placeholder="Optional" />
+                <Input label="Low Stock Threshold" type="number" min="0" value={formData.lowStockThreshold} onChange={(e) => setFormData({...formData, lowStockThreshold: e.target.value})} />
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <Input label="Stock Qty" type="number" min="0" required value={formData.stock} onChange={(e) => setFormData({...formData, stock: e.target.value})} />

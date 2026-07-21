@@ -243,7 +243,7 @@ export const addMyProduct = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const { name, description, mrp, price, stock, categoryId, brandId, oemNumber, partNumber, images } = req.body;
+    const { name, description, mrp, price, b2bPrice, lowStockThreshold, stock, categoryId, brandId, oemNumber, partNumber, images } = req.body;
 
     if (!categoryId || !brandId) {
       res.status(400).json({ error: 'Category and Brand are required fields' });
@@ -276,6 +276,8 @@ export const addMyProduct = async (req: Request, res: Response): Promise<void> =
         images: Array.isArray(images) ? images : [],
         vehicleType: category.vehicleType,
         status: 'APPROVED', // No admin approval required
+        b2bPrice: b2bPrice !== undefined && b2bPrice !== '' ? Number(b2bPrice) : null,
+        ...(lowStockThreshold !== undefined && lowStockThreshold !== '' && { lowStockThreshold: Number(lowStockThreshold) }),
       }
     });
 
@@ -286,7 +288,11 @@ export const addMyProduct = async (req: Request, res: Response): Promise<void> =
         data: {
           productId: newProduct.id,
           warehouseId: mainWarehouse.id,
-          availableStock: Number(stock)
+          availableStock: Number(stock),
+          // Seed the warehouse row's own reorder alert from the product-level
+          // threshold so the two don't immediately disagree (defaults to the
+          // Product's own default of 10 when the vendor didn't set one).
+          reorderLevel: newProduct.lowStockThreshold,
         }
       });
       
@@ -724,8 +730,14 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
     const liveProducts = await prisma.product.count({ where: { vendorId: vendor.id, status: 'APPROVED' } });
     const pendingProducts = await prisma.product.count({ where: { vendorId: vendor.id, status: 'PENDING' } });
 
-    // Low stock (under 10 units)
-    const lowStockProducts = await prisma.product.count({ where: { vendorId: vendor.id, stock: { lt: 10 } } });
+    // Low stock -- compares each product's stock against its OWN threshold, so
+    // this can't be expressed as a single Prisma `where` (no field-to-field
+    // comparison support); fetch the two columns and count in JS instead.
+    const stockLevels = await prisma.product.findMany({
+      where: { vendorId: vendor.id },
+      select: { stock: true, lowStockThreshold: true },
+    });
+    const lowStockProducts = stockLevels.filter(p => p.stock < p.lowStockThreshold).length;
 
     // Orders for this vendor
     const orders = await prisma.order.findMany({
@@ -792,7 +804,7 @@ export const updateMyProduct = async (req: Request, res: Response): Promise<void
   try {
     const userId = (req as any).user.userId;
     const id = String(req.params.id);
-    const { name, description, mrp, price, stock, oemNumber, partNumber } = req.body;
+    const { name, description, mrp, price, b2bPrice, lowStockThreshold, stock, oemNumber, partNumber } = req.body;
 
     const vendor = await prisma.vendor.findUnique({ where: { userId } });
     if (!vendor) { res.status(404).json({ error: 'Vendor not found' }); return; }
@@ -812,6 +824,8 @@ export const updateMyProduct = async (req: Request, res: Response): Promise<void
         oemNumber,
         partNumber,
         status: 'APPROVED', // no approval needed from admin side
+        b2bPrice: b2bPrice !== undefined ? (b2bPrice === '' ? null : Number(b2bPrice)) : undefined,
+        lowStockThreshold: lowStockThreshold !== undefined && lowStockThreshold !== '' ? Number(lowStockThreshold) : undefined,
       }
     });
 

@@ -100,7 +100,7 @@ export default function Dashboard() {
 
       {(stats?.lowStockProducts ?? 0) > 0 && (
         <Alert type="warning" title="Low Stock Alert" className="!rounded-3xl !items-center">
-          <p className="text-xs">{stats?.lowStockProducts} product(s) have less than 10 units in stock. Update inventory to avoid stockouts.</p>
+          <p className="text-xs">{stats?.lowStockProducts} product(s) are below their low-stock threshold. Update inventory to avoid stockouts.</p>
           <Link to="/inventory" className="inline-block mt-2 text-xs bg-warning-500/20 hover:bg-warning-500/30 text-warning-300 px-3 py-1.5 rounded-2xl font-semibold transition-colors whitespace-nowrap">View Inventory</Link>
         </Alert>
       )}

@@ -147,7 +147,9 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
         cartVehicleTypes.add(product.vehicleType);
 
         const retailPrice = product.price;
-        const b2bPrice = Math.floor(product.price * 0.9);
+        // Prefer the vendor/admin-set B2B price; fall back to the old flat
+        // 10%-off heuristic only for products that haven't had one set.
+        const b2bPrice = product.b2bPrice ?? Math.floor(product.price * 0.9);
         const priceToUse = isB2B ? b2bPrice : retailPrice;
         subtotal += priceToUse * quantity;
 
