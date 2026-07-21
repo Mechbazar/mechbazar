@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@source "../../../packages/shared/src";
 @config "../../../packages/shared/src/tailwind.config.ts";
 
 @theme {
