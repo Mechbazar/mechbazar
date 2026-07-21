@@ -33,7 +33,14 @@ export default function Products() {
 
   const fetchProducts = async () => {
     try {
-      const res = await axios.get(`${API_URL}/products`);
+      // This page has no pagination UI -- search, the stat cards (Total/Pending/Low
+      // Stock), and the table all assume `products` holds the entire catalog. The
+      // backend's default limit=20 (meant for the customer-facing paginated
+      // listing) was silently truncating everything here once the catalog grew
+      // past 20 items, e.g. "Total Products" undercounting and newly added
+      // products not being reflected in the stat cards even though they showed
+      // up in the table itself. Request a high limit to get the full catalog.
+      const res = await axios.get(`${API_URL}/products?limit=1000`);
       setProducts(res.data);
     } catch (err) {
       console.error(err);
