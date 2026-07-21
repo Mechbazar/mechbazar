@@ -152,7 +152,7 @@ export const getProductById = async (req: Request, res: Response) => {
 
 export const createProduct = async (req: AuthRequest, res: Response) => {
   try {
-    const { name, category, oem, price, b2bPrice, stock, vehicleType, vendorId } = req.body;
+    const { name, category, oem, price, mrp, stock, vehicleType, vendorId } = req.body;
 
     const vendor = await resolveVendorForWrite(req, vendorId);
     if (!vendor) {
@@ -183,7 +183,7 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
         name,
         description: 'New product',
         price: Number(price) || 0,
-        mrp: Number(price) || 0,
+        mrp: Number(mrp) || Number(price) || 0,
         stock: Number(stock) || 0,
         oemNumber: oem || null,
         vehicleType: resolvedVehicleType,
