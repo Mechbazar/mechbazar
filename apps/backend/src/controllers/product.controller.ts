@@ -102,6 +102,13 @@ export const getProducts = async (req: Request, res: Response) => {
         category: true,
         brand: true,
       },
+      // Without an explicit order, Postgres doesn't guarantee newest-first (or
+      // any stable order at all) -- a vendor's freshly added product could land
+      // anywhere in the result set. Since callers like the mobile Home screen's
+      // "trending" list just take the first N results (`getTrendingProducts`
+      // slices to 5), an unordered query meant new products routinely never
+      // appeared within that window even though they were correctly in the DB.
+      orderBy: { createdAt: 'desc' },
       skip: (page - 1) * limit,
       take: limit,
     });
