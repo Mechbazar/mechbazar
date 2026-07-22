@@ -7,6 +7,35 @@ import { API_BASE_URL, SERVER_ORIGIN } from './api';
 // the backend for per request, independent of the UI's own page size.
 const FETCH_BATCH_SIZE = 200;
 
+// Every fetch function below swallows failures and returns an empty
+// array/undefined by default -- that's deliberate existing behavior mobile
+// depends on for resilience (a flaky network shouldn't blank-crash the app).
+// The desktop catalog's error states (Stage 4) need to tell "genuinely no
+// results" apart from "the request actually failed" though, so functions
+// that support it take an optional trailing { rethrow, signal } argument:
+// omitted (every existing caller), behavior is byte-identical to before;
+// passed with rethrow:true, the function throws an ApiError instead of
+// swallowing, and `signal` (an AbortController's signal) enables real
+// caller-driven request timeouts.
+export class ApiError extends Error {
+  status?: number;
+  kind: 'network' | 'timeout' | 'http';
+  constructor(message: string, opts: { status?: number; kind: ApiError['kind'] }) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = opts.status;
+    this.kind = opts.kind;
+  }
+}
+
+interface FetchOpts { rethrow?: boolean; signal?: AbortSignal }
+
+function toApiError(err: any): ApiError {
+  if (err instanceof ApiError) return err;
+  if (err?.name === 'AbortError') return new ApiError('Request timed out', { kind: 'timeout' });
+  return new ApiError(err?.message || 'Network request failed', { kind: 'network' });
+}
+
 // Dynamic Categories will be fetched from the backend API.
 // We keep the arrays empty initially and fetch them in HomeScreen.
 export let CAR_CATEGORIES: Category[] = [];
@@ -50,7 +79,7 @@ export const CAR_MODELS: VehicleModel[] = [
   { id: 'cm5', brandId: 'cb6', name: 'Swift' },
 ];
 
-export const fetchCategories = async (type: VehicleType): Promise<Category[]> => {
+export const fetchCategories = async (type: VehicleType, opts?: FetchOpts): Promise<Category[]> => {
   const fallbackCategories = getFallbackCategories(type);
   const urls = [
     `${API_BASE_URL}/categories?vehicleType=${encodeURIComponent(type)}`,
@@ -58,9 +87,17 @@ export const fetchCategories = async (type: VehicleType): Promise<Category[]> =>
     `http://localhost:5001/api/categories?vehicleType=${encodeURIComponent(type)}`,
   ];
 
+  // Only counts as a real outage (worth rethrow:true throwing instead of
+  // falling back) if every URL threw -- a plain !res.ok/empty response still
+  // falls back to defaults exactly as before, that's normal degraded
+  // operation, not an error state.
+  let allThrew = true;
+  let lastErr: any;
+
   for (const url of urls) {
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { signal: opts?.signal });
+      allThrew = false;
       if (!res.ok) continue;
       const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) {
@@ -80,21 +117,27 @@ export const fetchCategories = async (type: VehicleType): Promise<Category[]> =>
 
       return categories.length > 0 ? categories : fallbackCategories;
     } catch (err) {
+      lastErr = err;
       console.warn(`Category fetch failed for ${url}`, err);
     }
   }
+
+  if (opts?.rethrow && allThrew) throw toApiError(lastErr);
 
   console.warn(`Using fallback categories for ${type}`);
   return fallbackCategories;
 };
 
-export const fetchBanners = async (type: VehicleType): Promise<any[]> => {
+export const fetchBanners = async (type: VehicleType, opts?: FetchOpts): Promise<any[]> => {
   try {
     // /banners (GET /) is the admin-only listing (authenticate + authorize(admins)).
     // The customer app has no admin token, so it must use the dedicated public
     // endpoint instead, which also does the isActive + vehicleType filtering.
-    const res = await fetch(`${API_BASE_URL}/banners/public?vehicle=${type}`);
-    if (!res.ok) return [];
+    const res = await fetch(`${API_BASE_URL}/banners/public?vehicle=${type}`, { signal: opts?.signal });
+    if (!res.ok) {
+      if (opts?.rethrow) throw new ApiError('Failed to fetch banners', { status: res.status, kind: 'http' });
+      return [];
+    }
     const data = await res.json();
     return data.map((b: any) => {
       let imageUrl = b.image as string | undefined;
@@ -112,6 +155,7 @@ export const fetchBanners = async (type: VehicleType): Promise<any[]> => {
       };
     });
   } catch (err) {
+    if (opts?.rethrow) throw toApiError(err);
     console.error(err);
     return [];
   }
@@ -239,14 +283,15 @@ export const mapBackendProduct = (p: any, opts?: { vehicleType?: VehicleType; ca
 
 export const getCategoryProducts = async (
   vehicleType: VehicleType,
-  categoryName: string, 
+  categoryName: string,
   searchQuery: string = '',
   brandId?: string,
   modelId?: string,
   year?: string,
   filters?: FilterOptions,
   page: number = 1,
-  limit: number = 10
+  limit: number = 10,
+  opts?: FetchOpts
 ): Promise<{ products: Product[], hasMore: boolean }> => {
   try {
     let url = `${API_BASE_URL}/products?`;
@@ -279,9 +324,9 @@ export const getCategoryProducts = async (
     // reaching real additional products.
     url += `limit=${FETCH_BATCH_SIZE}&`;
 
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: opts?.signal });
     if (!response.ok) {
-      throw new Error('Failed to fetch products');
+      throw new ApiError('Failed to fetch products', { status: response.status, kind: 'http' });
     }
     const data = await response.json();
 
@@ -340,26 +385,28 @@ export const getCategoryProducts = async (
       hasMore: startIndex + limit < results.length
     };
   } catch (err) {
+    if (opts?.rethrow) throw toApiError(err);
     console.error(err);
     // Fallback to empty if api fails for any reason
     return { products: [], hasMore: false };
   }
 };
 
-export const getTrendingProducts = async (vehicleType: VehicleType, limit: number = 5): Promise<Product[]> => {
+export const getTrendingProducts = async (vehicleType: VehicleType, limit: number = 5, opts?: FetchOpts): Promise<Product[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/products?vehicleType=${encodeURIComponent(vehicleType)}`);
+    const response = await fetch(`${API_BASE_URL}/products?vehicleType=${encodeURIComponent(vehicleType)}`, { signal: opts?.signal });
     if (!response.ok) {
-      throw new Error('Failed to fetch trending products');
+      throw new ApiError('Failed to fetch trending products', { status: response.status, kind: 'http' });
     }
     const data = await response.json();
-    
+
     // Map backend products to mobile frontend format
     let results: Product[] = data.map((p: any) => mapBackendProduct(p));
 
     // Simple randomization or just taking the first N as 'trending' for now
     return results.slice(0, limit);
   } catch (err) {
+    if (opts?.rethrow) throw toApiError(err);
     console.error(err);
     return [];
   }

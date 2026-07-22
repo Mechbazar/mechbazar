@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, TextInput, ActivityIndicator, Alert, StyleSheet } from 'react-native';
+import { View, Text, TextInput, ScrollView, Alert, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation, useRoute, NavigationProp, RouteProp } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
@@ -19,6 +19,11 @@ import SortBar from './SortBar';
 import ProductCardDesktop from './ProductCardDesktop';
 import QuickViewModal from './QuickViewModal';
 import Pagination from './Pagination';
+import { ProductGridSkeleton, SkeletonSection } from '../states/Skeletons';
+import ErrorState, { ErrorKind, classifyError } from '../states/ErrorState';
+import EmptyState from '../states/EmptyState';
+
+const FETCH_TIMEOUT_MS = 15000;
 
 type ParamList = {
   CategoryProducts: {
@@ -78,6 +83,8 @@ export default function CategoryProductsDesktop() {
 
   const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<ErrorKind | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
   const [page, setPage] = useState(1);
   const [categories, setCategories] = useState<Category[]>([]);
   const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
@@ -102,8 +109,11 @@ export default function CategoryProductsDesktop() {
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
     setPage(1);
-    const timer = setTimeout(() => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    const debounce = setTimeout(() => {
       getCategoryProducts(
         vehicleType,
         categoryName === 'Search Results' ? '' : categoryName,
@@ -114,10 +124,14 @@ export default function CategoryProductsDesktop() {
         undefined,
         1,
         FETCH_LIMIT,
-      ).then(res => setRawProducts(res.products)).finally(() => setLoading(false));
+        { rethrow: true, signal: controller.signal },
+      )
+        .then(res => setRawProducts(res.products))
+        .catch(err => setError(classifyError(err)))
+        .finally(() => { clearTimeout(timeoutId); setLoading(false); });
     }, 300);
-    return () => clearTimeout(timer);
-  }, [vehicleType, categoryName, searchQuery, vehicleBrandName, vehicleModelName]);
+    return () => { clearTimeout(debounce); clearTimeout(timeoutId); controller.abort(); };
+  }, [vehicleType, categoryName, searchQuery, vehicleBrandName, vehicleModelName, retryToken]);
 
   const availableBrands = useMemo(
     () => Array.from(new Set(rawProducts.map(p => p.brand))).sort(),
@@ -126,6 +140,7 @@ export default function CategoryProductsDesktop() {
   const filteredSorted = useMemo(() => applyFiltersAndSort(rawProducts, filters), [rawProducts, filters]);
   const pageItems = filteredSorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const hasMore = page * PAGE_SIZE < filteredSorted.length;
+  const hasActiveFilters = filters.brands.length > 0 || filters.inStockOnly || filters.priceMin != null || filters.priceMax != null || filters.minRating != null;
 
   const getQty = (id: string) => cartItems.find(i => i.id === id)?.qty ?? 0;
 
@@ -152,8 +167,8 @@ export default function CategoryProductsDesktop() {
   };
 
   return (
-    <View style={styles.page}>
-      <Container style={styles.content}>
+    <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <Container>
         <Breadcrumb categoryName={categoryName} />
 
         <View style={styles.searchRow}>
@@ -191,15 +206,20 @@ export default function CategoryProductsDesktop() {
             <SortBar sortBy={filters.sortBy} onChange={(sortBy) => setFilters(f => ({ ...f, sortBy }))} resultCount={filteredSorted.length} />
 
             {loading ? (
-              <View style={styles.loader}>
-                <ActivityIndicator size="large" color={colors.primary} />
-              </View>
+              <SkeletonSection label={`Loading ${categoryName}`}>
+                <ProductGridSkeleton count={PAGE_SIZE} />
+              </SkeletonSection>
+            ) : error ? (
+              <ErrorState kind={error} onRetry={() => setRetryToken(t => t + 1)} compact />
             ) : pageItems.length === 0 ? (
-              <View style={styles.empty}>
-                <Ionicons name="search-outline" size={40} color={colors.textMuted} />
-                <Text style={styles.emptyTitle}>No products found</Text>
-                <Text style={styles.emptySub}>Try adjusting your filters, search, or vehicle selection.</Text>
-              </View>
+              <EmptyState
+                icon="search-outline"
+                title="No products found"
+                message="Try adjusting your filters, search, or vehicle selection."
+                actionLabel={hasActiveFilters ? 'Clear Filters' : undefined}
+                onAction={hasActiveFilters ? () => setFilters({ sortBy: filters.sortBy, brands: [], inStockOnly: false }) : undefined}
+                compact
+              />
             ) : (
               <>
                 <View style={styles.grid}>
@@ -236,13 +256,13 @@ export default function CategoryProductsDesktop() {
         onAddToCart={handleQuickAdd}
         onQtyChange={handleQtyChange}
       />
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: colors.pageBg },
-  content: { paddingTop: spacing.md, flex: 1 },
+  content: { paddingTop: spacing.md },
   searchRow: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white,
     borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderLight,
@@ -252,8 +272,4 @@ const styles = StyleSheet.create({
   layout: { flexDirection: 'row', gap: spacing.xl, alignItems: 'flex-start' },
   main: { flex: 1, minWidth: 0 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-  loader: { paddingVertical: 100, alignItems: 'center' },
-  empty: { paddingVertical: 100, alignItems: 'center', gap: 8 },
-  emptyTitle: { fontSize: 16, fontWeight: '700', color: colors.textDark, marginTop: 8 },
-  emptySub: { fontSize: 13, color: colors.textMuted },
 });

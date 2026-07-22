@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, Alert, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, Alert, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
@@ -18,6 +18,11 @@ import TrustBadges from './TrustBadges';
 import Testimonials from './Testimonials';
 import DownloadAppSection from './DownloadAppSection';
 import DesktopFooter from '../footer/DesktopFooter';
+import { HeroSkeleton, CategoryGridSkeleton, ProductGridSkeleton, SectionTitleSkeleton, SkeletonSection } from '../states/Skeletons';
+import ErrorState, { ErrorKind, classifyError } from '../states/ErrorState';
+import EmptyState from '../states/EmptyState';
+
+const FETCH_TIMEOUT_MS = 15000;
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return <Text style={styles.sectionTitle}>{children}</Text>;
@@ -38,9 +43,11 @@ export default function HomeScreenDesktop() {
   const [trending, setTrending] = useState<Product[]>([]);
   const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<ErrorKind | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
 
   // Tells DesktopAppShell.web.tsx to render without its own boxed content
-  // area/footer while Home is focused -- see desktopHomeFocusStore.ts.
+  // area/footer while Home is focused -- see desktopFullPageScreenStore.ts.
   useFocusEffect(
     useCallback(() => {
       setDesktopFullPageScreenActive(true);
@@ -49,13 +56,29 @@ export default function HomeScreenDesktop() {
   );
 
   useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     setLoading(true);
+    setError(null);
+
     Promise.all([
-      fetchCategories(vehicleType).then(setCategories),
-      getTrendingProducts(vehicleType).then(setTrending),
-      fetchBanners(vehicleType).then(setBanners),
-    ]).finally(() => setLoading(false));
-  }, [vehicleType]);
+      fetchCategories(vehicleType, { rethrow: true, signal: controller.signal }),
+      getTrendingProducts(vehicleType, 8, { rethrow: true, signal: controller.signal }),
+      fetchBanners(vehicleType, { rethrow: true, signal: controller.signal }),
+    ])
+      .then(([cats, trend, banns]) => {
+        setCategories(cats);
+        setTrending(trend);
+        setBanners(banns);
+      })
+      .catch((err) => setError(classifyError(err)))
+      .finally(() => {
+        clearTimeout(timeoutId);
+        setLoading(false);
+      });
+
+    return () => { clearTimeout(timeoutId); controller.abort(); };
+  }, [vehicleType, retryToken]);
 
   useEffect(() => {
     if (!token) { setWishlist({}); return; }
@@ -86,11 +109,53 @@ export default function HomeScreenDesktop() {
     [trending],
   );
 
+  const isEmpty = !loading && !error && categories.length === 0 && trending.length === 0 && banners.length === 0;
+
   if (loading) {
     return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Container style={styles.section}>
+          <SkeletonSection label="Loading homepage content">
+            <HeroSkeleton />
+          </SkeletonSection>
+        </Container>
+        <Container style={styles.section}>
+          <SectionTitleSkeleton />
+          <CategoryGridSkeleton />
+        </Container>
+        <Container style={styles.section}>
+          <SectionTitleSkeleton />
+          <ProductGridSkeleton />
+        </Container>
+      </ScrollView>
+    );
+  }
+
+  if (error) {
+    return (
+      <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Container>
+          <ErrorState kind={error} onRetry={() => setRetryToken(t => t + 1)} />
+        </Container>
+        <DesktopFooter />
+      </ScrollView>
+    );
+  }
+
+  if (isEmpty) {
+    return (
+      <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Container>
+          <EmptyState
+            icon="storefront-outline"
+            title="Nothing to show yet"
+            message="We couldn't find any homepage content right now. Please check back shortly."
+            actionLabel="Refresh"
+            onAction={() => setRetryToken(t => t + 1)}
+          />
+        </Container>
+        <DesktopFooter />
+      </ScrollView>
     );
   }
 
@@ -161,5 +226,4 @@ const styles = StyleSheet.create({
   content: { paddingTop: spacing.xl },
   section: { marginBottom: spacing.xxl },
   sectionTitle: { fontSize: 22, fontWeight: '700', color: colors.textDark, marginBottom: spacing.md },
-  loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });
