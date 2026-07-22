@@ -1,8 +1,8 @@
-// Used for native builds only -- HomeScreen.web.tsx shadows this file on web
-// (desktop width renders HomeScreenDesktop.tsx, narrower web widths render
-// HomeScreenMobile.tsx, a deliberate byte-for-byte duplicate of this file's
-// original content kept in sync manually). If you change native/mobile Home
-// behavior here, mirror the change in HomeScreenMobile.tsx.
+// Web-only, used below the desktop breakpoint (see HomeScreen.web.tsx).
+// Deliberate byte-for-byte duplicate of HomeScreen.tsx's original content --
+// kept as a separate file (rather than extracting shared hooks) so this
+// screen's native behavior can never be affected by desktop web changes.
+// Mirror any native/mobile Home behavior change here too.
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
