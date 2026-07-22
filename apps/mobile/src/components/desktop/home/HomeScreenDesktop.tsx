@@ -7,7 +7,7 @@ import { fetchCategories, getTrendingProducts, fetchBanners } from '../../../ser
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../../../services/wishlist.service';
 import { Category, Product } from '../../../types/product';
 import { colors, spacing } from '../../../theme/tokens';
-import { setDesktopHomeFocused } from '../../../navigation/desktopHomeFocusStore';
+import { setDesktopFullPageScreenActive } from '../../../navigation/desktopFullPageScreenStore';
 import Container from '../shared/Container';
 import HeroCarousel from './HeroCarousel';
 import CategoryGridDesktop from './CategoryGridDesktop';
@@ -43,8 +43,8 @@ export default function HomeScreenDesktop() {
   // area/footer while Home is focused -- see desktopHomeFocusStore.ts.
   useFocusEffect(
     useCallback(() => {
-      setDesktopHomeFocused(true);
-      return () => setDesktopHomeFocused(false);
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
     }, []),
   );
 

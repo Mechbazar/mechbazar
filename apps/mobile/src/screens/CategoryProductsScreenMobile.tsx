@@ -1,8 +1,7 @@
-// Used for native builds only -- CategoryProductsScreen.web.tsx shadows this
-// file on web (desktop width renders CategoryProductsDesktop.tsx, narrower
-// web widths render CategoryProductsScreenMobile.tsx, a deliberate
-// byte-for-byte duplicate of this file's original content). Mirror any
-// native/mobile behavior change here in CategoryProductsScreenMobile.tsx too.
+// Web-only, used below the desktop breakpoint (see CategoryProductsScreen.web.tsx).
+// Deliberate byte-for-byte duplicate of CategoryProductsScreen.tsx's original
+// content -- kept separate so this screen's native/mobile-web behavior can
+// never be affected by desktop catalog changes. Mirror behavior changes here.
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 

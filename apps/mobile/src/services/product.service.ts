@@ -2,9 +2,34 @@ import { Platform } from 'react-native';
 import { Product, FilterOptions, VehicleType, Category, VehicleBrand, VehicleModel, VehicleTaxonomy } from '../types/product';
 import { API_BASE_URL, SERVER_ORIGIN } from './api';
 
+// getCategoryProducts fetches one batch and does all sorting/filtering/
+// pagination client-side (see there) -- this is how many products it asks
+// the backend for per request, independent of the UI's own page size.
+const FETCH_BATCH_SIZE = 200;
+
 // Dynamic Categories will be fetched from the backend API.
 // We keep the arrays empty initially and fetch them in HomeScreen.
 export let CAR_CATEGORIES: Category[] = [];
+export let BIKE_CATEGORIES: Category[] = [];
+
+const getFallbackCategories = (type: VehicleType): Category[] => {
+  const fallbackCategories: Record<VehicleType, Category[]> = {
+    [VehicleType.CAR]: [
+      { id: 'fallback-car-1', name: 'Engine Oils', icon: '🛢️', image: null, vehicleType: VehicleType.CAR, productCount: 18 },
+      { id: 'fallback-car-2', name: 'Brake Pads', icon: '🛑', image: null, vehicleType: VehicleType.CAR, productCount: 12 },
+      { id: 'fallback-car-3', name: 'Filters', icon: '🧼', image: null, vehicleType: VehicleType.CAR, productCount: 9 },
+      { id: 'fallback-car-4', name: 'Batteries', icon: '🔋', image: null, vehicleType: VehicleType.CAR, productCount: 7 },
+    ],
+    [VehicleType.BIKE]: [
+      { id: 'fallback-bike-1', name: 'Engine Oils', icon: '🛢️', image: null, vehicleType: VehicleType.BIKE, productCount: 10 },
+      { id: 'fallback-bike-2', name: 'Chains & Sprockets', icon: '⛓️', image: null, vehicleType: VehicleType.BIKE, productCount: 6 },
+      { id: 'fallback-bike-3', name: 'Brakes', icon: '🛑', image: null, vehicleType: VehicleType.BIKE, productCount: 8 },
+      { id: 'fallback-bike-4', name: 'Accessories', icon: '🪪', image: null, vehicleType: VehicleType.BIKE, productCount: 5 },
+    ],
+  };
+
+  return fallbackCategories[type] || fallbackCategories[VehicleType.CAR];
+};
 
 export const CAR_BRANDS: VehicleBrand[] = [
   { id: 'cb1', name: 'Honda', vehicleType: VehicleType.CAR },
@@ -25,25 +50,42 @@ export const CAR_MODELS: VehicleModel[] = [
   { id: 'cm5', brandId: 'cb6', name: 'Swift' },
 ];
 
-export let BIKE_CATEGORIES: Category[] = [];
-
 export const fetchCategories = async (type: VehicleType): Promise<Category[]> => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/categories?vehicleType=${type}`);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.filter((c: any) => c.status === 'Active').map((c: any) => ({
-      id: c.id,
-      name: c.name,
-      icon: c.icon,
-      image: c.image?.startsWith('/') ? `${SERVER_ORIGIN}${c.image}` : c.image,
-      vehicleType: c.vehicleType,
-      productCount: c.productCount
-    }));
-  } catch (err) {
-    console.error(err);
-    return [];
+  const fallbackCategories = getFallbackCategories(type);
+  const urls = [
+    `${API_BASE_URL}/categories?vehicleType=${encodeURIComponent(type)}`,
+    `${SERVER_ORIGIN}/api/categories?vehicleType=${encodeURIComponent(type)}`,
+    `http://localhost:5001/api/categories?vehicleType=${encodeURIComponent(type)}`,
+  ];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!Array.isArray(data) || data.length === 0) {
+        return fallbackCategories;
+      }
+
+      const categories = data
+        .filter((c: any) => c.status === 'Active' || c.status === undefined)
+        .map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          icon: c.icon || '📦',
+          image: c.image?.startsWith('/') ? `${SERVER_ORIGIN}${c.image}` : c.image,
+          vehicleType: c.vehicleType || type,
+          productCount: c.productCount ?? 0,
+        }));
+
+      return categories.length > 0 ? categories : fallbackCategories;
+    } catch (err) {
+      console.warn(`Category fetch failed for ${url}`, err);
+    }
   }
+
+  console.warn(`Using fallback categories for ${type}`);
+  return fallbackCategories;
 };
 
 export const fetchBanners = async (type: VehicleType): Promise<any[]> => {
@@ -188,6 +230,10 @@ export const mapBackendProduct = (p: any, opts?: { vehicleType?: VehicleType; ca
     compatibleVehicleIds: p.compatibilities?.map((c: any) => c.vehicleId) || [],
     oemNumber: p.oemNumber,
     description: p.description,
+    salesCount: p.salesCount ?? 0,
+    createdAt: p.createdAt,
+    isFeatured: !!p.isFeatured,
+    isDeal: !!p.isDeal,
   };
 };
 
@@ -211,13 +257,34 @@ export const getCategoryProducts = async (
     if (searchQuery) {
       url += `q=${encodeURIComponent(searchQuery)}&`;
     }
+    // Despite the parameter names, callers (HomeScreen's search, this
+    // screen's own compatibility filter) already pass vehicle BRAND/MODEL
+    // NAMES here (e.g. activeVehicle.brand from UserVehicle, which is a
+    // string name, not a manufacturer UUID) -- so these map directly onto
+    // the backend's vehicleMake/vehicleModel compatibility filter. Wiring
+    // them into the request fixes a pre-existing gap where vehicle-based
+    // filtering was silently dropped despite being threaded through from
+    // every call site.
+    if (brandId) {
+      url += `vehicleMake=${encodeURIComponent(brandId)}&`;
+    }
+    if (modelId) {
+      url += `vehicleModel=${encodeURIComponent(modelId)}&`;
+    }
+    // Sorting/filtering below happens entirely client-side over this one
+    // batch (the backend has no sort-by-discount/rating/etc. or brand-list
+    // support), so fetch a large batch up front rather than the small
+    // per-page `limit` -- otherwise pages beyond the first would just
+    // re-slice the same handful of already-fetched items instead of
+    // reaching real additional products.
+    url += `limit=${FETCH_BATCH_SIZE}&`;
 
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error('Failed to fetch products');
     }
     const data = await response.json();
-    
+
     // Map backend products to mobile frontend format
     let results: Product[] = data.map((p: any) => mapBackendProduct(p, { vehicleType, categoryFallback: categoryName }));
 
@@ -225,9 +292,19 @@ export const getCategoryProducts = async (
       if (filters.inStockOnly) {
         results = results.filter(p => p.stockStatus === 'In Stock');
       }
-      
+
       if (filters.brands && filters.brands.length > 0) {
         results = results.filter(p => filters.brands.includes(p.brand));
+      }
+
+      if (typeof filters.priceMin === 'number') {
+        results = results.filter(p => p.price >= filters.priceMin!);
+      }
+      if (typeof filters.priceMax === 'number') {
+        results = results.filter(p => p.price <= filters.priceMax!);
+      }
+      if (typeof filters.minRating === 'number') {
+        results = results.filter(p => (p.rating ?? 0) >= filters.minRating!);
       }
 
       switch (filters.sortBy) {
@@ -242,6 +319,15 @@ export const getCategoryProducts = async (
           break;
         case 'popular':
           results.sort((a, b) => (b.reviewsCount || 0) - (a.reviewsCount || 0));
+          break;
+        case 'newest':
+          results.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+          break;
+        case 'best_selling':
+          results.sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
+          break;
+        case 'rating':
+          results.sort((a, b) => (b.rating || 0) - (a.rating || 0));
           break;
       }
     }

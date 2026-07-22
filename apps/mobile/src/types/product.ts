@@ -45,21 +45,33 @@ export interface Product {
   stockStatus: 'In Stock' | 'Out of Stock' | 'Limited Stock';
   rating?: number;
   reviewsCount?: number;
-  
+
   vehicleType: VehicleType;
   // Instead of an array of string descriptions, this should ideally be an array of VehicleTaxonomy IDs.
   // For the mock, we will keep it simple.
-  compatibleVehicleIds: string[]; 
+  compatibleVehicleIds: string[];
   oemNumber?: string;
   specs?: Record<string, string>;
   warranty?: string;
   description?: string;
+  // Real backend fields (Product.salesCount/createdAt/isFeatured/isDeal in
+  // prisma/schema.prisma) -- added for the desktop catalog's Newest/Best
+  // Selling sorts and badges. Optional since older call sites don't set them.
+  salesCount?: number;
+  createdAt?: string;
+  isFeatured?: boolean;
+  isDeal?: boolean;
 }
 
 export interface FilterOptions {
-  sortBy: 'price_low_high' | 'price_high_low' | 'popular' | 'discount';
+  sortBy: 'price_low_high' | 'price_high_low' | 'popular' | 'discount' | 'newest' | 'best_selling' | 'rating';
   brands: string[];
   inStockOnly: boolean;
+  // Desktop catalog additions (Stage 3) -- optional, existing callers
+  // (mobile's FilterSortSheet) don't set them so behavior there is unchanged.
+  priceMin?: number;
+  priceMax?: number;
+  minRating?: number;
 }
 
 export interface Category {
