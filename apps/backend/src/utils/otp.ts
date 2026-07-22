@@ -3,6 +3,12 @@ import prisma from '../config/prisma';
 import crypto from 'crypto';
 
 const isDevOtpBypassAllowed = () => process.env.ALLOW_DEV_OTP_BYPASS === 'true';
+const isPhoneAllowedForBypass = (phone: string) =>
+  (process.env.DEV_OTP_BYPASS_PHONES || '')
+    .split(',')
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .includes(phone);
 const getOtpProvider = () => process.env.OTP_PROVIDER || 'TEST';
 
 const OTP_TTL_SECONDS = 300;
@@ -35,10 +41,10 @@ export const generateAndSendOtp = async (phone: string): Promise<{ otp: string; 
 
   console.log(`
 ========================================
-🔑 LOCAL TESTING OTP GENERATED
-📱 Phone: ${phone}
-🎟️ OTP Code: ${otp}
-⏱️ Expires in: 5 minutes (300s)
+🔑LOCAL TESTING OTP GENERATED
+📱Phone: ${phone}
+🔒OTP Code: ${otp}
+⏰Expires in: 5 minutes (300s)
 ========================================
   `);
 
@@ -56,9 +62,10 @@ export const verifyOtpAndResolvePhone = async (phone: string, otp: string): Prom
     return normalizedPhone;
   }
 
-  // Developer bypass gate
-  if (otp === '123456' && isDevOtpBypassAllowed()) {
-    console.log('⚠️ DEVELOPER BYPASS USED FOR OTP ⚠️');
+  // Developer bypass gate: restricted to an explicit phone allowlist, even when
+  // ALLOW_DEV_OTP_BYPASS=true. Never a blanket bypass for all accounts.
+  if (otp === '123456' && isDevOtpBypassAllowed() && isPhoneAllowedForBypass(normalizedPhone)) {
+    console.log(`⚠️DEVELOPER BYPASS USED FOR OTP (${normalizedPhone})⚠️`);
     return normalizedPhone;
   }
 
