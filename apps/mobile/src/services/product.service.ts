@@ -150,7 +150,7 @@ export const fetchBanners = async (type: VehicleType, opts?: FetchOpts): Promise
         subtitle: b.subtitle,
         offer: b.buttonText || 'Shop Now',
         redirectLink: b.redirectLink || b.link,
-        image: imageUrl ? { uri: imageUrl } : require('../../assets/car_banner.png'),
+        image: imageUrl ? { uri: imageUrl } : require('../../assets/car_banner.jpg'),
         vehicleType: type
       };
     });

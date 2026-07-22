@@ -10,11 +10,11 @@ export default function Breadcrumb({ categoryName }: { categoryName: string }) {
 
   return (
     <View style={styles.row}>
-      <Pressable onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}>
+      <Pressable onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })} accessibilityRole="link">
         <Text style={styles.link}>Home</Text>
       </Pressable>
       <Ionicons name="chevron-forward" size={12} color={colors.textMuted} style={styles.chevron} />
-      <Pressable onPress={() => navigation.navigate('MainTabs', { screen: 'Categories' })}>
+      <Pressable onPress={() => navigation.navigate('MainTabs', { screen: 'Categories' })} accessibilityRole="link">
         <Text style={styles.link}>Categories</Text>
       </Pressable>
       <Ionicons name="chevron-forward" size={12} color={colors.textMuted} style={styles.chevron} />

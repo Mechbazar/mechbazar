@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   column: { minWidth: 160, flexGrow: 1, gap: 10 },
   brandColumn: { flexGrow: 2, minWidth: 260, maxWidth: 320 },
   brand: { color: colors.white, fontSize: 22, fontWeight: '800' },
-  brandTagline: { color: colors.textMuted, fontSize: 13, lineHeight: 20 },
+  brandTagline: { color: colors.mutedOnDark, fontSize: 13, lineHeight: 20 },
   socialRow: { flexDirection: 'row', gap: 10, marginTop: spacing.sm },
   socialIcon: {
     width: 32,
@@ -127,9 +127,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   columnTitle: { color: colors.white, fontSize: 14, fontWeight: '700', marginBottom: 4 },
-  linkText: { color: colors.textMuted, fontSize: 13, marginBottom: 2 },
-  staticText: { color: '#4B5563', fontSize: 13, marginBottom: 2 },
+  linkText: { color: colors.mutedOnDark, fontSize: 13, marginBottom: 2 },
+  staticText: { color: colors.mutedOnDark, fontSize: 13, marginBottom: 2 },
   bottomBar: { borderTopWidth: 1, borderTopColor: colors.steel },
   bottomRow: { paddingVertical: spacing.md, alignItems: 'center' },
-  copyright: { color: colors.textMuted, fontSize: 12 },
+  copyright: { color: colors.mutedOnDark, fontSize: 12 },
 });

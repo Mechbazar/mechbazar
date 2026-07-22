@@ -23,7 +23,13 @@
       "usesCleartextTraffic": true
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "MechBazar - Genuine Auto Parts & Mechanic Services",
+      "shortName": "MechBazar",
+      "description": "Shop genuine car and bike parts online and book trusted mechanic services, delivered to your doorstep.",
+      "lang": "en",
+      "themeColor": "#E23B22",
+      "backgroundColor": "#F3F4F6"
     },
     "plugins": [
       "expo-asset",

@@ -9,7 +9,12 @@
 import { BREAKPOINTS } from '../hooks/useBreakpoint';
 
 export const colors = {
-  primary: '#E23B22',
+  // Nudged one step darker than the original #E23B22 -- that value only
+  // reached a 4.3:1 contrast ratio against white text (buttons/badges use
+  // primary as a solid background with white text throughout), just under
+  // WCAG AA's 4.5:1 minimum. This shade clears it (~4.6:1) while staying
+  // visually indistinguishable from the brand red at a glance.
+  primary: '#DB3820',
   primaryDark: '#C6301B',
   darkInk: '#161B21',
   steel: '#242C35',
@@ -18,6 +23,11 @@ export const colors = {
   borderLight: '#E3E6EA',
   textDark: '#161B21',
   textMuted: '#6B7480',
+  // For muted/secondary text on dark backgrounds (footer) -- textMuted
+  // itself only reaches ~3.7:1 against darkInk/steel, below the 4.5:1
+  // minimum; this reaches ~6.7:1. Not a replacement for textMuted, which is
+  // tuned for (and passes on) the light backgrounds it's normally used on.
+  mutedOnDark: '#9AA2AD',
   success: '#1E9E5A',
   warning: '#F5A300',
   danger: '#D32F2F',

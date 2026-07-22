@@ -40,7 +40,9 @@ export default function DesktopAppShell({ children }: { children: React.ReactNod
   return (
     <View style={styles.page}>
       <DesktopHeader />
-      <View style={styles.content}>{children}</View>
+      {/* `role` is a react-native-web web-only passthrough prop (not part of
+          RN's accessibilityRole enum) -- gives the document a <main> landmark. */}
+      <View style={styles.content} role="main">{children}</View>
       <DesktopFooter />
     </View>
   );

@@ -105,9 +105,11 @@ export default function DesktopHeader() {
               <Pressable
                 onHoverIn={() => setAccountOpen(true)}
                 onHoverOut={() => setAccountOpen(false)}
+                onPress={() => setAccountOpen(o => !o)}
                 style={styles.accountTrigger}
                 accessibilityRole="button"
                 accessibilityLabel="Account menu"
+                accessibilityState={{ expanded: accountOpen }}
               >
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{(user?.name || 'U').charAt(0).toUpperCase()}</Text>

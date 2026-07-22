@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
-import { colors, radius } from '../../../theme/tokens';
+import { colors, radius, shadows } from '../../../theme/tokens';
 
 // Reuses CategoryProductsScreen's existing search path (categoryName:
 // 'Search Results' + initialSearchQuery) -- the same one the mobile in-screen
@@ -10,6 +10,7 @@ import { colors, radius } from '../../../theme/tokens';
 export default function SearchBar() {
   const navigation = useNavigation<NavigationProp<any>>();
   const [query, setQuery] = useState('');
+  const [focused, setFocused] = useState(false);
 
   const runSearch = () => {
     const trimmed = query.trim();
@@ -21,12 +22,14 @@ export default function SearchBar() {
   };
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, focused && styles.wrapperFocused]}>
       <Ionicons name="search-outline" size={18} color={colors.textMuted} style={styles.icon} />
       <TextInput
         value={query}
         onChangeText={setQuery}
         onSubmitEditing={runSearch}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         placeholder="Search for parts, brands, categories..."
         placeholderTextColor={colors.textMuted}
         style={styles.input}
@@ -58,6 +61,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.borderLight,
   },
+  // Replaces the native input outline (suppressed below so it doesn't clash
+  // with the pill container) with an equivalent visible focus indicator --
+  // without this, keyboard users tabbing into the search box would see no
+  // focus indication at all.
+  wrapperFocused: { borderColor: colors.primary, ...shadows.sm },
   icon: { marginRight: 8 },
   input: {
     flex: 1,

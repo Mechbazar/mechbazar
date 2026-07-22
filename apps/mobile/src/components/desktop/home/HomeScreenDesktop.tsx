@@ -113,7 +113,7 @@ export default function HomeScreenDesktop() {
 
   if (loading) {
     return (
-      <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
         <Container style={styles.section}>
           <SkeletonSection label="Loading homepage content">
             <HeroSkeleton />
@@ -133,7 +133,7 @@ export default function HomeScreenDesktop() {
 
   if (error) {
     return (
-      <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
         <Container>
           <ErrorState kind={error} onRetry={() => setRetryToken(t => t + 1)} />
         </Container>
@@ -144,7 +144,7 @@ export default function HomeScreenDesktop() {
 
   if (isEmpty) {
     return (
-      <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
         <Container>
           <EmptyState
             icon="storefront-outline"
@@ -160,7 +160,7 @@ export default function HomeScreenDesktop() {
   }
 
   return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
       <Container style={styles.section}>
         <HeroCarousel banners={banners} />
       </Container>

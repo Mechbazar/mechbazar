@@ -26,11 +26,17 @@ interface ProductCardDesktopProps {
 // Badges are all derived from real fields (discountPercentage, stockStatus,
 // createdAt, isFeatured -- Product.isFeatured/createdAt in
 // prisma/schema.prisma) rather than invented ones.
-export default function ProductCardDesktop({
+// Wrapped in React.memo since this renders up to PAGE_SIZE (24) times per
+// catalog grid -- without it, every card in the grid re-renders whenever any
+// single card's local hover/focus state (or unrelated parent state such as
+// filters/sort) changes.
+function ProductCardDesktop({
   product, isWishlisted, onToggleWishlist, onQuickView, onQuickAdd, onOpenDetails, qtyInCart, onQtyChange,
 }: ProductCardDesktopProps) {
   const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
   const outOfStock = product.stockStatus === 'Out of Stock';
+  const showHoverActions = (hovered || focused) && !outOfStock;
 
   return (
     <Pressable
@@ -38,6 +44,8 @@ export default function ProductCardDesktop({
       onHoverIn={() => setHovered(true)}
       onHoverOut={() => setHovered(false)}
       onPress={() => onOpenDetails(product)}
+      accessibilityRole="button"
+      accessibilityLabel={`${product.name}, ${product.brand}, ₹${product.price}`}
     >
       <View style={styles.imageWrap}>
         <Image source={{ uri: product.image }} style={[styles.image, outOfStock && styles.imageDimmed]} resizeMode="cover" />
@@ -65,12 +73,15 @@ export default function ProductCardDesktop({
           <Ionicons name={isWishlisted ? 'heart' : 'heart-outline'} size={16} color={isWishlisted ? colors.primary : colors.textMuted} />
         </Pressable>
 
-        {hovered && !outOfStock && (
-          <View style={styles.hoverActions}>
+        {!outOfStock && (
+          <View style={[styles.hoverActions, !showHoverActions && styles.hoverActionsHidden]}>
             <Pressable
               style={styles.hoverActionBtn}
               onPress={(e) => { e.stopPropagation(); onQuickView(product); }}
-              accessibilityLabel="Quick view"
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              accessibilityRole="button"
+              accessibilityLabel={`Quick view ${product.name}`}
             >
               <Ionicons name="eye-outline" size={16} color={colors.textDark} />
               <Text style={styles.hoverActionText}>Quick View</Text>
@@ -114,6 +125,8 @@ export default function ProductCardDesktop({
   );
 }
 
+export default React.memo(ProductCardDesktop);
+
 const styles = StyleSheet.create({
   card: {
     flexBasis: 220, flexGrow: 1, maxWidth: 280,
@@ -138,6 +151,10 @@ const styles = StyleSheet.create({
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: 'rgba(22,27,33,0.85)', paddingVertical: 8, alignItems: 'center',
   },
+  // Always rendered (not conditionally mounted) so the Quick View button
+  // stays reachable by Tab -- only its visibility is hover/focus-gated, via
+  // opacity rather than removing it from the tree.
+  hoverActionsHidden: { opacity: 0, pointerEvents: 'none' as any },
   hoverActionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.white, borderRadius: radius.pill, paddingHorizontal: 12, paddingVertical: 6 },
   hoverActionText: { fontSize: 12, fontWeight: '700', color: colors.textDark },
   info: { padding: spacing.sm },

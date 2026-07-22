@@ -90,6 +90,7 @@ export default function CategoryProductsDesktop() {
   const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [filters, setFilters] = useState<FilterOptions>({ sortBy: 'popular', brands: [], inStockOnly: false });
+  const [searchFocused, setSearchFocused] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -144,18 +145,22 @@ export default function CategoryProductsDesktop() {
 
   const getQty = (id: string) => cartItems.find(i => i.id === id)?.qty ?? 0;
 
-  const handleQuickAdd = (product: Product) => {
+  // Stabilized with useCallback so identity stays constant across re-renders
+  // (filter/sort/page changes) -- required for React.memo on
+  // ProductCardDesktop to actually skip re-rendering the other ~23 cards in
+  // the grid when only one card's own state changes.
+  const handleQuickAdd = useCallback((product: Product) => {
     dispatch(addToCart({
       id: product.id, name: product.name, price: product.price, originalPrice: product.originalPrice,
       image: product.image, isB2B: product.isB2B, moq: product.moq, vehicleType: product.vehicleType,
     }));
-  };
+  }, [dispatch]);
 
-  const handleQtyChange = (product: Product, nextQty: number) => {
+  const handleQtyChange = useCallback((product: Product, nextQty: number) => {
     dispatch(updateQuantity({ id: product.id, qty: nextQty }));
-  };
+  }, [dispatch]);
 
-  const handleToggleWishlist = async (product: Product) => {
+  const handleToggleWishlist = useCallback(async (product: Product) => {
     if (!token) {
       Alert.alert('Sign in required', 'Please log in to save items to your wishlist.');
       return;
@@ -164,19 +169,25 @@ export default function CategoryProductsDesktop() {
     setWishlist(prev => ({ ...prev, [product.id]: !was }));
     const result = was ? await removeFromWishlist(token, product.id) : await addToWishlist(token, product.id);
     if (!result.ok) setWishlist(prev => ({ ...prev, [product.id]: was }));
-  };
+  }, [token, wishlist]);
+
+  const handleOpenDetails = useCallback((p: Product) => {
+    navigation.navigate('ProductDetails', { productId: p.id });
+  }, [navigation]);
 
   return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
       <Container>
         <Breadcrumb categoryName={categoryName} />
 
-        <View style={styles.searchRow}>
+        <View style={[styles.searchRow, searchFocused && styles.searchRowFocused]}>
           <Ionicons name="search-outline" size={16} color={colors.textMuted} style={{ marginRight: 8 }} />
           <TextInput
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             placeholder={`Search in ${categoryName}...`}
             placeholderTextColor={colors.textMuted}
           />
@@ -231,7 +242,7 @@ export default function CategoryProductsDesktop() {
                       onToggleWishlist={handleToggleWishlist}
                       onQuickView={setQuickViewProduct}
                       onQuickAdd={handleQuickAdd}
-                      onOpenDetails={(p) => navigation.navigate('ProductDetails', { productId: p.id })}
+                      onOpenDetails={handleOpenDetails}
                       qtyInCart={getQty(product.id)}
                       onQtyChange={handleQtyChange}
                     />
@@ -268,6 +279,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderLight,
     height: 44, paddingLeft: spacing.sm, marginBottom: spacing.md, maxWidth: 480,
   },
+  // Replaces the native input outline (suppressed on searchInput below) with
+  // a visible focus indicator on the wrapping pill instead.
+  searchRowFocused: { borderColor: colors.primary },
   searchInput: { flex: 1, height: '100%', fontSize: 14, color: colors.textDark, outlineStyle: 'none' as any },
   layout: { flexDirection: 'row', gap: spacing.xl, alignItems: 'flex-start' },
   main: { flex: 1, minWidth: 0 },

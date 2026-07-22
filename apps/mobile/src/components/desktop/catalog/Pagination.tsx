@@ -23,12 +23,14 @@ export default function Pagination({ page, hasMore, loading, onPrev, onNext }: P
         style={[styles.btn, page === 1 && styles.btnDisabled]}
         disabled={page === 1 || loading}
         onPress={onPrev}
+        accessibilityRole="button"
+        accessibilityLabel="Previous page"
       >
         <Ionicons name="chevron-back" size={16} color={page === 1 ? colors.textMuted : colors.textDark} />
         <Text style={[styles.btnText, page === 1 && styles.btnTextDisabled]}>Previous</Text>
       </Pressable>
 
-      <View style={styles.pageIndicator}>
+      <View style={styles.pageIndicator} accessibilityLiveRegion="polite">
         {loading ? <ActivityIndicator size="small" color={colors.primary} /> : <Text style={styles.pageText}>Page {page}</Text>}
       </View>
 
@@ -36,6 +38,8 @@ export default function Pagination({ page, hasMore, loading, onPrev, onNext }: P
         style={[styles.btn, !hasMore && styles.btnDisabled]}
         disabled={!hasMore || loading}
         onPress={onNext}
+        accessibilityRole="button"
+        accessibilityLabel="Next page"
       >
         <Text style={[styles.btnText, !hasMore && styles.btnTextDisabled]}>Next</Text>
         <Ionicons name="chevron-forward" size={16} color={!hasMore ? colors.textMuted : colors.textDark} />

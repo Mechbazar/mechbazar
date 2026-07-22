@@ -34,9 +34,11 @@ export default function MegaMenu() {
         <Pressable
           onHoverIn={() => setOpen(true)}
           onHoverOut={() => setOpen(false)}
+          onPress={() => setOpen(o => !o)}
           style={styles.categoriesTrigger}
           accessibilityRole="button"
           accessibilityLabel="Browse all categories"
+          accessibilityState={{ expanded: open }}
         >
           <Ionicons name="grid-outline" size={16} color={colors.white} />
           <Text style={styles.categoriesLabel}>All Categories</Text>
