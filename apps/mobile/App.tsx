@@ -17,6 +17,7 @@ import { API_BASE_URL } from './src/services/api';
 import { fetchMyVehicles } from './src/services/garage.service';
 import { OfflineBanner } from './src/components/OfflineBanner';
 import DesktopAppShell from './src/navigation/DesktopAppShell';
+import { useBreakpoint } from './src/hooks/useBreakpoint';
 
 import WelcomeScreen from './src/screens/auth/WelcomeScreen';
 import WholesaleRegistrationScreen from './src/screens/auth/WholesaleRegistrationScreen';
@@ -66,30 +67,38 @@ const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   Account: 'person-outline',
 };
 
+const MOBILE_TAB_BAR_STYLE = {
+  position: 'absolute' as const,
+  bottom: 20,
+  left: 16,
+  right: 16,
+  backgroundColor: '#1C1C1E',
+  borderRadius: 24,
+  height: 64,
+  paddingBottom: Platform.OS === 'ios' ? 0 : 8,
+  paddingTop: 8,
+  borderTopWidth: 0,
+  shadowColor: '#000000',
+  shadowOffset: { width: 0, height: 10 },
+  shadowOpacity: 0.35,
+  shadowRadius: 10,
+  elevation: 8,
+};
+
 function MainTabs() {
+  // DesktopAppShell already provides desktop navigation (header + mega menu),
+  // so the floating mobile tab bar would just be redundant chrome at desktop
+  // widths -- hide it there. Native ignores this: isDesktopUp is always false
+  // off-web, so MOBILE_TAB_BAR_STYLE is untouched on iOS/Android.
+  const { isDesktopUp } = useBreakpoint();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: '#E53935',
         tabBarInactiveTintColor: '#8E8E93',
-        tabBarStyle: {
-          position: 'absolute',
-          bottom: 20,
-          left: 16,
-          right: 16,
-          backgroundColor: '#1C1C1E',
-          borderRadius: 24,
-          height: 64,
-          paddingBottom: Platform.OS === 'ios' ? 0 : 8,
-          paddingTop: 8,
-          borderTopWidth: 0,
-          shadowColor: '#000000',
-          shadowOffset: { width: 0, height: 10 },
-          shadowOpacity: 0.35,
-          shadowRadius: 10,
-          elevation: 8,
-        },
+        tabBarStyle: Platform.OS === 'web' && isDesktopUp ? { display: 'none' } : MOBILE_TAB_BAR_STYLE,
         tabBarIcon: ({ focused, color, size }) => (
           <View style={{ alignItems: 'center', justifyContent: 'center' }}>
             <Ionicons 
