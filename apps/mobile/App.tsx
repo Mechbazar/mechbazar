@@ -16,6 +16,7 @@ import { registerForPushNotificationsAsync } from './src/services/notifications'
 import { API_BASE_URL } from './src/services/api';
 import { fetchMyVehicles } from './src/services/garage.service';
 import { OfflineBanner } from './src/components/OfflineBanner';
+import DesktopAppShell from './src/navigation/DesktopAppShell';
 
 import WelcomeScreen from './src/screens/auth/WelcomeScreen';
 import WholesaleRegistrationScreen from './src/screens/auth/WholesaleRegistrationScreen';
@@ -126,11 +127,33 @@ function RootNavigator() {
   useEffect(() => {
     (async () => {
       try {
-        try {
-          await Font.loadAsync(Ionicons.font);
-        } catch (fontErr) {
-          console.error('Failed to preload Ionicons font, retrying once', fontErr);
-          try { await Font.loadAsync(Ionicons.font); } catch (e2) { console.error('Icon font retry failed', e2); }
+        if (Platform.OS !== 'web') {
+          // Native: unchanged from today's behavior.
+          try {
+            await Font.loadAsync(Ionicons.font);
+          } catch (fontErr) {
+            console.error('Failed to preload Ionicons font, retrying once', fontErr);
+            try { await Font.loadAsync(Ionicons.font); } catch (e2) { console.error('Icon font retry failed', e2); }
+          }
+        } else {
+          // Web: Font.loadAsync registers the icon font, but its promise isn't a
+          // reliable signal that the browser has actually finished loading it --
+          // gate first paint on document.fonts.ready too, the browser's own
+          // authoritative signal, so icon glyphs never race a still-loading
+          // custom font (which shows as a blank/tofu box until it swaps in).
+          try {
+            await Font.loadAsync(Ionicons.font);
+          } catch (fontErr) {
+            console.error('Failed to preload Ionicons font on web', fontErr);
+          }
+          const webDocument = (globalThis as any).document;
+          if (webDocument?.fonts?.ready) {
+            try {
+              await webDocument.fonts.ready;
+            } catch (e) {
+              console.error('document.fonts.ready failed', e);
+            }
+          }
         }
 
         const storedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
@@ -220,6 +243,7 @@ function RootNavigator() {
     <>
       <OfflineBanner />
       <NavigationContainer>
+      <DesktopAppShell>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {token ? (
           <>
@@ -256,6 +280,7 @@ function RootNavigator() {
           </>
         )}
       </Stack.Navigator>
+      </DesktopAppShell>
       </NavigationContainer>
     </>
   );
