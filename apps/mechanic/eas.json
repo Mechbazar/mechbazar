@@ -14,7 +14,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://mechbazar-backend.vercel.app/api"
+        "EXPO_PUBLIC_API_URL": "https://mechbazar.com/api"
       }
     },
     "production": {
@@ -23,7 +23,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://mechbazar-backend.vercel.app/api"
+        "EXPO_PUBLIC_API_URL": "https://mechbazar.com/api"
       }
     }
   },

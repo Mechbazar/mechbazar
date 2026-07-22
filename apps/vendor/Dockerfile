@@ -18,6 +18,16 @@ RUN npm install
 COPY apps/vendor apps/vendor
 COPY packages/shared packages/shared
 
+# Vite bakes these into the static bundle at build time -- must be passed as
+# --build-arg, not just set in the container's runtime environment (that's
+# too late, the JS is already built by then). Without these, the app falls
+# back to guessing http://<hostname>:5001/api at runtime, which breaks under
+# HTTPS (mixed content) and isn't proxied anywhere.
+ARG VITE_API_URL
+ARG VITE_SERVER_ORIGIN
+ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_SERVER_ORIGIN=${VITE_SERVER_ORIGIN}
+
 RUN npm run build --workspace=apps/vendor
 
 FROM nginx:alpine

@@ -48,6 +48,9 @@ services:
     build:
       context: .
       dockerfile: apps/admin/Dockerfile
+      args:
+        VITE_API_URL: https://mechbazar.com/api
+        VITE_SERVER_ORIGIN: https://mechbazar.com
     container_name: mechbazar_admin
     ports:
       - "3000:80"
@@ -58,6 +61,9 @@ services:
     build:
       context: .
       dockerfile: apps/vendor/Dockerfile
+      args:
+        VITE_API_URL: https://mechbazar.com/api
+        VITE_SERVER_ORIGIN: https://mechbazar.com
     container_name: mechbazar_vendor
     ports:
       - "3001:80"

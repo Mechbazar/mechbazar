@@ -4,7 +4,7 @@ info:
   description: Quick Commerce Automotive Parts App API
   version: 1.0.0
 servers:
-  - url: https://mechbazar-backend.vercel.app
+  - url: https://mechbazar.com
     description: Production (Vercel)
   - url: http://localhost:5001
     description: Local server
