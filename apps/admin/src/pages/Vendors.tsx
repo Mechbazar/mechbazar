@@ -161,6 +161,7 @@ export default function Vendors() {
         </div>
       ) : (
         <div className="bg-brand-panel border border-brand-border rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-brand-dark border-b border-brand-border">
@@ -206,6 +207,7 @@ export default function Vendors() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

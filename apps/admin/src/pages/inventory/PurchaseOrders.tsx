@@ -129,8 +129,15 @@ export default function PurchaseOrders() {
                   </div>
                 </div>
 
-                <button className="w-10 h-10 rounded-full bg-neutral-950 hover:bg-primary-500/10 flex items-center justify-center group transition-colors">
-                  <ArrowRight className="w-5 h-5 text-neutral-400 group-hover:text-primary-500 transition-colors" />
+                {/* No GET /purchase-orders/:id or status-update endpoint exists yet on
+                    the backend, so there's nowhere for this to navigate to -- shown
+                    disabled rather than a click that silently does nothing. */}
+                <button
+                  disabled
+                  title="Purchase order detail view isn't available yet"
+                  className="w-10 h-10 rounded-full bg-neutral-950 flex items-center justify-center opacity-40 cursor-not-allowed"
+                >
+                  <ArrowRight className="w-5 h-5 text-neutral-400" />
                 </button>
               </div>
             </Card>

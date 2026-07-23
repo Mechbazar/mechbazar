@@ -262,7 +262,7 @@ export default function Products() {
 
       {/* Data Table */}
       <div className="bg-neutral-900 shadow-sm rounded-2xl border border-neutral-800 overflow-visible">
-        <div className="overflow-visible min-h-[400px]">
+        <div className="overflow-x-auto min-h-[400px]">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-neutral-950 border-b border-neutral-800 text-neutral-400 text-sm uppercase tracking-wider">

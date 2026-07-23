@@ -6,20 +6,29 @@ import { Warehouse as WarehouseIcon, MapPin, Plus } from 'lucide-react';
 import { Button, Card, Badge, Dialog, Input, Loader } from '@mechbazar/shared/web';
 import { API_URL } from '../../config/api';
 
-export default function Warehouses() {
+interface WarehousesProps {
+  // Warehouses and the stock ledger are separate tabs under the same parent
+  // (see ../inventory/index.tsx) with no shared routing, so "View Stock" can't
+  // be a real Link -- this callback lets the parent switch tabs for us.
+  onViewStock?: () => void;
+}
+
+export default function Warehouses({ onViewStock }: WarehousesProps) {
   const { token } = useSelector((state: RootState) => state.auth);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  
-  const [formData, setFormData] = useState({
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const emptyForm = {
     name: '',
     code: '',
     address: '',
     managerName: '',
     phone: '',
     capacity: 0
-  });
+  };
+  const [formData, setFormData] = useState(emptyForm);
 
   useEffect(() => {
     fetchWarehouses();
@@ -41,23 +50,49 @@ export default function Warehouses() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await axios.post(`${API_URL}/warehouses`, formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      if (editingId) {
+        await axios.put(`${API_URL}/warehouses/${editingId}`, formData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else {
+        await axios.post(`${API_URL}/warehouses`, formData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
       setShowModal(false);
+      setEditingId(null);
       fetchWarehouses();
-      setFormData({ name: '', code: '', address: '', managerName: '', phone: '', capacity: 0 });
+      setFormData(emptyForm);
     } catch (error) {
-      console.error('Failed to create warehouse', error);
-      alert('Failed to create warehouse. Please check the code is unique.');
+      console.error('Failed to save warehouse', error);
+      alert(editingId ? 'Failed to update warehouse.' : 'Failed to create warehouse. Please check the code is unique.');
     }
+  };
+
+  const handleOpenAdd = () => {
+    setEditingId(null);
+    setFormData(emptyForm);
+    setShowModal(true);
+  };
+
+  const handleOpenEdit = (wh: any) => {
+    setEditingId(wh.id);
+    setFormData({
+      name: wh.name || '',
+      code: wh.code || '',
+      address: wh.address || '',
+      managerName: wh.managerName || '',
+      phone: wh.phone || '',
+      capacity: wh.capacity || 0
+    });
+    setShowModal(true);
   };
 
   return (
     <div className="space-y-6 pb-12">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold text-brand-light">Manage Warehouses</h2>
-        <Button onClick={() => setShowModal(true)}>
+        <Button onClick={handleOpenAdd}>
           <Plus className="w-5 h-5 mr-1" /> Add Warehouse
         </Button>
       </div>
@@ -99,12 +134,20 @@ export default function Warehouses() {
               </div>
 
               <div className="flex space-x-2">
-                <button className="flex-1 bg-neutral-950 border border-neutral-800 text-neutral-300 py-2 rounded-lg hover:text-primary-500 transition-colors text-sm font-medium">
+                <button
+                  onClick={() => handleOpenEdit(wh)}
+                  className="flex-1 bg-neutral-950 border border-neutral-800 text-neutral-300 py-2 rounded-lg hover:text-primary-500 transition-colors text-sm font-medium"
+                >
                   Edit
                 </button>
-                <button className="flex-1 bg-neutral-950 border border-neutral-800 text-neutral-300 py-2 rounded-lg hover:text-primary-500 transition-colors text-sm font-medium">
-                  View Stock
-                </button>
+                {onViewStock && (
+                  <button
+                    onClick={onViewStock}
+                    className="flex-1 bg-neutral-950 border border-neutral-800 text-neutral-300 py-2 rounded-lg hover:text-primary-500 transition-colors text-sm font-medium"
+                  >
+                    View Stock
+                  </button>
+                )}
               </div>
             </Card>
           ))}
@@ -114,7 +157,7 @@ export default function Warehouses() {
         </div>
       )}
 
-      <Dialog isOpen={showModal} onClose={() => setShowModal(false)} title="Add New Warehouse">
+      <Dialog isOpen={showModal} onClose={() => { setShowModal(false); setEditingId(null); }} title={editingId ? 'Edit Warehouse' : 'Add New Warehouse'}>
             <form onSubmit={handleSubmit} className="space-y-4">
               <Input
                 label="Name"
@@ -156,13 +199,13 @@ export default function Warehouses() {
               <div className="flex space-x-4 mt-6">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => { setShowModal(false); setEditingId(null); }}
                   className="flex-1 bg-neutral-950 text-neutral-300 px-4 py-2 rounded-lg font-bold hover:bg-neutral-800 transition-colors"
                 >
                   Cancel
                 </button>
                 <Button type="submit" className="flex-1">
-                  Save Warehouse
+                  {editingId ? 'Save Changes' : 'Save Warehouse'}
                 </Button>
               </div>
             </form>

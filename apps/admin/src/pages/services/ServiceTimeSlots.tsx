@@ -117,6 +117,7 @@ export default function ServiceTimeSlots() {
       </div>
 
       <div className="bg-neutral-900 rounded-2xl border border-neutral-800 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-neutral-950 text-neutral-500 text-xs uppercase tracking-wider">
@@ -155,6 +156,7 @@ export default function ServiceTimeSlots() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       <Dialog

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Car, ShoppingBag, Users, Layers, Package, LogOut, Store, Navigation, Warehouse, Image, Tag, CreditCard, Bike, Wrench, ClipboardList, Layers3 } from 'lucide-react';
+import { LayoutDashboard, Car, ShoppingBag, Users, Layers, Package, LogOut, Store, Navigation, Warehouse, Image, Tag, CreditCard, Bike, Wrench, ClipboardList, Layers3, Menu, X } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { useDispatch } from 'react-redux';
 import { logout } from './store';
@@ -29,6 +29,7 @@ import OfflineBanner from './components/OfflineBanner';
 function MainLayout({ children }: { children: React.ReactNode }) {
   const dispatch = useDispatch();
   const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -54,17 +55,39 @@ function MainLayout({ children }: { children: React.ReactNode }) {
   ];
 
   return (
-    <div className="flex min-h-screen bg-neutral-50 text-neutral-900 overflow-hidden">
-      <aside className="w-72 bg-white border-r border-neutral-200 flex flex-col">
-        <div className="p-6 border-b border-neutral-200">
-          <h1 className="text-2xl font-bold text-neutral-900 tracking-wide">MECH<span className="text-primary-500">BAZAR</span></h1>
-          <p className="text-xs text-neutral-500 mt-1 uppercase tracking-wider font-semibold">Admin Portal</p>
+    <div className="flex min-h-screen bg-neutral-50 text-neutral-900">
+      {/* Backdrop, mobile/laptop only, closes the sidebar when tapped outside it */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col bg-white border-r border-neutral-200 transform transition-transform duration-200 ease-in-out lg:static lg:translate-x-0 lg:flex-shrink-0 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="p-6 border-b border-neutral-200 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-neutral-900 tracking-wide">MECH<span className="text-primary-500">BAZAR</span></h1>
+            <p className="text-xs text-neutral-500 mt-1 uppercase tracking-wider font-semibold">Admin Portal</p>
+          </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden text-neutral-500 hover:text-neutral-800"
+            aria-label="Close menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
         <nav className="mt-4 flex-1 overflow-y-auto px-2">
           {navLinks.map((link) => (
             <Link
               key={link.to}
               to={link.to}
+              onClick={() => setSidebarOpen(false)}
               className={`flex items-center gap-3 rounded-2xl px-4 py-3 transition-colors border-l-4 ${
                 location.pathname === link.to
                   ? 'bg-primary-50 border-primary text-primary shadow-sm'
@@ -87,12 +110,20 @@ function MainLayout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-y-auto bg-neutral-50">
+      <main className="flex-1 min-w-0 overflow-y-auto bg-neutral-50">
         <OfflineBanner />
-        <div className="flex justify-end px-8 pt-4">
+        <div className="flex items-center justify-between px-4 sm:px-8 pt-4">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="lg:hidden text-neutral-600 hover:text-neutral-900"
+            aria-label="Open menu"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+          <div className="flex-1" />
           <NotificationBell />
         </div>
-        <div className="p-8 pt-2">
+        <div className="p-4 sm:p-8 pt-2 overflow-x-auto">
           {children}
         </div>
       </main>

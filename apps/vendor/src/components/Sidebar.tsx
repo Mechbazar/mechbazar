@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
 import {
-  LayoutDashboard, Package, ShoppingCart, Warehouse, Wallet, Settings, LogOut, Store
+  LayoutDashboard, Package, ShoppingCart, Warehouse, Wallet, Settings, LogOut, Store, X
 } from 'lucide-react';
 
 const navItems = [
@@ -15,14 +15,32 @@ const navItems = [
   { to: '/profile',    icon: Settings,        label: 'Profile & Settings' },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  open?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ open = false, onClose }: SidebarProps) {
   const dispatch = useDispatch();
   const { user, vendorProfile } = useSelector((state: RootState) => state.auth);
 
   return (
-    <aside className="w-72 bg-neutral-950 border-r border-neutral-800 flex flex-col h-screen sticky top-0 text-white">
+    <aside
+      className={`fixed inset-y-0 left-0 z-40 flex w-72 flex-col h-screen bg-neutral-950 border-r border-neutral-800 text-white transform transition-transform duration-200 ease-in-out lg:static lg:sticky lg:top-0 lg:translate-x-0 lg:flex-shrink-0 ${
+        open ? 'translate-x-0' : '-translate-x-full'
+      }`}
+    >
       <div className="p-5 border-b border-neutral-800">
-        <h1 className="text-lg font-black text-white tracking-wide mb-3">MECH<span className="text-primary-500">BAZAR</span></h1>
+        <div className="flex items-center justify-between mb-3">
+          <h1 className="text-lg font-black text-white tracking-wide">MECH<span className="text-primary-500">BAZAR</span></h1>
+          <button
+            onClick={onClose}
+            className="lg:hidden text-neutral-400 hover:text-white"
+            aria-label="Close menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
             <Store className="w-5 h-5 text-primary" />
@@ -39,6 +57,7 @@ export default function Sidebar() {
           <NavLink
             key={to}
             to={to}
+            onClick={onClose}
             className={({ isActive }) =>
               `flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all ${
                 isActive

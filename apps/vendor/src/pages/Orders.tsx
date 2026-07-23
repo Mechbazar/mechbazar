@@ -174,7 +174,7 @@ export default function Orders() {
         </div>
 
         {/* Table */}
-        <div className="min-h-[400px] overflow-visible">
+        <div className="min-h-[400px] overflow-x-auto">
           {loading ? (
             <Loader fullScreen />
           ) : filteredOrders.length === 0 ? (

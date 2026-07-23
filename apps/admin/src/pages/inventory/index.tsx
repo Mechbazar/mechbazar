@@ -42,7 +42,7 @@ export default function InventorySystem() {
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'dashboard' && <InventoryDashboard />}
-        {activeTab === 'warehouses' && <Warehouses />}
+        {activeTab === 'warehouses' && <Warehouses onViewStock={() => setActiveTab('dashboard')} />}
         {activeTab === 'suppliers' && <Suppliers />}
         {activeTab === 'pos' && <PurchaseOrders />}
       </div>

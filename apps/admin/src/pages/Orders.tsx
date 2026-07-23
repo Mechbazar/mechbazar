@@ -256,7 +256,7 @@ export default function Orders() {
         </div>
 
         {/* Table */}
-        <div className="overflow-visible min-h-[400px]">
+        <div className="overflow-x-auto min-h-[400px]">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-neutral-950 text-neutral-500 text-xs uppercase tracking-wider">

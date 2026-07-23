@@ -101,6 +101,7 @@ export default function Inventory() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900">
+          <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-neutral-950 text-xs font-semibold uppercase tracking-wide text-neutral-400 border-b border-neutral-800">
@@ -148,6 +149,7 @@ export default function Inventory() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

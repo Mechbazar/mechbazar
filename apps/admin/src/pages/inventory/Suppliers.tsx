@@ -11,8 +11,9 @@ export default function Suppliers() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  
-  const [formData, setFormData] = useState({
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const emptyForm = {
     name: '',
     companyName: '',
     contactPerson: '',
@@ -20,7 +21,8 @@ export default function Suppliers() {
     email: '',
     gstNumber: '',
     address: ''
-  });
+  };
+  const [formData, setFormData] = useState(emptyForm);
 
   useEffect(() => {
     fetchSuppliers();
@@ -42,23 +44,50 @@ export default function Suppliers() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await axios.post(`${API_URL}/suppliers`, formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      if (editingId) {
+        await axios.put(`${API_URL}/suppliers/${editingId}`, formData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else {
+        await axios.post(`${API_URL}/suppliers`, formData, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      }
       setShowModal(false);
+      setEditingId(null);
       fetchSuppliers();
-      setFormData({ name: '', companyName: '', contactPerson: '', phone: '', email: '', gstNumber: '', address: '' });
+      setFormData(emptyForm);
     } catch (error) {
-      console.error('Failed to create supplier', error);
-      alert('Failed to create supplier.');
+      console.error('Failed to save supplier', error);
+      alert(editingId ? 'Failed to update supplier.' : 'Failed to create supplier.');
     }
+  };
+
+  const handleOpenAdd = () => {
+    setEditingId(null);
+    setFormData(emptyForm);
+    setShowModal(true);
+  };
+
+  const handleOpenEdit = (supplier: any) => {
+    setEditingId(supplier.id);
+    setFormData({
+      name: supplier.name || '',
+      companyName: supplier.companyName || '',
+      contactPerson: supplier.contactPerson || '',
+      phone: supplier.phone || '',
+      email: supplier.email || '',
+      gstNumber: supplier.gstNumber || '',
+      address: supplier.address || ''
+    });
+    setShowModal(true);
   };
 
   return (
     <div className="space-y-6 pb-12">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold text-brand-light">Manage Suppliers</h2>
-        <Button onClick={() => setShowModal(true)}>
+        <Button onClick={handleOpenAdd}>
           <Plus className="w-5 h-5 mr-1" /> Add Supplier
         </Button>
       </div>
@@ -80,6 +109,7 @@ export default function Suppliers() {
         </div>
       ) : (
         <div className="bg-brand-panel border border-brand-border rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-brand-dark border-b border-brand-border">
@@ -123,7 +153,10 @@ export default function Suppliers() {
                     </Badge>
                   </td>
                   <td className="p-4 text-right">
-                    <button className="text-brand-primary hover:text-brand-secondary text-sm font-medium transition-colors">
+                    <button
+                      onClick={() => handleOpenEdit(supplier)}
+                      className="text-brand-primary hover:text-brand-secondary text-sm font-medium transition-colors"
+                    >
                       Edit
                     </button>
                   </td>
@@ -131,10 +164,11 @@ export default function Suppliers() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
-      <Dialog isOpen={showModal} onClose={() => setShowModal(false)} title="Add New Supplier">
+      <Dialog isOpen={showModal} onClose={() => { setShowModal(false); setEditingId(null); }} title={editingId ? 'Edit Supplier' : 'Add New Supplier'}>
             <form onSubmit={handleSubmit} className="space-y-4">
               <Input
                 label="Supplier Name"
@@ -192,13 +226,13 @@ export default function Suppliers() {
               <div className="flex space-x-4 mt-6 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => { setShowModal(false); setEditingId(null); }}
                   className="flex-1 bg-neutral-950 text-neutral-300 px-4 py-2 rounded-lg font-bold hover:bg-neutral-800 transition-colors"
                 >
                   Cancel
                 </button>
                 <Button type="submit" className="flex-1">
-                  Save Supplier
+                  {editingId ? 'Save Changes' : 'Save Supplier'}
                 </Button>
               </div>
             </form>

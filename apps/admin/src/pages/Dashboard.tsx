@@ -48,7 +48,10 @@ export default function Dashboard() {
   }, []);
 
   const statCards = [
-    { title: "Today's Sales", value: `₹${stats.revenue.toLocaleString()}`, icon: DollarSign, color: "text-green-500", bg: "bg-green-500/10", link: "/finance" },
+    // No dedicated finance/analytics page exists yet, so this card is informational only --
+    // it previously linked to "/finance", a route that isn't registered in App.tsx and
+    // silently bounced back to this same dashboard via the catch-all redirect.
+    { title: "Today's Sales", value: `₹${stats.revenue.toLocaleString()}`, icon: DollarSign, color: "text-green-500", bg: "bg-green-500/10", link: null },
     { title: "Pending Orders", value: stats.orders, icon: Package, color: "text-brand-primary", bg: "bg-brand-primary/10", link: "/orders?status=PENDING" },
     { title: "Total Customers", value: stats.users, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10", link: "/customers" },
     { title: "Total Vendors", value: stats.vendors, icon: Activity, color: "text-purple-500", bg: "bg-purple-500/10", link: "/vendors" },
@@ -76,7 +79,12 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {statCards.map((stat, idx) => (
-          <Card key={idx} variant="dark" onClick={() => navigate(stat.link)} className="cursor-pointer">
+          <Card
+            key={idx}
+            variant="dark"
+            onClick={stat.link ? () => navigate(stat.link!) : undefined}
+            className={stat.link ? 'cursor-pointer' : ''}
+          >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-neutral-400 text-sm font-medium mb-1">{stat.title}</p>

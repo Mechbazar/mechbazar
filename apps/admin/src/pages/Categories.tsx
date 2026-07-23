@@ -13,6 +13,8 @@ export default function Categories() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [editingCategory, setEditingCategory] = useState<any>(null);
   const [formData, setFormData] = useState({ name: '', icon: '', status: 'Active', vehicleType: 'CAR' });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All Status');
   const emojiPickerRef = useRef<HTMLDivElement>(null);
 
   const loadCategories = () => {
@@ -105,6 +107,12 @@ export default function Categories() {
     setIsModalOpen(true);
   };
 
+  const filteredCategories = categories.filter((cat) => {
+    const matchesSearch = !searchQuery || cat.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === 'All Status' || cat.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
       {/* Header */}
@@ -127,20 +135,30 @@ export default function Categories() {
           <Search className="absolute left-4 top-3 text-neutral-500 w-5 h-5" />
           <input
             type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search categories..."
             className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-2.5 text-white placeholder-neutral-500 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
           />
         </div>
-        <select className="bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-white outline-none font-medium focus:border-brand-primary">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-white outline-none font-medium focus:border-brand-primary"
+        >
           <option>All Status</option>
           <option>Active</option>
           <option>Inactive</option>
         </select>
       </div>
 
+      {categories.length > 0 && filteredCategories.length === 0 && (
+        <div className="text-center py-12 text-neutral-400">No categories match your search.</div>
+      )}
+
       {/* Grid Layout */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {categories.map((cat) => (
+        {filteredCategories.map((cat) => (
           <Card key={cat.id} variant="dark" className="group relative">
             <div className="flex justify-between items-start mb-4">
               <div className="w-14 h-14 bg-neutral-950 rounded-2xl flex items-center justify-center text-2xl border border-neutral-800 overflow-hidden">

@@ -166,6 +166,7 @@ export default function Products() {
         </div>
       ) : (
         <div className="bg-brand-primary border border-brand-muted rounded-xl overflow-hidden">
+          <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-brand-dark border-b border-brand-muted text-xs text-gray-400 font-semibold uppercase">
@@ -215,6 +216,7 @@ export default function Products() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
