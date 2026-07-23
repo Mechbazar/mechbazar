@@ -8,7 +8,9 @@ export default function ForgotPassword() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate API call
+    // No password-reset endpoint exists on the backend yet (no email/SMTP
+    // integration) -- this used to simulate a successful email send, which
+    // told the admin to go check an inbox that would never receive anything.
     setSubmitted(true);
   };
 
@@ -21,7 +23,7 @@ export default function ForgotPassword() {
         </div>
 
         {submitted ? (
-          <Alert type="success" message="If an account with that email exists, we have sent a password reset link." className="mb-6 text-center">
+          <Alert type="info" message="Self-service password reset isn't available yet. Please contact your MechBazar administrator to have your password reset manually." className="mb-6 text-center">
             <div className="mt-4">
               <Link to="/login" className="text-primary-500 font-bold hover:underline">
                 Return to Login

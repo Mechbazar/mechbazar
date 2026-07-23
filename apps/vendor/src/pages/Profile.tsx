@@ -41,8 +41,12 @@ export default function Profile() {
         const res = await axios.get(`${API_URL}/vendors/profile`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        setBankAccounts(res.data.vendor?.bankAccounts || []);
-        setDocuments(res.data.vendor?.documents || []);
+        // GET /vendors/profile returns the vendor object directly (spread,
+        // not nested under a `.vendor` key) -- reading `.vendor?.bankAccounts`
+        // always evaluated to undefined, so this list silently rendered empty
+        // even when real bank accounts/documents existed.
+        setBankAccounts(res.data?.bankAccounts || []);
+        setDocuments(res.data?.documents || []);
       } catch (e) {
         console.error('Failed to fetch profile', e);
       }
