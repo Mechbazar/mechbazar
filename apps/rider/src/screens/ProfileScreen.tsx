@@ -21,6 +21,11 @@ export const ProfileScreen = () => {
         text: 'Sign Out',
         style: 'destructive',
         onPress: async () => {
+          try {
+            await riderService.clearPushToken();
+          } catch (e) {
+            console.error('Failed to clear push token on logout:', e);
+          }
           await SecureStore.deleteItemAsync('token');
           dispatch(logout());
         },

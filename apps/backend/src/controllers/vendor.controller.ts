@@ -696,15 +696,25 @@ export const updateSettlementStatus = async (req: Request, res: Response): Promi
 export const updateVendorStatus = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id); // Vendor ID
-    const { status } = req.body; // APPROVED, REJECTED, etc.
-    
+    const { status, remarks } = req.body; // APPROVED, REJECTED, etc.
+
     const vendor = await prisma.vendor.update({
       where: { id },
       data: {
         status
       }
     });
-    
+
+    // Rider/technician KYC status changes already notify the applicant --
+    // this was the one role left silent, so a vendor had no way to learn
+    // their account was approved/rejected except by manually re-checking.
+    notifyUser(
+      vendor.userId,
+      'Vendor application update',
+      remarks ? `Your vendor application status is now ${status}: ${remarks}` : `Your vendor application status is now ${status}.`,
+      { type: 'VENDOR_STATUS', status }
+    );
+
     res.status(200).json(vendor);
   } catch (error) {
     console.error('Error updating vendor status:', error);

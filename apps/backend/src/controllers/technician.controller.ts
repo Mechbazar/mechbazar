@@ -575,6 +575,26 @@ export const registerMyPushToken = async (req: AuthRequest, res: Response): Prom
   }
 };
 
+// Called on logout -- see auth.controller.ts's clearPushToken for why this
+// matters on a shared/reset device.
+export const clearMyPushToken = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const technician = await getOwnTechnician(req.user!.userId);
+    if (!technician) {
+      res.status(404).json({ error: 'Technician profile not found' });
+      return;
+    }
+    await prisma.serviceTechnician.update({
+      where: { id: technician.id },
+      data: { expoPushToken: null },
+    });
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error clearing push token:', error);
+    res.status(500).json({ error: 'Failed to clear push token' });
+  }
+};
+
 export const getMyBookings = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const technician = await getOwnTechnician(req.user!.userId);

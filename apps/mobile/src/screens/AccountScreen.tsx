@@ -273,7 +273,27 @@ export default function AccountScreen() {
   const handleLogout = () => {
     Alert.alert('Log out', 'Are you sure you want to log out of Mech Bazar?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Log out', style: 'destructive', onPress: () => dispatch(logout()) },
+      {
+        text: 'Log out',
+        style: 'destructive',
+        onPress: async () => {
+          // An Expo push token identifies the device, not the account -- on a
+          // shared/reset device, leaving it registered would keep sending
+          // this account's order/refund notifications to whoever logs in
+          // next. Best-effort: logout proceeds even if this fails.
+          if (token) {
+            try {
+              await fetch(`${API_BASE_URL}/auth/push-token`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+              });
+            } catch (e) {
+              console.error('Failed to clear push token on logout:', e);
+            }
+          }
+          dispatch(logout());
+        },
+      },
     ]);
   };
 

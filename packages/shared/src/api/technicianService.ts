@@ -76,6 +76,14 @@ export const technicianService = {
     await apiClient.post('/technicians/me/push-token', { token });
   },
 
+  // Called on logout -- an Expo push token identifies the device, not the
+  // account, so leaving it registered on a shared/reset device would keep
+  // sending this technician's job/earnings notifications to whoever logs in
+  // next.
+  clearPushToken: async () => {
+    await apiClient.delete('/technicians/me/push-token');
+  },
+
   // Bookings — the technician-scoped list omits images/statusHistory/invoice,
   // so booking detail is fetched from the richer shared endpoint instead.
   getMyBookings: async () => {

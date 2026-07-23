@@ -78,6 +78,13 @@ export const riderService = {
     await apiClient.post('/riders/me/push-token', { token });
   },
 
+  // Called on logout -- an Expo push token identifies the device, not the
+  // account, so leaving it registered on a shared/reset device would keep
+  // sending this rider's job/earnings notifications to whoever logs in next.
+  clearPushToken: async () => {
+    await apiClient.delete('/riders/me/push-token');
+  },
+
   // Deliveries
   getMyDeliveries: async () => {
     const response = await apiClient.get('/riders/me/deliveries');
