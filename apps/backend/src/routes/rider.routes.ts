@@ -15,6 +15,7 @@ import {
   updateMyAvailability,
   updateMyLocation,
   registerMyPushToken,
+  clearMyPushToken,
   getMyDeliveries,
   getMyEarnings,
   addMyBankAccount,
@@ -45,6 +46,7 @@ router.get('/me/deliveries', authenticate, authorize(riderOnly), requireApproved
 router.patch('/me/availability', authenticate, authorize(riderOnly), requireApprovedRider, updateMyAvailability);
 router.patch('/me/location', authenticate, authorize(riderOnly), requireApprovedRider, updateMyLocation);
 router.post('/me/push-token', authenticate, authorize(riderOnly), registerMyPushToken);
+router.delete('/me/push-token', authenticate, authorize(riderOnly), clearMyPushToken);
 router.patch('/me/deliveries/:id/status', authenticate, authorize(riderOnly), requireApprovedRider, updateMyDeliveryStatus);
 router.get('/me/earnings', authenticate, authorize(riderOnly), getMyEarnings);
 router.post('/me/bank', authenticate, authorize(riderOnly), addMyBankAccount);

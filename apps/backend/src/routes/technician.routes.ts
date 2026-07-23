@@ -15,6 +15,7 @@ import {
   updateMyAvailability,
   updateMyLocation,
   registerMyPushToken,
+  clearMyPushToken,
   getMyBookings,
   getMyEarnings,
   addMyBankAccount,
@@ -50,6 +51,7 @@ router.get('/me/bookings', authenticate, authorize(technicianOnly), requireAppro
 router.patch('/me/availability', authenticate, authorize(technicianOnly), requireApprovedTechnician, updateMyAvailability);
 router.patch('/me/location', authenticate, authorize(technicianOnly), requireApprovedTechnician, updateMyLocation);
 router.post('/me/push-token', authenticate, authorize(technicianOnly), registerMyPushToken);
+router.delete('/me/push-token', authenticate, authorize(technicianOnly), clearMyPushToken);
 router.patch('/me/bookings/:id/status', authenticate, authorize(technicianOnly), requireApprovedTechnician, updateMyBookingStatus);
 router.post('/me/bookings/:id/accept', authenticate, authorize(technicianOnly), requireApprovedTechnician, acceptBookingJob);
 router.post('/me/bookings/:id/reject', authenticate, authorize(technicianOnly), requireApprovedTechnician, rejectBookingJob);

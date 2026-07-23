@@ -218,6 +218,23 @@ export const registerPushToken = async (req: AuthRequest, res: Response): Promis
   }
 };
 
+// Called on logout -- an Expo push token identifies a device, not a user, so
+// on a shared/reset device the next person to log in would otherwise keep
+// receiving the previous user's order/refund notifications on their own
+// account's row until it happens to be overwritten by a fresh registration.
+export const clearPushToken = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    await prisma.user.update({
+      where: { id: req.user!.userId },
+      data: { expoPushToken: null },
+    });
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error clearing push token:', error);
+    res.status(500).json({ error: 'Failed to clear push token' });
+  }
+};
+
 export const requestOtp = async (req: Request, res: Response): Promise<void> => {
   try {
     const { phone } = req.body;
