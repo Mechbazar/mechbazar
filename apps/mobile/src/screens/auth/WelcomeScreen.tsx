@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
-  KeyboardAvoidingView, 
-  Platform, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Pressable,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   Animated,
   ActivityIndicator,
   Alert,
@@ -17,11 +18,15 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch } from 'react-redux';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Rect, Defs, LinearGradient, Stop, Circle, Path, G } from 'react-native-svg';
 import { loginSuccess } from '../../store/authSlice';
 import { API_BASE_URL } from '../../services/api';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
+import Container from '../../components/desktop/shared/Container';
+import { spacing as deskSpacing, radius as deskRadius } from '../../theme/tokens';
 
 const { width } = Dimensions.get('window');
 
@@ -140,6 +145,189 @@ const GradientButton = ({ onPress, children, disabled, isLoading }: any) => {
   );
 };
 
+// Shared by both the native/mobile-web layout and the desktop layout below
+// -- same dev-only API base URL switcher, just rendered from either branch.
+const ApiSettingsModal = ({
+  visible, tempBaseUrl, setTempBaseUrl, onSave, onReset, onClose,
+}: {
+  visible: boolean; tempBaseUrl: string; setTempBaseUrl: (v: string) => void;
+  onSave: () => void; onReset: () => void; onClose: () => void;
+}) => (
+  <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+    <View style={styles.modalOverlay}>
+      <View style={styles.modalCard}>
+        <Text style={styles.modalTitle}>API Server Configuration</Text>
+        <Text style={styles.modalDesc}>Change backend API base URL for testing environment updates.</Text>
+
+        <TextInput
+          style={styles.modalInput}
+          value={tempBaseUrl}
+          onChangeText={setTempBaseUrl}
+          placeholder="http://<IP>:<PORT>/api"
+          placeholderTextColor="#6B7480"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+
+        <View style={styles.modalBtnRow}>
+          <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onReset}>
+            <Text style={styles.modalSecondaryBtnText}>Reset</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onClose}>
+            <Text style={styles.modalSecondaryBtnText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.modalPrimaryBtn} onPress={onSave}>
+            <Text style={styles.modalPrimaryBtnText}>Save</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  </Modal>
+);
+
+// Desktop-only login layout (>=1024px). Reuses every piece of state/logic
+// from WelcomeScreen unchanged -- send-otp/login/register calls, validation,
+// GradientButton -- only the JSX/layout differs from the native/mobile-web
+// version below. Split screen (banner+trust content left, centered login
+// card right) instead of one stacked full-height column, so the form is
+// visible without scrolling at 1366x768 and the leftover width isn't empty
+// space. Sits under DesktopHeader (kept as-is -- already has logo/search/
+// categories/nav from the earlier header-compaction pass) via
+// setDesktopFullPageScreenActive, which also skips the shell's full
+// marketing DesktopFooter in favor of the compact one rendered here.
+function DesktopWelcomeLayout({
+  mobile, otp, isOtpSent, isLoading, phoneError,
+  handlePhoneChange, setOtp, handleSendOtp, handleLogin,
+  onOpenSettings, navigation,
+}: any) {
+  return (
+    <View style={desktopStyles.page}>
+      <Pressable
+        style={desktopStyles.settingsIconBtn}
+        onPress={onOpenSettings}
+        accessibilityRole="button"
+        accessibilityLabel="Developer settings"
+      >
+        <Ionicons name="settings-outline" size={16} color={colors.textMuted} />
+      </Pressable>
+
+      <Container style={desktopStyles.center}>
+        <View style={desktopStyles.splitRow}>
+          {/* LEFT: hero copy + banner + benefits */}
+          <View style={desktopStyles.leftCol}>
+            <Text style={desktopStyles.heroTitle}>India's Smart Vehicle Marketplace</Text>
+            <Text style={desktopStyles.heroSubtitle}>Car Parts • Bike Parts • Home Mechanic Services</Text>
+
+            <Image
+              source={require('../../../assets/car_banner.jpg')}
+              style={desktopStyles.bannerImage}
+              resizeMode="cover"
+            />
+
+            <View style={desktopStyles.benefitsRow}>
+              <View style={desktopStyles.benefitItem}>
+                <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
+                <Text style={desktopStyles.benefitText}>Genuine Parts</Text>
+              </View>
+              <View style={desktopStyles.benefitItem}>
+                <Ionicons name="home-outline" size={18} color={colors.primary} />
+                <Text style={desktopStyles.benefitText}>Doorstep Service</Text>
+              </View>
+              <View style={desktopStyles.benefitItem}>
+                <Ionicons name="flash-outline" size={18} color={colors.primary} />
+                <Text style={desktopStyles.benefitText}>Fast Delivery</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* RIGHT: login card */}
+          <View style={desktopStyles.rightCol}>
+            <View style={desktopStyles.card}>
+              <Text style={desktopStyles.welcomeBack}>Welcome Back</Text>
+              <Text style={desktopStyles.continueWith}>Continue with Mobile Number</Text>
+
+              <Text style={desktopStyles.inputLabel}>Mobile Number</Text>
+              <View style={[desktopStyles.inputRow, phoneError ? desktopStyles.inputRowError : null]}>
+                <View style={desktopStyles.flagBox}>
+                  <Text style={desktopStyles.flagText}>🇮🇳</Text>
+                  <Text style={desktopStyles.countryCode}>+91</Text>
+                  <View style={desktopStyles.verticalDivider} />
+                </View>
+                <TextInput
+                  style={desktopStyles.mobileInput}
+                  placeholder="Enter 10-digit number"
+                  placeholderTextColor="#6B7480"
+                  keyboardType="numeric"
+                  maxLength={10}
+                  value={mobile}
+                  onChangeText={handlePhoneChange}
+                  editable={!isOtpSent && !isLoading}
+                />
+              </View>
+              {!!phoneError && (
+                <View style={desktopStyles.errorRow}>
+                  <Ionicons name="alert-circle" size={13} color={colors.primary} />
+                  <Text style={desktopStyles.errorText}>{phoneError}</Text>
+                </View>
+              )}
+
+              {isOtpSent && (
+                <View style={desktopStyles.otpSection}>
+                  <Text style={desktopStyles.inputLabel}>Enter OTP</Text>
+                  <View style={desktopStyles.inputRow}>
+                    <Ionicons name="lock-closed-outline" size={17} color={colors.textMuted} style={{ marginRight: 10 }} />
+                    <TextInput
+                      style={desktopStyles.mobileInput}
+                      placeholder="Enter 6-digit OTP"
+                      placeholderTextColor="#6B7480"
+                      keyboardType="numeric"
+                      maxLength={6}
+                      value={otp}
+                      onChangeText={setOtp}
+                      editable={!isLoading}
+                    />
+                  </View>
+                </View>
+              )}
+
+              <GradientButton
+                onPress={isOtpSent ? handleLogin : handleSendOtp}
+                isLoading={isLoading}
+                disabled={mobile.length < 10}
+              >
+                <Text style={desktopStyles.primaryBtnText}>{isOtpSent ? 'Verify & Login' : 'Request OTP'}</Text>
+              </GradientButton>
+
+              <Pressable
+                style={({ hovered }: any) => [desktopStyles.wholesaleBtn, hovered && desktopStyles.wholesaleBtnHovered]}
+                onPress={() => navigation.navigate('WholesaleRegistration')}
+                accessibilityRole="button"
+              >
+                <Text style={desktopStyles.wholesaleBtnText}>Create Wholesale Account</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Container>
+
+      <View style={desktopStyles.footer}>
+        <Container style={desktopStyles.footerRow}>
+          <Text style={desktopStyles.footerCopy}>© {new Date().getFullYear()} MechBazar. All rights reserved.</Text>
+          <View style={desktopStyles.footerLinks}>
+            <Text style={desktopStyles.footerStatic}>Privacy Policy</Text>
+            <Text style={desktopStyles.footerDot}>•</Text>
+            <Text style={desktopStyles.footerStatic}>Terms</Text>
+            <Text style={desktopStyles.footerDot}>•</Text>
+            <Pressable onPress={() => navigation.navigate('HelpCenter')}>
+              <Text style={desktopStyles.footerLink}>Contact</Text>
+            </Pressable>
+          </View>
+        </Container>
+      </View>
+    </View>
+  );
+}
+
 export default function WelcomeScreen() {
   const dispatch = useDispatch();
   const navigation = useNavigation<any>();
@@ -153,6 +341,12 @@ export default function WelcomeScreen() {
   const [activeBaseUrl, setActiveBaseUrl] = useState(API_BASE_URL);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [tempBaseUrl, setTempBaseUrl] = useState(API_BASE_URL);
+  const { isDesktopUp } = useBreakpoint();
+
+  useFocusEffect(React.useCallback(() => {
+    setDesktopFullPageScreenActive(true);
+    return () => setDesktopFullPageScreenActive(false);
+  }, []));
 
   // Animations
   const logoFadeAnim = useRef(new Animated.Value(0)).current;
@@ -304,6 +498,37 @@ export default function WelcomeScreen() {
     setIsSettingsVisible(false);
     Alert.alert('Settings Reset', `API base URL reset to default:\n${API_BASE_URL}`);
   };
+
+  if (isDesktopUp) {
+    return (
+      <>
+        <DesktopWelcomeLayout
+          mobile={mobile}
+          otp={otp}
+          isOtpSent={isOtpSent}
+          isLoading={isLoading}
+          phoneError={phoneError}
+          handlePhoneChange={handlePhoneChange}
+          setOtp={setOtp}
+          handleSendOtp={handleSendOtp}
+          handleLogin={handleLogin}
+          navigation={navigation}
+          onOpenSettings={() => {
+            setTempBaseUrl(activeBaseUrl);
+            setIsSettingsVisible(true);
+          }}
+        />
+        <ApiSettingsModal
+          visible={isSettingsVisible}
+          tempBaseUrl={tempBaseUrl}
+          setTempBaseUrl={setTempBaseUrl}
+          onSave={saveSettings}
+          onReset={resetSettings}
+          onClose={() => setIsSettingsVisible(false)}
+        />
+      </>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -790,4 +1015,120 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   }
+});
+
+// Desktop-only (>=1024px, see DesktopWelcomeLayout above). Same dark brand
+// palette (`colors` above) as the native screen -- this is a layout change,
+// not a re-theme.
+const desktopStyles = StyleSheet.create({
+  page: { flex: 1, backgroundColor: '#0E1116' },
+  settingsIconBtn: {
+    position: 'absolute' as any,
+    top: deskSpacing.md,
+    right: deskSpacing.md,
+    zIndex: 10,
+    padding: 8,
+    backgroundColor: '#FFFFFF0D',
+    borderRadius: deskRadius.pill,
+    borderWidth: 1,
+    borderColor: '#FFFFFF15',
+  },
+  center: { flex: 1, justifyContent: 'center', paddingVertical: deskSpacing.xl },
+  splitRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: deskSpacing.xxl,
+  },
+  leftCol: { flex: 1.15 },
+  heroTitle: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: colors.white,
+  },
+  heroSubtitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+    marginTop: 6,
+    marginBottom: deskSpacing.md,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  bannerImage: {
+    width: '100%',
+    height: 320,
+    borderRadius: deskRadius.lg,
+  },
+  benefitsRow: {
+    flexDirection: 'row',
+    gap: deskSpacing.lg,
+    marginTop: deskSpacing.md,
+  },
+  benefitItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  benefitText: { color: colors.white, fontSize: 13, fontWeight: '600' },
+  rightCol: { width: 480, maxWidth: 480, flexShrink: 0, alignItems: 'stretch' },
+  card: {
+    backgroundColor: colors.steel,
+    borderRadius: deskRadius.lg,
+    padding: deskSpacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  welcomeBack: { fontSize: 22, fontWeight: '800', color: colors.white },
+  continueWith: { fontSize: 13, color: colors.textMuted, marginTop: 4, marginBottom: deskSpacing.lg },
+  inputLabel: { fontSize: 13, fontWeight: '600', color: colors.white, marginBottom: 8 },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1B2026',
+    borderRadius: deskRadius.md,
+    borderWidth: 1,
+    borderColor: '#343E4A',
+    paddingHorizontal: 12,
+    height: 50,
+  },
+  inputRowError: { borderColor: colors.primary },
+  flagBox: { flexDirection: 'row', alignItems: 'center' },
+  flagText: { fontSize: 17 },
+  countryCode: { fontSize: 15, fontWeight: '600', color: colors.white, marginLeft: 6 },
+  verticalDivider: { width: 1, height: 20, backgroundColor: '#343E4A', marginHorizontal: 12 },
+  mobileInput: { flex: 1, fontSize: 15, color: colors.white, outlineStyle: 'none' as any },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  errorText: { color: colors.primary, fontSize: 12 },
+  otpSection: { marginTop: deskSpacing.md },
+  primaryBtnText: {
+    color: colors.white,
+    fontSize: 15,
+    fontWeight: 'bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.75,
+  },
+  wholesaleBtn: {
+    marginTop: deskSpacing.md,
+    height: 44,
+    borderRadius: deskRadius.md,
+    borderWidth: 1.5,
+    borderColor: '#343E4A',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  wholesaleBtnHovered: { borderColor: colors.primary },
+  wholesaleBtnText: { color: colors.white, fontSize: 13, fontWeight: '700' },
+  footer: { borderTopWidth: 1, borderTopColor: '#1E252D' },
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: deskSpacing.sm,
+  },
+  footerCopy: { color: colors.textMuted, fontSize: 12 },
+  footerLinks: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  footerStatic: { color: colors.textMuted, fontSize: 12 },
+  footerLink: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  footerDot: { color: '#3A4552', fontSize: 12 },
 });
