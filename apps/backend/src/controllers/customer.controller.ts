@@ -1,9 +1,8 @@
 import { Request, Response } from 'express';
-import { PrismaClient, Role, VehicleType } from '@prisma/client';
+import { Role, VehicleType } from '@prisma/client';
 import { AuthRequest } from '../middlewares/auth';
 import { sanitizeUser, sanitizeUsers } from '../utils/sanitizeUser';
-
-const prisma = new PrismaClient();
+import prisma from '../config/prisma';
 
 export const getCustomers = async (req: Request, res: Response): Promise<void> => {
   try {

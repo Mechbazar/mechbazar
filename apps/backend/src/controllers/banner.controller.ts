@@ -1,8 +1,6 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
 import { normalizeVehicleType, parseVehicleTypeFilter } from '../utils/vehicleType';
-
-const prisma = new PrismaClient();
+import prisma from '../config/prisma';
 
 export const getBanners = async (req: Request, res: Response): Promise<void> => {
   try {

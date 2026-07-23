@@ -1,12 +1,11 @@
 import { Request, Response } from 'express';
-import { PrismaClient, Role, RiderStatus } from '@prisma/client';
+import { Role, RiderStatus } from '@prisma/client';
 import { AuthRequest } from '../middlewares/auth';
 import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
 import { generateToken } from '../utils/jwt';
 import { notifyUser } from '../utils/notify';
 import { sanitizeUser, sanitizeUsers, sanitizeOrders } from '../utils/sanitizeUser';
-
-const prisma = new PrismaClient();
+import prisma from '../config/prisma';
 
 // Every /me endpoint below re-derives the DeliveryPartner row from the JWT's
 // userId rather than trusting any id the client might pass in, mirroring the
