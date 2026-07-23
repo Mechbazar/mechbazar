@@ -375,8 +375,11 @@ export const BookingDetailScreen = () => {
             variant="outline"
             onPress={async () => {
               try {
-                await technicianService.getBookingInvoice(bookingId);
-                Alert.alert('Invoice', 'Invoice generated. Ask the customer to view it from their app, or check the admin panel.');
+                const invoice = await technicianService.getBookingInvoice(bookingId);
+                Alert.alert(
+                  invoice.invoiceNumber || 'Invoice',
+                  `Subtotal: ${formatINR(invoice.subtotal)}\nAdditional cost: ${formatINR(invoice.additionalCost)}\nTotal: ${formatINR(invoice.totalAmount)}`
+                );
               } catch (err: any) {
                 Alert.alert('Error', err.response?.data?.error || err.message);
               }
