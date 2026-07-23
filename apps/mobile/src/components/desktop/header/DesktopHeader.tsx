@@ -2,16 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, Pressable, Image, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
-import { logout } from '../../../store/authSlice';
 import { fetchMyWishlist } from '../../../services/wishlist.service';
-import { useBreakpoint } from '../../../hooks/useBreakpoint';
-import { colors, spacing, radius, shadows } from '../../../theme/tokens';
+import { colors, spacing, radius } from '../../../theme/tokens';
 import Container from '../shared/Container';
 import SearchBar from './SearchBar';
 import LocationSelector from './LocationSelector';
 import MegaMenu from './MegaMenu';
+import AccountMenu from './AccountMenu';
 
 function IconAction({
   icon, count, label, onPress,
@@ -39,15 +38,11 @@ function IconAction({
 // navigation targets beyond what App.tsx already registers.
 export default function DesktopHeader() {
   const navigation = useNavigation<NavigationProp<any>>();
-  const dispatch = useDispatch();
   const token = useSelector((state: RootState) => state.auth.token);
-  const user = useSelector((state: RootState) => state.auth.user);
   const cartItems = useSelector((state: RootState) => state.cart.items);
   const cartCount = cartItems.reduce((sum, item) => sum + item.qty, 0);
-  const { isWide } = useBreakpoint();
 
   const [wishlistCount, setWishlistCount] = useState(0);
-  const [accountOpen, setAccountOpen] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -58,23 +53,6 @@ export default function DesktopHeader() {
     fetchMyWishlist(token).then(items => { if (!cancelled) setWishlistCount(items.length); });
     return () => { cancelled = true; };
   }, [token]);
-
-  // DesktopHeader is part of the persistent shell (DesktopAppShell.web.tsx),
-  // not a per-screen component, so it never unmounts/remounts on navigation.
-  // Without this, opening the account panel (hover or click) and then using
-  // any OTHER header action -- notifications bell, cart, wishlist, a mega
-  // menu link -- leaves accountOpen stuck true, so the panel keeps floating
-  // over whatever screen the user navigated to instead of closing.
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('state', () => setAccountOpen(false));
-    return unsubscribe;
-  }, [navigation]);
-
-  const goAccount = (screen?: string) => {
-    setAccountOpen(false);
-    if (screen) navigation.navigate(screen);
-    else navigation.navigate('MainTabs', { screen: 'Account' });
-  };
 
   return (
     <View style={styles.wrapper}>
@@ -124,56 +102,7 @@ export default function DesktopHeader() {
           )}
 
           {token ? (
-            <Pressable
-              onHoverIn={() => setAccountOpen(true)}
-              onHoverOut={() => setAccountOpen(false)}
-              onPress={() => setAccountOpen(o => !o)}
-              style={styles.accountTrigger}
-              accessibilityRole="button"
-              accessibilityLabel="Account menu"
-              accessibilityState={{ expanded: accountOpen }}
-            >
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{(user?.name || 'U').charAt(0).toUpperCase()}</Text>
-              </View>
-              {isWide && (
-                <Text style={styles.accountName} numberOfLines={1}>{user?.name || 'Account'}</Text>
-              )}
-              <Ionicons name={accountOpen ? 'chevron-up' : 'chevron-down'} size={13} color={colors.white} />
-
-              {accountOpen && (
-                // Each item below stops event propagation -- without it, a
-                // click also bubbles up to the outer trigger's own onPress
-                // (setAccountOpen(o => !o)), which runs *after* the item's
-                // setAccountOpen(false) in the same batch and flips the panel
-                // straight back open right after the click, so nothing
-                // appeared to happen.
-                <View style={styles.accountPanel}>
-                  <Pressable style={styles.accountItem} onPress={(e) => { e.stopPropagation(); goAccount(); }}>
-                    <Text style={styles.accountItemText}>My Account</Text>
-                  </Pressable>
-                  <Pressable style={styles.accountItem} onPress={(e) => { e.stopPropagation(); setAccountOpen(false); navigation.navigate('MainTabs', { screen: 'Orders' }); }}>
-                    <Text style={styles.accountItemText}>My Orders</Text>
-                  </Pressable>
-                  <Pressable style={styles.accountItem} onPress={(e) => { e.stopPropagation(); goAccount('Wishlist'); }}>
-                    <Text style={styles.accountItemText}>Wishlist</Text>
-                  </Pressable>
-                  <Pressable style={styles.accountItem} onPress={(e) => { e.stopPropagation(); goAccount('AddressManagement'); }}>
-                    <Text style={styles.accountItemText}>Addresses</Text>
-                  </Pressable>
-                  <Pressable style={styles.accountItem} onPress={(e) => { e.stopPropagation(); goAccount('HelpCenter'); }}>
-                    <Text style={styles.accountItemText}>Help Center</Text>
-                  </Pressable>
-                  <View style={styles.accountDivider} />
-                  <Pressable
-                    style={styles.accountItem}
-                    onPress={(e) => { e.stopPropagation(); setAccountOpen(false); dispatch(logout()); }}
-                  >
-                    <Text style={[styles.accountItemText, styles.logoutText]}>Logout</Text>
-                  </Pressable>
-                </View>
-              )}
-            </Pressable>
+            <AccountMenu />
           ) : (
             <Pressable
               style={styles.loginButton}
@@ -231,44 +160,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeText: { color: colors.white, fontSize: 10, fontWeight: '700' },
-  accountTrigger: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: spacing.sm,
-    height: 40,
-    maxWidth: 180,
-  },
-  avatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { color: colors.white, fontWeight: '700', fontSize: 13 },
-  accountName: { color: colors.white, fontSize: 13, fontWeight: '600', maxWidth: 90 },
-  accountPanel: {
-    position: 'absolute' as any,
-    // Touches the trigger's bottom edge directly (no marginTop gap) -- a gap
-    // here is a dead zone: moving the mouse from the button down toward an
-    // item briefly leaves both the button's and the panel's rendered box,
-    // firing onHoverOut and closing the panel before the click lands.
-    top: '100%',
-    right: 0,
-    minWidth: 200,
-    backgroundColor: colors.white,
-    borderRadius: radius.md,
-    paddingTop: 10,
-    paddingBottom: 6,
-    zIndex: 50,
-    ...shadows.lg,
-  },
-  accountItem: { paddingVertical: 10, paddingHorizontal: 16 },
-  accountItemText: { fontSize: 13, fontWeight: '600', color: colors.textDark },
-  accountDivider: { height: 1, backgroundColor: colors.borderLight, marginVertical: 4 },
-  logoutText: { color: colors.danger },
   loginButton: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,
