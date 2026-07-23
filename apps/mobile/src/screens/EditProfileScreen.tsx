@@ -1,21 +1,24 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StyleSheet, 
-  TextInput, 
-  ScrollView, 
-  Alert, 
-  Platform
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  TextInput,
+  ScrollView,
+  Alert,
+  Platform,
+  Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { RootState } from '../store';
 import { updateUserSuccess } from '../store/authSlice';
 import { updateMyProfile } from '../services/profile.service';
+import { API_BASE_URL } from '../services/api';
 
 const colors = {
   primary: '#E53935',
@@ -39,7 +42,57 @@ export default function EditProfileScreen() {
   const [phone, setPhone] = useState(user?.phone || '');
   const [gender, setGender] = useState(user?.gender || 'Male');
   const [dob, setDob] = useState(user?.dob || '1995-08-15');
+  const [avatar, setAvatar] = useState<string | undefined>(user?.avatar || undefined);
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const handleChangePhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow photo library access to change your profile photo.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.6,
+      allowsEditing: true,
+      aspect: [1, 1],
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    setUploadingPhoto(true);
+    try {
+      const asset = result.assets[0];
+      const formData = new FormData();
+      formData.append('file', {
+        uri: asset.uri,
+        type: asset.mimeType || 'image/jpeg',
+        name: asset.fileName || 'avatar.jpg',
+      } as any);
+      const uploadRes = await fetch(`${API_BASE_URL}/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) {
+        Alert.alert('Upload Failed', uploadData.error || 'Could not upload photo.');
+        return;
+      }
+      const result2 = await updateMyProfile(token || '', { avatar: uploadData.url });
+      if (result2.error) {
+        Alert.alert('Update Failed', result2.error);
+        return;
+      }
+      setAvatar(uploadData.url);
+      dispatch(updateUserSuccess({ avatar: uploadData.url }));
+      Alert.alert('Success', 'Profile photo updated.');
+    } catch (e) {
+      Alert.alert('Error', 'Network error while uploading photo.');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!name.trim()) {
@@ -83,13 +136,18 @@ export default function EditProfileScreen() {
         {/* Profile Avatar section */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{(name || 'U').charAt(0).toUpperCase()}</Text>
+            {avatar ? (
+              <Image source={{ uri: avatar }} style={styles.avatarImage} />
+            ) : (
+              <Text style={styles.avatarText}>{(name || 'U').charAt(0).toUpperCase()}</Text>
+            )}
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.changePhotoBtn}
-            onPress={() => Alert.alert('Profile Photo', 'Selected dummy photo. Photo updated successfully.')}
+            onPress={handleChangePhoto}
+            disabled={uploadingPhoto}
           >
-            <Text style={styles.changePhotoText}>Change Profile Photo</Text>
+            <Text style={styles.changePhotoText}>{uploadingPhoto ? 'Uploading...' : 'Change Profile Photo'}</Text>
           </TouchableOpacity>
         </View>
 
@@ -121,14 +179,13 @@ export default function EditProfileScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>MOBILE NUMBER</Text>
-            <TextInput 
-              style={styles.input}
+            <TextInput
+              style={[styles.input, styles.inputDisabled]}
               value={phone}
-              onChangeText={setPhone}
-              placeholder="Enter mobile number"
-              keyboardType="phone-pad"
+              editable={false}
               placeholderTextColor={colors.textMuted}
             />
+            <Text style={styles.helperText}>Your mobile number is your verified login and can't be changed here.</Text>
           </View>
 
           {/* Gender */}
@@ -206,6 +263,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   avatarText: { fontSize: 36, fontWeight: '800', color: colors.white },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 45 },
   changePhotoBtn: { marginTop: 12 },
   changePhotoText: { color: colors.primary, fontWeight: 'bold', fontSize: 13 },
   formCard: {
@@ -228,6 +286,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  inputDisabled: { backgroundColor: colors.lightGray, color: colors.textMuted },
+  helperText: { fontSize: 11, color: colors.textMuted, marginTop: 6 },
   genderRow: { flexDirection: 'row', justifyContent: 'space-between' },
   genderOption: {
     width: '30%',

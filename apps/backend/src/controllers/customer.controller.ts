@@ -230,7 +230,7 @@ export const getMyProfile = async (req: AuthRequest, res: Response): Promise<voi
 
 export const updateMyProfile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { name, email, gender, dob } = req.body;
+    const { name, email, gender, dob, avatar } = req.body;
     const userId = req.user!.userId;
 
     if (email) {
@@ -248,6 +248,7 @@ export const updateMyProfile = async (req: AuthRequest, res: Response): Promise<
         ...(email !== undefined && { email: email || null }),
         ...(gender !== undefined && { gender }),
         ...(dob !== undefined && { dob }),
+        ...(avatar !== undefined && { avatar }),
       },
     });
 
