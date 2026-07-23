@@ -66,7 +66,7 @@ export default function Dashboard() {
           <p className="text-neutral-400 mt-1">Welcome back, Super Admin</p>
         </div>
         <button
-          onClick={() => alert('Report generated successfully and sent to your registered email.')}
+          onClick={() => alert('Report generation is coming soon -- there is no export/report endpoint yet.')}
           className="inline-flex items-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-600"
         >
           <TrendingUp className="w-4 h-4" />
@@ -85,12 +85,6 @@ export default function Dashboard() {
               <div className={`p-4 rounded-full ${stat.bg}`}>
                 <stat.icon className={`w-8 h-8 ${stat.color}`} />
               </div>
-            </div>
-            <div className="mt-4 flex items-center gap-2 text-sm text-neutral-400">
-              <span className="inline-flex items-center gap-1 font-medium text-success-500">
-                <TrendingUp className="w-3 h-3" /> +12.5%
-              </span>
-              <span>from last month</span>
             </div>
           </Card>
         ))}

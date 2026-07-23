@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { Button, Card, Dialog, Input } from '@mechbazar/shared/web';
 
-// Mock Data for UI demonstration
+// Sample rows only -- the backend has no CRUD for vehicle master data yet
+// (apps/backend/src/routes/vehicle.routes.ts only exposes GET manufacturers/
+// models/variants/fuels), so this page cannot list or save real vehicles
+// yet. Previously this looked like a working table with a working Save
+// button; it wasn't wired to anything.
 const mockVehicles = [
   { id: 1, make: 'Honda', model: 'City', variant: 'VX', year: 2018, fuel: 'Petrol' },
   { id: 2, make: 'Hyundai', model: 'Creta', variant: 'SX', year: 2022, fuel: 'Diesel' },
@@ -18,6 +22,10 @@ export default function Vehicles() {
         <Button onClick={() => setIsModalOpen(true)}>
           + Add New Vehicle
         </Button>
+      </div>
+
+      <div className="mb-4 rounded-lg border border-amber-700/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-300">
+        Read-only preview -- adding/editing vehicle master data isn't wired to the backend yet. The rows below are sample data, not your real catalog.
       </div>
 
       <Card variant="dark" className="!p-0 overflow-hidden">
@@ -49,13 +57,13 @@ export default function Vehicles() {
 
       <Dialog isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Add Vehicle">
             <div className="space-y-4">
-              <Input type="text" placeholder="Make (e.g., Honda)" />
-              <Input type="text" placeholder="Model (e.g., City)" />
-              <Input type="text" placeholder="Variant (e.g., VX)" />
-              <Input type="number" placeholder="Year" />
+              <p className="text-sm text-amber-300">Coming soon -- saving isn't connected to the backend yet, so nothing entered here will be kept.</p>
+              <Input type="text" placeholder="Make (e.g., Honda)" disabled />
+              <Input type="text" placeholder="Model (e.g., City)" disabled />
+              <Input type="text" placeholder="Variant (e.g., VX)" disabled />
+              <Input type="number" placeholder="Year" disabled />
               <div className="flex justify-end space-x-2 mt-4">
-                <button className="px-4 py-2 text-neutral-400 hover:text-white" onClick={() => setIsModalOpen(false)}>Cancel</button>
-                <Button onClick={() => setIsModalOpen(false)}>Save</Button>
+                <button className="px-4 py-2 text-neutral-400 hover:text-white" onClick={() => setIsModalOpen(false)}>Close</button>
               </div>
             </div>
       </Dialog>
