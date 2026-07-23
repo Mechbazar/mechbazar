@@ -37,6 +37,17 @@ const TechnicianGate = () => {
     }
   }, [isError, dispatch]);
 
+  // Resubmitting from the wizard (RegistrationScreen's "Submit for Review")
+  // moves status to UNDER_VERIFICATION -- without this, showWizard stayed
+  // true forever after the first "Edit & Continue" tap, so a successful
+  // resubmission kept rendering the wizard instead of the status screen, with
+  // no visible confirmation it went through.
+  React.useEffect(() => {
+    if (profile?.status === 'UNDER_VERIFICATION') {
+      setShowWizard(false);
+    }
+  }, [profile?.status]);
+
   if (isLoading) {
     return <Loader fullScreen />;
   }
