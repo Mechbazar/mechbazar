@@ -14,6 +14,12 @@ const prisma = new PrismaClient();
 const getOwnDeliveryPartner = (userId: string) =>
   prisma.deliveryPartner.findUnique({ where: { userId } });
 
+// Documents are listed with fileData excluded -- every KYC document's raw
+// bytes were previously fetched on every admin/rider page load, even though
+// the bytes are only needed by the dedicated single-document-file endpoint.
+// Mirrors technician.controller.ts's DOCUMENT_LIST_SELECT.
+const DOCUMENT_LIST_SELECT = { id: true, deliveryPartnerId: true, type: true, status: true, remarks: true, uploadedAt: true, mimeType: true };
+
 export const getRiders = async (req: Request, res: Response): Promise<void> => {
   try {
     const riders = await prisma.user.findMany({
@@ -23,7 +29,7 @@ export const getRiders = async (req: Request, res: Response): Promise<void> => {
       include: {
         deliveryProfile: {
           include: {
-            documents: true,
+            documents: { select: DOCUMENT_LIST_SELECT },
             bankAccounts: true,
           }
         },
@@ -47,7 +53,7 @@ export const getRiderById = async (req: Request, res: Response): Promise<void> =
       include: {
         deliveryProfile: {
           include: {
-            documents: true,
+            documents: { select: DOCUMENT_LIST_SELECT },
             bankAccounts: true,
           }
         },
@@ -427,7 +433,7 @@ export const submitMyApplication = async (req: AuthRequest, res: Response): Prom
   try {
     const partner = await prisma.deliveryPartner.findUnique({
       where: { userId: req.user!.userId },
-      include: { user: true, documents: true, bankAccounts: true },
+      include: { user: true, documents: { select: DOCUMENT_LIST_SELECT }, bankAccounts: true },
     });
     if (!partner) {
       res.status(404).json({ error: 'Rider profile not found' });
@@ -514,7 +520,7 @@ export const getMyRiderProfile = async (req: AuthRequest, res: Response): Promis
   try {
     const partner = await prisma.deliveryPartner.findUnique({
       where: { userId: req.user!.userId },
-      include: { user: true, documents: true, bankAccounts: true },
+      include: { user: true, documents: { select: DOCUMENT_LIST_SELECT }, bankAccounts: true },
     });
     if (!partner) {
       res.status(404).json({ error: 'Rider profile not found' });
