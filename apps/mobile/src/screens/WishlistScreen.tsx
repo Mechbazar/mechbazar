@@ -17,6 +17,10 @@ import { addToCart } from '../store/cartSlice';
 import { RootState } from '../store';
 import { Product } from '../types/product';
 import { fetchMyWishlist, removeFromWishlist } from '../services/wishlist.service';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 
 const colors = {
   primary: '#E53935',
@@ -52,6 +56,15 @@ export default function WishlistScreen() {
   // Refetch every time this screen gains focus so a heart toggled elsewhere
   // (product details, home) is reflected here without a manual pull-to-refresh.
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   const handleRemove = async (id: string) => {
     if (!token) return;
@@ -130,6 +143,7 @@ export default function WishlistScreen() {
         <View style={{ width: 24 }} />
       </View>
 
+      <CompactBookingShell maxWidth={880} style={styles.flexFill}>
       {isLoading ? (
         <View style={styles.loadingState}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -155,12 +169,18 @@ export default function WishlistScreen() {
           }
         />
       )}
+      </CompactBookingShell>
+
+      <CompactBookingShell maxWidth={880}>
+        <MinimalFooter />
+      </CompactBookingShell>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
+  flexFill: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

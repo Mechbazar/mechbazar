@@ -1,12 +1,16 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Linking, Platform } from 'react-native';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Linking, Platform, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { HeaderCartButton } from '../components/HeaderCartButton';
 import { RootState } from '../store';
 
 import { API_BASE_URL } from '../services/api';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 
 const TRACKING_POLL_INTERVAL_MS = 10000;
 
@@ -45,6 +49,15 @@ export default function DeliveryTrackingScreen() {
 
   // Pulse animation for active node
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   useEffect(() => {
     Animated.loop(
@@ -181,6 +194,8 @@ export default function DeliveryTrackingScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {renderHeader()}
 
+      <CompactBookingShell maxWidth={880} style={styles.flexFill}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
       {rider && hasRiderLocation ? (
         MapView ? (
           <MapView
@@ -253,12 +268,16 @@ export default function DeliveryTrackingScreen() {
         </View>
       </View>
 
+      <MinimalFooter />
+      </ScrollView>
+      </CompactBookingShell>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F4F6F8' },
+  flexFill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#FFFFFF' },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: '#1C1C1C', fontWeight: 'bold' },
@@ -276,7 +295,7 @@ const styles = StyleSheet.create({
   riderMeta: { fontSize: 12, color: '#6B7480' },
   iconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#F4F6F8', justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
 
-  trackingCard: { flex: 1, backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, marginTop: 14, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 10 },
+  trackingCard: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, marginTop: 14, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 10 },
   trackingTitle: { fontSize: 20, fontWeight: '800', color: '#111111', marginBottom: 24 },
 
   timeline: { paddingLeft: 8 },

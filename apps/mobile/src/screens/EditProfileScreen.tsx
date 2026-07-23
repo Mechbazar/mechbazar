@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -19,6 +19,10 @@ import { RootState } from '../store';
 import { updateUserSuccess } from '../store/authSlice';
 import { updateMyProfile } from '../services/profile.service';
 import { API_BASE_URL } from '../services/api';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 
 const colors = {
   primary: '#E53935',
@@ -40,11 +44,20 @@ export default function EditProfileScreen() {
   const [name, setName] = useState(user?.name || '');
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || '');
-  const [gender, setGender] = useState(user?.gender || 'Male');
-  const [dob, setDob] = useState(user?.dob || '1995-08-15');
+  const [gender, setGender] = useState(user?.gender || '');
+  const [dob, setDob] = useState(user?.dob || '');
   const [avatar, setAvatar] = useState<string | undefined>(user?.avatar || undefined);
   const [saving, setSaving] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   const handleChangePhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -132,6 +145,7 @@ export default function EditProfileScreen() {
         <View style={{ width: 24 }} />
       </View>
 
+      <CompactBookingShell maxWidth={640} style={styles.flexFill}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Profile Avatar section */}
         <View style={styles.avatarSection}>
@@ -229,14 +243,17 @@ export default function EditProfileScreen() {
             {saving ? 'Saving...' : 'Save Profile Details'}
           </Text>
         </TouchableOpacity>
+        <MinimalFooter />
       </ScrollView>
+      </CompactBookingShell>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
-  header: { 
+  flexFill: { flex: 1 },
+  header: {
     flexDirection: 'row', 
     alignItems: 'center', 
     justifyContent: 'space-between', 

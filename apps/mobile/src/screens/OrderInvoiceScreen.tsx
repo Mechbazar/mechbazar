@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { colors } from './services/theme';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 
 type ParamList = { OrderInvoice: { order: any } };
 
@@ -49,6 +53,15 @@ export default function OrderInvoiceScreen() {
 
   const [sharing, setSharing] = useState(false);
   const [downloading, setDownloading] = useState(false);
+
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   // printToFileAsync's own temp file lives in a location that's readable
   // neither by expo-sharing's FileProvider nor by expo-file-system's own
@@ -123,6 +136,7 @@ export default function OrderInvoiceScreen() {
         <Text style={styles.headerTitle}>Invoice</Text>
       </View>
 
+      <CompactBookingShell maxWidth={640} style={styles.flexFill}>
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         <View style={styles.invoiceCard}>
           <Text style={styles.brand}>MechBazar</Text>
@@ -168,13 +182,16 @@ export default function OrderInvoiceScreen() {
             <Text style={styles.actionBtnText}>{sharing ? 'Preparing...' : '↗ Share'}</Text>
           </TouchableOpacity>
         </View>
+        <MinimalFooter />
       </ScrollView>
+      </CompactBookingShell>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
+  flexFill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.darkInk },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: colors.white, fontWeight: 'bold' },

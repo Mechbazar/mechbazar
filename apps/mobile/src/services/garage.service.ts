@@ -17,6 +17,7 @@ const mapBackendVehicle = (v: any): UserVehicle => ({
   engine: v.engine || '',
   transmission: v.transmission || '',
   trim: v.trim || '',
+  registrationNumber: v.registrationNumber || undefined,
   isDefault: v.isDefault,
 });
 

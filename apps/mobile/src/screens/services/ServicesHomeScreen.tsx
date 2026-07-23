@@ -11,6 +11,10 @@ import { ServiceCategory, ServicePackage, ServiceBooking } from '../../types/ser
 import { fetchServiceCategories, fetchMyBookings } from '../../services/service.service';
 import { HeaderCartButton } from '../../components/HeaderCartButton';
 import { colors } from './theme';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
 
 type PkgWithCategory = ServicePackage & { category?: ServiceCategory };
 
@@ -49,6 +53,15 @@ export default function ServicesHomeScreen({ navigation }: any) {
 
   useEffect(() => { loadCategories(); }, [loadCategories]);
   useFocusEffect(useCallback(() => { loadCategories(); loadBookings(); }, [loadCategories, loadBookings]));
+
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   const onRefresh = () => loadCategories(true);
 
@@ -224,6 +237,7 @@ export default function ServicesHomeScreen({ navigation }: any) {
         </View>
       </View>
 
+      <CompactBookingShell maxWidth={960} style={styles.flexFill}>
       {loading ? (
         renderSkeleton()
       ) : loadError ? (
@@ -356,14 +370,17 @@ export default function ServicesHomeScreen({ navigation }: any) {
               {allServicesPackages.map((p) => renderPackageCard(p, true))}
             </View>
           </View>
+          <MinimalFooter />
         </ScrollView>
       )}
+      </CompactBookingShell>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
+  flexFill: { flex: 1 },
   header: { backgroundColor: colors.darkInk, padding: 14, paddingBottom: 16 },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
   headerTitle: { fontSize: 20, fontWeight: '900', color: colors.white },

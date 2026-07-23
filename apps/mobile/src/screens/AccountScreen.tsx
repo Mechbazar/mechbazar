@@ -75,6 +75,8 @@ export default function AccountScreen() {
   const [isCouponsVisible, setIsCouponsVisible] = useState(false);
   const [activeCoupons, setActiveCoupons] = useState<{ code: string; discountType: string; discountValue: number; minOrderValue: number; vehicleType: string | null }[]>([]);
   const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
+  const [offers, setOffers] = useState<{ id: string; title: string; description?: string }[]>([]);
+  const [isLoadingOffers, setIsLoadingOffers] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState('English');
@@ -153,8 +155,8 @@ export default function AccountScreen() {
     }
   };
 
-  const handleChangePassword = () => {
-    if (!currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
+  const handleChangePassword = async () => {
+    if (!newPassword.trim() || !confirmPassword.trim()) {
       Alert.alert('Validation Error', 'Please fill in all fields.');
       return;
     }
@@ -162,15 +164,30 @@ export default function AccountScreen() {
       Alert.alert('Validation Error', 'New passwords do not match.');
       return;
     }
-    setIsLoadingData(true);
-    setTimeout(() => {
-      setIsLoadingData(false);
+    if (newPassword.length < 6) {
+      Alert.alert('Validation Error', 'New password must be at least 6 characters.');
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/change-password`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        Alert.alert('Error', data.error || 'Failed to change password.');
+        return;
+      }
       setIsChangePasswordModalVisible(false);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      Alert.alert('Success', 'Password changed successfully!');
-    }, 1500);
+      Alert.alert('Success', 'Your password has been updated.');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      Alert.alert('Network Error', `Could not update password: ${message}`);
+    }
   };
 
   const handleSendPhoneOtp = () => {
@@ -209,27 +226,17 @@ export default function AccountScreen() {
     }, 1500);
   };
 
+  // There is no account-deletion API -- deleting a customer touches orders,
+  // bookings, wallet balance, and financial/GST records with no cascade rules
+  // in the schema, so a real "delete" needs its own design (hard vs soft
+  // delete, refund handling, invoice retention), not a same-pass patch. This
+  // used to fake a 2-second "success" and log the user out while their account
+  // and data were untouched -- tell them plainly instead of lying.
   const handleDeleteAccount = () => {
     Alert.alert(
       'Delete Account',
-      'Are you sure you want to permanently delete your Mech Bazar account? All saved vehicles, addresses, and wallet balance will be permanently lost.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Permanently Delete', 
-          style: 'destructive',
-          onPress: () => {
-            setIsLoadingData(true);
-            setTimeout(async () => {
-              setIsLoadingData(false);
-              dispatch(logout());
-              await AsyncStorage.removeItem('@auth_token');
-              await AsyncStorage.removeItem('@auth_user');
-              Alert.alert('Deleted', 'Your account has been deleted.');
-            }, 2000);
-          }
-        }
-      ]
+      'Account deletion isn\'t self-service yet. Please contact MechBazar support and we\'ll process the deletion of your account and data for you.',
+      [{ text: 'OK' }]
     );
   };
 
@@ -269,6 +276,19 @@ export default function AccountScreen() {
   useEffect(() => {
     loadDatabaseData();
   }, [token]);
+
+  // Real active offers (Offer model, admin-managed) -- this used to be 3
+  // hardcoded "Engine Oil discount" / "Free Car Wash" / "AC Servicing Off"
+  // cards shown to every customer regardless of what admin actually
+  // published. Public endpoint, no auth required.
+  useEffect(() => {
+    setIsLoadingOffers(true);
+    fetch(`${API_BASE_URL}/offers`)
+      .then(res => (res.ok ? res.json() : []))
+      .then(setOffers)
+      .catch(() => setOffers([]))
+      .finally(() => setIsLoadingOffers(false));
+  }, []);
 
   const handleLogout = () => {
     Alert.alert('Log out', 'Are you sure you want to log out of Mech Bazar?', [
@@ -347,6 +367,14 @@ export default function AccountScreen() {
     }
   };
 
+  // Real completion percentage from the fields the User model actually has
+  // (phone is required at signup, so it isn't counted) -- this used to be a
+  // hardcoded "80%" shown to every customer regardless of their real profile.
+  const profileFields = [user?.name, user?.email, user?.avatar, user?.gender, user?.dob];
+  const profileCompletion = Math.round(
+    (profileFields.filter(Boolean).length / profileFields.length) * 100
+  );
+
   const handleShareReferral = async () => {
     try {
       await Share.share({
@@ -381,7 +409,7 @@ export default function AccountScreen() {
             {/* Profile Info block */}
             <View style={styles.infoWrapper}>
               <Text style={styles.profileName}>{user?.name || 'Customer User'}</Text>
-              <Text style={styles.profilePhone}>{user?.phone || '+91 9876543210'}</Text>
+              <Text style={styles.profilePhone}>{user?.phone || 'No phone on file'}</Text>
               <Text style={styles.profileCustId}>Cust ID: MB-CUST{user?.id ? user.id.slice(0, 5).toUpperCase() : '847'}</Text>
               
               {/* Badge tier */}
@@ -395,19 +423,18 @@ export default function AccountScreen() {
             </View>
           </View>
 
-          {/* Loyalty & progress row */}
+          {/* Profile completion row -- the "LOYALTY BALANCE: 850 Points" box
+              that used to sit here was pure fabrication (no loyalty-points
+              field exists anywhere in the User model); removed rather than
+              wired, since there's nothing real to wire it to. */}
           <View style={styles.loyaltyRow}>
-            <View style={styles.loyaltyBox}>
-              <Text style={styles.loyaltyLabel}>LOYALTY BALANCE</Text>
-              <Text style={styles.loyaltyValue}>850 Points</Text>
-            </View>
-            <View style={styles.progressBox}>
+            <View style={styles.progressBoxFull}>
               <View style={styles.progressLabelRow}>
                 <Text style={styles.progressLabel}>Profile Completion</Text>
-                <Text style={styles.progressVal}>80%</Text>
+                <Text style={styles.progressVal}>{profileCompletion}%</Text>
               </View>
               <View style={styles.progressTrack}>
-                <View style={[styles.progressBar, { width: '80%' }]} />
+                <View style={[styles.progressBar, { width: `${profileCompletion}%` }]} />
               </View>
             </View>
           </View>
@@ -481,15 +508,8 @@ export default function AccountScreen() {
                   <View style={{ marginLeft: 12, flex: 1 }}>
                     <Text style={styles.vehicleName}>{veh.brand} {veh.model}</Text>
                     <Text style={styles.vehicleMeta}>{veh.year} • {veh.fuelType || 'Petrol'}</Text>
-                    <Text style={styles.vehicleReg}>Reg Number: {veh.id ? `DL-${veh.id.slice(0, 2).toUpperCase()}-XX-8921` : 'Not Registered'}</Text>
+                    <Text style={styles.vehicleReg}>Reg Number: {veh.registrationNumber || 'Not registered'}</Text>
                   </View>
-                  <View style={[styles.insuranceStatusTag, { backgroundColor: '#EBFBEE' }]}>
-                    <Text style={[styles.insuranceStatusText, { color: '#2B8A3E' }]}>Insurance Active</Text>
-                  </View>
-                </View>
-                <View style={styles.serviceDueRow}>
-                  <Ionicons name="time-outline" size={14} color={colors.warning} />
-                  <Text style={styles.serviceDueText}>Next Service Due: 24 Aug 2026</Text>
                 </View>
                 <View style={styles.vehicleBtnRow}>
                   <TouchableOpacity style={styles.vehicleSecondaryBtn} onPress={() => Alert.alert('Vehicle Specifications', `Specs: Brand ${veh.brand}, Model ${veh.model}, Fuel ${veh.fuelType || 'Petrol'}.`)}>
@@ -553,7 +573,9 @@ export default function AccountScreen() {
                     style={styles.bookingCallBtn}
                     onPress={() => {
                       if (booking.technician?.user?.phone) {
-                        Alert.alert('Calling Mechanic', `Calling ${booking.technician.user.name} at ${booking.technician.user.phone}...`);
+                        Linking.openURL(`tel:${booking.technician.user.phone}`).catch(() =>
+                          Alert.alert('Error', 'Could not open the phone dialer.')
+                        );
                       } else {
                         Alert.alert('Not Assigned', 'A doorstep mechanic will be assigned to your booking shortly.');
                       }
@@ -613,23 +635,30 @@ export default function AccountScreen() {
         </View>
 
         {/* PROMOTIONAL OFFERS */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Promotions & Offers</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
-            <View style={[styles.offerCard, { backgroundColor: '#FFF5F5', borderColor: '#FFA8A8' }]}>
-              <Text style={styles.offerCardTitle}>Engine Oil discount</Text>
-              <Text style={styles.offerCardDesc}>Save flat 10% on top synthetic engine lubricants.</Text>
-            </View>
-            <View style={[styles.offerCard, { backgroundColor: '#EBFBEE', borderColor: '#8CE99A' }]}>
-              <Text style={styles.offerCardTitle}>Free Car Wash</Text>
-              <Text style={styles.offerCardDesc}>Complimentary foam wash with every mechanic visit.</Text>
-            </View>
-            <View style={[styles.offerCard, { backgroundColor: '#E8F7FF', borderColor: '#74C0FC' }]}>
-              <Text style={styles.offerCardTitle}>AC Servicing Off</Text>
-              <Text style={styles.offerCardDesc}>Book AC gas refills and save flat ₹200 this week.</Text>
-            </View>
-          </ScrollView>
-        </View>
+        {(isLoadingOffers || offers.length > 0) && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Promotions & Offers</Text>
+            {isLoadingOffers ? (
+              <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 16 }} />
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
+                {offers.map((offer, i) => {
+                  const palette = [
+                    { backgroundColor: '#FFF5F5', borderColor: '#FFA8A8' },
+                    { backgroundColor: '#EBFBEE', borderColor: '#8CE99A' },
+                    { backgroundColor: '#E8F7FF', borderColor: '#74C0FC' },
+                  ];
+                  return (
+                    <View key={offer.id} style={[styles.offerCard, palette[i % palette.length]]}>
+                      <Text style={styles.offerCardTitle}>{offer.title}</Text>
+                      {!!offer.description && <Text style={styles.offerCardDesc}>{offer.description}</Text>}
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            )}
+          </View>
+        )}
 
         {/* COLLAPSIBLE MENUS (SUPPORT, SETTINGS, SECURITY) */}
         
@@ -1139,6 +1168,9 @@ const styles = StyleSheet.create({
   progressBox: {
     flex: 2,
     marginLeft: 16,
+  },
+  progressBoxFull: {
+    flex: 1,
   },
   progressLabelRow: {
     flexDirection: 'row',

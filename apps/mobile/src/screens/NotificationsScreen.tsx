@@ -1,19 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
   TouchableOpacity, 
   StyleSheet, 
-  FlatList, 
-  ActivityIndicator, 
-  Alert 
+  FlatList,
+  ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { RootState } from '../store';
 import { API_BASE_URL } from '../services/api';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 
 const colors = {
   primary: '#E53935',
@@ -56,6 +59,15 @@ export default function NotificationsScreen() {
     loadNotifications();
   }, [token]);
 
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
+
   const handleMarkAsRead = async (id: string) => {
     if (!token) return;
     try {
@@ -73,10 +85,20 @@ export default function NotificationsScreen() {
     }
   };
 
-  const handleDelete = (id: string) => {
-    // Since the database has no delete notification endpoint, we filter it out of the UI state
+  const handleDelete = async (id: string) => {
+    if (!token) return;
+    const previous = notifications;
     setNotifications(prev => prev.filter(notif => notif.id !== id));
-    Alert.alert('Deleted', 'Notification removed.');
+    try {
+      const res = await fetch(`${API_BASE_URL}/customers/notifications/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) setNotifications(previous);
+    } catch (e) {
+      console.error('Failed to delete notification:', e);
+      setNotifications(previous);
+    }
   };
 
   const renderItem = ({ item }: { item: any }) => (
@@ -124,28 +146,34 @@ export default function NotificationsScreen() {
         </View>
       )}
 
-      <FlatList
-        data={notifications}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          !loading ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="notifications-off-outline" size={48} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>All caught up!</Text>
-              <Text style={styles.emptySubtitle}>You have no notifications at the moment.</Text>
-            </View>
-          ) : null
-        }
-      />
+      <CompactBookingShell maxWidth={880} style={styles.flexFill}>
+        <FlatList
+          data={notifications}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            !loading ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="notifications-off-outline" size={48} color={colors.textMuted} />
+                <Text style={styles.emptyTitle}>All caught up!</Text>
+                <Text style={styles.emptySubtitle}>You have no notifications at the moment.</Text>
+              </View>
+            ) : null
+          }
+        />
+      </CompactBookingShell>
+      <CompactBookingShell maxWidth={880}>
+        <MinimalFooter />
+      </CompactBookingShell>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
-  header: { 
+  flexFill: { flex: 1 },
+  header: {
     flexDirection: 'row', 
     alignItems: 'center', 
     justifyContent: 'space-between', 

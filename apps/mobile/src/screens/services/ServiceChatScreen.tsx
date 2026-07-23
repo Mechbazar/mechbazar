@@ -1,12 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, TextInput, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { ServiceChatMessage } from '../../types/service';
 import { fetchBookingMessages, sendBookingMessage } from '../../services/service.service';
 import { colors } from './theme';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
 
 type ParamList = { ServiceChat: { bookingId: string } };
 const POLL_INTERVAL_MS = 5000;
@@ -21,6 +24,18 @@ export default function ServiceChatScreen() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const listRef = useRef<FlatList>(null);
+
+  // Full-page (no marketing footer) -- a chat screen's input bar should be
+  // the last visible element, not have a multi-column footer pushed in
+  // below it the way DesktopAppShell's default wrap would.
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   useEffect(() => {
     if (!token) return;
@@ -59,6 +74,7 @@ export default function ServiceChatScreen() {
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={90}>
+        <CompactBookingShell maxWidth={720} style={styles.flexFill}>
         <FlatList
           ref={listRef}
           data={messages}
@@ -96,6 +112,7 @@ export default function ServiceChatScreen() {
             <Text style={styles.sendBtnText}>➤</Text>
           </TouchableOpacity>
         </View>
+        </CompactBookingShell>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -103,6 +120,7 @@ export default function ServiceChatScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
+  flexFill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.darkInk },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: colors.white, fontWeight: 'bold' },

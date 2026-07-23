@@ -48,6 +48,7 @@ export default function GarageScreen() {
   const [selectedVehicle, setSelectedVehicle] = useState<any | null>(null);
   const [nickname, setNickname] = useState('');
   const [trim, setTrim] = useState('');
+  const [registrationNumber, setRegistrationNumber] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -118,19 +119,20 @@ export default function GarageScreen() {
     setSelectedVehicle(veh);
     setNickname(veh.nickname || '');
     setTrim(veh.trim || '');
+    setRegistrationNumber(veh.registrationNumber || '');
     setEditModalVisible(true);
   };
 
   const handleSaveEdit = async () => {
     if (!selectedVehicle || !token) return;
     setSavingEdit(true);
-    const result = await updateMyVehicle(token, selectedVehicle.id, { nickname, trim });
+    const result = await updateMyVehicle(token, selectedVehicle.id, { nickname, trim, registrationNumber });
     setSavingEdit(false);
     if (!result.vehicle) {
       Alert.alert('Error', result.error || 'Failed to update vehicle');
       return;
     }
-    dispatch(updateVehicleInGarage({ ...selectedVehicle, nickname, trim }));
+    dispatch(updateVehicleInGarage({ ...selectedVehicle, nickname, trim, registrationNumber }));
     setEditModalVisible(false);
     Alert.alert('Success', 'Vehicle details updated successfully!');
   };
@@ -252,6 +254,17 @@ export default function GarageScreen() {
                   value={trim}
                   onChangeText={setTrim}
                   placeholder="e.g. VXI / LXI"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>REGISTRATION NUMBER</Text>
+                <TextInput
+                  style={styles.input}
+                  value={registrationNumber}
+                  onChangeText={setRegistrationNumber}
+                  placeholder="e.g. DL-01-AB-1234"
+                  autoCapitalize="characters"
                 />
               </View>
 

@@ -7,6 +7,10 @@ import { RootState } from '../store';
 import { Category } from '../types/product';
 import { fetchCategories } from '../services/product.service';
 import { HeaderCartButton } from '../components/HeaderCartButton';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 
 // MechBazar Brand Colors (New Design System) -- matches HomeScreen/CartScreen
 const colors = {
@@ -44,6 +48,15 @@ export default function CategoriesScreen() {
     }, [loadCategories])
   );
 
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
@@ -51,6 +64,7 @@ export default function CategoriesScreen() {
         <HeaderCartButton color="#FFFFFF" backgroundColor="rgba(255,255,255,0.15)" />
       </View>
 
+      <CompactBookingShell maxWidth={880} style={styles.flexFill}>
       {loading && categories.length === 0 ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -81,12 +95,17 @@ export default function CategoriesScreen() {
           ))}
         </ScrollView>
       )}
+      </CompactBookingShell>
+      <CompactBookingShell maxWidth={880}>
+        <MinimalFooter />
+      </CompactBookingShell>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
+  flexFill: { flex: 1 },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

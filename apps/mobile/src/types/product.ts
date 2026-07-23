@@ -14,6 +14,7 @@ export interface UserVehicle {
   engine: string;
   transmission: string;
   trim: string;
+  registrationNumber?: string;
   isDefault: boolean;
 }
 

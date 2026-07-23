@@ -1,17 +1,21 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StyleSheet, 
-  ScrollView, 
-  Linking, 
-  Alert, 
-  Platform 
+import React, { useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Linking,
+  Alert,
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 
 const colors = {
   primary: '#E53935',
@@ -75,6 +79,15 @@ export default function HelpCenterScreen() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
 
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
+
   const handleCallSupport = () => {
     const phoneNumber = 'tel:1800123456';
     Linking.canOpenURL(phoneNumber)
@@ -115,6 +128,7 @@ export default function HelpCenterScreen() {
         <View style={{ width: 24 }} />
       </View>
 
+      <CompactBookingShell maxWidth={760} style={styles.flexFill}>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Help Cards */}
         <Text style={styles.sectionHeader}>Quick Help Channels</Text>
@@ -187,14 +201,17 @@ export default function HelpCenterScreen() {
             );
           })}
         </View>
+        <MinimalFooter />
       </ScrollView>
+      </CompactBookingShell>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
-  header: { 
+  flexFill: { flex: 1 },
+  header: {
     flexDirection: 'row', 
     alignItems: 'center', 
     justifyContent: 'space-between', 

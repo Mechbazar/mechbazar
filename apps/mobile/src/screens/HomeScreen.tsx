@@ -18,7 +18,8 @@ import {
   Alert,
   Modal,
   Platform,
-  ActivityIndicator
+  ActivityIndicator,
+  Share
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -27,7 +28,7 @@ import { RootState } from '../store';
 import { logout } from '../store/authSlice';
 import { addToCart, updateQuantity } from '../store/cartSlice';
 import { setVehicleType } from '../store/appSlice';
-import { fetchCategories, getTrendingProducts, fetchBanners } from '../services/product.service';
+import { fetchCategories, getTrendingProducts, fetchBanners, fetchOffers, HomeOffer } from '../services/product.service';
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../services/wishlist.service';
 import { VehicleType, Category, Product } from '../types/product';
 import * as Location from 'expo-location';
@@ -211,11 +212,13 @@ const ServiceIllustration = ({ type }: { type: string }) => {
   }
 };
 
-const OFFERS = [
-  { title: '⚡ Flash Sale', desc: 'Up to 60% OFF', code: 'FLASH60', color: '#FFF5F5', borderColor: '#FFA8A8' },
-  { title: '🎁 Combo Deals', desc: 'Save flat ₹500', code: 'COMBO500', color: '#F8F0FC', borderColor: '#E599F7' },
-  { title: '🔋 Battery Exchange', desc: 'Flat ₹1,000 Exchange Bonus', code: 'BATTSWAP', color: '#EBFBEE', borderColor: '#8CE99A' },
-  { title: '🚚 Free Delivery', desc: 'No minimum order today', code: 'FREESHIP', color: '#E8F7FF', borderColor: '#74C0FC' }
+// Rotating card palette for real offers fetched from the backend (Offer
+// model has no color fields of its own -- purely a display concern).
+const OFFER_PALETTE = [
+  { color: '#FFF5F5', borderColor: '#FFA8A8' },
+  { color: '#F8F0FC', borderColor: '#E599F7' },
+  { color: '#EBFBEE', borderColor: '#8CE99A' },
+  { color: '#E8F7FF', borderColor: '#74C0FC' },
 ];
 
 export default function HomeScreen({ navigation }: any) {
@@ -232,67 +235,15 @@ export default function HomeScreen({ navigation }: any) {
   // States
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [recentSearches, setRecentSearches] = useState<string[]>(['Castrol Oil', 'Spark Plugs']);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [locationName, setLocationName] = useState('Fetching location...');
   const [categories, setCategories] = useState<Category[]>([]);
   const [banners, setBanners] = useState<any[]>([]);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [trendingProducts, setTrendingProducts] = useState<Product[]>([]);
+  const [offers, setOffers] = useState<HomeOffer[]>([]);
   const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
   const [isHomeContentLoading, setIsHomeContentLoading] = useState(true);
-
-  // Voice & Scanner States
-  const [isVoiceSearchVisible, setIsVoiceSearchVisible] = useState(false);
-  const [isScannerVisible, setIsScannerVisible] = useState(false);
-  const [voiceText, setVoiceText] = useState('Listening...');
-  const [isListening, setIsListening] = useState(false);
-  const [scannerMsg, setScannerMsg] = useState('Align barcode or QR code inside the frame');
-  const [torchOn, setTorchOn] = useState(false);
-
-  const scanAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  
-  useEffect(() => {
-    if (isScannerVisible) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(scanAnim, {
-            toValue: 180,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(scanAnim, {
-            toValue: 0,
-            duration: 1500,
-            useNativeDriver: true,
-          })
-        ])
-      ).start();
-    } else {
-      scanAnim.setValue(0);
-    }
-  }, [isScannerVisible]);
-
-  useEffect(() => {
-    if (isVoiceSearchVisible) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.3,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          })
-        ])
-      ).start();
-    } else {
-      pulseAnim.setValue(1);
-    }
-  }, [isVoiceSearchVisible]);
 
   // Scroll View Ref for anchor jumps
   const mainScrollRef = useRef<ScrollView>(null);
@@ -318,6 +269,7 @@ export default function HomeScreen({ navigation }: any) {
       fetchCategories(vehicleType).then(setCategories),
       getTrendingProducts(vehicleType).then(setTrendingProducts),
       fetchBanners(vehicleType).then(setBanners),
+      fetchOffers(vehicleType).then(setOffers),
     ]).finally(() => setIsHomeContentLoading(false));
   }, [vehicleType]);
 
@@ -399,50 +351,6 @@ export default function HomeScreen({ navigation }: any) {
     });
   };
 
-  const startVoiceSearch = () => {
-    setVoiceText('Listening...');
-    setIsListening(true);
-    setIsVoiceSearchVisible(true);
-    
-    // Simulate speech recognition after 2 seconds
-    setTimeout(() => {
-      setVoiceText("Hearing 'brake pads'...");
-      setTimeout(() => {
-        setIsVoiceSearchVisible(false);
-        setIsListening(false);
-        setSearchQuery('brake pad');
-        navigation.navigate('CategoryProducts', {
-          categoryName: 'Search Results',
-          initialSearchQuery: 'brake pad',
-          brandId: activeVehicle?.brand || undefined,
-          modelId: activeVehicle?.model || undefined,
-          year: activeVehicle?.year || undefined
-        });
-      }, 1000);
-    }, 2000);
-  };
-
-  const startBarcodeScan = () => {
-    setScannerMsg('Align barcode or QR code inside the frame');
-    setIsScannerVisible(true);
-    
-    // Simulate scanner detection after 2.5 seconds
-    setTimeout(() => {
-      setScannerMsg('Code Detected! Loading product...');
-      setTimeout(() => {
-        setIsScannerVisible(false);
-        setSearchQuery('Castrol oil');
-        navigation.navigate('CategoryProducts', {
-          categoryName: 'Search Results',
-          initialSearchQuery: 'Castrol oil',
-          brandId: activeVehicle?.brand || undefined,
-          modelId: activeVehicle?.model || undefined,
-          year: activeVehicle?.year || undefined
-        });
-      }, 1000);
-    }, 2500);
-  };
-
   const handleWishlistToggle = async (id: string) => {
     if (!token) {
       Alert.alert('Sign in required', 'Please log in to save items to your wishlist.');
@@ -460,22 +368,17 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   const handleShareProduct = (name: string) => {
-    Alert.alert('Share Product', `Link to ${name} has been copied to your clipboard.`);
+    // Real native share sheet -- this used to just claim "copied to your
+    // clipboard" without ever touching the clipboard or sharing anything.
+    Share.share({ message: `Check out ${name} on MechBazar!` }).catch(() => {});
   };
 
+  // Real emergency booking flow lives in ServicesHomeScreen (isEmergency
+  // categories/packages, admin-managed) -- this used to show a fake "a
+  // verification agent is calling you back in 60 seconds" alert with no
+  // dispatcher, no backend call, and no way to actually get help.
   const handleEmergencyBreakdown = () => {
-    Alert.alert(
-      'Emergency Roadside Help',
-      'Need immediate breakdown dispatch? A local service technician will be directed to your current location.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Call Dispatcher', 
-          style: 'destructive', 
-          onPress: () => Alert.alert('Request Sent', 'A verification agent is calling you back in 60 seconds.') 
-        }
-      ]
-    );
+    navigation.navigate('Services');
   };
 
   const getProductQtyInCart = (prodId: string) => {
@@ -573,12 +476,6 @@ export default function HomeScreen({ navigation }: any) {
           onSubmitEditing={handleSearch}
           returnKeyType="search"
         />
-        <TouchableOpacity onPress={startVoiceSearch} style={styles.searchSideBtn}>
-          <Ionicons name="mic" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={startBarcodeScan} style={styles.searchSideBtn}>
-          <Ionicons name="qr-code-outline" size={20} color={colors.textMuted} />
-        </TouchableOpacity>
       </View>
 
       {/* Segmented Cars/Bikes Toggle inside sticky header to avoid overlapping */}
@@ -690,14 +587,18 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={styles.quickLabel}>Home Mechanic</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.quickCard} 
-              onPress={() => Alert.alert('Video Consultation', 'Connecting with a live consulting technician...')}
+            {/* Was a "Video Call" tile faking a live video consultation --
+                removed along with the rest of that fabricated feature (see
+                the video-call removal commit); replaced with a real,
+                working destination instead of just leaving a gap. */}
+            <TouchableOpacity
+              style={styles.quickCard}
+              onPress={() => navigation.navigate('MainTabs', { screen: 'Orders' })}
             >
               <View style={[styles.quickIconCircle, { backgroundColor: '#E8F7FF' }]}>
-                <Ionicons name="videocam" size={24} color="#1C7ED6" />
+                <Ionicons name="cube-outline" size={24} color="#1C7ED6" />
               </View>
-              <Text style={styles.quickLabel}>Video Call</Text>
+              <Text style={styles.quickLabel}>Track Order</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
@@ -926,26 +827,41 @@ export default function HomeScreen({ navigation }: any) {
         </View>
 
 
-        {/* TODAY'S OFFERS SECTION */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Today's Special Offers</Text>
-          </View>
-          <View style={styles.offersGrid}>
-            {OFFERS.map((offer, idx) => (
-              <View 
-                key={idx} 
-                style={[styles.offerCard, { backgroundColor: offer.color, borderColor: offer.borderColor }]}
-              >
-                <Text style={styles.offerTitle}>{offer.title}</Text>
-                <Text style={styles.offerDesc}>{offer.desc}</Text>
-                <View style={styles.offerBadge}>
-                  <Text style={styles.offerBadgeText}>{offer.code}</Text>
-                </View>
+        {/* TODAY'S OFFERS SECTION -- real Offer rows (admin-managed) instead
+            of the 4 hardcoded "Flash Sale / Combo Deals / Battery Exchange /
+            Free Delivery" cards with invented codes this used to always show. */}
+        {(isHomeContentLoading || offers.length > 0) && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Today's Special Offers</Text>
+            </View>
+            {isHomeContentLoading ? (
+              <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                <ActivityIndicator size="small" color={colors.primary} />
               </View>
-            ))}
+            ) : (
+              <View style={styles.offersGrid}>
+                {offers.map((offer, idx) => {
+                  const palette = OFFER_PALETTE[idx % OFFER_PALETTE.length];
+                  return (
+                    <View
+                      key={offer.id}
+                      style={[styles.offerCard, { backgroundColor: palette.color, borderColor: palette.borderColor }]}
+                    >
+                      <Text style={styles.offerTitle}>{offer.title}</Text>
+                      {!!offer.description && <Text style={styles.offerDesc}>{offer.description}</Text>}
+                      {!!offer.code && (
+                        <View style={styles.offerBadge}>
+                          <Text style={styles.offerBadgeText}>{offer.code}</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
           </View>
-        </View>
+        )}
 
         {/* TRUST ACCREDITATION SECTION */}
         <View style={styles.section}>
@@ -980,8 +896,8 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={styles.whyTitle}>Live Tracking</Text>
             </View>
             <View style={styles.whyCard}>
-              <Ionicons name="videocam-outline" size={24} color={colors.primary} />
-              <Text style={styles.whyTitle}>Video Assist</Text>
+              <Ionicons name="chatbubbles-outline" size={24} color={colors.primary} />
+              <Text style={styles.whyTitle}>In-App Chat</Text>
             </View>
             <View style={styles.whyCard}>
               <Ionicons name="ribbon-outline" size={24} color={colors.primary} />
@@ -1067,113 +983,11 @@ export default function HomeScreen({ navigation }: any) {
         </SafeAreaView>
       </Modal>
 
-      {/* Voice Search Modal */}
-      <Modal
-        visible={isVoiceSearchVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setIsVoiceSearchVisible(false)}
-      >
-        <View style={styles.voiceOverlay}>
-          <View style={styles.voiceCard}>
-            <Text style={styles.voiceTitle}>Voice Search</Text>
-            <Text style={styles.voiceSub}>{voiceText}</Text>
-            
-            <View style={styles.micPulseContainer}>
-              <Animated.View style={[styles.micPulseBack, { transform: [{ scale: pulseAnim }] }]} />
-              <View style={styles.micCircle}>
-                <Ionicons name="mic" size={32} color={colors.white} />
-              </View>
-            </View>
-
-            {/* Simulating animation waves */}
-            <View style={styles.waveContainer}>
-              <View style={[styles.waveBar, { height: isListening ? 20 : 5 }]} />
-              <View style={[styles.waveBar, { height: isListening ? 40 : 5 }]} />
-              <View style={[styles.waveBar, { height: isListening ? 25 : 5 }]} />
-              <View style={[styles.waveBar, { height: isListening ? 35 : 5 }]} />
-              <View style={[styles.waveBar, { height: isListening ? 15 : 5 }]} />
-            </View>
-
-            <TouchableOpacity 
-              style={styles.voiceCloseBtn}
-              onPress={() => setIsVoiceSearchVisible(false)}
-            >
-              <Text style={styles.voiceCloseText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Barcode/QR Scanner Modal */}
-      <Modal
-        visible={isScannerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setIsScannerVisible(false)}
-      >
-        <View style={styles.scannerOverlay}>
-          <View style={styles.scannerHeader}>
-            <Text style={styles.scannerTitle}>Scan QR / Barcode</Text>
-            <TouchableOpacity onPress={() => setIsScannerVisible(false)}>
-              <Ionicons name="close" size={24} color={colors.white} />
-            </TouchableOpacity>
-          </View>
-
-          {/* Viewfinder reticle */}
-          <View style={styles.viewfinderContainer}>
-            <View style={styles.viewfinderReticle}>
-              {/* Corner brackets */}
-              <View style={[styles.cornerBracket, styles.topLeftBracket]} />
-              <View style={[styles.cornerBracket, styles.topRightBracket]} />
-              <View style={[styles.cornerBracket, styles.bottomLeftBracket]} />
-              <View style={[styles.cornerBracket, styles.bottomRightBracket]} />
-              
-              {/* Animated Laser Line */}
-              <Animated.View 
-                style={[
-                  styles.scannerLaser, 
-                  { transform: [{ translateY: scanAnim }] }
-                ]} 
-              />
-            </View>
-          </View>
-
-          <View style={styles.scannerFooter}>
-            <Text style={styles.scannerStatus}>{scannerMsg}</Text>
-            <View style={styles.scannerActionRow}>
-              <TouchableOpacity 
-                style={styles.scannerActionBtn} 
-                onPress={() => setTorchOn(!torchOn)}
-              >
-                <Ionicons 
-                  name={torchOn ? "flash" : "flash-off"} 
-                  size={20} 
-                  color={colors.white} 
-                />
-                <Text style={styles.scannerActionText}>
-                  Torch {torchOn ? 'ON' : 'OFF'}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.scannerActionBtn}
-                onPress={() => {
-                  setIsScannerVisible(false);
-                  setSearchQuery('Spark Plug');
-                  navigation.navigate('CategoryProducts', {
-                    categoryName: 'Search Results',
-                    initialSearchQuery: 'Spark Plug'
-                  });
-                }}
-              >
-                <Ionicons name="images-outline" size={20} color={colors.white} />
-                <Text style={styles.scannerActionText}>Gallery</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Voice search and barcode/QR scanner modals removed -- both used to
+          simulate their result (a canned "brake pads" / "Castrol oil" search
+          after a timed animation) with no real speech-to-text or camera/
+          barcode SDK behind them, the same class of fabricated feature the
+          video-call section was already removed for. */}
 
     </SafeAreaView>
   );
@@ -1953,186 +1767,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.secondary,
   },
-  // Voice Search Styles
-  voiceOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(17, 17, 18, 0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  voiceCard: {
-    width: '85%',
-    alignItems: 'center',
-    padding: 24,
-  },
-  voiceTitle: {
-    color: colors.white,
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  voiceSub: {
-    color: colors.textMuted,
-    fontSize: 14,
-    marginBottom: 40,
-    textAlign: 'center',
-  },
-  micPulseContainer: {
-    width: 100,
-    height: 100,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  micPulseBack: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(229, 57, 53, 0.3)',
-  },
-  micCircle: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  waveContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 60,
-    marginBottom: 40,
-  },
-  waveBar: {
-    width: 4,
-    backgroundColor: colors.primary,
-    marginHorizontal: 3,
-    borderRadius: 2,
-  },
-  voiceCloseBtn: {
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF30',
-    borderRadius: 14,
-    paddingHorizontal: 28,
-    paddingVertical: 10,
-  },
-  voiceCloseText: {
-    color: colors.white,
-    fontSize: 13,
-    fontWeight: 'bold',
-  },
-
-  // Barcode Scanner Styles
-  scannerOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(17, 17, 18, 0.98)',
-    justifyContent: 'space-between',
-  },
-  scannerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-  },
-  scannerTitle: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  viewfinderContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  viewfinderReticle: {
-    width: 260,
-    height: 200,
-    borderWidth: 1,
-    borderColor: '#FFFFFF20',
-    backgroundColor: 'transparent',
-    position: 'relative',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  cornerBracket: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderColor: colors.primary,
-  },
-  topLeftBracket: {
-    top: 0,
-    left: 0,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-  },
-  topRightBracket: {
-    top: 0,
-    right: 0,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-  },
-  bottomLeftBracket: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-  },
-  bottomRightBracket: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-  },
-  scannerLaser: {
-    height: 2.5,
-    backgroundColor: colors.primary,
-    width: '100%',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 6,
-  },
-  scannerFooter: {
-    padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
-    alignItems: 'center',
-  },
-  scannerStatus: {
-    color: colors.white,
-    fontSize: 13,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  scannerActionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '80%',
-  },
-  scannerActionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF10',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    width: '45%',
-    justifyContent: 'center',
-  },
-  scannerActionText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginLeft: 6,
-  }
 });

@@ -167,6 +167,42 @@ export const fetchBanners = async (type: VehicleType, opts?: FetchOpts): Promise
   }
 };
 
+export interface HomeOffer {
+  id: string;
+  title: string;
+  description?: string;
+  code?: string;
+  discountType: string;
+  discountValue: number;
+}
+
+// Real Offer rows (admin-managed, GET /api/offers is public) -- this used to
+// be a hardcoded local OFFERS array on the Home screen showing the same 4
+// "Flash Sale / Combo Deals / Battery Exchange / Free Delivery" cards with
+// invented codes to every customer regardless of what's actually active.
+export const fetchOffers = async (type: VehicleType, opts?: FetchOpts): Promise<HomeOffer[]> => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/offers?vehicle=${type}`, { signal: opts?.signal });
+    if (!res.ok) {
+      if (opts?.rethrow) throw new ApiError('Failed to fetch offers', { status: res.status, kind: 'http' });
+      return [];
+    }
+    const data = await res.json();
+    return data.map((o: any) => ({
+      id: o.id,
+      title: o.title,
+      description: o.description || undefined,
+      code: o.code || undefined,
+      discountType: o.discountType,
+      discountValue: o.discountValue,
+    }));
+  } catch (err) {
+    if (opts?.rethrow) throw toApiError(err);
+    console.error(err);
+    return [];
+  }
+};
+
 export const fetchManufacturers = async (type?: 'CAR' | 'BIKE'): Promise<any[]> => {
   try {
     const query = type ? `?type=${type}` : '';

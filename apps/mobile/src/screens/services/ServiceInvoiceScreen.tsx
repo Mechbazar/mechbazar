@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -10,6 +10,10 @@ import { RootState } from '../../store';
 import { ServiceInvoice, ServiceBooking } from '../../types/service';
 import { fetchBookingInvoice, fetchBookingById } from '../../services/service.service';
 import { colors } from './theme';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
 
 type ParamList = { ServiceInvoice: { bookingId: string } };
 
@@ -49,6 +53,15 @@ export default function ServiceInvoiceScreen() {
   const [loading, setLoading] = useState(true);
   const [sharing, setSharing] = useState(false);
   const [downloading, setDownloading] = useState(false);
+
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   useEffect(() => {
     if (!token) return;
@@ -144,6 +157,7 @@ export default function ServiceInvoiceScreen() {
         <Text style={styles.headerTitle}>Invoice</Text>
       </View>
 
+      <CompactBookingShell maxWidth={640} style={styles.flexFill}>
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         <View style={styles.invoiceCard}>
           <Text style={styles.brand}>MechBazar</Text>
@@ -178,13 +192,16 @@ export default function ServiceInvoiceScreen() {
             <Text style={styles.actionBtnText}>{sharing ? 'Preparing...' : '↗ Share'}</Text>
           </TouchableOpacity>
         </View>
+        <MinimalFooter />
       </ScrollView>
+      </CompactBookingShell>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
+  flexFill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.darkInk },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: colors.white, fontWeight: 'bold' },

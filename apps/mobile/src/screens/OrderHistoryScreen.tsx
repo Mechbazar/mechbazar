@@ -10,6 +10,10 @@ import { addToCart } from '../store/cartSlice';
 import { ServiceBooking } from '../types/service';
 import { fetchMyBookings } from '../services/service.service';
 import ServiceBookingCard from '../components/services/ServiceBookingCard';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 
 type OrdersTab = 'products' | 'services';
 
@@ -79,6 +83,15 @@ export default function OrderHistoryScreen() {
     fetchBookings();
   }, [token]));
 
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
+
   const onRefresh = async () => {
     setRefreshing(true);
     await Promise.all([fetchOrders(), fetchBookings()]);
@@ -115,11 +128,21 @@ export default function OrderHistoryScreen() {
     </View>
   );
 
+  // Matches the real backend OrderStatus enum (schema.prisma) -- this used to
+  // check for RECEIVED/OUT_FOR_DELIVERY, neither of which exist, so every
+  // real in-progress order (PLACED/ACCEPTED/PACKING/PICKUP/ON_THE_WAY) fell
+  // through to the default case and showed its raw enum value instead of a
+  // readable label (same class of bug already fixed in
+  // DeliveryTrackingScreen's getStatusWeight).
   const getStatusBadge = (status: string) => {
-    switch(status) {
-      case 'RECEIVED':
+    switch (status) {
+      case 'PLACED':
+      case 'ACCEPTED':
+      case 'PACKING':
         return <View style={[styles.badge, { backgroundColor: '#FFFDF9', borderColor: colors.warning }]}><Text style={[styles.badgeText, { color: colors.warning }]}>PROCESSING</Text></View>;
-      case 'OUT_FOR_DELIVERY':
+      case 'PICKUP':
+        return <View style={[styles.badge, { backgroundColor: '#FFFDF9', borderColor: colors.warning }]}><Text style={[styles.badgeText, { color: colors.warning }]}>RIDER ASSIGNED</Text></View>;
+      case 'ON_THE_WAY':
         return <View style={[styles.badge, { backgroundColor: '#FFFDF9', borderColor: colors.warning }]}><Text style={[styles.badgeText, { color: colors.warning }]}>OUT FOR DELIVERY</Text></View>;
       case 'DELIVERED':
         return <View style={[styles.badge, { backgroundColor: '#F0FDF4', borderColor: colors.success }]}><Text style={[styles.badgeText, { color: colors.success }]}>COMPLETED</Text></View>;
@@ -352,13 +375,19 @@ export default function OrderHistoryScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {renderHeader()}
       {renderTabs()}
-      {tab === 'products' ? renderProductsTab() : renderServicesTab()}
+      <CompactBookingShell maxWidth={960} style={styles.flexFill}>
+        {tab === 'products' ? renderProductsTab() : renderServicesTab()}
+      </CompactBookingShell>
+      <CompactBookingShell maxWidth={960}>
+        <MinimalFooter />
+      </CompactBookingShell>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
+  flexFill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#161B21' },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: '#FFFFFF', fontWeight: 'bold' },

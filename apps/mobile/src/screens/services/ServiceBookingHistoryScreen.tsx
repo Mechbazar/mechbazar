@@ -8,6 +8,10 @@ import { ServiceBooking, BookingStatus } from '../../types/service';
 import { fetchMyBookings } from '../../services/service.service';
 import { HeaderCartButton } from '../../components/HeaderCartButton';
 import { colors } from './theme';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
 
 const STATUS_COLORS: Partial<Record<BookingStatus, { bg: string; border: string; text: string }>> = {
   COMPLETED: { bg: '#F0FDF4', border: colors.success, text: colors.success },
@@ -32,6 +36,15 @@ export default function ServiceBookingHistoryScreen() {
   }, [token]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   const renderHeader = () => (
     <View style={styles.header}>
@@ -94,6 +107,7 @@ export default function ServiceBookingHistoryScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {renderHeader()}
+      <CompactBookingShell maxWidth={880} style={styles.flexFill}>
       {bookings.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyEmoji}>🛠️</Text>
@@ -109,12 +123,17 @@ export default function ServiceBookingHistoryScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+      </CompactBookingShell>
+      <CompactBookingShell maxWidth={880}>
+        <MinimalFooter />
+      </CompactBookingShell>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
+  flexFill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.darkInk },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: colors.white, fontWeight: 'bold' },

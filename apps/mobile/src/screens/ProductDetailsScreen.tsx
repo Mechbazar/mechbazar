@@ -1,21 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  Image, 
-  TouchableOpacity, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Image,
+  TouchableOpacity,
   ActivityIndicator
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { Product } from '../types/product';
 import { getProductById, NO_IMAGE_PLACEHOLDER } from '../services/product.service';
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../services/wishlist.service';
 import { useDispatch, useSelector } from 'react-redux';
 import { addToCart, RootState } from '../store';
 import { HeaderCartButton } from '../components/HeaderCartButton';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 
 type ParamList = {
   ProductDetails: {
@@ -36,6 +40,15 @@ export default function ProductDetailsScreen() {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [wishlistBusy, setWishlistBusy] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   useEffect(() => {
     (async () => {
@@ -138,6 +151,7 @@ export default function ProductDetailsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <CompactBookingShell maxWidth={880} style={styles.flexFill}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         <View style={styles.header}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
@@ -239,8 +253,14 @@ export default function ProductDetailsScreen() {
             </View>
           )}
         </View>
+        <MinimalFooter />
       </ScrollView>
+      </CompactBookingShell>
 
+      {/* Left absolute-positioned (not CompactBookingShell-wrapped) so it keeps
+          pinning to the true screen bottom on every platform -- a wrapping
+          View around only an absolutely-positioned child would collapse to
+          zero height and break that anchoring. */}
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.addToCartBtn} onPress={handleAddToCart}>
           <Text style={styles.addToCartText}>Add to Cart</Text>
@@ -255,6 +275,7 @@ export default function ProductDetailsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F3F4F6' },
+  flexFill: { flex: 1 },
   loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
     flexDirection: 'row',
