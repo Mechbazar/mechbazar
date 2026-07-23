@@ -57,6 +57,17 @@ export default function DesktopHeader() {
     return () => { cancelled = true; };
   }, [token]);
 
+  // DesktopHeader is part of the persistent shell (DesktopAppShell.web.tsx),
+  // not a per-screen component, so it never unmounts/remounts on navigation.
+  // Without this, opening the account panel (hover or click) and then using
+  // any OTHER header action -- notifications bell, cart, wishlist, a mega
+  // menu link -- leaves accountOpen stuck true, so the panel keeps floating
+  // over whatever screen the user navigated to instead of closing.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('state', () => setAccountOpen(false));
+    return unsubscribe;
+  }, [navigation]);
+
   const goAccount = (screen?: string) => {
     setAccountOpen(false);
     if (screen) navigation.navigate(screen);
