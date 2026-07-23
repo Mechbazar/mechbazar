@@ -1,12 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Linking, Platform, Alert, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { ServiceBooking, BookingStatus } from '../../types/service';
 import { fetchBookingById, cancelServiceBooking, respondToBookingApproval, fetchTechnicianPhotoDataUri, fetchBookingImageDataUri } from '../../services/service.service';
 import { HeaderCartButton } from '../../components/HeaderCartButton';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
 import { colors } from './theme';
 
 let MapView: any = null;
@@ -66,6 +70,15 @@ export default function ServiceTrackingScreen() {
   const [respondingApproval, setRespondingApproval] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -210,6 +223,7 @@ export default function ServiceTrackingScreen() {
         <HeaderCartButton color="#1C1C1C" backgroundColor="rgba(0,0,0,0.05)" />
       </View>
 
+      <CompactBookingShell maxWidth={880} style={styles.flexFill}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {isCancelled || isRejected ? (
           <View style={styles.cancelledBanner}>
@@ -415,13 +429,17 @@ export default function ServiceTrackingScreen() {
             </>
           )}
         </View>
+
+        <MinimalFooter />
       </ScrollView>
+      </CompactBookingShell>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
+  flexFill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.white },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: colors.textDark, fontWeight: 'bold' },

@@ -88,4 +88,9 @@ export const radius = {
 /** Max content width for centered desktop layouts (Container component). */
 export const maxContentWidth = 1280;
 
+/** Max width for centered single-column booking/form flows (CompactBookingShell)
+ *  -- deliberately narrower than maxContentWidth, since a wide form reads worse
+ *  than a wide product grid. */
+export const bookingMaxWidth = 720;
+
 export { BREAKPOINTS as breakpoints } from '../hooks/useBreakpoint';

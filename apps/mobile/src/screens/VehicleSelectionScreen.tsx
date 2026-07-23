@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, TextInput, Animated, Dimensions, Modal, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { addVehicleToGarage } from '../store/appSlice';
 import { RootState } from '../store';
@@ -9,6 +9,10 @@ import { HeaderCartButton } from '../components/HeaderCartButton';
 import { VehicleType } from '../types/product';
 import { fetchManufacturers, fetchModels, fetchVariants } from '../services/product.service';
 import { createMyVehicle } from '../services/garage.service';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 
 const { width, height } = Dimensions.get('window');
 
@@ -56,9 +60,18 @@ export default function VehicleSelectionScreen() {
   const [selectedTrim, setSelectedTrim] = useState<string>('');
 
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Animation for Toggle
   const indicatorPosition = useRef(new Animated.Value(0)).current;
+
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -350,12 +363,16 @@ export default function VehicleSelectionScreen() {
         <HeaderCartButton color="#1C1C1C" backgroundColor="rgba(0,0,0,0.05)" />
       </View>
 
-      {step === 'BRAND' && renderToggle()}
+      <CompactBookingShell maxWidth={880} style={styles.flexFill}>
+        {step === 'BRAND' && renderToggle()}
 
-      <View style={styles.content}>
-        {step === 'BRAND' && renderBrandSelection()}
-        {(step === 'MODEL' || step === 'DETAILS') && renderModelSelection()}
-      </View>
+        <View style={styles.content}>
+          {step === 'BRAND' && renderBrandSelection()}
+          {(step === 'MODEL' || step === 'DETAILS') && renderModelSelection()}
+        </View>
+
+        <MinimalFooter />
+      </CompactBookingShell>
 
       {renderDetailsBottomSheet()}
     </SafeAreaView>
@@ -364,6 +381,7 @@ export default function VehicleSelectionScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.light },
+  flexFill: { flex: 1 },
   appBar: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.border },
   appBarBack: { marginRight: 16, padding: 4 },
   appBarBackIcon: { fontSize: 20, color: colors.primary },

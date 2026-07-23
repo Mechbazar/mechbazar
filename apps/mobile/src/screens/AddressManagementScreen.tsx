@@ -14,17 +14,21 @@ import {
   Switch
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { RootState } from '../store';
-import { 
-  fetchMyAddresses, 
-  createMyAddress, 
-  updateMyAddress, 
-  deleteMyAddress 
+import {
+  fetchMyAddresses,
+  createMyAddress,
+  updateMyAddress,
+  deleteMyAddress
 } from '../services/address.service';
 import { locationService } from '../services/location.service';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 
 const colors = {
   primary: '#E53935',
@@ -57,6 +61,15 @@ export default function AddressManagementScreen() {
   const [pincode, setPincode] = useState('');
   const [isDefault, setIsDefault] = useState(false);
   const [fetchingGPS, setFetchingGPS] = useState(false);
+
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   const loadAddresses = async () => {
     if (!token) return;
@@ -246,25 +259,30 @@ export default function AddressManagementScreen() {
         </View>
       )}
 
-      <FlatList
-        data={addresses}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          !loading ? (
-            <View style={styles.emptyState}>
-              <Ionicons name="location-outline" size={48} color={colors.textMuted} />
-              <Text style={styles.emptyTitle}>No saved addresses found</Text>
-              <Text style={styles.emptySubtitle}>Save your home, work, or garage locations for easy doorstep visits.</Text>
-            </View>
-          ) : null
-        }
-      />
+      <CompactBookingShell maxWidth={880} style={styles.flexFill}>
+        <FlatList
+          data={addresses}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            !loading ? (
+              <View style={styles.emptyState}>
+                <Ionicons name="location-outline" size={48} color={colors.textMuted} />
+                <Text style={styles.emptyTitle}>No saved addresses found</Text>
+                <Text style={styles.emptySubtitle}>Save your home, work, or garage locations for easy doorstep visits.</Text>
+              </View>
+            ) : null
+          }
+        />
+      </CompactBookingShell>
 
-      <TouchableOpacity style={styles.addButton} onPress={handleOpenAddModal}>
-        <Text style={styles.addButtonText}>+ Add New Address</Text>
-      </TouchableOpacity>
+      <CompactBookingShell maxWidth={880}>
+        <TouchableOpacity style={styles.addButton} onPress={handleOpenAddModal}>
+          <Text style={styles.addButtonText}>+ Add New Address</Text>
+        </TouchableOpacity>
+        <MinimalFooter />
+      </CompactBookingShell>
 
       {/* Address Form Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
@@ -376,6 +394,7 @@ export default function AddressManagementScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
+  flexFill: { flex: 1 },
   header: { 
     flexDirection: 'row', 
     alignItems: 'center', 

@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Image, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import * as ImagePicker from 'expo-image-picker';
 import { RootState } from '../../store';
@@ -9,6 +9,9 @@ import { VehicleType } from '../../types/product';
 import { ServicePackage, ServiceCategory, TimeSlot, ServiceAddress } from '../../types/service';
 import { fetchServicePackageById, fetchTimeSlots, createServiceBooking, uploadBookingImage } from '../../services/service.service';
 import { AddressPickerSheet } from '../../components/services/AddressPickerSheet';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
 import { colors } from './theme';
 
 type ParamList = { ServiceBooking: { packageId: string; categoryId: string } };
@@ -66,6 +69,19 @@ export default function ServiceBookingScreen() {
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'online'>('COD');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { isDesktopUp } = useBreakpoint();
+  // Opts this screen into DesktopAppShell's "full page" mode on desktop --
+  // skips the shell's default box+footer so this wizard gets the shorter
+  // header and no marketing footer while it's the focused screen. Native/
+  // mobile-web unaffected (isDesktopUp is always false there).
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   useEffect(() => {
     fetchServicePackageById(packageId).then((p) => {
@@ -180,14 +196,17 @@ export default function ServiceBookingScreen() {
   );
 
   const renderProgress = () => (
-    <View style={styles.progressRow}>
-      {STEPS.map((s, i) => (
-        <View key={s} style={[styles.progressDot, i <= stepIndex && styles.progressDotActive]} />
-      ))}
-    </View>
+    <CompactBookingShell>
+      <View style={styles.progressRow}>
+        {STEPS.map((s, i) => (
+          <View key={s} style={[styles.progressDot, i <= stepIndex && styles.progressDotActive]} />
+        ))}
+      </View>
+    </CompactBookingShell>
   );
 
   const renderVehicleStep = () => (
+    <CompactBookingShell style={styles.flexFill}>
     <ScrollView contentContainerStyle={styles.stepContent}>
       <Text style={styles.stepTitle}>Which vehicle needs service?</Text>
       {myGarage.length === 0 ? (
@@ -229,9 +248,11 @@ export default function ServiceBookingScreen() {
         autoCapitalize="characters"
       />
     </ScrollView>
+    </CompactBookingShell>
   );
 
   const renderIssueStep = () => (
+    <CompactBookingShell style={styles.flexFill}>
     <ScrollView contentContainerStyle={styles.stepContent}>
       <Text style={styles.stepTitle}>Describe the issue</Text>
       <Text style={styles.helperText}>Help your mechanic prepare — what's wrong with your vehicle?</Text>
@@ -263,9 +284,11 @@ export default function ServiceBookingScreen() {
         )}
       </View>
     </ScrollView>
+    </CompactBookingShell>
   );
 
   const renderAddressStep = () => (
+    <CompactBookingShell style={styles.flexFill}>
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>Where should the mechanic come?</Text>
       {selectedAddress ? (
@@ -284,9 +307,11 @@ export default function ServiceBookingScreen() {
         </TouchableOpacity>
       )}
     </View>
+    </CompactBookingShell>
   );
 
   const renderScheduleStep = () => (
+    <CompactBookingShell style={styles.flexFill}>
     <ScrollView contentContainerStyle={styles.stepContent}>
       <Text style={styles.stepTitle}>Pick a date & time</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
@@ -331,9 +356,11 @@ export default function ServiceBookingScreen() {
         </View>
       )}
     </ScrollView>
+    </CompactBookingShell>
   );
 
   const renderReviewStep = () => (
+    <CompactBookingShell style={styles.flexFill}>
     <ScrollView contentContainerStyle={styles.stepContent}>
       <Text style={styles.stepTitle}>Review & Pay</Text>
 
@@ -372,6 +399,7 @@ export default function ServiceBookingScreen() {
 
       {error && <Text style={styles.errorText}>{error}</Text>}
     </ScrollView>
+    </CompactBookingShell>
   );
 
   if (loadingPkg) {
@@ -408,15 +436,17 @@ export default function ServiceBookingScreen() {
       {step === 'REVIEW' && renderReviewStep()}
 
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={[styles.continueBtn, (!canContinue() || submitting) && styles.continueBtnDisabled]}
-          disabled={!canContinue() || submitting}
-          onPress={step === 'REVIEW' ? handleSubmit : goNext}
-        >
-          <Text style={styles.continueBtnText}>
-            {submitting ? 'Placing booking...' : step === 'REVIEW' ? `Confirm Booking · ₹${finalCost}` : 'Continue'}
-          </Text>
-        </TouchableOpacity>
+        <CompactBookingShell>
+          <TouchableOpacity
+            style={[styles.continueBtn, (!canContinue() || submitting) && styles.continueBtnDisabled]}
+            disabled={!canContinue() || submitting}
+            onPress={step === 'REVIEW' ? handleSubmit : goNext}
+          >
+            <Text style={styles.continueBtnText}>
+              {submitting ? 'Placing booking...' : step === 'REVIEW' ? `Confirm Booking · ₹${finalCost}` : 'Continue'}
+            </Text>
+          </TouchableOpacity>
+        </CompactBookingShell>
       </View>
 
       {token && (
@@ -433,6 +463,11 @@ export default function ServiceBookingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
+  // Passed as CompactBookingShell's `style` prop so its desktop-only wrapper
+  // View keeps filling the available height (matching what the ScrollView/
+  // View it wraps would have gotten as a direct flex sibling) while also
+  // gaining the horizontal max-width cap + centering.
+  flexFill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.darkInk },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: colors.white, fontWeight: 'bold' },

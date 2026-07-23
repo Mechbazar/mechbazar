@@ -5,6 +5,7 @@ import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import { fetchMyAddresses } from '../../../services/address.service';
+import { useBreakpoint } from '../../../hooks/useBreakpoint';
 import { colors, spacing } from '../../../theme/tokens';
 
 // Reads the existing saved-addresses API (already backing AddressManagementScreen)
@@ -13,6 +14,7 @@ import { colors, spacing } from '../../../theme/tokens';
 export default function LocationSelector() {
   const navigation = useNavigation<NavigationProp<any>>();
   const token = useSelector((state: RootState) => state.auth.token);
+  const { isWide } = useBreakpoint();
   const [label, setLabel] = useState<string | null>(null);
 
   useEffect(() => {
@@ -36,11 +38,13 @@ export default function LocationSelector() {
       accessibilityRole="button"
       accessibilityLabel="Delivery location"
     >
-      <Ionicons name="location-outline" size={18} color={colors.white} />
-      <Text style={styles.text} numberOfLines={1}>
-        {label ? `Deliver to ${label}` : 'Select location'}
-      </Text>
-      <Ionicons name="chevron-down" size={14} color={colors.white} />
+      <Ionicons name="location-outline" size={17} color={colors.white} />
+      {isWide && (
+        <Text style={styles.text} numberOfLines={1}>
+          {label ? `Deliver to ${label}` : 'Select location'}
+        </Text>
+      )}
+      <Ionicons name="chevron-down" size={13} color={colors.white} />
     </TouchableOpacity>
   );
 }

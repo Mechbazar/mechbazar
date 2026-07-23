@@ -1,11 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { HeaderCartButton } from '../../components/HeaderCartButton';
 import { ServicePackage } from '../../types/service';
 import { fetchServicePackages } from '../../services/service.service';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
 import { colors } from './theme';
 
 type ParamList = { ServiceCategory: { categoryId: string; categoryName: string } };
@@ -17,6 +21,15 @@ export default function ServiceCategoryScreen() {
 
   const [packages, setPackages] = useState<ServicePackage[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   useEffect(() => {
     fetchServicePackages(categoryId).then((data) => {
@@ -103,25 +116,29 @@ export default function ServiceCategoryScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       {renderHeader()}
-      <FlatList
-        data={packages}
-        keyExtractor={(item) => item.id}
-        renderItem={renderPackage}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyEmoji}>🔧</Text>
-            <Text style={styles.emptyTitle}>No packages available</Text>
-            <Text style={styles.emptySubtitle}>Check back soon for this service category.</Text>
-          </View>
-        }
-      />
+      <CompactBookingShell maxWidth={880} style={styles.flexFill}>
+        <FlatList
+          data={packages}
+          keyExtractor={(item) => item.id}
+          renderItem={renderPackage}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyEmoji}>🔧</Text>
+              <Text style={styles.emptyTitle}>No packages available</Text>
+              <Text style={styles.emptySubtitle}>Check back soon for this service category.</Text>
+            </View>
+          }
+          ListFooterComponent={isDesktopUp ? <MinimalFooter /> : undefined}
+        />
+      </CompactBookingShell>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
+  flexFill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.darkInk },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: colors.white, fontWeight: 'bold' },

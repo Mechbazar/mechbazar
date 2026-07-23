@@ -7,17 +7,14 @@ import { RootState } from '../../../store';
 import { Category } from '../../../types/product';
 import { fetchCategories } from '../../../services/product.service';
 import { colors, spacing, radius, shadows } from '../../../theme/tokens';
-import Container from '../shared/Container';
 
-const NAV_LINKS: { label: string; onPress: (nav: NavigationProp<any>) => void }[] = [
-  { label: 'Home', onPress: nav => nav.navigate('MainTabs', { screen: 'Home' }) },
-  { label: 'Services', onPress: nav => nav.navigate('MainTabs', { screen: 'Services' }) },
-  { label: 'My Orders', onPress: nav => nav.navigate('MainTabs', { screen: 'Orders' }) },
-  { label: 'Help Center', onPress: nav => nav.navigate('HelpCenter') },
-];
-
-// Reuses the exact same fetchCategories(vehicleType) call CategoriesScreen
-// already makes -- same data, new (hover-triggered) presentation only.
+// Just the "All Categories" dropdown trigger + flyout panel -- rendered
+// inline inside DesktopHeader's single row (no own background/height/
+// Container of its own; the header-height-reduction pass folded the old
+// standalone nav-links bar this used to render into the header row itself,
+// keeping only "Services" there -- see DesktopHeader.tsx). Reuses the exact
+// same fetchCategories(vehicleType) call CategoriesScreen already makes --
+// same data, new (hover-triggered) presentation only.
 export default function MegaMenu() {
   const navigation = useNavigation<NavigationProp<any>>();
   const vehicleType = useSelector((state: RootState) => state.app.vehicleType);
@@ -29,67 +26,52 @@ export default function MegaMenu() {
   }, [vehicleType]);
 
   return (
-    <View style={styles.bar}>
-      <Container style={styles.row}>
-        <Pressable
-          onHoverIn={() => setOpen(true)}
-          onHoverOut={() => setOpen(false)}
-          onPress={() => setOpen(o => !o)}
-          style={styles.categoriesTrigger}
-          accessibilityRole="button"
-          accessibilityLabel="Browse all categories"
-          accessibilityState={{ expanded: open }}
-        >
-          <Ionicons name="grid-outline" size={16} color={colors.white} />
-          <Text style={styles.categoriesLabel}>All Categories</Text>
-          <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={14} color={colors.white} />
+    <Pressable
+      onHoverIn={() => setOpen(true)}
+      onHoverOut={() => setOpen(false)}
+      onPress={() => setOpen(o => !o)}
+      style={styles.categoriesTrigger}
+      accessibilityRole="button"
+      accessibilityLabel="Browse all categories"
+      accessibilityState={{ expanded: open }}
+    >
+      <Ionicons name="grid-outline" size={15} color={colors.white} />
+      <Text style={styles.categoriesLabel}>All Categories</Text>
+      <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={13} color={colors.white} />
 
-          {open && categories.length > 0 && (
-            <View style={styles.panel}>
-              <ScrollView style={styles.panelScroll} contentContainerStyle={styles.panelGrid}>
-                {categories.map(cat => (
-                  <Pressable
-                    key={cat.id}
-                    style={styles.panelItem}
-                    onPress={() => {
-                      setOpen(false);
-                      navigation.navigate('CategoryProducts', { categoryName: cat.name });
-                    }}
-                  >
-                    <Text style={styles.panelItemText} numberOfLines={1}>{cat.name}</Text>
-                    <Text style={styles.panelItemCount}>{cat.productCount ?? 0} items</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-        </Pressable>
-
-        {NAV_LINKS.map(link => (
-          <Pressable
-            key={link.label}
-            style={({ hovered }: any) => [styles.navLink, hovered && styles.navLinkHovered]}
-            onPress={() => link.onPress(navigation)}
-            accessibilityRole="link"
-          >
-            <Text style={styles.navLinkText}>{link.label}</Text>
-          </Pressable>
-        ))}
-      </Container>
-    </View>
+      {open && categories.length > 0 && (
+        <View style={styles.panel}>
+          <ScrollView style={styles.panelScroll} contentContainerStyle={styles.panelGrid}>
+            {categories.map(cat => (
+              <Pressable
+                key={cat.id}
+                style={styles.panelItem}
+                onPress={() => {
+                  setOpen(false);
+                  navigation.navigate('CategoryProducts', { categoryName: cat.name });
+                }}
+              >
+                <Text style={styles.panelItemText} numberOfLines={1}>{cat.name}</Text>
+                <Text style={styles.panelItemCount}>{cat.productCount ?? 0} items</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  bar: { backgroundColor: colors.steel },
-  row: { flexDirection: 'row', alignItems: 'center', height: 44, gap: spacing.lg },
   categoriesTrigger: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    height: '100%',
+    height: 40,
     paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
     backgroundColor: colors.primary,
+    flexShrink: 0,
   },
   categoriesLabel: { color: colors.white, fontSize: 13, fontWeight: '700' },
   panel: {
@@ -100,7 +82,7 @@ const styles = StyleSheet.create({
     maxHeight: 420,
     backgroundColor: colors.white,
     borderRadius: radius.md,
-    marginTop: 1,
+    marginTop: 4,
     zIndex: 50,
     ...shadows.lg,
   },
@@ -114,7 +96,4 @@ const styles = StyleSheet.create({
   },
   panelItemText: { fontSize: 13, fontWeight: '600', color: colors.textDark },
   panelItemCount: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  navLink: { paddingVertical: 6 },
-  navLinkHovered: { opacity: 0.75 },
-  navLinkText: { color: colors.white, fontSize: 13, fontWeight: '600' },
 });

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { updateQuantity, clearCart } from '../store/cartSlice';
@@ -9,6 +9,9 @@ import { API_BASE_URL } from '../services/api';
 import { ServiceAddress } from '../types/service';
 import { fetchMyAddresses } from '../services/address.service';
 import { AddressPickerSheet } from '../components/services/AddressPickerSheet';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 
 export default function CartScreen() {
   const navigation = useNavigation();
@@ -22,6 +25,15 @@ export default function CartScreen() {
   const cartItems = useSelector((state: RootState) => state.cart.items);
   const deliveryFee = useSelector((state: RootState) => state.cart.deliveryFee);
   const { user, token } = useSelector((state: RootState) => state.auth);
+
+  const { isDesktopUp } = useBreakpoint();
+  useFocusEffect(
+    useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   useEffect(() => {
     if (!token) {
@@ -320,28 +332,32 @@ export default function CartScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       {renderHeader()}
       
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
-        {renderCartItems()}
-        {renderCouponSection()}
-        {renderBillDetails()}
-        {renderAddressSelection()}
-        {renderPaymentSelection()}
-      </ScrollView>
+      <CompactBookingShell maxWidth={960} style={styles.flexFill}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+          {renderCartItems()}
+          {renderCouponSection()}
+          {renderBillDetails()}
+          {renderAddressSelection()}
+          {renderPaymentSelection()}
+        </ScrollView>
+      </CompactBookingShell>
 
       <View style={styles.footer}>
-        <View style={styles.footerTotal}>
-          <Text style={styles.footerTotalLabel}>Total to pay</Text>
-          <Text style={styles.footerTotalValue}>₹{grandTotal}</Text>
-        </View>
-        <TouchableOpacity
-          style={[styles.checkoutButton, (isProcessing || !selectedAddress) && { opacity: 0.7 }]}
-          onPress={handleCheckout}
-          disabled={isProcessing || !selectedAddress}
-        >
-          <Text style={styles.checkoutText}>
-            {isProcessing ? 'PROCESSING...' : !selectedAddress ? 'SELECT AN ADDRESS' : `PLACE ORDER · ₹${grandTotal}`}
-          </Text>
-        </TouchableOpacity>
+        <CompactBookingShell maxWidth={960}>
+          <View style={styles.footerTotal}>
+            <Text style={styles.footerTotalLabel}>Total to pay</Text>
+            <Text style={styles.footerTotalValue}>₹{grandTotal}</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.checkoutButton, (isProcessing || !selectedAddress) && { opacity: 0.7 }]}
+            onPress={handleCheckout}
+            disabled={isProcessing || !selectedAddress}
+          >
+            <Text style={styles.checkoutText}>
+              {isProcessing ? 'PROCESSING...' : !selectedAddress ? 'SELECT AN ADDRESS' : `PLACE ORDER · ₹${grandTotal}`}
+            </Text>
+          </TouchableOpacity>
+        </CompactBookingShell>
       </View>
 
       {token && (
@@ -370,6 +386,7 @@ const colors = {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
+  flexFill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.darkInk, borderBottomWidth: 1, borderBottomColor: colors.darkInk },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: colors.white, fontWeight: 'bold' },

@@ -6,6 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import { logout } from '../../../store/authSlice';
 import { fetchMyWishlist } from '../../../services/wishlist.service';
+import { useBreakpoint } from '../../../hooks/useBreakpoint';
 import { colors, spacing, radius, shadows } from '../../../theme/tokens';
 import Container from '../shared/Container';
 import SearchBar from './SearchBar';
@@ -22,7 +23,7 @@ function IconAction({
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <Ionicons name={icon} size={22} color={colors.white} />
+      <Ionicons name={icon} size={19} color={colors.white} />
       {!!count && (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{count > 99 ? '99+' : count}</Text>
@@ -43,6 +44,7 @@ export default function DesktopHeader() {
   const user = useSelector((state: RootState) => state.auth.user);
   const cartItems = useSelector((state: RootState) => state.cart.items);
   const cartCount = cartItems.reduce((sum, item) => sum + item.qty, 0);
+  const { isWide } = useBreakpoint();
 
   const [wishlistCount, setWishlistCount] = useState(0);
   const [accountOpen, setAccountOpen] = useState(false);
@@ -76,96 +78,107 @@ export default function DesktopHeader() {
 
   return (
     <View style={styles.wrapper}>
-      <View style={styles.topBar}>
-        <Container style={styles.topRow}>
-          <Pressable
-            onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}
-            style={styles.logoWrap}
-            accessibilityRole="link"
-            accessibilityLabel="MechBazar home"
-          >
-            <Text style={styles.logoText}>MechBazar</Text>
-          </Pressable>
+      <Container style={styles.topRow}>
+        <Pressable
+          onPress={() => navigation.navigate('MainTabs', { screen: 'Home' })}
+          style={styles.logoWrap}
+          accessibilityRole="link"
+          accessibilityLabel="MechBazar home"
+        >
+          <Text style={styles.logoText}>MechBazar</Text>
+        </Pressable>
 
-          <SearchBar />
+        <MegaMenu />
 
-          {!!token && <LocationSelector />}
+        <Pressable
+          style={({ hovered }: any) => [styles.servicesLink, hovered && styles.servicesLinkHovered]}
+          onPress={() => navigation.navigate('MainTabs', { screen: 'Services' })}
+          accessibilityRole="link"
+        >
+          <Text style={styles.servicesLinkText}>Services</Text>
+        </Pressable>
 
-          <View style={styles.actions}>
+        <SearchBar />
+
+        {!!token && <LocationSelector />}
+
+        <View style={styles.actions}>
+          <IconAction
+            icon="heart-outline"
+            count={wishlistCount}
+            label="Wishlist"
+            onPress={() => navigation.navigate(token ? 'Wishlist' : 'Welcome')}
+          />
+          <IconAction
+            icon="cart-outline"
+            count={cartCount}
+            label="Cart"
+            onPress={() => navigation.navigate('Cart')}
+          />
+          {!!token && (
             <IconAction
-              icon="heart-outline"
-              count={wishlistCount}
-              label="Wishlist"
-              onPress={() => navigation.navigate(token ? 'Wishlist' : 'Welcome')}
+              icon="notifications-outline"
+              label="Notifications"
+              onPress={() => navigation.navigate('Notifications')}
             />
-            <IconAction
-              icon="cart-outline"
-              count={cartCount}
-              label="Cart"
-              onPress={() => navigation.navigate('Cart')}
-            />
-            {!!token && (
-              <IconAction
-                icon="notifications-outline"
-                label="Notifications"
-                onPress={() => navigation.navigate('Notifications')}
-              />
-            )}
+          )}
 
-            {token ? (
-              <Pressable
-                onHoverIn={() => setAccountOpen(true)}
-                onHoverOut={() => setAccountOpen(false)}
-                onPress={() => setAccountOpen(o => !o)}
-                style={styles.accountTrigger}
-                accessibilityRole="button"
-                accessibilityLabel="Account menu"
-                accessibilityState={{ expanded: accountOpen }}
-              >
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{(user?.name || 'U').charAt(0).toUpperCase()}</Text>
-                </View>
+          {token ? (
+            <Pressable
+              onHoverIn={() => setAccountOpen(true)}
+              onHoverOut={() => setAccountOpen(false)}
+              onPress={() => setAccountOpen(o => !o)}
+              style={styles.accountTrigger}
+              accessibilityRole="button"
+              accessibilityLabel="Account menu"
+              accessibilityState={{ expanded: accountOpen }}
+            >
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{(user?.name || 'U').charAt(0).toUpperCase()}</Text>
+              </View>
+              {isWide && (
                 <Text style={styles.accountName} numberOfLines={1}>{user?.name || 'Account'}</Text>
-                <Ionicons name={accountOpen ? 'chevron-up' : 'chevron-down'} size={14} color={colors.white} />
+              )}
+              <Ionicons name={accountOpen ? 'chevron-up' : 'chevron-down'} size={13} color={colors.white} />
 
-                {accountOpen && (
-                  <View style={styles.accountPanel}>
-                    <Pressable style={styles.accountItem} onPress={() => goAccount()}>
-                      <Text style={styles.accountItemText}>My Account</Text>
-                    </Pressable>
-                    <Pressable style={styles.accountItem} onPress={() => navigation.navigate('MainTabs', { screen: 'Orders' })}>
-                      <Text style={styles.accountItemText}>My Orders</Text>
-                    </Pressable>
-                    <Pressable style={styles.accountItem} onPress={() => goAccount('Wishlist')}>
-                      <Text style={styles.accountItemText}>Wishlist</Text>
-                    </Pressable>
-                    <Pressable style={styles.accountItem} onPress={() => goAccount('AddressManagement')}>
-                      <Text style={styles.accountItemText}>Addresses</Text>
-                    </Pressable>
-                    <View style={styles.accountDivider} />
-                    <Pressable
-                      style={styles.accountItem}
-                      onPress={() => { setAccountOpen(false); dispatch(logout()); }}
-                    >
-                      <Text style={[styles.accountItemText, styles.logoutText]}>Logout</Text>
-                    </Pressable>
-                  </View>
-                )}
-              </Pressable>
-            ) : (
-              <Pressable
-                style={styles.loginButton}
-                onPress={() => navigation.navigate('Welcome')}
-                accessibilityRole="button"
-              >
-                <Text style={styles.loginButtonText}>Login / Register</Text>
-              </Pressable>
-            )}
-          </View>
-        </Container>
-      </View>
-
-      <MegaMenu />
+              {accountOpen && (
+                <View style={styles.accountPanel}>
+                  <Pressable style={styles.accountItem} onPress={() => goAccount()}>
+                    <Text style={styles.accountItemText}>My Account</Text>
+                  </Pressable>
+                  <Pressable style={styles.accountItem} onPress={() => navigation.navigate('MainTabs', { screen: 'Orders' })}>
+                    <Text style={styles.accountItemText}>My Orders</Text>
+                  </Pressable>
+                  <Pressable style={styles.accountItem} onPress={() => goAccount('Wishlist')}>
+                    <Text style={styles.accountItemText}>Wishlist</Text>
+                  </Pressable>
+                  <Pressable style={styles.accountItem} onPress={() => goAccount('AddressManagement')}>
+                    <Text style={styles.accountItemText}>Addresses</Text>
+                  </Pressable>
+                  <Pressable style={styles.accountItem} onPress={() => goAccount('HelpCenter')}>
+                    <Text style={styles.accountItemText}>Help Center</Text>
+                  </Pressable>
+                  <View style={styles.accountDivider} />
+                  <Pressable
+                    style={styles.accountItem}
+                    onPress={() => { setAccountOpen(false); dispatch(logout()); }}
+                  >
+                    <Text style={[styles.accountItemText, styles.logoutText]}>Logout</Text>
+                  </Pressable>
+                </View>
+              )}
+            </Pressable>
+          ) : (
+            <Pressable
+              style={styles.loginButton}
+              onPress={() => navigation.navigate('Welcome')}
+              accessibilityRole="button"
+            >
+              <Text style={styles.loginButtonText}>Login / Register</Text>
+            </Pressable>
+          )}
+        </View>
+      </Container>
     </View>
   );
 }
@@ -176,20 +189,25 @@ const styles = StyleSheet.create({
     top: 0,
     zIndex: 100,
     width: '100%',
+    backgroundColor: colors.darkInk,
   },
-  topBar: { backgroundColor: colors.darkInk },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 72,
-    gap: spacing.lg,
+    height: 64,
+    gap: spacing.md,
   },
   logoWrap: { flexShrink: 0 },
-  logoText: { color: colors.white, fontSize: 24, fontWeight: '800' },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 0 },
+  // fontSize reduced from 24 to keep proportion with the shorter 64px row
+  // (same weight/color/wordmark -- brand identity unchanged, just smaller).
+  logoText: { color: colors.white, fontSize: 20, fontWeight: '800' },
+  servicesLink: { paddingVertical: 6, flexShrink: 0 },
+  servicesLinkHovered: { opacity: 0.75 },
+  servicesLinkText: { color: colors.white, fontSize: 13, fontWeight: '600' },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, flexShrink: 0 },
   iconAction: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -212,7 +230,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     paddingHorizontal: spacing.sm,
-    height: 44,
+    height: 40,
     maxWidth: 180,
   },
   avatar: {

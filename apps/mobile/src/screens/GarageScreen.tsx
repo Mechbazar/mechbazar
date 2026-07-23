@@ -19,6 +19,10 @@ import { RootState } from '../store';
 import { setActiveVehicle, removeVehicleFromGarage, updateVehicleInGarage, hydrateGarage } from '../store/appSlice';
 import { HeaderCartButton } from '../components/HeaderCartButton';
 import { fetchMyVehicles, updateMyVehicle, deleteMyVehicle } from '../services/garage.service';
+import { useBreakpoint } from '../hooks/useBreakpoint';
+import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
+import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
+import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 
 const colors = {
   primary: '#034C8C',
@@ -47,6 +51,18 @@ export default function GarageScreen() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  const { isDesktopUp } = useBreakpoint();
+  // Independent of the data-refetch useFocusEffect below -- kept separate so
+  // this shell-registration concern doesn't get tangled with the vehicle
+  // refetch logic.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!isDesktopUp) return;
+      setDesktopFullPageScreenActive(true);
+      return () => setDesktopFullPageScreenActive(false);
+    }, [isDesktopUp]),
+  );
 
   useFocusEffect(
     React.useCallback(() => {
@@ -141,6 +157,7 @@ export default function GarageScreen() {
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
+      <CompactBookingShell maxWidth={880} style={styles.flexFill}>
       <FlatList
         data={myGarage}
         keyExtractor={(item) => item.id}
@@ -188,14 +205,18 @@ export default function GarageScreen() {
           </TouchableOpacity>
         )}
       />
+      </CompactBookingShell>
       )}
 
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => navigation.navigate('VehicleSelection')}
-      >
-        <Text style={styles.addButtonText}>+ Add New Vehicle</Text>
-      </TouchableOpacity>
+      <CompactBookingShell maxWidth={880}>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => navigation.navigate('VehicleSelection')}
+        >
+          <Text style={styles.addButtonText}>+ Add New Vehicle</Text>
+        </TouchableOpacity>
+        <MinimalFooter />
+      </CompactBookingShell>
 
       {/* Edit Vehicle Modal */}
       <Modal
@@ -247,6 +268,7 @@ export default function GarageScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.light },
+  flexFill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.primary },
   backButton: { marginRight: 16, padding: 4 },
   headerTitle: { fontSize: 20, fontWeight: 'bold', color: colors.white },
