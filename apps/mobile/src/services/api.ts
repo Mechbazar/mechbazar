@@ -47,3 +47,24 @@ export const setAuthToken = (token: string | null) => {
     delete api.defaults.headers.common['Authorization'];
   }
 };
+
+// A rejected/expired token previously just produced a confusing per-screen
+// error (e.g. an empty orders list) while the app still looked "logged in".
+// Force a real logout so the user lands back on Welcome and can re-authenticate,
+// instead of being stuck on a broken screen. Lazy-imported to dodge a
+// store <-> api require cycle (store doesn't import api, but several services
+// that api-consumers import do import store; this keeps api.ts safe to import
+// from anywhere including store/index.ts's own dependency graph).
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 401) {
+      const { store } = require('../store');
+      const { logout } = require('../store/authSlice');
+      if (store.getState().auth.token) {
+        store.dispatch(logout());
+      }
+    }
+    return Promise.reject(error);
+  }
+);

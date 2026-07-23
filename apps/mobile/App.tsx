@@ -12,6 +12,7 @@ import { store, RootState } from './src/store';
 import { loginSuccess } from './src/store/authSlice';
 import { hydrateCart } from './src/store/cartSlice';
 import { hydrateGarage, setVehicleTypeHydrated, loadVehicleType } from './src/store/appSlice';
+import './src/services/sessionGuard';
 import { registerForPushNotificationsAsync } from './src/services/notifications';
 import { API_BASE_URL } from './src/services/api';
 import { fetchMyVehicles } from './src/services/garage.service';
@@ -133,6 +134,10 @@ function RootNavigator() {
   // (before the AsyncStorage reads in the boot effect resolve) never overwrites
   // what was just read from storage. Same pattern App.js used for cart persistence.
   const hydratedRef = useRef(false);
+  // Mirrors `token` for the refresh effect below, which intentionally does NOT
+  // depend on `token` itself (see that effect's comment for why).
+  const tokenRef = useRef(token);
+  useEffect(() => { tokenRef.current = token; }, [token]);
 
   useEffect(() => {
     (async () => {
@@ -199,6 +204,37 @@ function RootNavigator() {
       AsyncStorage.removeItem(USER_STORAGE_KEY).catch(e => console.error('Failed to clear session:', e));
     }
   }, [token, user]);
+
+  // Sessions are a flat 7-day JWT with no rotation -- silently slide the
+  // expiry forward for anyone actively using the app (on launch, then every
+  // 12h) so a real customer mid-session doesn't get hard-logged-out. If the
+  // token has already expired/is invalid, the backend 401s and sessionGuard's
+  // global-fetch patch (imported above) logs them out cleanly instead.
+  // Deliberately keyed on login/logout transitions (boolean), not the token
+  // value itself -- a successful refresh replaces the token, which would
+  // otherwise re-trigger this effect and refresh again in an infinite loop.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    const doRefresh = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${tokenRef.current}` },
+        });
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          dispatch(loginSuccess({ user: data.user, token: data.token }));
+        }
+      } catch (e) {
+        console.error('Failed to refresh session token:', e);
+      }
+    };
+    doRefresh();
+    const interval = setInterval(doRefresh, 12 * 60 * 60 * 1000);
+    return () => { cancelled = true; clearInterval(interval); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!token]);
 
   // Register for order-status push notifications once logged in. No-ops
   // quietly inside Expo Go (SDK 53+ removed push there) or without a
