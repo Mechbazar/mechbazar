@@ -361,10 +361,14 @@ export default function ServiceBookingScreen() {
         <View style={[styles.radioCircle, paymentMethod === 'COD' && styles.radioCircleActive]}>{paymentMethod === 'COD' && <View style={styles.radioDot} />}</View>
         <Text style={styles.paymentText}>Cash on Service Completion</Text>
       </TouchableOpacity>
-      <TouchableOpacity style={[styles.paymentRow, paymentMethod === 'online' && styles.paymentRowActive]} onPress={() => setPaymentMethod('online')}>
-        <View style={[styles.radioCircle, paymentMethod === 'online' && styles.radioCircleActive]}>{paymentMethod === 'online' && <View style={styles.radioDot} />}</View>
+      {/* No payment gateway is integrated yet -- disabled rather than
+          selectable, so this can't silently create a booking with a payment
+          method that will never actually be charged or confirmed. */}
+      <View style={[styles.paymentRow, { opacity: 0.5 }]}>
+        <View style={styles.radioCircle} />
         <Text style={styles.paymentText}>Pay Online (UPI / Card / Net Banking)</Text>
-      </TouchableOpacity>
+        <Text style={styles.comingSoonBadge}>Coming soon</Text>
+      </View>
 
       {error && <Text style={styles.errorText}>{error}</Text>}
     </ScrollView>
@@ -492,6 +496,7 @@ const styles = StyleSheet.create({
   radioCircleActive: { borderColor: colors.primary },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
   paymentText: { fontSize: 13, fontWeight: '600', color: colors.textDark },
+  comingSoonBadge: { marginLeft: 8, fontSize: 10, fontWeight: '700', color: colors.textMuted, backgroundColor: colors.borderLight, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, overflow: 'hidden' },
 
   errorText: { color: colors.danger, fontSize: 13, marginTop: 8, marginBottom: 4 },
 
