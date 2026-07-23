@@ -13,6 +13,12 @@ services:
     environment:
       - PORT=5005
       - NODE_ENV=production
+      # No SMS provider is configured yet, so real phone numbers can't receive an
+      # OTP -- until one is wired up, this fixed allowlist is the only way to log
+      # into the production site. Not a secret (OTP itself still required to be
+      # exactly '123456' AND the phone must be listed here), safe to track in git.
+      - ALLOW_DEV_OTP_BYPASS=true
+      - DEV_OTP_BYPASS_PHONES=9998887771
     volumes:
       - ./apps/backend/uploads:/app/uploads
     networks:

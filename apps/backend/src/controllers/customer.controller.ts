@@ -77,6 +77,22 @@ export const markNotificationRead = async (req: AuthRequest, res: Response): Pro
   }
 };
 
+export const deleteMyNotification = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const id = String(req.params.id);
+    const notification = await prisma.notification.findUnique({ where: { id } });
+    if (!notification || notification.userId !== req.user!.userId) {
+      res.status(404).json({ error: 'Notification not found' });
+      return;
+    }
+    await prisma.notification.delete({ where: { id } });
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    res.status(500).json({ error: 'Failed to delete notification' });
+  }
+};
+
 // ============ Self-service saved addresses (any authenticated user) ============
 // The Address model already existed (order.controller.ts auto-creates one
 // inline as part of checkout), but no API ever let a customer manage their

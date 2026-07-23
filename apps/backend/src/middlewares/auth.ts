@@ -27,6 +27,23 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   }
 };
 
+// Like `authenticate`, but never rejects -- attaches `req.user` if a valid
+// Bearer token is present, otherwise leaves it undefined and continues. For
+// routes that are genuinely public (anonymous browsing) but should behave
+// differently for a logged-in caller with elevated privileges, e.g. the
+// public product list including non-APPROVED products for an admin caller.
+export const optionalAuthenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      req.user = verifyToken(authHeader.split(' ')[1]) as { userId: string; role: string };
+    } catch {
+      // Invalid/expired token on an otherwise-public route -- treat as anonymous.
+    }
+  }
+  next();
+};
+
 export const authorize = (roles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     if (!req.user || !roles.includes(req.user.role)) {

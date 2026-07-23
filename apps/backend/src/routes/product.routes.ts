@@ -1,11 +1,11 @@
 import { Router } from 'express';
 import { getProducts, getProductById, createProduct, updateProductStatus, bulkCreateProducts, getBrands, updateProduct, deleteProduct } from '../controllers/product.controller';
-import { authenticate, authorize } from '../middlewares/auth';
+import { authenticate, authorize, optionalAuthenticate } from '../middlewares/auth';
 import { Role } from '@prisma/client';
 
 const router = Router();
 
-router.get('/', getProducts);
+router.get('/', optionalAuthenticate, getProducts);
 router.get('/brands', getBrands);
 const productWriters = [Role.VENDOR, Role.ADMIN, Role.SUPER_ADMIN, Role.INVENTORY_MANAGER, Role.VENDOR_MANAGER];
 

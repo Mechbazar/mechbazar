@@ -3,12 +3,18 @@ import prisma from '../config/prisma';
 import crypto from 'crypto';
 
 const isDevOtpBypassAllowed = () => process.env.ALLOW_DEV_OTP_BYPASS === 'true';
-const isPhoneAllowedForBypass = (phone: string) =>
-  (process.env.DEV_OTP_BYPASS_PHONES || '')
+// Phone numbers get stored/compared in inconsistent formats across this codebase
+// (+91XXXXXXXXXX vs bare 10-digit) -- compare by the last 10 digits so an
+// allowlist entry works regardless of which format it or the caller used.
+const last10Digits = (phone: string) => phone.replace(/\D/g, '').slice(-10);
+const isPhoneAllowedForBypass = (phone: string) => {
+  const target = last10Digits(phone);
+  return (process.env.DEV_OTP_BYPASS_PHONES || '')
     .split(',')
-    .map((p) => p.trim())
+    .map((p) => last10Digits(p.trim()))
     .filter(Boolean)
-    .includes(phone);
+    .includes(target);
+};
 const getOtpProvider = () => process.env.OTP_PROVIDER || 'TEST';
 
 const OTP_TTL_SECONDS = 300;

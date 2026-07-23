@@ -235,6 +235,67 @@ export const clearPushToken = async (req: AuthRequest, res: Response): Promise<v
   }
 };
 
+// Sessions are plain long-lived JWTs (7d customer / 1d admin) with no rotation
+// or revocation list -- this endpoint lets an already-authenticated client
+// (valid, not-yet-expired token) silently slide its session forward instead of
+// being hard-logged-out mid-expiry window. Requires the existing token to still
+// verify, so it can't be used to resurrect an expired or tampered session.
+export const refreshToken = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user) {
+      res.status(401).json({ error: 'User not found' });
+      return;
+    }
+    const token = generateToken(user.id, user.role, { accountType: user.accountType });
+    res.status(200).json({ user: sanitizeUser(user), token });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    res.status(500).json({ error: 'Failed to refresh token' });
+  }
+};
+
+// Self-service password change for an already-authenticated user (Bearer JWT,
+// not OTP -- unaffected by the OTP-provider constraint elsewhere in this file).
+// Most customers registered via phone/OTP and have no password at all
+// (`user.password` is null); for those, skip the current-password check since
+// there's nothing to verify against -- they're already proven to own the
+// account by holding a valid session token.
+export const changePassword = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!newPassword || String(newPassword).length < 6) {
+      res.status(400).json({ error: 'newPassword must be at least 6 characters' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: req.user!.userId } });
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    if (user.password) {
+      if (!currentPassword) {
+        res.status(400).json({ error: 'currentPassword is required' });
+        return;
+      }
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        res.status(401).json({ error: 'Current password is incorrect' });
+        return;
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({ where: { id: user.id }, data: { password: hashedPassword } });
+    res.status(200).json({ success: true });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Failed to change password' });
+  }
+};
+
 export const requestOtp = async (req: Request, res: Response): Promise<void> => {
   try {
     const { phone } = req.body;

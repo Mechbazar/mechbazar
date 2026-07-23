@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import {
-  getCustomers, updateCustomer, getMyNotifications, markNotificationRead,
+  getCustomers, updateCustomer, getMyNotifications, markNotificationRead, deleteMyNotification,
   getMyAddresses, createMyAddress, updateMyAddress, deleteMyAddress,
   getMyProfile, updateMyProfile,
   getMyWishlist, addToMyWishlist, removeFromMyWishlist,
@@ -19,6 +19,7 @@ router.patch('/:id', authenticate, authorize(admins), updateCustomer);
 // Self-service, any authenticated role -- not admin-gated like the routes above.
 router.get('/notifications', authenticate, getMyNotifications);
 router.patch('/notifications/:id/read', authenticate, markNotificationRead);
+router.delete('/notifications/:id', authenticate, deleteMyNotification);
 
 router.get('/me/addresses', authenticate, getMyAddresses);
 router.post('/me/addresses', authenticate, createMyAddress);

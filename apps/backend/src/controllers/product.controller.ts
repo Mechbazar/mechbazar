@@ -56,9 +56,21 @@ export const getBrands = async (req: Request, res: Response) => {
   }
 };
 
-export const getProducts = async (req: Request, res: Response) => {
+const ADMIN_PRODUCT_ROLES: string[] = [Role.ADMIN, Role.SUPER_ADMIN, Role.INVENTORY_MANAGER, Role.VENDOR_MANAGER];
+
+export const getProducts = async (req: AuthRequest, res: Response) => {
   try {
-    const { vehicleId, categoryId, category_id, categoryName, q, search, vehicleMake, vehicleModel, vehicleType, vehicle_type } = req.query;
+    const { vehicleId, categoryId, category_id, categoryName, q, search, vehicleMake, vehicleModel, vehicleType, vehicle_type, status } = req.query;
+    // Public/customer callers only ever see APPROVED products (unchanged
+    // behaviour). An authenticated admin caller manages the catalog from this
+    // same list (Products.tsx has no separate "pending review" view) and
+    // previously could never see or re-approve a product they'd set to
+    // PENDING/INACTIVE/REJECTED, since it would vanish from their own list --
+    // let them pass an explicit status filter, or see every status by default.
+    const isAdminCaller = !!req.user && ADMIN_PRODUCT_ROLES.includes(req.user.role);
+    const statusFilter = isAdminCaller
+      ? (status ? { status: String(status) as any } : {})
+      : { status: 'APPROVED' as const };
     const resolvedCategoryId = categoryId || category_id;
     const resolvedSearch = q || search;
     const rawVehicleType = vehicleType || vehicle_type;
@@ -75,7 +87,7 @@ export const getProducts = async (req: Request, res: Response) => {
     // composes with, the make/model/vehicleId compatibility filters below.
     const products = await prisma.product.findMany({
       where: {
-        status: 'APPROVED',
+        ...statusFilter,
         ...(resolvedCategoryId && { categoryId: String(resolvedCategoryId) }),
         ...(categoryName && { category: { name: String(categoryName) } }),
         ...(resolvedSearch && {
