@@ -10,6 +10,7 @@ export interface ProfileUpdateInput {
   email?: string;
   gender?: string;
   dob?: string;
+  avatar?: string;
 }
 
 export const updateMyProfile = async (
