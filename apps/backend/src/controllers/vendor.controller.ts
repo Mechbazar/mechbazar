@@ -538,27 +538,50 @@ export const requestPayout = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Use a transaction to ensure balance is deducted and settlement is created atomically
-    const [updatedVendor, settlement] = await prisma.$transaction([
-      prisma.vendor.update({
-        where: { id: vendor.id },
-        data: { walletBalance: { decrement: amount } }
-      }),
-      prisma.vendorSettlement.create({
-        data: {
-          vendorId: vendor.id,
-          amount: Number(amount),
-          status: 'PENDING'
-        }
-      })
-    ]);
+    const result = await prisma.$transaction(async (tx) => {
+      // Re-check for a pending settlement inside the transaction -- narrows
+      // (though on its own doesn't fully close, without a DB-level unique
+      // constraint) the window where two concurrent requests both pass the
+      // outer check above and both create a PENDING settlement.
+      const stillNoPending = await tx.vendorSettlement.findFirst({ where: { vendorId: vendor.id, status: 'PENDING' } });
+      if (stillNoPending) {
+        throw new Error('DUPLICATE_PENDING_PAYOUT');
+      }
+      // Guarded decrement -- only succeeds if the balance is still sufficient
+      // at write time, re-checked under Postgres's row lock, not against the
+      // stale `vendor.walletBalance` read above. Without this, two concurrent
+      // payout requests for the vendor's full balance could each pass the
+      // outer balance check and both decrement, driving walletBalance
+      // negative (a plain `decrement` has no floor -- unlike Product.stock's
+      // decrement in createOrder, which uses this same gte-guarded pattern).
+      const claim = await tx.vendor.updateMany({
+        where: { id: vendor.id, walletBalance: { gte: amount } },
+        data: { walletBalance: { decrement: amount } },
+      });
+      if (claim.count === 0) {
+        throw new Error('INSUFFICIENT_BALANCE');
+      }
+      const updatedVendor = await tx.vendor.findUniqueOrThrow({ where: { id: vendor.id } });
+      const settlement = await tx.vendorSettlement.create({
+        data: { vendorId: vendor.id, amount: Number(amount), status: 'PENDING' },
+      });
+      return { updatedVendor, settlement };
+    });
 
     res.status(200).json({
       message: 'Payout requested successfully',
-      walletBalance: updatedVendor.walletBalance,
-      settlement
+      walletBalance: result.updatedVendor.walletBalance,
+      settlement: result.settlement,
     });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === 'DUPLICATE_PENDING_PAYOUT') {
+      res.status(400).json({ error: 'You already have a pending payout request' });
+      return;
+    }
+    if (error.message === 'INSUFFICIENT_BALANCE') {
+      res.status(400).json({ error: 'Insufficient balance' });
+      return;
+    }
     console.error('Error requesting payout:', error);
     res.status(500).json({ error: 'Failed to request payout' });
   }
@@ -636,29 +659,35 @@ export const updateSettlementStatus = async (req: Request, res: Response): Promi
       return;
     }
 
-    if (status === 'FAILED') {
-      // Refund the wallet
-      const [updatedSettlement] = await prisma.$transaction([
-        prisma.vendorSettlement.update({
-          where: { id },
-          data: { status, transactionId }
-        }),
-        prisma.vendor.update({
+    // Atomically claim the transition: only matches if the settlement's
+    // status is still what we just read, re-checked under Postgres's row
+    // lock at UPDATE time -- not against the stale `settlement.status` read
+    // above. Without this, two concurrent/duplicated requests marking the
+    // same settlement FAILED could both pass the "already finalised" check
+    // and both credit the vendor's wallet with settlement.amount.
+    const updatedSettlement = await prisma.$transaction(async (tx) => {
+      const claim = await tx.vendorSettlement.updateMany({
+        where: { id, status: settlement.status },
+        data: { status, transactionId },
+      });
+      if (claim.count === 0) {
+        throw new Error('SETTLEMENT_CHANGED_CONCURRENTLY');
+      }
+      if (status === 'FAILED') {
+        await tx.vendor.update({
           where: { id: settlement.vendorId },
-          data: { walletBalance: { increment: settlement.amount } }
-        })
-      ]);
-      res.status(200).json(updatedSettlement);
+          data: { walletBalance: { increment: settlement.amount } },
+        });
+      }
+      return tx.vendorSettlement.findUniqueOrThrow({ where: { id } });
+    });
+
+    res.status(200).json(updatedSettlement);
+  } catch (error: any) {
+    if (error.message === 'SETTLEMENT_CHANGED_CONCURRENTLY') {
+      res.status(409).json({ error: 'Settlement was already updated by another request. Please refresh and retry.' });
       return;
     }
-
-    const updatedSettlement = await prisma.vendorSettlement.update({
-      where: { id },
-      data: { status, transactionId }
-    });
-    
-    res.status(200).json(updatedSettlement);
-  } catch (error) {
     console.error('Error updating settlement status:', error);
     res.status(500).json({ error: 'Failed to update settlement status' });
   }
