@@ -338,7 +338,7 @@ export const updateProduct = async (req: Request, res: Response) => {
 export const deleteProduct = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);
-    
+
     // Check for order items linking to this product to avoid FK constraints breaking
     const orderItems = await prisma.orderItem.count({ where: { productId: id } });
     if (orderItems > 0) {
@@ -346,7 +346,22 @@ export const deleteProduct = async (req: Request, res: Response): Promise<void> 
        return;
     }
 
-    await prisma.product.delete({ where: { id } });
+    // The schema has no onDelete cascade, so Inventory/StockMovement/
+    // ProductCompatibility/Review/Wishlist rows referencing this product must
+    // be cleaned up first, or the delete below throws an FK-violation 500 --
+    // which it did for almost every real product, since vendor.controller.ts's
+    // createProduct auto-creates an Inventory row for any product with stock.
+    // Mirrors vendor.controller.ts's deleteMyProduct, which already does this.
+    await prisma.$transaction(async (tx) => {
+      const inventories = await tx.inventory.findMany({ where: { productId: id }, select: { id: true } });
+      await tx.stockMovement.deleteMany({ where: { inventoryId: { in: inventories.map((i) => i.id) } } });
+      await tx.inventory.deleteMany({ where: { productId: id } });
+      await tx.productCompatibility.deleteMany({ where: { productId: id } });
+      await tx.review.deleteMany({ where: { productId: id } });
+      await tx.wishlist.deleteMany({ where: { productId: id } });
+      await tx.product.delete({ where: { id } });
+    });
+
     res.json({ success: true });
   } catch (error) {
     console.error(error);
