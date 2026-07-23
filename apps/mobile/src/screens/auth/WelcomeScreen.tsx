@@ -235,7 +235,7 @@ export default function WelcomeScreen() {
         if (data.otp) {
           Alert.alert('OTP Sent', `OTP Code is: ${data.otp} (it is also printed in your backend terminal logs).`);
         } else {
-          Alert.alert('OTP Sent', 'An OTP has been sent. Please check backend logs.');
+          Alert.alert('OTP Sent', 'An OTP has been sent to your phone.');
         }
       } else {
         Alert.alert('Error', data.error || 'Failed to send OTP.');

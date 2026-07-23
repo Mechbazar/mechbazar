@@ -1,6 +1,5 @@
 import { Router } from 'express';
-console.log('VENDOR ROUTES EVALUATED');
-import { 
+import {
   getVendors, 
   createVendor, 
   updateVendor, 

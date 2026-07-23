@@ -6,6 +6,7 @@ import { sendExpoPush } from '../utils/expoPush';
 import { resolveCoupon } from './coupon.controller';
 import { notifyUser } from '../utils/notify';
 import { sanitizeOrder, sanitizeOrders } from '../utils/sanitizeUser';
+import { pendingPaymentCreateInput, creditWalletForOnlineRefund } from '../services/payment.service';
 
 // Thrown from inside the createOrder $transaction to carry an intended HTTP
 // status (400/409) back out through Prisma's error propagation, instead of
@@ -238,16 +239,10 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
           items: {
             create: validatedItems // This connects the OrderItems if they exist in DB
           },
-          // No real payment gateway is integrated yet (no SDK/credentials/webhook handling
-          // exists in this codebase) -- status is always PENDING since nothing is actually
-          // charged, for either method. This only makes sure the *method* the customer chose
-          // is recorded accurately instead of always being hardcoded to COD.
+          // See services/payment.service.ts -- no real gateway is integrated yet,
+          // so status is always PENDING regardless of method.
           payment: {
-            create: {
-              method: payment_method === 'online' ? 'ONLINE' : 'COD',
-              status: 'PENDING',
-              amount: finalAmount
-            }
+            create: pendingPaymentCreateInput(payment_method, finalAmount)
           }
         },
         include: {
@@ -625,15 +620,14 @@ export const cancelMyOrder = async (req: AuthRequest, res: Response) => {
 
       await restoreOrderStock(tx, existing.items, req.user!.userId, id);
 
-      if (existing.payment && existing.payment.method !== 'COD' && existing.payment.status === 'SUCCESS') {
-        await tx.user.update({
-          where: { id: req.user!.userId },
-          data: { wallet: { increment: existing.payment.amount } },
-        });
-        await tx.payment.update({
-          where: { id: existing.payment.id },
-          data: { status: 'REFUNDED' },
-        });
+      if (existing.payment) {
+        const credited = await creditWalletForOnlineRefund(tx, existing.payment, req.user!.userId);
+        if (credited) {
+          await tx.payment.update({
+            where: { id: existing.payment.id },
+            data: { status: 'REFUNDED' },
+          });
+        }
       }
 
       return tx.order.findUniqueOrThrow({ where: { id } });

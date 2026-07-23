@@ -9,3 +9,4 @@ src/config/firebaseServiceAccount.json
 
 .vercel
 .env*
+!.env.example
