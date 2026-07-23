@@ -1,12 +1,11 @@
 import { Request, Response } from 'express';
-import { PrismaClient, Role, TechnicianStatus } from '@prisma/client';
+import { Role, TechnicianStatus } from '@prisma/client';
 import { AuthRequest } from '../middlewares/auth';
 import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
 import { generateToken } from '../utils/jwt';
 import { notifyUser } from '../utils/notify';
 import { sanitizeUser, sanitizeUsers } from '../utils/sanitizeUser';
-
-const prisma = new PrismaClient();
+import prisma from '../config/prisma';
 
 // Every /me endpoint below re-derives the ServiceTechnician row from the JWT's
 // userId rather than trusting any id the client might pass in -- mirrors

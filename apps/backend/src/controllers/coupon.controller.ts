@@ -1,8 +1,7 @@
 import { Request, Response } from 'express';
 import { Prisma, PrismaClient, VehicleType } from '@prisma/client';
 import { normalizeVehicleType } from '../utils/vehicleType';
-
-const prisma = new PrismaClient();
+import prisma from '../config/prisma';
 
 // Shared by validateCoupon (standalone "apply coupon" check in the cart UI)
 // and order.controller.ts's createOrder (the actual checkout, which must

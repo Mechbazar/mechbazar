@@ -1,12 +1,11 @@
 import { Request, Response } from 'express';
-import { PrismaClient, Role } from '@prisma/client';
+import { Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { generateToken } from '../utils/jwt';
 import { AuthRequest } from '../middlewares/auth';
 import { verifyOtpAndResolvePhone, OtpVerificationError, generateAndSendOtp } from '../utils/otp';
 import { sanitizeUser } from '../utils/sanitizeUser';
-
-const prisma = new PrismaClient();
+import prisma from '../config/prisma';
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
