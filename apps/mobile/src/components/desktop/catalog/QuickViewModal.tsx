@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, View, Text, Image, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { Product } from '../../../types/product';
 import { colors, spacing, radius } from '../../../theme/tokens';
+import { NO_IMAGE_PLACEHOLDER } from '../../../services/product.service';
 
 interface QuickViewModalProps {
   product: Product | null;
@@ -19,6 +20,8 @@ export default function QuickViewModal({
   product, onClose, isWishlisted, onToggleWishlist, qtyInCart, onAddToCart, onQtyChange,
 }: QuickViewModalProps) {
   const navigation = useNavigation<NavigationProp<any>>();
+  const [imageFailed, setImageFailed] = useState(false);
+  useEffect(() => setImageFailed(false), [product?.id]);
   if (!product) return null;
   const outOfStock = product.stockStatus === 'Out of Stock';
 
@@ -32,7 +35,12 @@ export default function QuickViewModal({
 
           <ScrollView horizontal={false} contentContainerStyle={styles.body}>
             <View style={styles.imageCol}>
-              <Image source={{ uri: product.image }} style={styles.image} resizeMode="contain" />
+              <Image
+                source={{ uri: imageFailed ? NO_IMAGE_PLACEHOLDER : product.image }}
+                style={styles.image}
+                resizeMode="contain"
+                onError={() => setImageFailed(true)}
+              />
             </View>
 
             <View style={styles.infoCol}>

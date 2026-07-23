@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Product } from '../types/product';
 import { useDispatch } from 'react-redux';
 import { addToCart } from '../store';
+import { NO_IMAGE_PLACEHOLDER } from '../services/product.service';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2; // 2 columns with 16 padding on edges and middle
@@ -16,6 +17,7 @@ interface ProductGridCardProps {
 
 export const ProductGridCard: React.FC<ProductGridCardProps> = ({ product, onPress, isWishlisted, onToggleWishlist }) => {
   const dispatch = useDispatch();
+  const [imageFailed, setImageFailed] = useState(false);
 
   const handleAddToCart = () => {
     dispatch(addToCart({ 
@@ -31,7 +33,11 @@ export const ProductGridCard: React.FC<ProductGridCardProps> = ({ product, onPre
   return (
     <TouchableOpacity style={styles.card} onPress={() => onPress(product)} activeOpacity={0.9}>
       <View style={styles.imageContainer}>
-        <Image source={{ uri: product.image }} style={styles.image} />
+        <Image
+          source={{ uri: imageFailed ? NO_IMAGE_PLACEHOLDER : product.image }}
+          style={styles.image}
+          onError={() => setImageFailed(true)}
+        />
         {!!product.discountPercentage && (
           <View style={styles.discountBadge}>
             <Text style={styles.discountText}>{product.discountPercentage}% OFF</Text>

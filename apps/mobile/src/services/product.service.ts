@@ -81,11 +81,17 @@ export const CAR_MODELS: VehicleModel[] = [
 
 export const fetchCategories = async (type: VehicleType, opts?: FetchOpts): Promise<Category[]> => {
   const fallbackCategories = getFallbackCategories(type);
-  const urls = [
-    `${API_BASE_URL}/categories?vehicleType=${encodeURIComponent(type)}`,
-    `${SERVER_ORIGIN}/api/categories?vehicleType=${encodeURIComponent(type)}`,
-    `http://localhost:5001/api/categories?vehicleType=${encodeURIComponent(type)}`,
-  ];
+  // The localhost/SERVER_ORIGIN retries only make sense in local dev, where
+  // API_BASE_URL === `${SERVER_ORIGIN}/api` (no EXPO_PUBLIC_API_URL set) and
+  // the dev host guess can be wrong. In production, EXPO_PUBLIC_API_URL is
+  // always set to the real HTTPS API, so these would just be dead, always-
+  // failing requests against a port real users can't reach.
+  const urls = process.env.EXPO_PUBLIC_API_URL
+    ? [`${API_BASE_URL}/categories?vehicleType=${encodeURIComponent(type)}`]
+    : [
+        `${API_BASE_URL}/categories?vehicleType=${encodeURIComponent(type)}`,
+        `http://localhost:5001/api/categories?vehicleType=${encodeURIComponent(type)}`,
+      ];
 
   // Only counts as a real outage (worth rethrow:true throwing instead of
   // falling back) if every URL threw -- a plain !res.ok/empty response still
@@ -245,8 +251,22 @@ export const ALL_PRODUCTS: Product[] = [
 
 // Shared by getCategoryProducts/getTrendingProducts/getProductById/the wishlist
 // service below -- was duplicated identically in all three before this.
+// Inline SVG data URI so products with no uploaded image still render something
+// instead of a broken-image icon -- an external placeholder host (previously
+// Unsplash) is a live dependency that can 403/rate-limit or trip Chrome's
+// Opaque Response Blocking, which is exactly what was happening in production.
+export const NO_IMAGE_PLACEHOLDER =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">` +
+      `<rect width="400" height="400" fill="#F1F3F5"/>` +
+      `<path d="M140 260 L180 210 L215 245 L255 190 L280 260 Z" fill="#CED4DA"/>` +
+      `<circle cx="160" cy="165" r="20" fill="#CED4DA"/>` +
+      `</svg>`
+  );
+
 export const mapBackendProduct = (p: any, opts?: { vehicleType?: VehicleType; categoryFallback?: string }): Product => {
-  let imageUrl = 'https://images.unsplash.com/photo-1606169429760-4b2e88a38a7c?w=400&q=80';
+  let imageUrl = NO_IMAGE_PLACEHOLDER;
   if (Array.isArray(p.images) && p.images.length > 0 && p.images[0] && typeof p.images[0] === 'string' && p.images[0].trim() !== '') {
     imageUrl = p.images[0];
     if (imageUrl.startsWith('/')) {

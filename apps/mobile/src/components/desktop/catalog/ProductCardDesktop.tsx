@@ -3,6 +3,7 @@ import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Product } from '../../../types/product';
 import { colors, spacing, radius, shadows } from '../../../theme/tokens';
+import { NO_IMAGE_PLACEHOLDER } from '../../../services/product.service';
 
 const NEW_WINDOW_DAYS = 14;
 
@@ -35,6 +36,7 @@ function ProductCardDesktop({
 }: ProductCardDesktopProps) {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
   const outOfStock = product.stockStatus === 'Out of Stock';
   const showHoverActions = (hovered || focused) && !outOfStock;
 
@@ -48,7 +50,12 @@ function ProductCardDesktop({
       accessibilityLabel={`${product.name}, ${product.brand}, ₹${product.price}`}
     >
       <View style={styles.imageWrap}>
-        <Image source={{ uri: product.image }} style={[styles.image, outOfStock && styles.imageDimmed]} resizeMode="cover" />
+        <Image
+          source={{ uri: imageFailed ? NO_IMAGE_PLACEHOLDER : product.image }}
+          style={[styles.image, outOfStock && styles.imageDimmed]}
+          resizeMode="cover"
+          onError={() => setImageFailed(true)}
+        />
 
         <View style={styles.badgeStack}>
           {outOfStock && (

@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Product } from '../types/product';
-import { getProductById } from '../services/product.service';
+import { getProductById, NO_IMAGE_PLACEHOLDER } from '../services/product.service';
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../services/wishlist.service';
 import { useDispatch, useSelector } from 'react-redux';
 import { addToCart, RootState } from '../store';
@@ -35,6 +35,7 @@ export default function ProductDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [wishlistBusy, setWishlistBusy] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -151,7 +152,11 @@ export default function ProductDetailsScreen() {
         </View>
 
         <View style={styles.imageContainer}>
-          <Image source={{ uri: product.image }} style={styles.image} />
+          <Image
+            source={{ uri: imageFailed ? NO_IMAGE_PLACEHOLDER : product.image }}
+            style={styles.image}
+            onError={() => setImageFailed(true)}
+          />
           {product.discountPercentage && (
             <View style={styles.discountBadge}>
               <Text style={styles.discountText}>{product.discountPercentage}% OFF</Text>
