@@ -786,12 +786,22 @@ export const deleteTechnician = async (req: Request, res: Response): Promise<voi
       return;
     }
 
+    // No onDelete cascade exists in the schema, so any other table referencing
+    // this technician's userId (not just the technician-specific tables
+    // above) must be cleaned up first, or prisma.user.delete throws an opaque
+    // FK-violation 500 -- reachable the moment a technician's user account
+    // has ever filed a support ticket, added an address, or triggered an
+    // audit log entry.
     await prisma.$transaction([
       prisma.technicianDocument.deleteMany({ where: { technicianId: id } }),
       prisma.technicianBankAccount.deleteMany({ where: { technicianId: id } }),
       prisma.technicianSettlement.deleteMany({ where: { technicianId: id } }),
       prisma.serviceTechnician.delete({ where: { id } }),
       prisma.notification.deleteMany({ where: { userId: technician.userId } }),
+      prisma.address.deleteMany({ where: { userId: technician.userId } }),
+      prisma.supportTicket.deleteMany({ where: { userId: technician.userId } }),
+      prisma.auditLog.deleteMany({ where: { userId: technician.userId } }),
+      prisma.stockMovement.deleteMany({ where: { userId: technician.userId } }),
       prisma.user.delete({ where: { id: technician.userId } }),
     ]);
 
