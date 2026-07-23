@@ -60,13 +60,13 @@ const FAQS: FAQItem[] = [
     id: 5,
     category: 'payments',
     question: 'What payment options do you support?',
-    answer: 'We support all major payment types including UPI (Google Pay, PhonePe, Paytm), Credit/Debit cards, Net Banking, and Cash on Delivery (COD) for parts and services.'
+    answer: 'Cash on Delivery (COD) is currently the only supported payment method for both parts and services. Online payment (UPI/Cards/Net Banking) is coming soon.'
   },
   {
     id: 6,
     category: 'payments',
     question: 'When will I get my refund for a cancelled booking?',
-    answer: 'Refunds are processed instantly upon cancellation and reflect in your original payment method within 3-5 business days, depending on your bank.'
+    answer: 'For a cancelled order or booking that was already paid, the amount is credited to your MechBazar wallet balance, which you can view under Account > Wallet.'
   }
 ];
 
