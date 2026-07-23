@@ -48,36 +48,6 @@ const colors = {
   success: '#34C759'
 };
 
-const NEARBY_MECHANICS = [
-  {
-    id: 'mech_1',
-    name: 'Sohan Lal',
-    rating: '4.9★',
-    experience: '8 Yrs Exp',
-    distance: '1.2 km',
-    avatar: 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&q=80',
-    available: true
-  },
-  {
-    id: 'mech_2',
-    name: 'Manpreet Singh',
-    rating: '4.8★',
-    experience: '5 Yrs Exp',
-    distance: '2.5 km',
-    avatar: 'https://images.unsplash.com/photo-1566492031773-4f4e44671857?w=150&q=80',
-    available: true
-  },
-  {
-    id: 'mech_3',
-    name: 'Ramesh Verma',
-    rating: '4.7★',
-    experience: '10 Yrs Exp',
-    distance: '3.0 km',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&q=80',
-    available: false
-  }
-];
-
 const SERVICES = [
   { id: 's1', type: 'wash', name: 'Premium Wash', price: 199 },
   { id: 's2', type: 'ac', name: 'AC Servicing', price: 499 },
@@ -955,78 +925,6 @@ export default function HomeScreen({ navigation }: any) {
           )}
         </View>
 
-        {/* NEARBY VERIFIED MECHANICS */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Nearby Verified Mechanics</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
-            {NEARBY_MECHANICS.map((mech) => (
-              <TouchableOpacity
-                key={mech.id}
-                style={styles.mechanicCard}
-                activeOpacity={0.9}
-                onPress={() => navigation.navigate('MechanicDetail', {
-                  id: mech.id,
-                  name: mech.name,
-                  rating: mech.rating,
-                  experience: mech.experience,
-                  distance: mech.distance,
-                  avatar: mech.avatar,
-                  available: mech.available,
-                })}
-              >
-                <View style={styles.mechHeaderRow}>
-                  <View style={styles.mechAvatarBox}>
-                    <Image source={{ uri: mech.avatar }} style={styles.mechAvatarImg} />
-                    {mech.available && <View style={styles.mechOnlineDot} />}
-                  </View>
-                  <View style={{ marginLeft: 12 }}>
-                    <Text style={styles.mechName}>{mech.name}</Text>
-                    <Text style={styles.mechRating}>{mech.rating} • {mech.experience}</Text>
-                    <Text style={styles.mechDistance}>{mech.distance} away</Text>
-                  </View>
-                </View>
-                <View style={styles.mechBtnRow}>
-                  <TouchableOpacity 
-                    style={styles.mechCallBtn}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      navigation.navigate('VideoCall', {
-                        mechanicName: mech.name,
-                        mechanicAvatar: mech.avatar,
-                      });
-                    }}
-                  >
-                    <Ionicons name="videocam" size={16} color={colors.primary} />
-                    <Text style={styles.mechCallText}>Video Call</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.mechBookBtn, !mech.available && styles.mechBookBtnDisabled]}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      if (!mech.available) {
-                        Alert.alert('Mechanic Busy', `${mech.name} is currently unavailable. Try another mechanic or browse our Services.`);
-                        return;
-                      }
-                      navigation.navigate('MechanicDetail', {
-                        id: mech.id,
-                        name: mech.name,
-                        rating: mech.rating,
-                        experience: mech.experience,
-                        distance: mech.distance,
-                        avatar: mech.avatar,
-                        available: mech.available,
-                      });
-                    }}
-                  >
-                    <Text style={styles.mechBookText}>{mech.available ? 'Book Visit' : 'Busy'}</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
 
         {/* TODAY'S OFFERS SECTION */}
         <View style={styles.section}>

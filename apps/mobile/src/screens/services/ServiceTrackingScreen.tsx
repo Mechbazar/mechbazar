@@ -299,12 +299,10 @@ export default function ServiceTrackingScreen() {
                 <TouchableOpacity style={styles.iconBtn} onPress={handleCall}>
                   <Text style={{ fontSize: 18 }}>📞</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.iconBtn}
-                  onPress={() => navigation.navigate('VideoCall', { mechanicName: technician.user?.name || 'Your Mechanic', mechanicAvatar: photoUri || undefined })}
-                >
-                  <Text style={{ fontSize: 18 }}>🎥</Text>
-                </TouchableOpacity>
+                {/* Video call removed -- it had no real video SDK behind it
+                    (simulated connection + a canned diagnosis message
+                    regardless of the actual booking). Call + chat below are
+                    real, backend-backed contact channels. */}
                 <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('ServiceChat', { bookingId })}>
                   <Text style={{ fontSize: 18 }}>💬</Text>
                 </TouchableOpacity>

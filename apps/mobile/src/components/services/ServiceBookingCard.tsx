@@ -100,13 +100,6 @@ export default function ServiceBookingCard({ booking, token, onChanged }: Props)
     if (phone) Linking.openURL(`tel:${phone}`);
   };
 
-  const handleVideoCall = () => {
-    navigation.navigate('VideoCall', {
-      mechanicName: technician?.user?.name || 'Your Mechanic',
-      mechanicAvatar: photoUri || undefined,
-    });
-  };
-
   const handleCancel = () => {
     Alert.alert('Cancel booking', 'Are you sure you want to cancel this service booking?', [
       { text: 'No', style: 'cancel' },
@@ -180,9 +173,7 @@ export default function ServiceBookingCard({ booking, token, onChanged }: Props)
               <TouchableOpacity style={styles.iconBtn} onPress={handleCall}>
                 <Text style={{ fontSize: 15 }}>📞</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.iconBtn} onPress={handleVideoCall}>
-                <Text style={{ fontSize: 15 }}>🎥</Text>
-              </TouchableOpacity>
+              {/* Video call removed -- see ServiceTrackingScreen.tsx for why. */}
               <TouchableOpacity style={styles.iconBtn} onPress={() => navigation.navigate('ServiceChat', { bookingId: booking.id })}>
                 <Text style={{ fontSize: 15 }}>💬</Text>
               </TouchableOpacity>
