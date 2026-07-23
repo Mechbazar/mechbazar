@@ -3,7 +3,7 @@ import { Role, VendorStatus, OrderStatus } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { generateToken } from '../utils/jwt';
 import { AuthRequest } from '../middlewares/auth';
-import { restoreOrderStock } from './order.controller';
+import { restoreOrderStock, creditOrderDelivery } from './order.controller';
 import { notifyUser } from '../utils/notify';
 import { sanitizeUser, sanitizeUsers, sanitizeOrders } from '../utils/sanitizeUser';
 import prisma from '../config/prisma';
@@ -416,15 +416,23 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       res.status(400).json({ error: 'A delivered order cannot be cancelled directly -- use RETURNED once the goods are physically returned.' });
       return;
     }
+    // Once delivered, the only legitimate forward transition is RETURNED --
+    // "un-delivering" doesn't reflect reality, and would let a later call
+    // re-trigger creditOrderDelivery below for the same physical delivery.
+    if (order.status === OrderStatus.DELIVERED && status !== OrderStatus.DELIVERED && status !== OrderStatus.RETURNED) {
+      res.status(400).json({ error: 'A delivered order can only move to RETURNED, not back to an earlier status.' });
+      return;
+    }
 
     const isBeingClosed = status === OrderStatus.CANCELLED || status === OrderStatus.RETURNED;
+    const isBeingDelivered = status === OrderStatus.DELIVERED && order.status !== OrderStatus.DELIVERED;
 
     const updatedOrder = await prisma.$transaction(async (tx) => {
       // Atomically claim the transition -- only matches if the order's status
       // is still what we just read, re-checked under Postgres's row lock at
       // UPDATE time. Closes the race where a concurrent admin/vendor status
       // update on the same order both read the same pre-close status and
-      // both restore stock.
+      // both restore stock/credit wallets.
       const claim = await tx.order.updateMany({
         where: { id, status: order.status },
         data: {
@@ -438,6 +446,15 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
 
       if (isBeingClosed) {
         await restoreOrderStock(tx, order.items, userId, id);
+      }
+      // A vendor can close an order out directly (e.g. no rider was ever
+      // assigned) -- without this, the rider/vendor wallet credit that
+      // normally happens in the rider's own updateMyDeliveryStatus would
+      // just never happen for these orders. order.items is already scoped to
+      // this vendor's own products, so this only ever credits this vendor's
+      // own share (plus the assigned rider, if any).
+      if (isBeingDelivered) {
+        await creditOrderDelivery(tx, order);
       }
 
       return tx.order.findUniqueOrThrow({ where: { id } });

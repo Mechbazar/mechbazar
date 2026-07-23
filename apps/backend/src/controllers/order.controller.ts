@@ -69,6 +69,48 @@ export const restoreOrderStock = async (
   }
 };
 
+type DeliveryCreditOrder = {
+  deliveryPartnerId: string | null;
+  deliveryFee: number;
+  items: { price: number; quantity: number; product: { vendorId: string } | null }[];
+};
+
+// Shared by updateMyDeliveryStatus (rider's own flow), updateAdminOrderStatus,
+// and vendor.controller.ts's updateOrderStatus: credits the assigned rider's
+// delivery fee and each vendor's share of the order total when an order is
+// first marked DELIVERED, regardless of which of the three endpoints performs
+// that transition. Previously only the rider's own endpoint credited anyone,
+// so an order the admin or a vendor set straight to DELIVERED (bypassing the
+// rider flow entirely) silently never paid the vendor for it.
+export const creditOrderDelivery = async (
+  tx: Prisma.TransactionClient,
+  order: DeliveryCreditOrder
+) => {
+  if (order.deliveryPartnerId) {
+    await tx.deliveryPartner.update({
+      where: { id: order.deliveryPartnerId },
+      data: { walletBalance: { increment: order.deliveryFee } },
+    });
+  }
+
+  // An order can contain items from multiple vendors under one global status
+  // (schema/architecture unchanged) -- each vendor is credited their own
+  // share, computed from the items actually attributed to them, rather than
+  // crediting one vendor the whole order total.
+  const shareByVendor = new Map<string, number>();
+  for (const item of order.items) {
+    const vendorId = item.product?.vendorId;
+    if (!vendorId) continue;
+    shareByVendor.set(vendorId, (shareByVendor.get(vendorId) || 0) + item.price * item.quantity);
+  }
+  for (const [vendorId, share] of shareByVendor) {
+    await tx.vendor.update({
+      where: { id: vendorId },
+      data: { walletBalance: { increment: share } },
+    });
+  }
+};
+
 export const createOrder = async (req: AuthRequest, res: Response) => {
   try {
     const { items, addressId, deliveryAddress, couponCode, isB2B, payment_method } = req.body;
@@ -478,8 +520,16 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
     if (status === 'CANCELLED' && existing.status === 'DELIVERED') {
       return res.status(400).json({ error: 'A delivered order cannot be cancelled directly -- use RETURNED once the goods are physically returned.' });
     }
+    // Once delivered, the only legitimate forward transition is RETURNED --
+    // "un-delivering" back to an earlier status doesn't reflect reality, and
+    // would also let a second admin call re-trigger creditOrderDelivery below
+    // (rider/vendor wallet credit) for the same physical delivery.
+    if (existing.status === 'DELIVERED' && status !== 'DELIVERED' && status !== 'RETURNED') {
+      return res.status(400).json({ error: 'A delivered order can only move to RETURNED, not back to an earlier status.' });
+    }
 
     const isBeingClosed = status === 'CANCELLED' || status === 'RETURNED';
+    const isBeingDelivered = status === 'DELIVERED' && existing.status !== 'DELIVERED';
 
     const order = await prisma.$transaction(async (tx) => {
       // Atomically claim the transition: only matches if the order's status
@@ -487,7 +537,7 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
       // UPDATE time -- not against the stale `existing.status` read above.
       // This closes the race where two concurrent admin status-update calls
       // (or a retried request) both read the same pre-close status and both
-      // restore stock for the same order.
+      // restore stock/credit wallets for the same order.
       const claim = await tx.order.updateMany({
         where: { id, status: existing.status },
         data: {
@@ -504,6 +554,13 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
 
       if (isBeingClosed) {
         await restoreOrderStock(tx, existing.items, req.user!.userId, id);
+      }
+      // An admin can close an order out directly (e.g. no rider was ever
+      // assigned, or the rider's own app wasn't used) -- without this, the
+      // rider/vendor wallet credit that normally happens in
+      // updateMyDeliveryStatus would just never happen for these orders.
+      if (isBeingDelivered) {
+        await creditOrderDelivery(tx, existing);
       }
 
       return tx.order.findUniqueOrThrow({ where: { id } });
@@ -647,8 +704,16 @@ export const updateMyDeliveryStatus = async (req: AuthRequest, res: Response) =>
     }
 
     const updated = await prisma.$transaction(async (tx) => {
-      const updatedOrder = await tx.order.update({
-        where: { id },
+      // Atomically claim the transition: only matches if the order's status
+      // is still what we just read, re-checked under Postgres's row lock at
+      // UPDATE time -- not against the stale `order.status` read above.
+      // RIDER_STATUS_FLOW prevents an illegitimate transition, but on its own
+      // does nothing to stop the SAME legitimate transition (e.g. a mobile
+      // network retry double-tapping "Mark Delivered") from being processed
+      // twice concurrently, which would double-credit the rider's and every
+      // vendor's wallet below.
+      const claim = await tx.order.updateMany({
+        where: { id, status: order.status },
         data: {
           status: status as any,
           ...(proofImageUrl && { proofImageUrl }),
@@ -656,31 +721,16 @@ export const updateMyDeliveryStatus = async (req: AuthRequest, res: Response) =>
           ...(issueReason && { issueReason }),
         },
       });
+      if (claim.count === 0) {
+        throw new OrderError(409, 'Delivery status changed concurrently by another request. Please retry.');
+      }
+      const updatedOrder = await tx.order.findUniqueOrThrow({ where: { id } });
 
-      // Credit the rider's wallet with the delivery fee. RIDER_STATUS_FLOW has no
-      // transitions out of DELIVERED, so this only ever fires once per order.
+      // Credit the rider's and vendors' wallets. RIDER_STATUS_FLOW has no
+      // transitions out of DELIVERED, so this only ever fires once per order
+      // (the atomic claim above additionally guards against a concurrent retry).
       if (status === 'DELIVERED') {
-        await tx.deliveryPartner.update({
-          where: { id: partner.id },
-          data: { walletBalance: { increment: order.deliveryFee } },
-        });
-
-        // An order can contain items from multiple vendors under one global
-        // status (schema/architecture unchanged) -- each vendor is credited
-        // their own share, computed from the items actually attributed to
-        // them, rather than crediting one vendor the whole order total.
-        const shareByVendor = new Map<string, number>();
-        for (const item of order.items) {
-          const vendorId = item.product?.vendorId;
-          if (!vendorId) continue;
-          shareByVendor.set(vendorId, (shareByVendor.get(vendorId) || 0) + item.price * item.quantity);
-        }
-        for (const [vendorId, share] of shareByVendor) {
-          await tx.vendor.update({
-            where: { id: vendorId },
-            data: { walletBalance: { increment: share } },
-          });
-        }
+        await creditOrderDelivery(tx, order);
       }
 
       return updatedOrder;
@@ -695,6 +745,9 @@ export const updateMyDeliveryStatus = async (req: AuthRequest, res: Response) =>
 
     res.status(200).json(updated);
   } catch (error: any) {
+    if (error instanceof OrderError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('Error updating delivery status:', error.message);
     res.status(500).json({ error: 'Failed to update delivery status' });
   }
