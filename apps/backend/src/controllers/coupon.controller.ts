@@ -124,6 +124,24 @@ export const deleteCoupon = async (req: Request, res: Response): Promise<void> =
   }
 };
 
+// Any authenticated customer can browse currently redeemable coupons -- used
+// by the account screen's "Available Coupons" list, which previously showed
+// hardcoded mock codes that didn't correspond to any real coupon in the DB
+// (applying one at checkout would have failed with "Invalid coupon code").
+export const getActiveCoupons = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const coupons = await prisma.coupon.findMany({
+      where: { isActive: true },
+      orderBy: { id: 'desc' },
+      select: { id: true, code: true, discountType: true, discountValue: true, minOrderValue: true, vehicleType: true },
+    });
+    res.status(200).json(coupons);
+  } catch (error) {
+    console.error('Error fetching active coupons:', error);
+    res.status(500).json({ error: 'Failed to fetch coupons' });
+  }
+};
+
 export const validateCoupon = async (req: Request, res: Response): Promise<void> => {
   try {
     const { code, cartTotal } = req.body;

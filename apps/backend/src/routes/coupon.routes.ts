@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getCoupons, createCoupon, updateCoupon, deleteCoupon, validateCoupon } from '../controllers/coupon.controller';
+import { getCoupons, createCoupon, updateCoupon, deleteCoupon, validateCoupon, getActiveCoupons } from '../controllers/coupon.controller';
 import { authenticate, authorize } from '../middlewares/auth';
 import { Role } from '@prisma/client';
 
@@ -7,6 +7,7 @@ const router = Router();
 
 const admins = [Role.ADMIN, Role.SUPER_ADMIN, Role.OPERATIONS_MANAGER, Role.FINANCE_MANAGER];
 
+router.get('/active', authenticate, getActiveCoupons);
 router.post('/validate', authenticate, validateCoupon);
 
 router.get('/', authenticate, authorize(admins), getCoupons);
