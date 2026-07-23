@@ -230,7 +230,10 @@ export const requestOtp = async (req: Request, res: Response): Promise<void> => 
     res.status(200).json({
       success: true,
       message: 'OTP sent successfully',
-      otp: (process.env.OTP_PROVIDER || 'TEST') === 'TEST' ? result.otp : undefined,
+      // Never echo the OTP in production, even if OTP_PROVIDER is misconfigured
+      // as TEST there -- this response field exists purely for local/dev testing
+      // without a real SMS provider.
+      otp: process.env.NODE_ENV !== 'production' && (process.env.OTP_PROVIDER || 'TEST') === 'TEST' ? result.otp : undefined,
     });
   } catch (error) {
     console.error('Request OTP error:', error);

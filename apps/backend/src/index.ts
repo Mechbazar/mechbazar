@@ -44,7 +44,17 @@ app.set('trust proxy', 1);
 // Middlewares
 app.use(compression());
 app.use(express.json());
-app.use(cors());
+// Auth is Bearer-token based (not cookies), so this isn't CSRF-exploitable,
+// but a wide-open '*' still lets any origin's JS read authenticated responses
+// if it ever gets hold of a token. CORS_ALLOWED_ORIGINS (comma-separated) lets
+// ops lock this down per-environment without code changes; unset preserves
+// today's permissive default so this can't silently break admin/vendor web
+// access on deploy.
+const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+app.use(cors(allowedOrigins.length > 0 ? { origin: allowedOrigins } : undefined));
 app.use(helmet());
 app.use(morgan('dev'));
 

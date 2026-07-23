@@ -21,6 +21,24 @@ if (process.env.NODE_ENV === 'production' && process.env.JWT_SECRET === 'superse
   fail('JWT_SECRET is still set to the local development default. Set a real secret before running in production.');
 }
 
+// OTP_PROVIDER=PRODUCTION verifies phone OTPs via Firebase (utils/otp.ts) --
+// without these three set, every phone/OTP login and registration silently
+// fails at request time with a generic "Invalid or expired OTP token" (see
+// config/firebase.ts, which catches the missing-credentials case at import
+// time and continues with an uninitialized app). Failing fast at boot instead
+// turns that into an immediate, diagnosable startup error.
+if (process.env.OTP_PROVIDER === 'PRODUCTION') {
+  const missingFirebase = ['FIREBASE_PROJECT_ID', 'FIREBASE_CLIENT_EMAIL', 'FIREBASE_PRIVATE_KEY'].filter(
+    (key) => !process.env[key] || process.env[key]?.trim() === ''
+  );
+  if (missingFirebase.length > 0) {
+    fail(
+      `OTP_PROVIDER=PRODUCTION requires Firebase credentials: missing ${missingFirebase.join(', ')}.\n` +
+        `Set these or switch OTP_PROVIDER back to TEST.`
+    );
+  }
+}
+
 export const env = {
   NODE_ENV: process.env.NODE_ENV || 'development',
   PORT: Number(process.env.PORT) || 5001,

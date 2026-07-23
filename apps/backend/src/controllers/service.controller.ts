@@ -638,13 +638,24 @@ export const updateMyBookingStatus = async (req: AuthRequest, res: Response) => 
     }
 
     const updated = await prisma.$transaction(async (tx) => {
-      const b = await tx.serviceBooking.update({
-        where: { id },
+      // Atomically claim the transition: only matches if the booking's status
+      // is still what we just read, re-checked under Postgres's row lock at
+      // UPDATE time -- not against the stale `booking.status` read above.
+      // Without this, a retried/duplicated request (e.g. a mobile network
+      // retry resubmitting the same OTP) could pass the allowedNext/OTP checks
+      // twice concurrently and credit the technician's wallet + totalJobs
+      // twice for the same job.
+      const claim = await tx.serviceBooking.updateMany({
+        where: { id, status: booking.status },
         data: {
           status,
           ...(status === 'COMPLETED' && { completedAt: new Date(), completionOtp: null, completionOtpGeneratedAt: null }),
         },
       });
+      if (claim.count === 0) {
+        throw new Error('Booking status changed concurrently by another request. Please retry.');
+      }
+      const b = await tx.serviceBooking.findUniqueOrThrow({ where: { id } });
       await tx.bookingStatusHistory.create({
         data: { bookingId: id, status, changedByUserId: req.user!.userId },
       });
@@ -674,6 +685,9 @@ export const updateMyBookingStatus = async (req: AuthRequest, res: Response) => 
 
     res.status(200).json(updated);
   } catch (error: any) {
+    if (error.message?.startsWith('Booking status changed concurrently')) {
+      return res.status(409).json({ error: error.message });
+    }
     console.error('Error updating booking status:', error.message);
     res.status(500).json({ error: 'Failed to update booking status' });
   }
@@ -797,8 +811,13 @@ export const generateBookingCompletionOtp = async (req: AuthRequest, res: Respon
     });
 
     // Deliberately never echoed back to the technician's own response -- the
-    // customer must read it aloud for the technician to enter.
-    notifyUser(booking.userId, 'Completion code', `Share this code with your mechanic to confirm job completion: ${otp}`, { bookingId: id });
+    // customer must read it aloud for the technician to enter. The OTP itself
+    // must not go in the push title/body either: those render on the lock
+    // screen by default, which would defeat the point of requiring the
+    // customer to read it aloud. Keep it in the data payload only, where it's
+    // reachable by the app in the foreground but not shown in a notification
+    // preview.
+    notifyUser(booking.userId, 'Completion code ready', 'Open the app to view your mechanic completion code.', { bookingId: id, completionOtp: otp });
 
     res.status(200).json({ message: 'OTP sent to the customer' });
   } catch (error: any) {
@@ -1356,19 +1375,47 @@ export const updateAdminBookingStatus = async (req: AuthRequest, res: Response) 
     const existing = await prisma.serviceBooking.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ error: 'Booking not found' });
 
+    // Terminal states can't be reopened through this endpoint. Without this,
+    // an admin could move a COMPLETED booking back to WORK_STARTED, letting
+    // the technician legitimately re-run generate-OTP -> complete and get
+    // credited (wallet + totalJobs) a second time for the same job.
+    if (existing.status === 'COMPLETED' || existing.status === 'CANCELLED') {
+      return res.status(400).json({ error: `Booking is already ${existing.status}; this is a terminal state and cannot be changed.` });
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
-      const b = await tx.serviceBooking.update({
-        where: { id },
+      // Atomically claim the transition -- only matches if the booking's
+      // status is still what we just read, re-checked under Postgres's row
+      // lock at UPDATE time. Closes the race where a concurrent admin/
+      // technician status update on the same booking both act on the same
+      // stale pre-transition status.
+      const claim = await tx.serviceBooking.updateMany({
+        where: { id, status: existing.status },
         data: {
           status,
           ...(status === 'CANCELLED' && { technicianId: null }),
           ...(status === 'COMPLETED' && { completedAt: new Date() }),
         },
       });
+      if (claim.count === 0) {
+        throw new Error('Booking status changed concurrently by another request. Please refresh and retry.');
+      }
+      const b = await tx.serviceBooking.findUniqueOrThrow({ where: { id } });
       await tx.bookingStatusHistory.create({
         data: { bookingId: id, status, changedByUserId: req.user!.userId, note: 'Updated by admin' },
       });
       if (status === 'COMPLETED') {
+        // An admin can close out a booking directly, bypassing the
+        // technician's own accept/OTP flow (updateMyBookingStatus) -- that
+        // flow is the only other place the technician gets credited, so
+        // without this, a technician who did the job could go unpaid simply
+        // because an admin closed the booking administratively instead.
+        if (b.technicianId) {
+          await tx.serviceTechnician.update({
+            where: { id: b.technicianId },
+            data: { walletBalance: { increment: b.finalAmount }, totalJobs: { increment: 1 } },
+          });
+        }
         await generateInvoiceForBooking(tx, b);
       }
       return b;
@@ -1379,6 +1426,9 @@ export const updateAdminBookingStatus = async (req: AuthRequest, res: Response) 
 
     res.status(200).json(updated);
   } catch (error: any) {
+    if (error.message?.startsWith('Booking status changed concurrently')) {
+      return res.status(409).json({ error: error.message });
+    }
     console.error('Error updating booking status:', error.message);
     res.status(500).json({ error: 'Failed to update booking status' });
   }
@@ -1387,11 +1437,33 @@ export const updateAdminBookingStatus = async (req: AuthRequest, res: Response) 
 export const refundBookingPayment = async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
-    const payment = await prisma.payment.findUnique({ where: { serviceBookingId: id } });
+    const payment = await prisma.payment.findUnique({
+      where: { serviceBookingId: id },
+      include: { serviceBooking: true },
+    });
     if (!payment) return res.status(404).json({ error: 'Payment not found for this booking' });
     if (payment.status === 'REFUNDED') return res.status(400).json({ error: 'Payment already refunded' });
 
-    const updated = await prisma.payment.update({ where: { id: payment.id }, data: { status: 'REFUNDED' } });
+    // Mirrors order.controller.ts's cancelMyOrder refund logic: a paid-online
+    // payment actually credits the customer's wallet, not just a status flip.
+    // COD has nothing to refund through the wallet (no money moved through
+    // the platform), so it stays a status-only record for ops purposes.
+    const shouldCreditWallet = payment.method !== 'COD' && payment.status === 'SUCCESS' && payment.serviceBooking;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      if (shouldCreditWallet) {
+        await tx.user.update({
+          where: { id: payment.serviceBooking!.userId },
+          data: { wallet: { increment: payment.amount } },
+        });
+      }
+      return tx.payment.update({ where: { id: payment.id }, data: { status: 'REFUNDED' } });
+    });
+
+    if (shouldCreditWallet) {
+      notifyUser(payment.serviceBooking!.userId, 'Refund processed', `₹${payment.amount} has been credited to your wallet.`, { bookingId: id });
+    }
+
     res.status(200).json(updated);
   } catch (error: any) {
     console.error('Error refunding payment:', error.message);
