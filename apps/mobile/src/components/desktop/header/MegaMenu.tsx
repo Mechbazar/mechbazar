@@ -46,7 +46,8 @@ export default function MegaMenu() {
               <Pressable
                 key={cat.id}
                 style={styles.panelItem}
-                onPress={() => {
+                onPress={(e) => {
+                  e.stopPropagation();
                   setOpen(false);
                   navigation.navigate('CategoryProducts', { categoryName: cat.name });
                 }}
@@ -76,18 +77,20 @@ const styles = StyleSheet.create({
   categoriesLabel: { color: colors.white, fontSize: 13, fontWeight: '700' },
   panel: {
     position: 'absolute' as any,
+    // No marginTop -- touches the trigger's bottom edge directly so there's
+    // no dead-zone gap for the mouse to cross (see DesktopHeader.tsx's
+    // accountPanel for the full explanation of why a gap here breaks hover).
     top: '100%',
     left: 0,
     minWidth: 360,
     maxHeight: 420,
     backgroundColor: colors.white,
     borderRadius: radius.md,
-    marginTop: 4,
     zIndex: 50,
     ...shadows.lg,
   },
   panelScroll: { maxHeight: 420 },
-  panelGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: spacing.sm },
+  panelGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: spacing.sm, paddingTop: 12 },
   panelItem: {
     width: 180,
     paddingVertical: 10,

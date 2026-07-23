@@ -142,26 +142,32 @@ export default function DesktopHeader() {
               <Ionicons name={accountOpen ? 'chevron-up' : 'chevron-down'} size={13} color={colors.white} />
 
               {accountOpen && (
+                // Each item below stops event propagation -- without it, a
+                // click also bubbles up to the outer trigger's own onPress
+                // (setAccountOpen(o => !o)), which runs *after* the item's
+                // setAccountOpen(false) in the same batch and flips the panel
+                // straight back open right after the click, so nothing
+                // appeared to happen.
                 <View style={styles.accountPanel}>
-                  <Pressable style={styles.accountItem} onPress={() => goAccount()}>
+                  <Pressable style={styles.accountItem} onPress={(e) => { e.stopPropagation(); goAccount(); }}>
                     <Text style={styles.accountItemText}>My Account</Text>
                   </Pressable>
-                  <Pressable style={styles.accountItem} onPress={() => navigation.navigate('MainTabs', { screen: 'Orders' })}>
+                  <Pressable style={styles.accountItem} onPress={(e) => { e.stopPropagation(); setAccountOpen(false); navigation.navigate('MainTabs', { screen: 'Orders' }); }}>
                     <Text style={styles.accountItemText}>My Orders</Text>
                   </Pressable>
-                  <Pressable style={styles.accountItem} onPress={() => goAccount('Wishlist')}>
+                  <Pressable style={styles.accountItem} onPress={(e) => { e.stopPropagation(); goAccount('Wishlist'); }}>
                     <Text style={styles.accountItemText}>Wishlist</Text>
                   </Pressable>
-                  <Pressable style={styles.accountItem} onPress={() => goAccount('AddressManagement')}>
+                  <Pressable style={styles.accountItem} onPress={(e) => { e.stopPropagation(); goAccount('AddressManagement'); }}>
                     <Text style={styles.accountItemText}>Addresses</Text>
                   </Pressable>
-                  <Pressable style={styles.accountItem} onPress={() => goAccount('HelpCenter')}>
+                  <Pressable style={styles.accountItem} onPress={(e) => { e.stopPropagation(); goAccount('HelpCenter'); }}>
                     <Text style={styles.accountItemText}>Help Center</Text>
                   </Pressable>
                   <View style={styles.accountDivider} />
                   <Pressable
                     style={styles.accountItem}
-                    onPress={() => { setAccountOpen(false); dispatch(logout()); }}
+                    onPress={(e) => { e.stopPropagation(); setAccountOpen(false); dispatch(logout()); }}
                   >
                     <Text style={[styles.accountItemText, styles.logoutText]}>Logout</Text>
                   </Pressable>
@@ -245,13 +251,17 @@ const styles = StyleSheet.create({
   accountName: { color: colors.white, fontSize: 13, fontWeight: '600', maxWidth: 90 },
   accountPanel: {
     position: 'absolute' as any,
+    // Touches the trigger's bottom edge directly (no marginTop gap) -- a gap
+    // here is a dead zone: moving the mouse from the button down toward an
+    // item briefly leaves both the button's and the panel's rendered box,
+    // firing onHoverOut and closing the panel before the click lands.
     top: '100%',
     right: 0,
     minWidth: 200,
     backgroundColor: colors.white,
     borderRadius: radius.md,
-    marginTop: 4,
-    paddingVertical: 6,
+    paddingTop: 10,
+    paddingBottom: 6,
     zIndex: 50,
     ...shadows.lg,
   },
