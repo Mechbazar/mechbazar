@@ -58,10 +58,6 @@ export const generateAndSendOtp = async (phone: string): Promise<{ otp: string; 
 export const verifyOtpAndResolvePhone = async (phone: string, otp: string): Promise<string> => {
   const normalizedPhone = phone.startsWith('+') ? phone : `+91${phone}`;
 
-  if (process.env.NODE_ENV === 'test') {
-    return normalizedPhone;
-  }
-
   // Developer bypass gate: restricted to an explicit phone allowlist, even when
   // ALLOW_DEV_OTP_BYPASS=true. Never a blanket bypass for all accounts.
   if (otp === '123456' && isDevOtpBypassAllowed() && isPhoneAllowedForBypass(normalizedPhone)) {

@@ -6,6 +6,7 @@ import { sendExpoPush } from '../utils/expoPush';
 import { notifyUser, notifyAdmins } from '../utils/notify';
 import { sanitizeBooking, sanitizeBookings } from '../utils/sanitizeUser';
 import { haversineKm, findNearestApprovedTechnician } from '../utils/geo';
+import { pendingPaymentCreateInput, creditWalletForOnlineRefund } from '../services/payment.service';
 
 // Thrown from inside createBooking's $transaction to carry an intended HTTP
 // status (400/404/409) back out, mirroring order.controller.ts's OrderError.
@@ -434,11 +435,7 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
           estimatedCost,
           finalAmount: estimatedCost,
           payment: {
-            create: {
-              method: payment_method === 'online' ? 'ONLINE' : 'COD',
-              status: 'PENDING',
-              amount: estimatedCost,
-            },
+            create: pendingPaymentCreateInput(payment_method, estimatedCost),
           },
           statusHistory: {
             create: [
@@ -1444,23 +1441,20 @@ export const refundBookingPayment = async (req: Request, res: Response) => {
     if (!payment) return res.status(404).json({ error: 'Payment not found for this booking' });
     if (payment.status === 'REFUNDED') return res.status(400).json({ error: 'Payment already refunded' });
 
-    // Mirrors order.controller.ts's cancelMyOrder refund logic: a paid-online
-    // payment actually credits the customer's wallet, not just a status flip.
-    // COD has nothing to refund through the wallet (no money moved through
-    // the platform), so it stays a status-only record for ops purposes.
-    const shouldCreditWallet = payment.method !== 'COD' && payment.status === 'SUCCESS' && payment.serviceBooking;
-
+    // Shares its wallet-crediting logic with order.controller.ts's
+    // cancelMyOrder via services/payment.service.ts: a paid-online payment
+    // actually credits the customer's wallet, not just a status flip. COD has
+    // nothing to refund through the wallet (no money moved through the
+    // platform), so it stays a status-only record for ops purposes.
+    let credited = false;
     const updated = await prisma.$transaction(async (tx) => {
-      if (shouldCreditWallet) {
-        await tx.user.update({
-          where: { id: payment.serviceBooking!.userId },
-          data: { wallet: { increment: payment.amount } },
-        });
+      if (payment.serviceBooking) {
+        credited = await creditWalletForOnlineRefund(tx, payment, payment.serviceBooking.userId);
       }
       return tx.payment.update({ where: { id: payment.id }, data: { status: 'REFUNDED' } });
     });
 
-    if (shouldCreditWallet) {
+    if (credited) {
       notifyUser(payment.serviceBooking!.userId, 'Refund processed', `₹${payment.amount} has been credited to your wallet.`, { bookingId: id });
     }
 

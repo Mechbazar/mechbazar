@@ -56,7 +56,10 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
   .filter(Boolean);
 app.use(cors(allowedOrigins.length > 0 ? { origin: allowedOrigins } : undefined));
 app.use(helmet());
-app.use(morgan('dev'));
+// 'dev' is a verbose, colorized per-request format meant for a local
+// terminal; 'combined' (standard Apache-style access log, no ANSI colors) is
+// what production log collectors expect.
+app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
 // Generous limit on the public API surface; auth routes get a tighter limit
 // below since brute-forcing login/OTP is the more sensitive target.
@@ -87,13 +90,17 @@ app.use(
 app.use(healthRoutes);
 app.use('/api', healthRoutes);
 
-// Swagger Setup
-let swaggerPath = path.join(__dirname, 'swagger.yaml');
-if (!fs.existsSync(swaggerPath)) {
-  swaggerPath = path.join(__dirname, '../src/swagger.yaml');
+// Swagger Setup -- documents the full internal API surface (including admin
+// routes), so it's only mounted outside production. Endpoints still require
+// their normal auth regardless; this just avoids publishing a map of them.
+if (env.NODE_ENV !== 'production') {
+  let swaggerPath = path.join(__dirname, 'swagger.yaml');
+  if (!fs.existsSync(swaggerPath)) {
+    swaggerPath = path.join(__dirname, '../src/swagger.yaml');
+  }
+  const swaggerDocument = YAML.load(swaggerPath);
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 }
-const swaggerDocument = YAML.load(swaggerPath);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // Routes
 app.use('/api/vendors', vendorRoutes);
