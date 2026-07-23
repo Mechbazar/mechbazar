@@ -43,12 +43,6 @@ const colors = {
   warning: '#FF9500'
 };
 
-const MOCK_COUPONS = [
-  { code: 'MECH250', desc: 'Get ₹250 OFF on doorstep mechanic service.' },
-  { code: 'SPARE10', desc: 'Save flat 10% on genuine Castrol and Bosch spares.' },
-  { code: 'WASHFREE', desc: 'Free foam wash on ordering spares above ₹3,000.' }
-];
-
 const HeaderBackground = () => (
   <View style={StyleSheet.absoluteFill}>
     <Svg height="100%" width="100%">
@@ -79,6 +73,8 @@ export default function AccountScreen() {
 
   // UI States
   const [isCouponsVisible, setIsCouponsVisible] = useState(false);
+  const [activeCoupons, setActiveCoupons] = useState<{ code: string; discountType: string; discountValue: number; minOrderValue: number; vehicleType: string | null }[]>([]);
+  const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState('English');
@@ -313,10 +309,28 @@ export default function AccountScreen() {
     Alert.alert('Edit Profile', 'Profile details edit form is loading...');
   };
 
+  const handleShowCoupons = async () => {
+    setIsCouponsVisible(true);
+    if (!token) return;
+    try {
+      setIsLoadingCoupons(true);
+      const res = await fetch(`${API_BASE_URL}/coupons/active`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setActiveCoupons(await res.json());
+      }
+    } catch (error) {
+      console.error('Error fetching active coupons:', error);
+    } finally {
+      setIsLoadingCoupons(false);
+    }
+  };
+
   const handleShareReferral = async () => {
     try {
       await Share.share({
-        message: 'Join Mech Bazar today! Use code MECHREF500 to get ₹500 referral bonus in your wallet on registration.',
+        message: 'Join Mech Bazar today for genuine spares and doorstep mechanic service!',
       });
     } catch (error) {
       console.error('Error sharing:', error);
@@ -565,24 +579,15 @@ export default function AccountScreen() {
                 <Text style={styles.walletLabel}>WALLET BALANCE</Text>
                 <Text style={styles.walletAmount}>₹{user?.wallet ? user.wallet.toFixed(2) : '0.00'}</Text>
               </View>
-              <View style={styles.verticalDivider} />
-              <View style={styles.walletHeaderCol}>
-                <Text style={styles.walletLabel}>REWARD COINS</Text>
-                <Text style={styles.rewardCoinsVal}>1,200 Coins</Text>
-              </View>
             </View>
             <View style={styles.walletBtnRow}>
-              <TouchableOpacity style={styles.walletBtn} onPress={() => Alert.alert('Redeem Coins', 'Convert coins to wallet cashback. 100 Coins = ₹10.')}>
-                <Ionicons name="ribbon-outline" size={16} color={colors.primary} style={{ marginRight: 6 }} />
-                <Text style={styles.walletBtnText}>Redeem Coins</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.walletBtn} onPress={handleShareReferral}>
+              <TouchableOpacity style={[styles.walletBtn, { width: '100%' }]} onPress={handleShareReferral}>
                 <Ionicons name="share-social-outline" size={16} color={colors.primary} style={{ marginRight: 6 }} />
                 <Text style={styles.walletBtnText}>Refer & Earn</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.couponsFullBtn} onPress={() => setIsCouponsVisible(true)}>
-              <Text style={styles.couponsFullBtnText}>View Available Coupons (3 Active) ➔</Text>
+            <TouchableOpacity style={styles.couponsFullBtn} onPress={handleShowCoupons}>
+              <Text style={styles.couponsFullBtnText}>View Available Coupons ➔</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -764,16 +769,26 @@ export default function AccountScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Available Coupons</Text>
-            <Text style={styles.modalDesc}>Redeem these coupons on checkout to save flat discounts on spares and services.</Text>
-            
-            {MOCK_COUPONS.map((coupon, i) => (
-              <View key={i} style={styles.couponRow}>
-                <View style={styles.couponCodeBadge}>
-                  <Text style={styles.couponCodeText}>{coupon.code}</Text>
+            <Text style={styles.modalDesc}>Enter these codes on checkout to save on spares and services.</Text>
+
+            {isLoadingCoupons ? (
+              <Text style={styles.couponDesc}>Loading...</Text>
+            ) : activeCoupons.length === 0 ? (
+              <Text style={styles.couponDesc}>No coupons available right now. Check back soon!</Text>
+            ) : (
+              activeCoupons.map((coupon) => (
+                <View key={coupon.code} style={styles.couponRow}>
+                  <View style={styles.couponCodeBadge}>
+                    <Text style={styles.couponCodeText}>{coupon.code}</Text>
+                  </View>
+                  <Text style={styles.couponDesc}>
+                    {coupon.discountType === 'PERCENTAGE' ? `${coupon.discountValue}% off` : `₹${coupon.discountValue} off`}
+                    {coupon.minOrderValue > 0 ? ` on orders above ₹${coupon.minOrderValue}` : ''}
+                    {coupon.vehicleType ? ` (${coupon.vehicleType === 'CAR' ? 'Car' : 'Bike'} only)` : ''}
+                  </Text>
                 </View>
-                <Text style={styles.couponDesc}>{coupon.desc}</Text>
-              </View>
-            ))}
+              ))
+            )}
 
             <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsCouponsVisible(false)}>
               <Text style={styles.modalCloseBtnText}>Close</Text>
