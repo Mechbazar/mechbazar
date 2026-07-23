@@ -1,13 +1,12 @@
 import { Request, Response } from 'express';
-import { PrismaClient, Role, VendorStatus, OrderStatus } from '@prisma/client';
+import { Role, VendorStatus, OrderStatus } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import { generateToken } from '../utils/jwt';
 import { AuthRequest } from '../middlewares/auth';
 import { restoreOrderStock } from './order.controller';
 import { notifyUser } from '../utils/notify';
 import { sanitizeUser, sanitizeUsers, sanitizeOrders } from '../utils/sanitizeUser';
-
-const prisma = new PrismaClient();
+import prisma from '../config/prisma';
 
 // ----------------------------------------------------
 // VENDOR PORTAL APIs (Used by Vendor Frontend)
@@ -379,7 +378,12 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    // Ensure the order actually contains items from this vendor before updating
+    // Ensure the order actually contains items from this vendor before updating.
+    // `items` is scoped to this vendor's own products only -- an unscoped
+    // include here previously pulled every item in the order regardless of
+    // vendor, so restoreOrderStock below would restore stock (and the update
+    // would cancel the whole order) for other vendors' items too whenever one
+    // vendor acted on their own line item in a shared multi-vendor order.
     const order = await prisma.order.findFirst({
       where: {
         id,
@@ -391,7 +395,12 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
           }
         }
       },
-      include: { items: { include: { product: true } } }
+      include: {
+        items: {
+          where: { product: { vendorId: vendor.id } },
+          include: { product: true }
+        }
+      }
     });
 
     if (!order) {
@@ -399,26 +408,39 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       return;
     }
 
-    const wasAlreadyClosed = order.status === OrderStatus.CANCELLED || order.status === OrderStatus.RETURNED;
-    const isBeingClosed = (status === OrderStatus.CANCELLED || status === OrderStatus.RETURNED) && !wasAlreadyClosed;
+    if (order.status === OrderStatus.CANCELLED || order.status === OrderStatus.RETURNED) {
+      res.status(400).json({ error: `Order is already ${order.status}; this is a terminal state and cannot be changed.` });
+      return;
+    }
+    if (status === OrderStatus.CANCELLED && order.status === OrderStatus.DELIVERED) {
+      res.status(400).json({ error: 'A delivered order cannot be cancelled directly -- use RETURNED once the goods are physically returned.' });
+      return;
+    }
+
+    const isBeingClosed = status === OrderStatus.CANCELLED || status === OrderStatus.RETURNED;
 
     const updatedOrder = await prisma.$transaction(async (tx) => {
-      // This vendor's items are only ever a subset of a multi-vendor order,
-      // but restoring the full order's stock here is correct either way --
-      // it mirrors what happens on an admin-driven cancellation and there's
-      // only ever one CANCELLED/RETURNED transition per order (guarded by
-      // wasAlreadyClosed), so it can't double-restore.
-      if (isBeingClosed) {
-        await restoreOrderStock(tx, order.items, userId, id);
-      }
-
-      return tx.order.update({
-        where: { id },
+      // Atomically claim the transition -- only matches if the order's status
+      // is still what we just read, re-checked under Postgres's row lock at
+      // UPDATE time. Closes the race where a concurrent admin/vendor status
+      // update on the same order both read the same pre-close status and
+      // both restore stock.
+      const claim = await tx.order.updateMany({
+        where: { id, status: order.status },
         data: {
           status,
           ...(status === OrderStatus.CANCELLED && { deliveryPartnerId: null }),
         }
       });
+      if (claim.count === 0) {
+        throw new Error('Order status changed concurrently by another request. Please refresh and retry.');
+      }
+
+      if (isBeingClosed) {
+        await restoreOrderStock(tx, order.items, userId, id);
+      }
+
+      return tx.order.findUniqueOrThrow({ where: { id } });
     });
 
     notifyUser(
@@ -429,7 +451,11 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
     );
 
     res.status(200).json(updatedOrder);
-  } catch (error) {
+  } catch (error: any) {
+    if (error instanceof Error && error.message.startsWith('Order status changed concurrently')) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
     console.error('Error updating order status:', error);
     res.status(500).json({ error: 'Failed to update order status' });
   }

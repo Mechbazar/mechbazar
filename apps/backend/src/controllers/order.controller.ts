@@ -463,18 +463,33 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    const wasAlreadyClosed = existing.status === 'CANCELLED' || existing.status === 'RETURNED';
-    const isBeingClosed = (status === 'CANCELLED' || status === 'RETURNED') && !wasAlreadyClosed;
+    // Terminal states can't be reopened through this endpoint. Without this,
+    // an order could be un-cancelled and re-cancelled later, restoring stock
+    // a second time for the same units (isBeingClosed would evaluate true
+    // again on the second closure since the order isn't "already closed" any
+    // more at that point).
+    if (existing.status === 'CANCELLED' || existing.status === 'RETURNED') {
+      return res.status(400).json({ error: `Order is already ${existing.status}; this is a terminal state and cannot be changed.` });
+    }
+    // A delivered order's goods are physically with the customer -- cancelling
+    // it (as opposed to marking it RETURNED once the goods actually come back)
+    // would restore stock for units that were never returned, inflating
+    // Product.stock/Inventory.availableStock beyond the true physical count.
+    if (status === 'CANCELLED' && existing.status === 'DELIVERED') {
+      return res.status(400).json({ error: 'A delivered order cannot be cancelled directly -- use RETURNED once the goods are physically returned.' });
+    }
+
+    const isBeingClosed = status === 'CANCELLED' || status === 'RETURNED';
 
     const order = await prisma.$transaction(async (tx) => {
-      // Restore stock exactly once, only on the transition into a closed state
-      // -- never on repeat calls, and never for an order that was already closed.
-      if (isBeingClosed) {
-        await restoreOrderStock(tx, existing.items, req.user!.userId, id);
-      }
-
-      return tx.order.update({
-        where: { id },
+      // Atomically claim the transition: only matches if the order's status
+      // is still what we just read, re-checked under Postgres's row lock at
+      // UPDATE time -- not against the stale `existing.status` read above.
+      // This closes the race where two concurrent admin status-update calls
+      // (or a retried request) both read the same pre-close status and both
+      // restore stock for the same order.
+      const claim = await tx.order.updateMany({
+        where: { id, status: existing.status },
         data: {
           status: status as any,
           // A cancelled order frees up the rider for reassignment. A RETURNED
@@ -483,6 +498,15 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
           ...(status === 'CANCELLED' && { deliveryPartnerId: null }),
         }
       });
+      if (claim.count === 0) {
+        throw new OrderError(409, 'Order status changed concurrently by another request. Please refresh and retry.');
+      }
+
+      if (isBeingClosed) {
+        await restoreOrderStock(tx, existing.items, req.user!.userId, id);
+      }
+
+      return tx.order.findUniqueOrThrow({ where: { id } });
     });
 
     notifyUser(
@@ -494,6 +518,9 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
 
     res.status(200).json(order);
   } catch (error: any) {
+    if (error instanceof OrderError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('Error updating order status:', error.message);
     res.status(500).json({ error: 'Failed to update order status' });
   }
@@ -524,6 +551,21 @@ export const cancelMyOrder = async (req: AuthRequest, res: Response) => {
     }
 
     const order = await prisma.$transaction(async (tx) => {
+      // Claim the cancellation atomically: this conditional updateMany only
+      // matches (and flips) the row if it's still in a cancellable status at
+      // the moment the UPDATE actually runs, re-checked under Postgres's row
+      // lock -- not against the stale `existing.status` read above. Without
+      // this, two concurrent cancel requests (a double-tap, or a client retry
+      // after a timeout) would both pass the `existing.status` check and both
+      // restore stock / refund the wallet for the same order.
+      const claim = await tx.order.updateMany({
+        where: { id, userId: req.user!.userId, status: { in: CUSTOMER_CANCELLABLE_STATUSES } },
+        data: { status: OrderStatus.CANCELLED, deliveryPartnerId: null },
+      });
+      if (claim.count === 0) {
+        throw new OrderError(409, 'Order status changed just now and can no longer be self-cancelled. Please refresh and contact support if needed.');
+      }
+
       await restoreOrderStock(tx, existing.items, req.user!.userId, id);
 
       if (existing.payment && existing.payment.method !== 'COD' && existing.payment.status === 'SUCCESS') {
@@ -537,10 +579,7 @@ export const cancelMyOrder = async (req: AuthRequest, res: Response) => {
         });
       }
 
-      return tx.order.update({
-        where: { id },
-        data: { status: OrderStatus.CANCELLED, deliveryPartnerId: null },
-      });
+      return tx.order.findUniqueOrThrow({ where: { id } });
     });
 
     notifyUser(
@@ -552,6 +591,9 @@ export const cancelMyOrder = async (req: AuthRequest, res: Response) => {
 
     res.status(200).json(order);
   } catch (error: any) {
+    if (error instanceof OrderError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('Error cancelling order:', error.message);
     res.status(500).json({ error: 'Failed to cancel order' });
   }
