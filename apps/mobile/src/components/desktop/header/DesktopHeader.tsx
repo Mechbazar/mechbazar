@@ -5,12 +5,12 @@ import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import { fetchMyWishlist } from '../../../services/wishlist.service';
+import { useBreakpoint } from '../../../hooks/useBreakpoint';
 import { colors, spacing, radius } from '../../../theme/tokens';
 import Container from '../shared/Container';
 import SearchBar from './SearchBar';
 import LocationSelector from './LocationSelector';
 import MegaMenu from './MegaMenu';
-import AccountMenu from './AccountMenu';
 
 function IconAction({
   icon, count, label, onPress,
@@ -39,8 +39,10 @@ function IconAction({
 export default function DesktopHeader() {
   const navigation = useNavigation<NavigationProp<any>>();
   const token = useSelector((state: RootState) => state.auth.token);
+  const user = useSelector((state: RootState) => state.auth.user);
   const cartItems = useSelector((state: RootState) => state.cart.items);
   const cartCount = cartItems.reduce((sum, item) => sum + item.qty, 0);
+  const { isWide } = useBreakpoint();
 
   const [wishlistCount, setWishlistCount] = useState(0);
 
@@ -102,7 +104,19 @@ export default function DesktopHeader() {
           )}
 
           {token ? (
-            <AccountMenu />
+            <Pressable
+              onPress={() => navigation.navigate('AccountDashboard')}
+              style={styles.accountTrigger}
+              accessibilityRole="button"
+              accessibilityLabel="My Account"
+            >
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{(user?.name || 'U').charAt(0).toUpperCase()}</Text>
+              </View>
+              {isWide && (
+                <Text style={styles.accountName} numberOfLines={1}>{user?.name || 'Account'}</Text>
+              )}
+            </Pressable>
           ) : (
             <Pressable
               style={styles.loginButton}
@@ -160,6 +174,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeText: { color: colors.white, fontSize: 10, fontWeight: '700' },
+  accountTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: spacing.sm,
+    height: 40,
+    maxWidth: 180,
+  },
+  avatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { color: colors.white, fontWeight: '700', fontSize: 13 },
+  accountName: { color: colors.white, fontSize: 13, fontWeight: '600', maxWidth: 90 },
   loginButton: {
     backgroundColor: colors.primary,
     borderRadius: radius.md,

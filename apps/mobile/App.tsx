@@ -27,6 +27,7 @@ import CartScreen from './src/screens/CartScreen';
 import OrderHistoryScreen from './src/screens/OrderHistoryScreen';
 import OrderInvoiceScreen from './src/screens/OrderInvoiceScreen';
 import AccountScreen from './src/screens/AccountScreen';
+import AccountDashboardScreen from './src/screens/AccountDashboardScreen';
 import ProductDetailsScreen from './src/screens/ProductDetailsScreen';
 import CategoryProductsScreen from './src/screens/CategoryProductsScreen';
 import GarageScreen from './src/screens/GarageScreen';
@@ -264,6 +265,7 @@ function RootNavigator() {
             <Stack.Screen name="DeliveryTracking" component={DeliveryTrackingScreen} />
             <Stack.Screen name="OrderInvoice" component={OrderInvoiceScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+            <Stack.Screen name="AccountDashboard" component={AccountDashboardScreen} />
             <Stack.Screen name="Wishlist" component={WishlistScreen} />
             <Stack.Screen name="AddressManagement" component={AddressManagementScreen} />
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
