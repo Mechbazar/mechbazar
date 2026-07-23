@@ -7,10 +7,14 @@ import { Wrench } from 'lucide-react-native';
 import { setAuth } from '../store';
 
 // Technicians are created by admin without a password, so they log in the
-// same way the phone+OTP flow works for every role today: the backend
-// accepts a dev-bypass OTP of '123456' (no real Firebase SMS verification
-// wired up here yet). New technicians can also self-register here (the only
-// entry point into the KYC wizard, see RootNavigator).
+// same phone+OTP flow every role uses. A real OTP only ever exists once
+// POST /auth/send-otp has been called (it's what creates the PhoneOtp row,
+// or sends the real SMS in production) -- previously this screen submitted
+// straight to /auth/login with no way to request an OTP first, so the only
+// code that ever worked was the dev-bypass '123456', and only for phones
+// explicitly allow-listed via DEV_OTP_BYPASS_PHONES on the backend. New
+// technicians can also self-register here (the only entry point into the KYC
+// wizard, see RootNavigator).
 export const LoginScreen = () => {
   const dispatch = useDispatch();
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -18,7 +22,40 @@ export const LoginScreen = () => {
   const [otp, setOtp] = useState('');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const handleSendOtp = async () => {
+    const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
+    if (normalizedPhone.length !== 10) {
+      Alert.alert('Error', 'Phone number must be 10 digits');
+      return;
+    }
+    if (mode === 'register' && !name.trim()) {
+      Alert.alert('Error', 'Please enter your full name');
+      return;
+    }
+
+    try {
+      setSendingOtp(true);
+      const data = await technicianService.sendOtp(normalizedPhone);
+      setOtpSent(true);
+      if (data?.otp) {
+        Alert.alert('OTP Sent', `Your OTP is: ${data.otp} (dev/test mode only).`);
+      } else {
+        Alert.alert('OTP Sent', 'An OTP has been sent to your phone.');
+      }
+    } catch (error: any) {
+      const networkError = !error?.response;
+      const message = networkError
+        ? `Cannot reach server (${getApiBaseUrl()}). Check the backend is running and phone/laptop are on same Wi-Fi.`
+        : error.response?.data?.error || error.message || 'Failed to send OTP';
+      Alert.alert('Error', message);
+    } finally {
+      setSendingOtp(false);
+    }
+  };
 
   const handleSubmit = async () => {
     const normalizedPhone = phone.replace(/\D/g, '').slice(-10);
@@ -102,25 +139,47 @@ export const LoginScreen = () => {
           label="Phone Number"
           placeholder="10 digit phone number"
           value={phone}
-          onChangeText={(text) => setPhone(text.replace(/\D/g, '').slice(0, 10))}
+          onChangeText={(text) => {
+            setPhone(text.replace(/\D/g, '').slice(0, 10));
+            setOtpSent(false);
+          }}
           autoCapitalize="none"
           keyboardType="phone-pad"
+          editable={!otpSent}
         />
-        <Input
-          label="OTP"
-          placeholder="Enter OTP"
-          value={otp}
-          onChangeText={(text) => setOtp(text.replace(/\D/g, '').slice(0, 6))}
-          keyboardType="number-pad"
-          secureTextEntry
-        />
-        <Button
-          title={mode === 'login' ? 'Login' : 'Register'}
-          onPress={handleSubmit}
-          loading={loading}
-          style={{ width: '100%', marginTop: 24, paddingVertical: 16 }}
-        />
-        <TouchableOpacity onPress={() => setMode(mode === 'login' ? 'register' : 'login')} style={{ marginTop: 16, alignItems: 'center' }}>
+        {otpSent && (
+          <Input
+            label="OTP"
+            placeholder="Enter OTP"
+            value={otp}
+            onChangeText={(text) => setOtp(text.replace(/\D/g, '').slice(0, 6))}
+            keyboardType="number-pad"
+            secureTextEntry
+          />
+        )}
+        {!otpSent ? (
+          <Button
+            title="Send OTP"
+            onPress={handleSendOtp}
+            loading={sendingOtp}
+            style={{ width: '100%', marginTop: 24, paddingVertical: 16 }}
+          />
+        ) : (
+          <>
+            <Button
+              title={mode === 'login' ? 'Login' : 'Register'}
+              onPress={handleSubmit}
+              loading={loading}
+              style={{ width: '100%', marginTop: 24, paddingVertical: 16 }}
+            />
+            <TouchableOpacity onPress={handleSendOtp} disabled={sendingOtp} style={{ marginTop: 16, alignItems: 'center' }}>
+              <Typography variant="body" style={{ color: colors.primary, fontWeight: '600' }}>
+                Resend OTP
+              </Typography>
+            </TouchableOpacity>
+          </>
+        )}
+        <TouchableOpacity onPress={() => { setMode(mode === 'login' ? 'register' : 'login'); setOtpSent(false); }} style={{ marginTop: 16, alignItems: 'center' }}>
           <Typography variant="body" style={{ color: colors.primary, fontWeight: '600' }}>
             {mode === 'login' ? 'New mechanic? Register' : 'Already registered? Log in'}
           </Typography>
