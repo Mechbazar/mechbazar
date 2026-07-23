@@ -60,7 +60,7 @@ export const getTechnicianById = async (req: Request, res: Response): Promise<vo
       where: { id, role: Role.SERVICE_TECHNICIAN },
       include: {
         technicianProfile: {
-          include: { documents: true, bankAccounts: true },
+          include: { documents: { select: DOCUMENT_LIST_SELECT }, bankAccounts: true },
         },
       },
     });
@@ -407,7 +407,7 @@ export const submitMyApplication = async (req: AuthRequest, res: Response): Prom
   try {
     const technician = await prisma.serviceTechnician.findUnique({
       where: { userId: req.user!.userId },
-      include: { user: true, documents: true, bankAccounts: true },
+      include: { user: true, documents: { select: DOCUMENT_LIST_SELECT }, bankAccounts: true },
     });
     if (!technician) {
       res.status(404).json({ error: 'Technician profile not found' });
@@ -492,7 +492,7 @@ export const getMyTechnicianProfile = async (req: AuthRequest, res: Response): P
   try {
     const technician = await prisma.serviceTechnician.findUnique({
       where: { userId: req.user!.userId },
-      include: { user: true, documents: true, bankAccounts: true },
+      include: { user: true, documents: { select: DOCUMENT_LIST_SELECT }, bankAccounts: true },
     });
     if (!technician) {
       res.status(404).json({ error: 'Technician profile not found' });
