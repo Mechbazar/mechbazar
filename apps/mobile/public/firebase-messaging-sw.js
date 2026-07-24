@@ -9,12 +9,12 @@ importScripts('https://www.gstatic.com/firebasejs/12.16.0/firebase-messaging-com
 // Same config as src/services/firebase.ts -- a service worker runs in its own
 // global scope with no access to app code/env vars, so it's duplicated here.
 firebase.initializeApp({
-  apiKey: 'AIzaSyASZymn8XoSNYAGbempjXkJzJk3wWCZxJM',
-  authDomain: 'mech-bazar.firebaseapp.com',
-  projectId: 'mech-bazar',
-  storageBucket: 'mech-bazar.firebasestorage.app',
-  messagingSenderId: '631087649858',
-  appId: '1:631087649858:web:c600e0750c8fccd53649db',
+  apiKey: 'AIzaSyDGfDIni8X8FQyroo-KonEfbJQuHBV0nKk',
+  authDomain: 'mech-bazar-8fd86.firebaseapp.com',
+  projectId: 'mech-bazar-8fd86',
+  storageBucket: 'mech-bazar-8fd86.firebasestorage.app',
+  messagingSenderId: '42514698096',
+  appId: '1:42514698096:web:2da09e89e77068173149b5',
 });
 
 const messaging = firebase.messaging();

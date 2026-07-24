@@ -61,6 +61,44 @@
           "other_platform_oauth_client": []
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:42514698096:android:f1e8df4c059274393149b5",
+        "android_client_info": {
+          "package_name": "com.mechbazar.rider"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAIxT72Oh1r07pJYDXDKJcMR3d9UCEvWyQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:42514698096:android:8c400e8db76639903149b5",
+        "android_client_info": {
+          "package_name": "com.mechbazar.seller"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAIxT72Oh1r07pJYDXDKJcMR3d9UCEvWyQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"

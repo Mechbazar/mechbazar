@@ -64,6 +64,8 @@ services:
       context: ./apps/mobile
       args:
         EXPO_PUBLIC_API_URL: https://mechbazar.com/api
+        EXPO_PUBLIC_FIREBASE_VAPID_KEY: BKzZ31SGSXlgFaHsazwM9jXwmNqoUUrNfEAA1WJiQle7kipWHVcWi2fyiEhYfHTCJusQWynxPWJQ1wggAHLNjak
+        EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: AIzaSyBtwy6SVkh5E-LjFFKgrCIKy4bp658KQhQ
     container_name: mechbazar_mobile
     ports:
       # Loopback only -- see the backend service's port comment above.
