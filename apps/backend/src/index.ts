@@ -158,9 +158,6 @@ if (!env.IS_VERCEL) {
 async function startServer() {
   console.log(`[startup] Starting MechBazar backend (${env.NODE_ENV})...`);
 
-  await connectDatabase();
-  await connectRedis();
-
   const server = app
     .listen(env.PORT, '0.0.0.0', () => {
       console.log(`[startup] Server is running on port ${env.PORT} across all interfaces`);
@@ -177,6 +174,17 @@ async function startServer() {
       }
       process.exit(1);
     });
+
+  // Connect to backing services AFTER the HTTP server is already listening, and
+  // without blocking on them: a slow or misconfigured DB/Redis must not stop the
+  // port from binding. Otherwise Nginx has nothing to proxy to and every request
+  // 502s (and, if `npm start` gated on `prisma db push`, the container would
+  // crash-loop). connectDatabase() retries forever with backoff, so the API
+  // comes up immediately, reports DB health via /api/status, and recovers on its
+  // own once connectivity is restored -- which is exactly what prisma.ts's
+  // "shouldn't take the whole API down" contract promises.
+  connectDatabase().catch((err) => console.error('[db] Fatal connection error:', err));
+  connectRedis().catch((err) => console.error('[redis] Fatal connection error:', err));
 
   let shuttingDown = false;
   const shutdown = async (signal: string) => {

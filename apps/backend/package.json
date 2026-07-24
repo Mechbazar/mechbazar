@@ -7,9 +7,10 @@
     "postinstall": "prisma generate",
     "dev": "prisma generate && tsx watch src/index.ts",
     "build": "prisma generate && (tsc || true) && mkdir -p dist/config && (cp src/config/*.json dist/config/ || true) && (cp src/swagger.yaml dist/ || true)",
-    "start": "prisma db push --accept-data-loss=false && node dist/index.js",
+    "start": "node dist/index.js",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
+    "db:deploy": "prisma db push --accept-data-loss=false",
     "seed:live": "tsx src/scripts/seed-from-live.ts",
     "seed:vehicle": "tsx prisma/seed-vehicle-data.ts",
     "seed:services": "tsx prisma/seed-doorstep-services.ts"
