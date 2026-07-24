@@ -13,7 +13,7 @@ COPY apps/rider/package.json apps/rider/package.json
 COPY apps/vendor/package.json apps/vendor/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 COPY apps/vendor apps/vendor
 COPY packages/shared packages/shared
