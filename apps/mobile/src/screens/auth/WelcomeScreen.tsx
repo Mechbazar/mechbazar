@@ -31,11 +31,6 @@ import { spacing as deskSpacing, radius as deskRadius } from '../../theme/tokens
 
 const { width } = Dimensions.get('window');
 
-// Mirrors the backend's OTP_PROVIDER env var (apps/backend/.env.example) --
-// when PRODUCTION, OTP send/verify goes through real Firebase phone auth
-// (services/phoneAuth) instead of the Postgres-backed TEST-mode numeric code.
-const USE_FIREBASE_OTP = process.env.EXPO_PUBLIC_OTP_PROVIDER === 'PRODUCTION';
-
 const colors = {
   primary: '#DA3830',     
   primaryLight: '#FF573C',
@@ -202,7 +197,7 @@ const ApiSettingsModal = ({
 // setDesktopFullPageScreenActive, which also skips the shell's full
 // marketing DesktopFooter in favor of the compact one rendered here.
 function DesktopWelcomeLayout({
-  mobile, otp, isOtpSent, isLoading, phoneError,
+  mobile, otp, isOtpSent, isLoading, phoneError, resendCooldown,
   handlePhoneChange, setOtp, handleSendOtp, handleLogin,
   onOpenSettings, navigation,
 }: any) {
@@ -293,11 +288,20 @@ function DesktopWelcomeLayout({
                       editable={!isLoading}
                     />
                   </View>
+                  <TouchableOpacity
+                    onPress={() => handleSendOtp(true)}
+                    disabled={resendCooldown > 0 || isLoading}
+                    style={desktopStyles.resendBtn}
+                  >
+                    <Text style={[desktopStyles.resendText, (resendCooldown > 0 || isLoading) && desktopStyles.resendTextDisabled]}>
+                      {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               )}
 
               <GradientButton
-                onPress={isOtpSent ? handleLogin : handleSendOtp}
+                onPress={isOtpSent ? handleLogin : () => handleSendOtp(false)}
                 isLoading={isLoading}
                 disabled={mobile.length < 10}
               >
@@ -344,6 +348,15 @@ export default function WelcomeScreen() {
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [phoneError, setPhoneError] = useState('');
+  // Seconds left before a resend is allowed again (0 = allowed). Prevents a
+  // user from re-triggering an SMS repeatedly, which is what trips Firebase's
+  // per-number TOO_MANY_ATTEMPTS limit.
+  const [resendCooldown, setResendCooldown] = useState(0);
+  // Synchronous in-flight guard. setIsLoading (which disables the button) only
+  // takes effect on the next render, so a fast double-tap can re-enter
+  // handleSendOtp before that; this ref flips immediately so the second call
+  // bails before it ever reaches Firebase / the backend.
+  const sendInFlightRef = useRef(false);
   const [activeBaseUrl, setActiveBaseUrl] = useState(API_BASE_URL);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [tempBaseUrl, setTempBaseUrl] = useState(API_BASE_URL);
@@ -406,6 +419,17 @@ export default function WelcomeScreen() {
     ).start();
   }, []);
 
+  // Ticks the resend cooldown down to zero once a send starts it.
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const id = setInterval(() => {
+      setResendCooldown((s) => (s <= 1 ? 0 : s - 1));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [resendCooldown]);
+
+  const startResendCooldown = () => setResendCooldown(60);
+
   const handlePhoneChange = (text: string) => {
     const numeric = text.replace(/[^0-9]/g, '');
     setMobile(numeric);
@@ -416,52 +440,37 @@ export default function WelcomeScreen() {
     }
   };
 
-  const handleSendOtp = async () => {
+  const handleSendOtp = async (isResend = false) => {
     if (mobile.length < 10) {
       setPhoneError('Please enter a valid 10-digit mobile number.');
       return;
     }
+    // A resend is only allowed once the 60s cooldown has elapsed.
+    if (isResend && resendCooldown > 0) return;
+    // Reject a duplicate in-flight send synchronously (see sendInFlightRef).
+    if (sendInFlightRef.current) return;
+    sendInFlightRef.current = true;
+
+    // Timestamped so duplicate/rapid sends are identifiable in client logs.
+    console.log(`[otp] ${new Date().toISOString()} send requested (resend=${isResend})`);
     setIsLoading(true);
 
-    // Firebase sends the SMS itself as part of signInWithPhoneNumber -- no
-    // need to also hit the backend's /auth/send-otp (that endpoint only
-    // populates the Postgres TEST-mode OTP table, which PRODUCTION-mode
-    // verification ignores anyway; see apps/backend/src/utils/otp.ts).
-    if (USE_FIREBASE_OTP) {
-      try {
-        await sendPhoneOtp(mobile);
-        setIsLoading(false);
-        setIsOtpSent(true);
-        Alert.alert('OTP Sent', 'An OTP has been sent to your phone.');
-      } catch (err) {
-        setIsLoading(false);
-        const message = err instanceof Error ? err.message : String(err);
-        Alert.alert('Error', message || 'Failed to send OTP.');
-      }
-      return;
-    }
-
+    // Firebase Phone Auth sends the SMS itself as part of signInWithPhoneNumber
+    // and, once confirmed in handleLogin, yields an ID token the backend
+    // verifies. This is the only OTP path -- there is no backend send-otp
+    // fallback (see apps/backend/src/utils/otp.ts).
     try {
-      const res = await fetch(`${activeBaseUrl}/auth/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: mobile })
-      });
-      const data = await res.json();
+      await sendPhoneOtp(mobile);
       setIsLoading(false);
-      if (res.ok) {
-        setIsOtpSent(true);
-        if (data.otp) {
-          Alert.alert('OTP Sent', `OTP Code is: ${data.otp} (it is also printed in your backend terminal logs).`);
-        } else {
-          Alert.alert('OTP Sent', 'An OTP has been sent to your phone.');
-        }
-      } else {
-        Alert.alert('Error', data.error || 'Failed to send OTP.');
-      }
+      setIsOtpSent(true);
+      startResendCooldown();
+      Alert.alert('OTP Sent', 'An OTP has been sent to your phone.');
     } catch (err) {
       setIsLoading(false);
-      Alert.alert('Error', 'Could not connect to server. Check if backend is running.');
+      const message = err instanceof Error ? err.message : String(err);
+      Alert.alert('Error', message || 'Failed to send OTP.');
+    } finally {
+      sendInFlightRef.current = false;
     }
   };
 
@@ -473,13 +482,10 @@ export default function WelcomeScreen() {
     
     setIsLoading(true);
     try {
-      // In the Firebase-backed flow, `otp` (the code the user typed) confirms
-      // the pending Firebase phone-auth request and yields an ID token; that
-      // token -- not the raw code -- is what the backend actually verifies
-      // (verifyOtpAndResolvePhone accepts a Firebase ID token in the `otp`
-      // field when OTP_PROVIDER=PRODUCTION). Otherwise, send the raw code
-      // as before (TEST-mode Postgres-backed verification).
-      const otpForBackend = USE_FIREBASE_OTP ? await confirmPhoneOtp(otp) : otp;
+      // `otp` (the code the user typed) confirms the pending Firebase
+      // phone-auth request and yields an ID token; that token -- not the raw
+      // code -- is what the backend verifies (verifyOtpAndResolvePhone).
+      const otpForBackend = await confirmPhoneOtp(otp);
 
       let res = await fetch(`${activeBaseUrl}/auth/login`, {
         method: 'POST',
@@ -541,6 +547,7 @@ export default function WelcomeScreen() {
           isOtpSent={isOtpSent}
           isLoading={isLoading}
           phoneError={phoneError}
+          resendCooldown={resendCooldown}
           handlePhoneChange={handlePhoneChange}
           setOtp={setOtp}
           handleSendOtp={handleSendOtp}
@@ -677,11 +684,20 @@ export default function WelcomeScreen() {
                       editable={!isLoading}
                     />
                   </View>
+                  <TouchableOpacity
+                    onPress={() => handleSendOtp(true)}
+                    disabled={resendCooldown > 0 || isLoading}
+                    style={styles.resendBtn}
+                  >
+                    <Text style={[styles.resendText, (resendCooldown > 0 || isLoading) && styles.resendTextDisabled]}>
+                      {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               )}
 
-              <GradientButton 
-                onPress={isOtpSent ? handleLogin : handleSendOtp} 
+              <GradientButton
+                onPress={isOtpSent ? handleLogin : () => handleSendOtp(false)}
                 isLoading={isLoading}
                 disabled={mobile.length < 10}
               >
@@ -930,6 +946,19 @@ const styles = StyleSheet.create({
   otpSection: {
     marginTop: 14,
   },
+  resendBtn: {
+    alignSelf: 'flex-end',
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  resendText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  resendTextDisabled: {
+    color: colors.textMuted,
+  },
   otpInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1134,6 +1163,9 @@ const desktopStyles = StyleSheet.create({
   errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
   errorText: { color: colors.primary, fontSize: 12 },
   otpSection: { marginTop: deskSpacing.md },
+  resendBtn: { alignSelf: 'flex-end', marginTop: 8, paddingVertical: 4 },
+  resendText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  resendTextDisabled: { color: colors.textMuted },
   primaryBtnText: {
     color: colors.white,
     fontSize: 15,

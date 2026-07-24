@@ -3,7 +3,7 @@ import { Role } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { generateToken } from '../utils/jwt';
 import { AuthRequest } from '../middlewares/auth';
-import { verifyOtpAndResolvePhone, OtpVerificationError, generateAndSendOtp } from '../utils/otp';
+import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
 import { sanitizeUser } from '../utils/sanitizeUser';
 import prisma from '../config/prisma';
 
@@ -308,24 +308,8 @@ export const changePassword = async (req: AuthRequest, res: Response): Promise<v
   }
 };
 
-export const requestOtp = async (req: Request, res: Response): Promise<void> => {
-  try {
-    const { phone } = req.body;
-    if (!phone) {
-      res.status(400).json({ error: 'phone is required' });
-      return;
-    }
-    const result = await generateAndSendOtp(phone);
-    res.status(200).json({
-      success: true,
-      message: 'OTP sent successfully',
-      // Never echo the OTP in production, even if OTP_PROVIDER is misconfigured
-      // as TEST there -- this response field exists purely for local/dev testing
-      // without a real SMS provider.
-      otp: process.env.NODE_ENV !== 'production' && (process.env.OTP_PROVIDER || 'TEST') === 'TEST' ? result.otp : undefined,
-    });
-  } catch (error) {
-    console.error('Request OTP error:', error);
-    res.status(500).json({ error: 'Failed to generate OTP' });
-  }
-};
+// NOTE: OTP sending is no longer a backend concern. Every app runs Firebase
+// Phone Auth client-side, which sends the SMS and returns an ID token that the
+// login/register endpoints verify via verifyOtpAndResolvePhone. The old
+// POST /auth/send-otp endpoint (which generated a local numeric code) has been
+// removed along with all TEST-mode/dev-bypass OTP handling.

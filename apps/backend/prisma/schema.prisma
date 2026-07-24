@@ -1043,10 +1043,3 @@ model ServiceInvoice {
   pdfUrl         String?
   createdAt      DateTime       @default(now())
 }
-
-model PhoneOtp {
-  phone     String   @id
-  otpHash   String
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-}

@@ -27,9 +27,9 @@ export const sendPhoneOtp = async (phone10Digit: string): Promise<void> => {
   confirmationResult = await signInWithPhoneNumber(auth, `+91${phone10Digit}`, recaptchaVerifier);
 };
 
-// Resolves to a Firebase ID token -- sent as the `otp` field to the existing
-// /auth/login and /auth/register endpoints, which already verify it via
-// firebase-admin when OTP_PROVIDER=PRODUCTION (see apps/backend/src/utils/otp.ts).
+// Resolves to a Firebase ID token -- sent as the `otp` field to the
+// /auth/login and /auth/register endpoints, which verify it via firebase-admin
+// (see apps/backend/src/utils/otp.ts).
 export const confirmPhoneOtp = async (code: string): Promise<string> => {
   if (!confirmationResult) {
     throw new Error('No OTP request in progress. Send an OTP first.');

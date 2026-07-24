@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { Role, VehicleType } from '@prisma/client';
 import { AuthRequest } from '../middlewares/auth';
 import { sanitizeUser, sanitizeUsers } from '../utils/sanitizeUser';
-import { generateAndSendOtp, verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
+import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
 import prisma from '../config/prisma';
 
 export const getCustomers = async (req: Request, res: Response): Promise<void> => {
@@ -277,36 +277,15 @@ export const updateMyProfile = async (req: AuthRequest, res: Response): Promise<
 };
 
 // ============ Self-service phone number change (any authenticated user) ============
-// Replaces AccountScreen.tsx's previous fake flow (a setTimeout + Alert.alert
-// pretending an OTP was sent and the number updated, while only ever patching
-// local Redux state -- the backend was never called at all). Reuses the same
-// OTP infrastructure the login flow already relies on (utils/otp.ts) rather
-// than inventing a second one. auth.controller.ts's JWT payload is only
-// {userId, role} (see middlewares/auth.ts), so an existing session's token
-// stays valid after this -- no re-login required.
-
-export const requestPhoneChangeOtp = async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const { newPhone } = req.body;
-    if (!newPhone || String(newPhone).replace(/\D/g, '').length < 10) {
-      res.status(400).json({ error: 'Please enter a valid 10-digit mobile number.' });
-      return;
-    }
-    const normalized = String(newPhone).startsWith('+') ? String(newPhone) : `+91${newPhone}`;
-
-    const existing = await prisma.user.findUnique({ where: { phone: normalized } });
-    if (existing && existing.id !== req.user!.userId) {
-      res.status(400).json({ error: 'This mobile number is already registered to another account.' });
-      return;
-    }
-
-    const { expiredInSeconds } = await generateAndSendOtp(normalized);
-    res.status(200).json({ message: 'OTP sent to the new number.', expiredInSeconds });
-  } catch (error) {
-    console.error('Error requesting phone change OTP:', error);
-    res.status(500).json({ error: 'Failed to send OTP' });
-  }
-};
+// Phone change is Firebase-only, mirroring login: the client runs Firebase
+// Phone Auth against the NEW number, then PATCHes /me/phone with the resulting
+// ID token as `otp`. confirmPhoneChange verifies that token (via
+// verifyOtpAndResolvePhone) and updates the record. There is no backend
+// send-otp step -- Firebase sends the SMS -- so the old requestPhoneChangeOtp
+// endpoint (which generated a local numeric code) has been removed.
+// auth.controller.ts's JWT payload is only {userId, role} (see
+// middlewares/auth.ts), so an existing session's token stays valid after this
+// -- no re-login required.
 
 export const confirmPhoneChange = async (req: AuthRequest, res: Response): Promise<void> => {
   try {

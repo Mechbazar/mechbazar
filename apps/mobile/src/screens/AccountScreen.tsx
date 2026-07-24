@@ -27,6 +27,7 @@ import { logout, updateUserSuccess } from '../store/authSlice';
 import { setThemePreference } from '../store/themeSlice';
 import { API_BASE_URL, SERVER_ORIGIN } from '../services/api';
 import { fetchMyBookings, cancelServiceBooking } from '../services/service.service';
+import { sendPhoneOtp, confirmPhoneOtp } from '../services/phoneAuth';
 
 const { width } = Dimensions.get('window');
 
@@ -188,21 +189,15 @@ export default function AccountScreen() {
     }
     setIsVerifyingPhone(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/customers/me/phone/otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ newPhone }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        Alert.alert('Error', data.error || 'Failed to send OTP.');
-        return;
-      }
+      // Firebase Phone Auth against the NEW number sends the real SMS; the
+      // confirmed ID token is submitted in handleVerifyAndUpdatePhone. Same
+      // Firebase-only flow as login -- there is no backend send-otp step.
+      await sendPhoneOtp(newPhone);
       setIsOtpSent(true);
       Alert.alert('Verification Code Sent', 'A 6-digit OTP code has been sent to your new mobile number.');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      Alert.alert('Network Error', `Could not send OTP: ${message}`);
+      Alert.alert('Error', message || 'Could not send OTP.');
     } finally {
       setIsVerifyingPhone(false);
     }
@@ -215,10 +210,13 @@ export default function AccountScreen() {
     }
     setIsVerifyingPhone(true);
     try {
+      // Confirm the SMS code with Firebase -> ID token, which the backend
+      // verifies (verifyOtpAndResolvePhone) before updating the number.
+      const idToken = await confirmPhoneOtp(otpCode);
       const res = await fetch(`${API_BASE_URL}/customers/me/phone`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ newPhone, otp: otpCode }),
+        body: JSON.stringify({ newPhone, otp: idToken }),
       });
       const data = await res.json();
       if (!res.ok) {

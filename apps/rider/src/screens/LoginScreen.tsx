@@ -5,16 +5,15 @@ import * as SecureStore from 'expo-secure-store';
 import { colors, Button, Typography, Input, riderService, getApiBaseUrl } from '@mechbazar/shared';
 import { Truck } from 'lucide-react-native';
 import { setAuth } from '../store';
+import { sendPhoneOtp, confirmPhoneOtp } from '../services/phoneAuth';
 
 // Riders are created by admin without a password, so they log in the same
-// phone+OTP flow every role uses. A real OTP only ever exists once
-// POST /auth/send-otp has been called (it's what creates the PhoneOtp row,
-// or sends the real SMS in production) -- previously this screen submitted
-// straight to /auth/login with no way to request an OTP first, so the only
-// code that ever worked was the dev-bypass '123456', and only for phones
-// explicitly allow-listed via DEV_OTP_BYPASS_PHONES on the backend. New
-// riders can also self-register here (the only entry point into the KYC
-// wizard, see RootNavigator).
+// Firebase Phone Auth flow every role uses: "Send OTP" triggers a real SMS via
+// Firebase (sendPhoneOtp), and the code the user enters is confirmed with
+// Firebase to produce an ID token, which is what /auth/login and
+// /riders/register verify (there is no dev bypass or backend send-otp
+// anymore). New riders can also self-register here (the only entry point into
+// the KYC wizard, see RootNavigator).
 export const LoginScreen = () => {
   const dispatch = useDispatch();
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -39,19 +38,12 @@ export const LoginScreen = () => {
 
     try {
       setSendingOtp(true);
-      const data = await riderService.sendOtp(normalizedPhone);
+      // Firebase sends the real SMS; the code is confirmed in handleSubmit.
+      await sendPhoneOtp(normalizedPhone);
       setOtpSent(true);
-      if (data?.otp) {
-        Alert.alert('OTP Sent', `Your OTP is: ${data.otp} (dev/test mode only).`);
-      } else {
-        Alert.alert('OTP Sent', 'An OTP has been sent to your phone.');
-      }
+      Alert.alert('OTP Sent', 'An OTP has been sent to your phone.');
     } catch (error: any) {
-      const networkError = !error?.response;
-      const message = networkError
-        ? `Cannot reach server (${getApiBaseUrl()}). Check the backend is running and phone/laptop are on same Wi-Fi.`
-        : error.response?.data?.error || error.message || 'Failed to send OTP';
-      Alert.alert('Error', message);
+      Alert.alert('Error', error?.message || 'Failed to send OTP');
     } finally {
       setSendingOtp(false);
     }
@@ -78,11 +70,22 @@ export const LoginScreen = () => {
       return;
     }
 
+    setLoading(true);
+    // Confirm the SMS code with Firebase first -> ID token. A failure here is
+    // a wrong/expired code, distinct from a backend/network error below.
+    let idToken: string;
     try {
-      setLoading(true);
+      idToken = await confirmPhoneOtp(normalizedOtp);
+    } catch (error: any) {
+      Alert.alert(mode === 'login' ? 'Login Failed' : 'Registration Failed', error?.message || 'The OTP you entered is incorrect or has expired.');
+      setLoading(false);
+      return;
+    }
+
+    try {
       const data = mode === 'login'
-        ? await riderService.login({ phone: normalizedPhone, otp: normalizedOtp })
-        : await riderService.register({ phone: normalizedPhone, otp: normalizedOtp, name: name.trim(), email: email.trim() || undefined });
+        ? await riderService.login({ phone: normalizedPhone, otp: idToken })
+        : await riderService.register({ phone: normalizedPhone, otp: idToken, name: name.trim(), email: email.trim() || undefined });
 
       if (data.token) {
         await SecureStore.setItemAsync('token', data.token);

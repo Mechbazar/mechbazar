@@ -1,19 +1,11 @@
 import { apiClient } from './client';
 
 export const riderService = {
-  // Must be called before login/register can succeed with a real OTP -- it's
-  // what actually creates the PhoneOtp row (or sends the real SMS in
-  // production). Without this step there is no way to obtain a valid OTP; the
-  // dev-bypass '123456' only works for phones explicitly allow-listed via
-  // DEV_OTP_BYPASS_PHONES on the backend.
-  sendOtp: async (phone: string) => {
-    const response = await apiClient.post('/auth/send-otp', { phone });
-    return response.data; // { success, message, otp? (dev/test only) }
-  },
-
-  // Auth — riders have no password set by admin creation, so login goes
-  // through the same phone+OTP path as everyone else, not a dedicated
-  // /riders/login endpoint.
+  // Auth is Firebase-only. The app runs Firebase Phone Auth client-side
+  // (apps/rider/src/services/phoneAuth.ts), which sends the SMS and returns an
+  // ID token; that token is passed here as `otp`. There is no backend send-otp
+  // step. Riders have no password (admin-created), so login goes through the
+  // same phone-auth path as everyone else.
   login: async (credentials: { phone: string; otp: string }) => {
     const response = await apiClient.post('/auth/login', credentials);
     return response.data; // { user, token }
