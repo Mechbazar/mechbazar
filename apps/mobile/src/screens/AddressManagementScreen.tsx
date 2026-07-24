@@ -18,6 +18,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { RootState } from '../store';
+import MapPlaceholder from '../components/shared/MapPlaceholder';
 import {
   fetchMyAddresses,
   createMyAddress,
@@ -299,7 +300,7 @@ export default function AddressManagementScreen() {
               </View>
 
               {/* GPS Auto-detect */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.gpsDetectBtn}
                 onPress={handleGPSDetect}
                 disabled={fetchingGPS}
@@ -309,6 +310,13 @@ export default function AddressManagementScreen() {
                   {fetchingGPS ? 'Locating...' : 'Get Current GPS Location'}
                 </Text>
               </TouchableOpacity>
+
+              {/* Pin-on-map confirmation for the detected/entered address --
+                  see config/maps.ts for how to enable this once a Google Maps
+                  API key is available. */}
+              <View style={{ marginTop: 12, marginBottom: 4 }}>
+                <MapPlaceholder label="Confirm pin location on map" height={140} />
+              </View>
 
               <View style={styles.form}>
                 <View style={styles.inputGroup}>

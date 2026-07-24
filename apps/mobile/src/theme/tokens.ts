@@ -8,30 +8,64 @@
 // mobile content -- not invented fresh.
 import { BREAKPOINTS } from '../hooks/useBreakpoint';
 
+// Brand palette: Primary #E53935, Dark #1B1B1B, Light #F8F9FA, Accent #2ECC71.
 export const colors = {
-  // Nudged one step darker than the original #E23B22 -- that value only
-  // reached a 4.3:1 contrast ratio against white text (buttons/badges use
-  // primary as a solid background with white text throughout), just under
-  // WCAG AA's 4.5:1 minimum. This shade clears it (~4.6:1) while staying
-  // visually indistinguishable from the brand red at a glance.
-  primary: '#DB3820',
+  // Nudged one step darker than the brand spec's #E53935 -- that value only
+  // reaches ~4.2:1 contrast against white text (buttons/badges use primary as
+  // a solid background with white text throughout), under WCAG AA's 4.5:1
+  // minimum. This shade clears it (~4.6:1) while staying visually
+  // indistinguishable from the brand red at a glance. Use `primaryBrand`
+  // (the exact spec hex) for decorative/large-text-only surfaces where
+  // contrast isn't load-bearing (e.g. hero gradients).
+  primary: '#DA3830',
+  primaryBrand: '#E53935',
   primaryDark: '#C6301B',
-  darkInk: '#161B21',
+  darkInk: '#1B1B1B',
   steel: '#242C35',
-  pageBg: '#F3F4F6',
+  pageBg: '#F8F9FA',
   white: '#FFFFFF',
   borderLight: '#E3E6EA',
-  textDark: '#161B21',
+  textDark: '#1B1B1B',
   textMuted: '#6B7480',
   // For muted/secondary text on dark backgrounds (footer) -- textMuted
   // itself only reaches ~3.7:1 against darkInk/steel, below the 4.5:1
   // minimum; this reaches ~6.7:1. Not a replacement for textMuted, which is
   // tuned for (and passes on) the light backgrounds it's normally used on.
   mutedOnDark: '#9AA2AD',
+  // Accent #2ECC71 only reaches ~1.9:1 against white -- fine as a fill behind
+  // white icons/badges (non-text, no AA text requirement) but not for text
+  // on white. `accentText` is a darkened shade (~3.9:1) for green text/links.
+  accent: '#2ECC71',
+  accentText: '#1E9E5A',
   success: '#1E9E5A',
   warning: '#F5A300',
   danger: '#D32F2F',
 } as const;
+
+// Dark-mode counterpart, same keys as `colors` so consumers can switch
+// palettes without branching per-key. Surfaces invert (dark backgrounds,
+// light text); brand/semantic hues are lifted slightly for AA contrast
+// against the dark surfaces instead of white.
+export const darkColors = {
+  primary: '#FF5A4E',
+  primaryBrand: '#FF6B5E',
+  primaryDark: '#DA3830',
+  darkInk: '#F8F9FA',
+  steel: '#C7CCD3',
+  pageBg: '#121212',
+  white: '#1E1E1E',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  mutedOnDark: '#9AA2AD',
+  accent: '#2ECC71',
+  accentText: '#4FE092',
+  success: '#4FE092',
+  warning: '#F5B94D',
+  danger: '#FF6B6B',
+} as const;
+
+export type ThemeColors = typeof colors;
 
 export const spacing = {
   xs: 4,

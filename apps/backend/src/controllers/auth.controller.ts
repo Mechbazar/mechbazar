@@ -202,14 +202,21 @@ export const adminLogin = async (req: Request, res: Response): Promise<void> => 
 // used today for customer order-status push notifications.
 export const registerPushToken = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { token } = req.body;
+    const { token, type } = req.body;
     if (!token || typeof token !== 'string') {
       res.status(400).json({ error: 'token (string) is required' });
       return;
     }
+    if (type && type !== 'expo' && type !== 'fcm') {
+      res.status(400).json({ error: "type must be 'expo' or 'fcm'" });
+      return;
+    }
     await prisma.user.update({
       where: { id: req.user!.userId },
-      data: { expoPushToken: token },
+      // Default 'expo' keeps existing clients (which send only `{ token }`,
+      // no `type`) writing to the same column as before. 'fcm' is the new
+      // web-push channel (apps/mobile/src/services/webPush.web.ts).
+      data: type === 'fcm' ? { fcmToken: token } : { expoPushToken: token },
     });
     res.status(204).send();
   } catch (error) {
@@ -218,15 +225,20 @@ export const registerPushToken = async (req: AuthRequest, res: Response): Promis
   }
 };
 
-// Called on logout -- an Expo push token identifies a device, not a user, so
+// Called on logout -- a push token identifies a device, not a user, so
 // on a shared/reset device the next person to log in would otherwise keep
 // receiving the previous user's order/refund notifications on their own
 // account's row until it happens to be overwritten by a fresh registration.
 export const clearPushToken = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
+    const type = (req.query.type as string | undefined) || req.body?.type;
+    if (type && type !== 'expo' && type !== 'fcm') {
+      res.status(400).json({ error: "type must be 'expo' or 'fcm'" });
+      return;
+    }
     await prisma.user.update({
       where: { id: req.user!.userId },
-      data: { expoPushToken: null },
+      data: type === 'fcm' ? { fcmToken: null } : { expoPushToken: null },
     });
     res.status(204).send();
   } catch (error) {

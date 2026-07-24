@@ -9,13 +9,16 @@ interface PaginationProps {
   loading: boolean;
   onPrev: () => void;
   onNext: () => void;
+  // Real total-count from the backend (X-Total-Count header, see
+  // getCategoryProducts) -- optional so callers that don't have it yet keep
+  // the plain "Page N" display instead of breaking.
+  total?: number;
+  pageSize?: number;
 }
 
-// getCategoryProducts's response has no total-count field (it fetches one
-// large batch and paginates client-side -- see product.service.ts), so this
-// shows Prev/current page/Next rather than a fabricated total page count.
-export default function Pagination({ page, hasMore, loading, onPrev, onNext }: PaginationProps) {
+export default function Pagination({ page, hasMore, loading, onPrev, onNext, total, pageSize }: PaginationProps) {
   if (page === 1 && !hasMore) return null;
+  const totalPages = total != null && pageSize ? Math.max(1, Math.ceil(total / pageSize)) : undefined;
 
   return (
     <View style={styles.row}>
@@ -31,7 +34,9 @@ export default function Pagination({ page, hasMore, loading, onPrev, onNext }: P
       </Pressable>
 
       <View style={styles.pageIndicator} accessibilityLiveRegion="polite">
-        {loading ? <ActivityIndicator size="small" color={colors.primary} /> : <Text style={styles.pageText}>Page {page}</Text>}
+        {loading
+          ? <ActivityIndicator size="small" color={colors.primary} />
+          : <Text style={styles.pageText}>{totalPages ? `Page ${page} of ${totalPages}` : `Page ${page}`}</Text>}
       </View>
 
       <Pressable

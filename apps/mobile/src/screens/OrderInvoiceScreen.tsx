@@ -15,8 +15,8 @@ type ParamList = { OrderInvoice: { order: any } };
 
 const invoiceHtml = (order: any, shortId: string) => `
   <html>
-    <body style="font-family: -apple-system, sans-serif; padding: 24px; color: #161B21;">
-      <h1 style="color: #E23B22; margin-bottom: 4px;">MechBazar</h1>
+    <body style="font-family: -apple-system, sans-serif; padding: 24px; color: #1B1B1B;">
+      <h1 style="color: #DA3830; margin-bottom: 4px;">MechBazar</h1>
       <p style="color: #6B7480; margin-top: 0;">Order Invoice</p>
       <hr style="border: none; border-top: 1px solid #E3E6EA; margin: 16px 0;" />
       <p><strong>Order No:</strong> ${shortId}</p>

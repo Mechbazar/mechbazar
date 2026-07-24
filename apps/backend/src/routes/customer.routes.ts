@@ -3,6 +3,7 @@ import {
   getCustomers, updateCustomer, getMyNotifications, markNotificationRead, deleteMyNotification,
   getMyAddresses, createMyAddress, updateMyAddress, deleteMyAddress,
   getMyProfile, updateMyProfile,
+  requestPhoneChangeOtp, confirmPhoneChange,
   getMyWishlist, addToMyWishlist, removeFromMyWishlist,
   getMyVehicles, createMyVehicle, updateMyVehicle, deleteMyVehicle,
 } from '../controllers/customer.controller';
@@ -28,6 +29,8 @@ router.delete('/me/addresses/:id', authenticate, deleteMyAddress);
 
 router.get('/me/profile', authenticate, getMyProfile);
 router.patch('/me/profile', authenticate, updateMyProfile);
+router.post('/me/phone/otp', authenticate, requestPhoneChangeOtp);
+router.patch('/me/phone', authenticate, confirmPhoneChange);
 
 router.get('/me/wishlist', authenticate, getMyWishlist);
 router.post('/me/wishlist', authenticate, addToMyWishlist);

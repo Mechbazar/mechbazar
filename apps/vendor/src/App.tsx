@@ -15,6 +15,9 @@ import Orders from './pages/Orders';
 import Inventory from './pages/Inventory';
 import Wallet from './pages/Wallet';
 import Profile from './pages/Profile';
+import Coupons from './pages/Coupons';
+import Notifications from './pages/Notifications';
+import Returns from './pages/Returns';
 import Layout from './components/Layout';
 import { API_URL } from './config/api';
 
@@ -66,6 +69,9 @@ function App() {
           <Route path="/inventory" element={Wrapped(Inventory)} />
           <Route path="/wallet" element={Wrapped(Wallet)} />
           <Route path="/profile" element={Wrapped(Profile)} />
+          <Route path="/coupons" element={Wrapped(Coupons)} />
+          <Route path="/notifications" element={Wrapped(Notifications)} />
+          <Route path="/returns" element={Wrapped(Returns)} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>

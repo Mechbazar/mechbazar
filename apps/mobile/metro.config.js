@@ -11,6 +11,6 @@ const config = getDefaultConfig(__dirname);
 
 config.watchFolders = [__dirname];
 config.resolver.nodeModulesPaths = [path.resolve(__dirname, 'node_modules')];
-config.resolver.disableHierarchicalLookup = true;
+config.resolver.disableHierarchicalLookup = false;
 
 module.exports = config;

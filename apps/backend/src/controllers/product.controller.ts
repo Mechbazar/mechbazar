@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
 import { AuthRequest } from '../middlewares/auth';
-import { Role, VendorStatus } from '@prisma/client';
+import { Role, VendorStatus, Prisma } from '@prisma/client';
 import { normalizeVehicleType, parseVehicleTypeFilter } from '../utils/vehicleType';
 
 // The admin product form has no vendor picker -- products added directly by
@@ -58,9 +58,27 @@ export const getBrands = async (req: Request, res: Response) => {
 
 const ADMIN_PRODUCT_ROLES: string[] = [Role.ADMIN, Role.SUPER_ADMIN, Role.INVENTORY_MANAGER, Role.VENDOR_MANAGER];
 
+// Prisma's query builder can't express an ORDER BY over a computed
+// expression (discount % = (mrp-price)/mrp), so "discount" sort resolves the
+// page's product IDs via one raw query, then fetches those rows normally --
+// keeps the rest of the pipeline (include/mapping) identical to every other
+// sort mode instead of forking into a separate raw-SQL response shape.
+const resolveDiscountSortedIds = async (whereSql: ReturnType<typeof Prisma.sql>, skip: number, take: number) => {
+  const rows = await prisma.$queryRaw<{ id: string }[]>(Prisma.sql`
+    SELECT id FROM "Product"
+    WHERE ${whereSql}
+    ORDER BY CASE WHEN mrp > 0 THEN (mrp - price) / mrp ELSE 0 END DESC
+    OFFSET ${skip} LIMIT ${take}
+  `);
+  return rows.map(r => r.id);
+};
+
 export const getProducts = async (req: AuthRequest, res: Response) => {
   try {
-    const { vehicleId, categoryId, category_id, categoryName, q, search, vehicleMake, vehicleModel, vehicleType, vehicle_type, status } = req.query;
+    const {
+      vehicleId, categoryId, category_id, categoryName, q, search, vehicleMake, vehicleModel,
+      vehicleType, vehicle_type, status, brand, priceMin, priceMax, inStock, minRating, sortBy,
+    } = req.query;
     // Public/customer callers only ever see APPROVED products (unchanged
     // behaviour). An authenticated admin caller manages the catalog from this
     // same list (Products.tsx has no separate "pending review" view) and
@@ -81,54 +99,128 @@ export const getProducts = async (req: AuthRequest, res: Response) => {
     }
     const page = Number(req.query.page) || 1;
     const limit = Number(req.query.limit) || 20;
+    const brandNames = brand ? String(brand).split(',').map(s => s.trim()).filter(Boolean) : [];
 
     // Core Compatibility Engine filtering. vehicleType is a first-class field on
     // Product (and Category) -- filtering by it here is independent of, and
     // composes with, the make/model/vehicleId compatibility filters below.
+    const where = {
+      ...statusFilter,
+      ...(resolvedCategoryId && { categoryId: String(resolvedCategoryId) }),
+      ...(categoryName && { category: { name: String(categoryName) } }),
+      ...(resolvedSearch && {
+        OR: [
+          { name: { contains: String(resolvedSearch) } }, // No mode insensitive since Prisma MySQL doesn't strictly need it if collation is CI, but can add it if needed.
+          { oemNumber: { contains: String(resolvedSearch) } },
+          { description: { contains: String(resolvedSearch) } }
+        ]
+      }),
+      ...((vehicleId || vehicleMake || vehicleModel) && {
+        compatibilities: {
+          some: {
+            ...(vehicleId && { vehicleId: String(vehicleId) }),
+            vehicle: {
+              ...(vehicleMake && { manufacturer: { name: String(vehicleMake) } }),
+              ...(vehicleModel && { model: { name: String(vehicleModel) } })
+            }
+          },
+        },
+      }),
+      ...(resolvedVehicleType && { vehicleType: resolvedVehicleType }),
+      ...(brandNames.length > 0 && { brand: { name: { in: brandNames } } }),
+      ...((priceMin || priceMax) && {
+        price: {
+          ...(priceMin && { gte: Number(priceMin) }),
+          ...(priceMax && { lte: Number(priceMax) }),
+        },
+      }),
+      ...(inStock === 'true' && { stock: { gt: 0 } }),
+      ...(minRating && { avgRating: { gte: Number(minRating) } }),
+    };
+
+    const total = await prisma.product.count({ where });
+
+    let finalProducts: any[];
+    if (sortBy === 'discount') {
+      // Prisma's query builder can't ORDER BY a computed expression
+      // (discount % = (mrp-price)/mrp), so this mode resolves the page's IDs
+      // via one raw query, then fetches those rows normally. Prisma.sql
+      // needs the where clause built directly (the object form above is
+      // Prisma-client-only, not usable in raw SQL), so this rebuilds an
+      // equivalent filter as a parameterized raw fragment.
+      const conditions = [Prisma.sql`"status" = ${isAdminCaller ? (status ? String(status) : 'APPROVED') : 'APPROVED'}`];
+      if (resolvedCategoryId) conditions.push(Prisma.sql`"categoryId" = ${String(resolvedCategoryId)}`);
+      if (resolvedVehicleType) conditions.push(Prisma.sql`"vehicleType" = ${resolvedVehicleType}::"VehicleType"`);
+      if (resolvedSearch) conditions.push(Prisma.sql`("name" ILIKE ${'%' + String(resolvedSearch) + '%'} OR "description" ILIKE ${'%' + String(resolvedSearch) + '%'})`);
+      if (priceMin) conditions.push(Prisma.sql`"price" >= ${Number(priceMin)}`);
+      if (priceMax) conditions.push(Prisma.sql`"price" <= ${Number(priceMax)}`);
+      if (inStock === 'true') conditions.push(Prisma.sql`"stock" > 0`);
+      if (minRating) conditions.push(Prisma.sql`"avgRating" >= ${Number(minRating)}`);
+      const whereSql = Prisma.join(conditions, ' AND ');
+      const ids = await resolveDiscountSortedIds(whereSql, (page - 1) * limit, limit);
+      const rows = await prisma.product.findMany({ where: { id: { in: ids } }, include: { category: true, brand: true } });
+      const byId = new Map(rows.map(r => [r.id, r]));
+      finalProducts = ids.map(id => byId.get(id)).filter(Boolean);
+    } else {
+      const orderBy: any =
+        sortBy === 'price_low_high' ? { price: 'asc' } :
+        sortBy === 'price_high_low' ? { price: 'desc' } :
+        sortBy === 'popular' ? { reviewCount: 'desc' } :
+        sortBy === 'best_selling' ? { salesCount: 'desc' } :
+        sortBy === 'rating' ? { avgRating: 'desc' } :
+        // Without an explicit order, Postgres doesn't guarantee newest-first
+        // (or any stable order at all) -- a vendor's freshly added product
+        // could land anywhere in the result set. Covers sortBy=newest too.
+        { createdAt: 'desc' };
+
+      finalProducts = await prisma.product.findMany({
+        where,
+        include: { category: true, brand: true },
+        orderBy,
+        skip: (page - 1) * limit,
+        take: limit,
+      });
+    }
+
+    res.setHeader('X-Total-Count', String(total));
+    res.setHeader('X-Has-More', String(page * limit < total));
+    res.json(finalProducts);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Failed to fetch products' });
+  }
+};
+
+// Lightweight autocomplete for the search bar -- name/image/price/category
+// only (not the full product shape getProducts returns), so a keystroke can
+// hit this without paying for compatibilities/brand joins it doesn't need.
+export const getSearchSuggestions = async (req: Request, res: Response) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 2) {
+      res.json([]);
+      return;
+    }
+    const rawVehicleType = req.query.vehicleType || req.query.vehicle_type;
+    const resolvedVehicleType = parseVehicleTypeFilter(rawVehicleType);
+
     const products = await prisma.product.findMany({
       where: {
-        ...statusFilter,
-        ...(resolvedCategoryId && { categoryId: String(resolvedCategoryId) }),
-        ...(categoryName && { category: { name: String(categoryName) } }),
-        ...(resolvedSearch && {
-          OR: [
-            { name: { contains: String(resolvedSearch) } }, // No mode insensitive since Prisma MySQL doesn't strictly need it if collation is CI, but can add it if needed.
-            { oemNumber: { contains: String(resolvedSearch) } },
-            { description: { contains: String(resolvedSearch) } }
-          ]
-        }),
-        ...((vehicleId || vehicleMake || vehicleModel) && {
-          compatibilities: {
-            some: {
-              ...(vehicleId && { vehicleId: String(vehicleId) }),
-              vehicle: {
-                ...(vehicleMake && { manufacturer: { name: String(vehicleMake) } }),
-                ...(vehicleModel && { model: { name: String(vehicleModel) } })
-              }
-            },
-          },
-        }),
+        status: 'APPROVED',
         ...(resolvedVehicleType && { vehicleType: resolvedVehicleType }),
+        OR: [
+          { name: { contains: q } },
+          { oemNumber: { contains: q } },
+        ],
       },
-      include: {
-        category: true,
-        brand: true,
-      },
-      // Without an explicit order, Postgres doesn't guarantee newest-first (or
-      // any stable order at all) -- a vendor's freshly added product could land
-      // anywhere in the result set. Since callers like the mobile Home screen's
-      // "trending" list just take the first N results (`getTrendingProducts`
-      // slices to 5), an unordered query meant new products routinely never
-      // appeared within that window even though they were correctly in the DB.
-      orderBy: { createdAt: 'desc' },
-      skip: (page - 1) * limit,
-      take: limit,
+      select: { id: true, name: true, images: true, price: true, category: { select: { name: true } } },
+      orderBy: { salesCount: 'desc' },
+      take: 8,
     });
 
     res.json(products);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Failed to fetch products' });
+    res.status(500).json({ error: 'Failed to fetch search suggestions' });
   }
 };
 
@@ -148,7 +240,6 @@ export const getProductById = async (req: Request, res: Response) => {
             vehicle: true,
           }
         },
-        reviews: true,
       },
     });
 
@@ -159,6 +250,39 @@ export const getProductById = async (req: Request, res: Response) => {
     res.json(product);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch product' });
+  }
+};
+
+// Same category, same vehicleType, excluding the product itself -- no
+// dedicated "related products" model/relation exists, so this is computed
+// on read rather than curated.
+export const getRelatedProducts = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const source = await prisma.product.findUnique({ where: { id: String(id) }, select: { categoryId: true, vehicleType: true } });
+    if (!source) {
+      res.status(404).json({ error: 'Product not found' });
+      return;
+    }
+
+    const related = await prisma.product.findMany({
+      where: {
+        id: { not: String(id) },
+        categoryId: source.categoryId,
+        vehicleType: source.vehicleType,
+        status: 'APPROVED',
+      },
+      include: {
+        category: true,
+        brand: true,
+      },
+      orderBy: { salesCount: 'desc' },
+      take: 8,
+    });
+
+    res.json(related);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch related products' });
   }
 };
 
@@ -177,7 +301,11 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
     // Category is unique on [name, vehicleType] -- a name-only lookup is
     // ambiguous once both a CAR and a BIKE category can share the same name,
     // so the vehicleType must be part of the lookup/create key too.
-    let cat = await prisma.category.findFirst({ where: { name: category, vehicleType: resolvedVehicleType } });
+    // Case-insensitive: an exact-match lookup let "Engine Oil" and "Engine
+    // oil" silently create two separate categories from a typo, splitting
+    // one real category's products across duplicates (found 9 such pairs in
+    // the imported catalog -- see catalog-hygiene.ts).
+    let cat = await prisma.category.findFirst({ where: { name: { equals: category, mode: 'insensitive' }, vehicleType: resolvedVehicleType } });
     if (!cat) {
       cat = await prisma.category.create({ data: { name: category, vehicleType: resolvedVehicleType } });
     }
@@ -312,7 +440,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       const vehicleTypeForLookup = vehicleType
         ? normalizeVehicleType(vehicleType)
         : (await prisma.product.findUnique({ where: { id }, select: { vehicleType: true } }))?.vehicleType;
-      let cat = await prisma.category.findFirst({ where: { name: category, vehicleType: vehicleTypeForLookup } });
+      let cat = await prisma.category.findFirst({ where: { name: { equals: category, mode: 'insensitive' }, vehicleType: vehicleTypeForLookup } });
       if (!cat) {
         cat = await prisma.category.create({ data: { name: category, vehicleType: vehicleTypeForLookup } });
       }

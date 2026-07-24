@@ -18,7 +18,7 @@ const { width, height } = Dimensions.get('window');
 
 // MechBazar Brand Colors
 const colors = {
-  primary: '#034C8C',
+  primary: '#DA3830',
   secondary: '#F29F05',
   accent: '#BF3617',
   dark: '#111111',

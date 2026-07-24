@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, Linking, Alert, Image, TouchableOpacity, Switch } from 'react-native';
+import { View, StyleSheet, ScrollView, Linking, Alert, Image, TouchableOpacity, Switch, TextInput } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, Typography, Card, Button, Loader, riderService } from '@mechbazar/shared';
-import { Phone, Navigation as NavigationIcon, Camera } from 'lucide-react-native';
+import { Phone, Navigation as NavigationIcon, Camera, KeyRound } from 'lucide-react-native';
 import { Delivery } from '../utils/deliveries';
 import { formatINR } from '../utils/currency';
 
@@ -23,6 +23,14 @@ export const DeliveryDetailScreen = () => {
   const [showIssueForm, setShowIssueForm] = useState(false);
   const [issueReason, setIssueReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+
+  const generateOtpMutation = useMutation({
+    mutationFn: () => riderService.generateDeliveryOtp(orderId),
+    onSuccess: () => setOtpSent(true),
+    onError: (err: any) => Alert.alert('Error', err.response?.data?.error || err.message),
+  });
 
   const { data: deliveries, isLoading } = useQuery<Delivery[]>({
     queryKey: ['rider-deliveries'],
@@ -32,7 +40,7 @@ export const DeliveryDetailScreen = () => {
   const order = deliveries?.find((d) => d.id === orderId);
 
   const statusMutation = useMutation({
-    mutationFn: (payload: { status: string; proofImageUrl?: string; codCollected?: boolean; issueReason?: string }) =>
+    mutationFn: (payload: { status: string; proofImageUrl?: string; codCollected?: boolean; issueReason?: string; otp?: string }) =>
       riderService.updateDeliveryStatus(orderId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['rider-deliveries'] });
@@ -78,6 +86,10 @@ export const DeliveryDetailScreen = () => {
       Alert.alert('Confirm collection', 'Please confirm you have collected the COD amount.');
       return;
     }
+    if (otpSent && otpInput.trim().length < 4) {
+      Alert.alert('Delivery code required', 'Ask the customer for the 4-digit code sent to their app.');
+      return;
+    }
     try {
       setSubmitting(true);
       const upload = await riderService.uploadImage(proofUri, 'image/jpeg', `proof-${orderId}.jpg`);
@@ -85,6 +97,7 @@ export const DeliveryDetailScreen = () => {
         status: 'DELIVERED',
         proofImageUrl: upload.url,
         codCollected: order.payment?.method === 'COD' ? codCollected : undefined,
+        otp: otpSent ? otpInput.trim() : undefined,
       });
     } catch (err: any) {
       Alert.alert('Error', err.response?.data?.error || err.message);
@@ -183,10 +196,49 @@ export const DeliveryDetailScreen = () => {
             </View>
           )}
 
+          <View style={styles.otpSection}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <KeyRound color={colors.primary} size={18} />
+              <Typography variant="body" style={{ fontWeight: '700' }}>Delivery Code</Typography>
+            </View>
+            {!otpSent ? (
+              <Button
+                title="Send Code to Customer"
+                variant="outline"
+                onPress={() => generateOtpMutation.mutate()}
+                loading={generateOtpMutation.isPending}
+                style={{ marginTop: 10 }}
+              />
+            ) : (
+              <>
+                <Typography variant="caption" style={{ color: colors.textSecondary, marginTop: 6 }}>
+                  Ask the customer for the code shown in their app and enter it below.
+                </Typography>
+                <TextInput
+                  value={otpInput}
+                  onChangeText={(t) => setOtpInput(t.replace(/[^0-9]/g, '').slice(0, 4))}
+                  placeholder="0000"
+                  keyboardType="number-pad"
+                  maxLength={4}
+                  style={styles.otpInput}
+                  placeholderTextColor={colors.textSecondary}
+                />
+                <Button
+                  title="Resend Code"
+                  variant="outline"
+                  onPress={() => generateOtpMutation.mutate()}
+                  loading={generateOtpMutation.isPending}
+                  style={{ marginTop: 8 }}
+                />
+              </>
+            )}
+          </View>
+
           <Button
             title="Confirm Delivered"
             onPress={handleConfirmDelivered}
             loading={submitting || statusMutation.isPending}
+            disabled={!otpSent || otpInput.trim().length < 4}
             style={{ marginTop: 16 }}
           />
           <Button
@@ -247,4 +299,18 @@ const styles = StyleSheet.create({
   reasonBox: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   reasonChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16, backgroundColor: colors.surfaceHover },
   reasonChipActive: { backgroundColor: colors.danger },
+  otpSection: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border },
+  otpInput: {
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 8,
+    textAlign: 'center',
+    color: colors.text,
+  },
 });

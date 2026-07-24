@@ -1,13 +1,18 @@
 import React from 'react';
 import { Provider } from 'react-redux';
-import { store } from './src/store';
+import { store, logout } from './src/store';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Constants from 'expo-constants';
-import { setApiBaseUrl } from '@mechbazar/shared';
+import { setApiBaseUrl, setUnauthorizedHandler } from '@mechbazar/shared';
 import { OfflineBanner } from './src/components/OfflineBanner';
+
+// An expired/invalid token would otherwise leave the technician stuck on a
+// screen that looks logged-in but silently fails every request -- see
+// packages/shared/src/api/client.ts for why this lives there, not here.
+setUnauthorizedHandler(() => store.dispatch(logout()));
 
 const queryClient = new QueryClient({
   defaultOptions: {

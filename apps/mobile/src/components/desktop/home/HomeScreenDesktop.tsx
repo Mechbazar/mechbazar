@@ -5,15 +5,19 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import { fetchCategories, getTrendingProducts, fetchBanners } from '../../../services/product.service';
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../../../services/wishlist.service';
+import { fetchTopVendors, TopVendor } from '../../../services/vendor.service';
 import { Category, Product } from '../../../types/product';
-import { colors, spacing } from '../../../theme/tokens';
+import { spacing } from '../../../theme/tokens';
+import { useThemeColors } from '../../../theme/useThemeColors';
 import { setDesktopFullPageScreenActive } from '../../../navigation/desktopFullPageScreenStore';
 import Container from '../shared/Container';
 import HeroCarousel from './HeroCarousel';
 import CategoryGridDesktop from './CategoryGridDesktop';
 import ProductRail from './ProductRail';
 import BrandsRow from './BrandsRow';
-import ServiceHighlights from './ServiceHighlights';
+import { MechanicServicesSection, GarageServicesSection } from './ServiceHighlights';
+import TopVendorsRow from './TopVendorsRow';
+import NewsletterSection from './NewsletterSection';
 import TrustBadges from './TrustBadges';
 import Testimonials from './Testimonials';
 import DownloadAppSection from './DownloadAppSection';
@@ -25,7 +29,8 @@ import EmptyState from '../states/EmptyState';
 const FETCH_TIMEOUT_MS = 15000;
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
-  return <Text style={styles.sectionTitle}>{children}</Text>;
+  const colors = useThemeColors();
+  return <Text style={[styles.sectionTitle, { color: colors.textDark }]}>{children}</Text>;
 }
 
 // The desktop-only Home screen (rendered by HomeScreen.web.tsx at desktop
@@ -35,12 +40,14 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 // fully decoupled from HomeScreenMobile.tsx -- editing one can't break the
 // other. No new backend endpoints anywhere in this tree.
 export default function HomeScreenDesktop() {
+  const colors = useThemeColors();
   const token = useSelector((state: RootState) => state.auth.token);
   const vehicleType = useSelector((state: RootState) => state.app.vehicleType);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [banners, setBanners] = useState<any[]>([]);
   const [trending, setTrending] = useState<Product[]>([]);
+  const [topVendors, setTopVendors] = useState<TopVendor[]>([]);
   const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ErrorKind | null>(null);
@@ -63,7 +70,11 @@ export default function HomeScreenDesktop() {
 
     Promise.all([
       fetchCategories(vehicleType, { rethrow: true, signal: controller.signal }),
-      getTrendingProducts(vehicleType, 8, { rethrow: true, signal: controller.signal }),
+      // Fetched at 20 (not just the 8 actually shown in the "Trending" rail)
+      // so Best Sellers / Flash Deals / Special Offers / Popular Brands below
+      // have a wider real pool to derive from instead of all reslicing the
+      // same 8 items.
+      getTrendingProducts(vehicleType, 20, { rethrow: true, signal: controller.signal }),
       fetchBanners(vehicleType, { rethrow: true, signal: controller.signal }),
     ])
       .then(([cats, trend, banns]) => {
@@ -79,6 +90,10 @@ export default function HomeScreenDesktop() {
 
     return () => { clearTimeout(timeoutId); controller.abort(); };
   }, [vehicleType, retryToken]);
+
+  useEffect(() => {
+    fetchTopVendors().then(setTopVendors);
+  }, []);
 
   useEffect(() => {
     if (!token) { setWishlist({}); return; }
@@ -104,6 +119,13 @@ export default function HomeScreenDesktop() {
     () => trending.filter(p => (p.discountPercentage ?? 0) > 0).sort((a, b) => (b.discountPercentage ?? 0) - (a.discountPercentage ?? 0)).slice(0, 8),
     [trending],
   );
+  // Distinct from Flash Deals (any discounted product, ranked by discount%):
+  // this is the Product.isDeal flag, which a vendor/admin sets explicitly to
+  // curate a promotion -- not every discounted product is a "special offer".
+  const specialOffers = useMemo(
+    () => trending.filter(p => p.isDeal).slice(0, 8),
+    [trending],
+  );
   const brands = useMemo(
     () => Array.from(new Set(trending.map(p => p.brand).filter(Boolean))).slice(0, 10),
     [trending],
@@ -113,7 +135,7 @@ export default function HomeScreenDesktop() {
 
   if (loading) {
     return (
-      <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
+      <ScrollView style={[styles.page, { backgroundColor: colors.pageBg }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
         <Container style={styles.section}>
           <SkeletonSection label="Loading homepage content">
             <HeroSkeleton />
@@ -133,7 +155,7 @@ export default function HomeScreenDesktop() {
 
   if (error) {
     return (
-      <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
+      <ScrollView style={[styles.page, { backgroundColor: colors.pageBg }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
         <Container>
           <ErrorState kind={error} onRetry={() => setRetryToken(t => t + 1)} />
         </Container>
@@ -144,7 +166,7 @@ export default function HomeScreenDesktop() {
 
   if (isEmpty) {
     return (
-      <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
+      <ScrollView style={[styles.page, { backgroundColor: colors.pageBg }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
         <Container>
           <EmptyState
             icon="storefront-outline"
@@ -160,7 +182,7 @@ export default function HomeScreenDesktop() {
   }
 
   return (
-    <ScrollView style={styles.page} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
+    <ScrollView style={[styles.page, { backgroundColor: colors.pageBg }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
       <Container style={styles.section}>
         <HeroCarousel banners={banners} />
       </Container>
@@ -171,14 +193,19 @@ export default function HomeScreenDesktop() {
       </Container>
 
       <Container style={styles.section}>
-        <SectionHeading>Service Highlights</SectionHeading>
-        <ServiceHighlights />
+        <SectionHeading>Mechanic Services</SectionHeading>
+        <MechanicServicesSection />
+      </Container>
+
+      <Container style={styles.section}>
+        <SectionHeading>Garage Services</SectionHeading>
+        <GarageServicesSection />
       </Container>
 
       <Container style={styles.section}>
         <ProductRail
           title={`Trending ${vehicleType === 'BIKE' ? 'Bike' : 'Car'} Parts`}
-          products={trending}
+          products={trending.slice(0, 8)}
           wishlist={wishlist}
           onWishlistToggle={handleWishlistToggle}
         />
@@ -187,6 +214,12 @@ export default function HomeScreenDesktop() {
       {bestSellers.length > 0 && (
         <Container style={styles.section}>
           <ProductRail title="Best Sellers" products={bestSellers} wishlist={wishlist} onWishlistToggle={handleWishlistToggle} />
+        </Container>
+      )}
+
+      {specialOffers.length > 0 && (
+        <Container style={styles.section}>
+          <ProductRail title="Special Offers" products={specialOffers} wishlist={wishlist} onWishlistToggle={handleWishlistToggle} />
         </Container>
       )}
 
@@ -203,6 +236,13 @@ export default function HomeScreenDesktop() {
         </Container>
       )}
 
+      {topVendors.length > 0 && (
+        <Container style={styles.section}>
+          <SectionHeading>Top Vendors</SectionHeading>
+          <TopVendorsRow vendors={topVendors} />
+        </Container>
+      )}
+
       <Container style={styles.section}>
         <TrustBadges />
       </Container>
@@ -216,14 +256,18 @@ export default function HomeScreenDesktop() {
         <DownloadAppSection />
       </Container>
 
+      <Container style={styles.section}>
+        <NewsletterSection />
+      </Container>
+
       <DesktopFooter />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: colors.pageBg },
+  page: { flex: 1 },
   content: { paddingTop: spacing.xl },
   section: { marginBottom: spacing.xxl },
-  sectionTitle: { fontSize: 22, fontWeight: '700', color: colors.textDark, marginBottom: spacing.md },
+  sectionTitle: { fontSize: 22, fontWeight: '700', marginBottom: spacing.md },
 });

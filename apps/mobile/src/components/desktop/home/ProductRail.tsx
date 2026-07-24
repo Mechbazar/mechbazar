@@ -74,8 +74,14 @@ export default function ProductRail({ title, products, wishlist, onWishlistToggl
                 <Text style={styles.brand}>{prod.brand}</Text>
                 <Text style={styles.name} numberOfLines={2}>{prod.name}</Text>
                 <View style={styles.ratingRow}>
-                  <Ionicons name="star" size={12} color="#F5A300" />
-                  <Text style={styles.ratingText}>{prod.rating} ({prod.reviewsCount})</Text>
+                  {prod.reviewsCount ? (
+                    <>
+                      <Ionicons name="star" size={12} color="#F5A300" />
+                      <Text style={styles.ratingText}>{prod.rating} ({prod.reviewsCount})</Text>
+                    </>
+                  ) : (
+                    <Text style={styles.ratingText}>New</Text>
+                  )}
                 </View>
                 <View style={styles.priceRow}>
                   <Text style={styles.price}>₹{prod.price}</Text>

@@ -4,12 +4,16 @@ import { colors } from '@mechbazar/shared';
 import { TabNavigator } from './TabNavigator';
 import { BookingDetailScreen } from '../screens/BookingDetailScreen';
 import { BookingChatScreen } from '../screens/BookingChatScreen';
+import { ReviewsScreen } from '../screens/ReviewsScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { registerForPushNotificationsAsync } from '../services/notifications';
 
 export type MainStackParamList = {
   Tabs: undefined;
   BookingDetail: { bookingId: string };
   BookingChat: { bookingId: string };
+  Reviews: undefined;
+  Notifications: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -39,6 +43,24 @@ export const MainStack = () => {
         component={BookingChatScreen}
         options={{
           title: 'Chat',
+          headerStyle: { backgroundColor: colors.card },
+          headerTintColor: colors.text,
+        }}
+      />
+      <Stack.Screen
+        name="Reviews"
+        component={ReviewsScreen}
+        options={{
+          title: 'My Reviews',
+          headerStyle: { backgroundColor: colors.card },
+          headerTintColor: colors.text,
+        }}
+      />
+      <Stack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{
+          title: 'Notifications',
           headerStyle: { backgroundColor: colors.card },
           headerTintColor: colors.text,
         }}

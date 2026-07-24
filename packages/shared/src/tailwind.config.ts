@@ -13,19 +13,44 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Brand Colors — anchored on the real customer-app accent (#E23B22)
+        // Brand Colors — kept in lockstep with the customer app's actual
+        // palette (apps/mobile/src/theme/tokens.ts: Primary #E53935, nudged
+        // to #DA3830 for AA text contrast). This scale previously anchored
+        // on #E23B22, an earlier/different red captured before the customer
+        // web redesign moved to the brand spec's #E53935 -- left the two
+        // apps' "brand red" visibly different colors side by side.
         primary: {
-          50: '#fdece8',
-          100: '#fbd2c9',
-          200: '#f6a894',
-          300: '#f07d5f',
-          400: '#e85a3d',
-          500: '#E23B22', // Main brand color
-          600: '#c0362c', // matches the app's own "cancelled/strong" shade
-          700: '#9c2a20',
-          800: '#7a2018',
-          900: '#5c1710',
-          DEFAULT: '#E23B22',
+          50: '#fdeceb',
+          100: '#fbd3d0',
+          200: '#f5aaa3',
+          300: '#ef8177',
+          400: '#e65c4f',
+          500: '#DA3830', // Main brand color -- matches apps/mobile colors.primary
+          600: '#C6301B', // matches apps/mobile colors.primaryDark
+          700: '#9c2416',
+          800: '#7a1c11',
+          900: '#5c150d',
+          DEFAULT: '#DA3830',
+        },
+        // Exact brand-spec hex (#E53935) for decorative/large-text surfaces
+        // where AA text contrast isn't load-bearing -- mirrors apps/mobile's
+        // primary vs primaryBrand split.
+        brandRed: '#E53935',
+        // Brand accent (#2ECC71) -- previously absent from this config
+        // entirely, so vendor/admin had no way to use the customer app's
+        // green accent for "live"/success-style highlights.
+        accent: {
+          50: '#e9faf1',
+          100: '#c8f3da',
+          200: '#96e7b8',
+          300: '#5edb93',
+          400: '#3cd67e',
+          500: '#2ECC71', // Main accent color -- matches apps/mobile colors.accent
+          600: '#1E9E5A', // matches apps/mobile colors.accentText
+          700: '#177a46',
+          800: '#125f37',
+          900: '#0d4527',
+          DEFAULT: '#2ECC71',
         },
         navy: {
           50: '#e9f1f9',
@@ -81,18 +106,20 @@ export default {
           900: '#4d3200',
           DEFAULT: '#F5A300',
         },
+        // Distinct from `primary` so a destructive action doesn't read as a
+        // brand-colored CTA -- matches apps/mobile colors.danger (#D32F2F).
         danger: {
-          50: '#fdece8',
-          100: '#fbd2c9',
-          200: '#f6a894',
-          300: '#f07d5f',
-          400: '#e85a3d',
-          500: '#E23B22',
-          600: '#C0362C',
-          700: '#9c2a20',
-          800: '#7a2018',
-          900: '#5c1710',
-          DEFAULT: '#E23B22',
+          50: '#fdeceb',
+          100: '#fad2cf',
+          200: '#f3a49e',
+          300: '#ec766d',
+          400: '#e0493d',
+          500: '#D32F2F',
+          600: '#B71C1C',
+          700: '#8f1616',
+          800: '#6b1010',
+          900: '#4a0b0b',
+          DEFAULT: '#D32F2F',
         },
         info: {
           50: '#e9f1f9',
@@ -204,9 +231,9 @@ export default {
         lg: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
         xl: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
         '2xl': '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-        'primary-sm': '0 4px 12px 0 rgba(219, 0, 0, 0.15)',
-        'success-sm': '0 4px 12px 0 rgba(40, 167, 69, 0.15)',
-        'danger-sm': '0 4px 12px 0 rgba(219, 0, 0, 0.15)',
+        'primary-sm': '0 4px 12px 0 rgba(218, 56, 48, 0.15)',
+        'success-sm': '0 4px 12px 0 rgba(30, 158, 90, 0.15)',
+        'danger-sm': '0 4px 12px 0 rgba(211, 47, 47, 0.15)',
         none: 'none',
       },
 

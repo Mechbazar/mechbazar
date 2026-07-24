@@ -1,12 +1,13 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useDispatch } from 'react-redux';
 import * as SecureStore from 'expo-secure-store';
 import { colors, Typography, Card, Button, Loader, technicianService } from '@mechbazar/shared';
+import { Star, ChevronRight } from 'lucide-react-native';
 import { logout } from '../store';
 
-export const ProfileScreen = () => {
+export const ProfileScreen = ({ navigation }: { navigation: any }) => {
   const dispatch = useDispatch();
 
   const { data: profile, isLoading, refetch, isRefetching } = useQuery({
@@ -82,6 +83,17 @@ export const ProfileScreen = () => {
           </View>
         </Card>
 
+        <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.getParent()?.navigate('Reviews')}>
+          <Card style={styles.reviewsLink}>
+            <Star color={colors.warning} size={22} />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Typography variant="body" style={{ fontWeight: '700' }}>My Reviews</Typography>
+              <Typography variant="caption">See what customers said about your work</Typography>
+            </View>
+            <ChevronRight color={colors.textSecondary} size={20} />
+          </Card>
+        </TouchableOpacity>
+
         <Button title="Sign Out" onPress={handleLogout} style={{ backgroundColor: colors.danger }} />
       </View>
     </ScrollView>
@@ -93,4 +105,5 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', padding: 32, backgroundColor: colors.surfaceHover },
   avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  reviewsLink: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, marginBottom: 16 },
 });

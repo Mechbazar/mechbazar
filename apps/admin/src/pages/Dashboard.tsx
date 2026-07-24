@@ -4,6 +4,7 @@ import { Users, Package, ShoppingBag, DollarSign, Activity, TrendingUp, AlertCir
 import axios from 'axios';
 import { Card, Badge } from '@mechbazar/shared/web';
 import { API_URL, SERVER_ORIGIN } from '../config/api';
+import RevenueChart from '../components/RevenueChart';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -69,11 +70,11 @@ export default function Dashboard() {
           <p className="text-neutral-400 mt-1">Welcome back, Super Admin</p>
         </div>
         <button
-          onClick={() => alert('Report generation is coming soon -- there is no export/report endpoint yet.')}
+          onClick={() => navigate('/reports')}
           className="inline-flex items-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-600"
         >
           <TrendingUp className="w-4 h-4" />
-          Generate Report
+          View Reports
         </button>
       </div>
 
@@ -97,6 +98,8 @@ export default function Dashboard() {
           </Card>
         ))}
       </div>
+
+      <RevenueChart />
 
       {serviceStats && (
         <Card variant="dark" onClick={() => navigate('/service-bookings')} className="cursor-pointer">

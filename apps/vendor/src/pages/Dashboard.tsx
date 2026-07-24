@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Card, Badge, Loader, Alert } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
+import SalesChart from '../components/SalesChart';
 
 interface DashboardStats {
   totalProducts: number;
@@ -104,6 +105,8 @@ export default function Dashboard() {
           <Link to="/inventory" className="inline-block mt-2 text-xs bg-warning-500/20 hover:bg-warning-500/30 text-warning-300 px-3 py-1.5 rounded-2xl font-semibold transition-colors whitespace-nowrap">View Inventory</Link>
         </Alert>
       )}
+
+      <SalesChart />
 
       <Card variant="dark" className="!rounded-3xl !p-0 overflow-hidden">
         <div className="p-4 border-b border-neutral-800 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

@@ -5,9 +5,9 @@
 @theme {
   /* Brand accent matches the real customer app (apps/mobile) palette;
      admin shell uses a light surface theme. */
-  --color-brand-primary: #E23B22;
+  --color-brand-primary: #DA3830;
   --color-brand-secondary: #F5A300;
-  --color-brand-accent: #C0362C;
+  --color-brand-accent: #C6301B;
   --color-brand-dark: #f3f4f6;
   --color-brand-light: #111827;
   --color-brand-panel: #ffffff;
@@ -34,7 +34,7 @@
     border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #E23B22;
+    background: #DA3830;
   }
 }
 

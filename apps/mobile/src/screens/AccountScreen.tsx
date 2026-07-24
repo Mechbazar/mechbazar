@@ -24,6 +24,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { RootState } from '../store';
 import { logout, updateUserSuccess } from '../store/authSlice';
+import { setThemePreference } from '../store/themeSlice';
 import { API_BASE_URL, SERVER_ORIGIN } from '../services/api';
 import { fetchMyBookings, cancelServiceBooking } from '../services/service.service';
 
@@ -61,6 +62,7 @@ export default function AccountScreen() {
   const navigation = useNavigation<any>();
   const dispatch = useDispatch();
   const { user, token } = useSelector((state: RootState) => state.auth);
+  const isDarkMode = useSelector((state: RootState) => state.theme.resolvedScheme === 'dark');
   const activeVehicleId = useSelector((state: RootState) => state.app.activeVehicleId);
   const myGarage = useSelector((state: RootState) => state.app.myGarage);
   const activeVehicle = myGarage.find(v => v.id === activeVehicleId);
@@ -77,7 +79,6 @@ export default function AccountScreen() {
   const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
   const [offers, setOffers] = useState<{ id: string; title: string; description?: string }[]>([]);
   const [isLoadingOffers, setIsLoadingOffers] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(true);
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState('English');
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
@@ -105,10 +106,6 @@ export default function AccountScreen() {
     // Hydrate application settings from cache
     const hydrateSettings = async () => {
       try {
-        const savedDarkMode = await AsyncStorage.getItem('@mechbazar_dark_mode');
-        if (savedDarkMode !== null) {
-          setIsDarkMode(savedDarkMode === 'true');
-        }
         const savedNotifications = await AsyncStorage.getItem('@mechbazar_notifications');
         if (savedNotifications !== null) {
           setIsNotificationsEnabled(savedNotifications === 'true');
@@ -124,14 +121,8 @@ export default function AccountScreen() {
     hydrateSettings();
   }, []);
 
-  const handleToggleDarkMode = async (value: boolean) => {
-    setIsDarkMode(value);
-    try {
-      await AsyncStorage.setItem('@mechbazar_dark_mode', String(value));
-      Alert.alert('Settings', value ? 'Dark mode enabled.' : 'Light mode enabled.');
-    } catch (e) {
-      console.error(e);
-    }
+  const handleToggleDarkMode = (value: boolean) => {
+    dispatch(setThemePreference(value ? 'dark' : 'light'));
   };
 
   const handleToggleNotifications = async (value: boolean) => {
@@ -190,40 +181,62 @@ export default function AccountScreen() {
     }
   };
 
-  const handleSendPhoneOtp = () => {
+  const handleSendPhoneOtp = async () => {
     if (!newPhone.trim() || newPhone.length < 10) {
       Alert.alert('Validation Error', 'Please enter a valid 10-digit mobile number.');
       return;
     }
     setIsVerifyingPhone(true);
-    setTimeout(() => {
-      setIsVerifyingPhone(false);
+    try {
+      const res = await fetch(`${API_BASE_URL}/customers/me/phone/otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ newPhone }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        Alert.alert('Error', data.error || 'Failed to send OTP.');
+        return;
+      }
       setIsOtpSent(true);
       Alert.alert('Verification Code Sent', 'A 6-digit OTP code has been sent to your new mobile number.');
-    }, 1200);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      Alert.alert('Network Error', `Could not send OTP: ${message}`);
+    } finally {
+      setIsVerifyingPhone(false);
+    }
   };
 
-  const handleVerifyAndUpdatePhone = () => {
+  const handleVerifyAndUpdatePhone = async () => {
     if (!otpCode.trim() || otpCode.length < 4) {
       Alert.alert('Validation Error', 'Please enter a valid OTP code.');
       return;
     }
     setIsVerifyingPhone(true);
-    setTimeout(() => {
-      setIsVerifyingPhone(false);
+    try {
+      const res = await fetch(`${API_BASE_URL}/customers/me/phone`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ newPhone, otp: otpCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        Alert.alert('Error', data.error || 'Failed to update phone number.');
+        return;
+      }
       setIsChangePhoneModalVisible(false);
       setIsOtpSent(false);
       setOtpCode('');
-      
-      if (user) {
-        dispatch(updateUserSuccess({
-          ...user,
-          phone: newPhone
-        }));
-      }
       setNewPhone('');
+      if (user) dispatch(updateUserSuccess({ ...user, phone: data.phone }));
       Alert.alert('Success', 'Phone number updated successfully!');
-    }, 1500);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      Alert.alert('Network Error', `Could not update phone number: ${message}`);
+    } finally {
+      setIsVerifyingPhone(false);
+    }
   };
 
   // There is no account-deletion API -- deleting a customer touches orders,
@@ -303,10 +316,19 @@ export default function AccountScreen() {
           // next. Best-effort: logout proceeds even if this fails.
           if (token) {
             try {
-              await fetch(`${API_BASE_URL}/auth/push-token`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` },
-              });
+              await Promise.all([
+                fetch(`${API_BASE_URL}/auth/push-token`, {
+                  method: 'DELETE',
+                  headers: { Authorization: `Bearer ${token}` },
+                }),
+                // Web push token is a separate column (User.fcmToken) -- clear
+                // it too so a shared/reset browser doesn't keep this
+                // account's notifications after the next person logs in.
+                fetch(`${API_BASE_URL}/auth/push-token?type=fcm`, {
+                  method: 'DELETE',
+                  headers: { Authorization: `Bearer ${token}` },
+                }),
+              ]);
             } catch (e) {
               console.error('Failed to clear push token on logout:', e);
             }

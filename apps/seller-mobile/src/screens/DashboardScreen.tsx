@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 import { colors, Typography, Card, Loader, vendorService } from '@mechbazar/shared';
-import { Package, IndianRupee, ShoppingCart, Wallet } from 'lucide-react-native';
+import { Package, IndianRupee, ShoppingCart, Wallet, BarChart3, ChevronRight } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
@@ -59,6 +59,17 @@ export const DashboardScreen = ({ navigation }: { navigation: any }) => {
           </Card>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.getParent()?.navigate('Analytics')}>
+        <Card style={styles.analyticsLink}>
+          <BarChart3 color={colors.primary} size={22} />
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Typography variant="body" style={{ fontWeight: '700' }}>Sales Analytics</Typography>
+            <Typography variant="caption">View revenue trends over time</Typography>
+          </View>
+          <ChevronRight color={colors.textSecondary} size={20} />
+        </Card>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -84,5 +95,11 @@ const styles = StyleSheet.create({
   statCard: {
     alignItems: 'center',
     paddingVertical: 24,
-  }
+  },
+  analyticsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    marginBottom: 16,
+  },
 });

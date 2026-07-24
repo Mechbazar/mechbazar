@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { put } from '@vercel/blob';
+import admin from '../config/firebase';
 
 // The saved extension must come from the validated mimetype, never the
 // client-supplied original filename -- multer's fileFilter (upload.ts) checks
@@ -32,6 +33,30 @@ export const uploadFile = async (req: Request, res: Response): Promise<void> => 
     }
 
     const filename = uniqueFilename(req.file.mimetype);
+
+    // Checked first (before Vercel Blob) so that setting FIREBASE_STORAGE_BUCKET
+    // is enough to switch uploads over to Firebase Storage without touching
+    // the fallback branches below -- they stay as-is for environments that
+    // don't set it.
+    if (process.env.FIREBASE_STORAGE_BUCKET) {
+      const bucket = admin.storage().bucket(process.env.FIREBASE_STORAGE_BUCKET);
+      const file = bucket.file(filename);
+      await file.save(req.file.buffer, {
+        contentType: req.file.mimetype,
+        // Matches storage.rules (`allow read: if true`) and the existing
+        // Vercel Blob branch's `access: 'public'` -- consumers of the
+        // returned `url` (product images, avatars, etc.) already assume a
+        // directly-loadable public URL, not a signed one.
+        public: true,
+      });
+      res.status(200).json({
+        url: `https://storage.googleapis.com/${bucket.name}/${filename}`,
+        filename,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+      });
+      return;
+    }
 
     // BLOB_READ_WRITE_TOKEN is only set when a Vercel Blob store is attached
     // (production/Vercel deployments). Local docker/dev has no persistent

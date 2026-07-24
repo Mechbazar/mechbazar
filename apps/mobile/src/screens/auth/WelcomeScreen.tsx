@@ -23,6 +23,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Rect, Defs, LinearGradient, Stop, Circle, Path, G } from 'react-native-svg';
 import { loginSuccess } from '../../store/authSlice';
 import { API_BASE_URL } from '../../services/api';
+import { sendPhoneOtp, confirmPhoneOtp } from '../../services/phoneAuth';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import Container from '../../components/desktop/shared/Container';
@@ -30,10 +31,15 @@ import { spacing as deskSpacing, radius as deskRadius } from '../../theme/tokens
 
 const { width } = Dimensions.get('window');
 
+// Mirrors the backend's OTP_PROVIDER env var (apps/backend/.env.example) --
+// when PRODUCTION, OTP send/verify goes through real Firebase phone auth
+// (services/phoneAuth) instead of the Postgres-backed TEST-mode numeric code.
+const USE_FIREBASE_OTP = process.env.EXPO_PUBLIC_OTP_PROVIDER === 'PRODUCTION';
+
 const colors = {
-  primary: '#E23B22',     
+  primary: '#DA3830',     
   primaryLight: '#FF573C',
-  secondary: '#161B21',   
+  secondary: '#1B1B1B',   
   steel: '#242C35',       
   white: '#FFFFFF',
   textMuted: '#9AA5B1',
@@ -416,6 +422,25 @@ export default function WelcomeScreen() {
       return;
     }
     setIsLoading(true);
+
+    // Firebase sends the SMS itself as part of signInWithPhoneNumber -- no
+    // need to also hit the backend's /auth/send-otp (that endpoint only
+    // populates the Postgres TEST-mode OTP table, which PRODUCTION-mode
+    // verification ignores anyway; see apps/backend/src/utils/otp.ts).
+    if (USE_FIREBASE_OTP) {
+      try {
+        await sendPhoneOtp(mobile);
+        setIsLoading(false);
+        setIsOtpSent(true);
+        Alert.alert('OTP Sent', 'An OTP has been sent to your phone.');
+      } catch (err) {
+        setIsLoading(false);
+        const message = err instanceof Error ? err.message : String(err);
+        Alert.alert('Error', message || 'Failed to send OTP.');
+      }
+      return;
+    }
+
     try {
       const res = await fetch(`${activeBaseUrl}/auth/send-otp`, {
         method: 'POST',
@@ -448,21 +473,29 @@ export default function WelcomeScreen() {
     
     setIsLoading(true);
     try {
+      // In the Firebase-backed flow, `otp` (the code the user typed) confirms
+      // the pending Firebase phone-auth request and yields an ID token; that
+      // token -- not the raw code -- is what the backend actually verifies
+      // (verifyOtpAndResolvePhone accepts a Firebase ID token in the `otp`
+      // field when OTP_PROVIDER=PRODUCTION). Otherwise, send the raw code
+      // as before (TEST-mode Postgres-backed verification).
+      const otpForBackend = USE_FIREBASE_OTP ? await confirmPhoneOtp(otp) : otp;
+
       let res = await fetch(`${activeBaseUrl}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: mobile, otp })
+        body: JSON.stringify({ phone: mobile, otp: otpForBackend })
       });
-      
+
       let data = await res.json();
 
       if (res.status === 401 && data.error?.includes('User not found')) {
         res = await fetch(`${activeBaseUrl}/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            phone: mobile, 
-            otp, 
+          body: JSON.stringify({
+            phone: mobile,
+            otp: otpForBackend,
             name: 'Customer User',
             accountType: 'RETAIL'
           })

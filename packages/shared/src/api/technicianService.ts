@@ -169,4 +169,32 @@ export const technicianService = {
     const response = await apiClient.post('/technicians/me/wallet/withdraw', { amount });
     return response.data;
   },
+
+  // Reviews -- previously only the denormalized average rating was visible
+  // to the technician; this exposes the individual ServiceReview rows.
+  getMyReviews: async (page: number = 1) => {
+    const response = await apiClient.get(`/technicians/me/reviews?page=${page}`);
+    return response.data as {
+      reviews: { id: string; rating: number; comment: string | null; createdAt: string; customerName: string; bookingNumber?: string; category?: string }[];
+      total: number;
+      page: number;
+      pageSize: number;
+      totalPages: number;
+      avgRating: number;
+    };
+  },
+
+  // Notifications -- reuses the generic /customers/notifications endpoints
+  // (scoped by the authenticated user's own id server-side, not by role).
+  getNotifications: async () => {
+    const response = await apiClient.get('/customers/notifications');
+    return response.data as { id: string; title: string; body: string; isRead: boolean; createdAt: string }[];
+  },
+  markNotificationRead: async (id: string) => {
+    const response = await apiClient.patch(`/customers/notifications/${id}/read`);
+    return response.data;
+  },
+  deleteNotification: async (id: string) => {
+    await apiClient.delete(`/customers/notifications/${id}`);
+  },
 };

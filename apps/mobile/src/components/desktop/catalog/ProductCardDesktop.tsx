@@ -101,8 +101,14 @@ function ProductCardDesktop({
         <Text style={styles.brand}>{product.brand}</Text>
         <Text style={styles.name} numberOfLines={2}>{product.name}</Text>
         <View style={styles.ratingRow}>
-          <Ionicons name="star" size={12} color="#F5A300" />
-          <Text style={styles.ratingText}>{product.rating} ({product.reviewsCount ?? 0})</Text>
+          {product.reviewsCount ? (
+            <>
+              <Ionicons name="star" size={12} color="#F5A300" />
+              <Text style={styles.ratingText}>{product.rating} ({product.reviewsCount})</Text>
+            </>
+          ) : (
+            <Text style={styles.ratingText}>New</Text>
+          )}
         </View>
         <View style={styles.priceRow}>
           <Text style={styles.price}>₹{product.price}</Text>

@@ -48,8 +48,14 @@ export default function QuickViewModal({
               <Text style={styles.name}>{product.name}</Text>
 
               <View style={styles.ratingRow}>
-                <Ionicons name="star" size={14} color="#F5A300" />
-                <Text style={styles.ratingText}>{product.rating} ({product.reviewsCount ?? 0} reviews)</Text>
+                {product.reviewsCount ? (
+                  <>
+                    <Ionicons name="star" size={14} color="#F5A300" />
+                    <Text style={styles.ratingText}>{product.rating} ({product.reviewsCount} reviews)</Text>
+                  </>
+                ) : (
+                  <Text style={styles.ratingText}>New — no reviews yet</Text>
+                )}
               </View>
 
               <View style={styles.priceRow}>

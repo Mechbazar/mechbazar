@@ -29,3 +29,31 @@ apiClient.interceptors.request.use(async (config) => {
   }
   return config;
 });
+
+// This client is shared by apps/seller-mobile, apps/mechanic and apps/rider,
+// none of which had ANY 401 handling -- an expired/invalid token just left
+// the user stuck on a screen that looked logged-in but silently failed every
+// request. Fixed once here rather than three times per-app. Each app's own
+// Redux store/logout action differs, so this file can't dispatch logout
+// itself (no circular dependency on a specific app's store) -- instead it
+// exposes a registration hook that each app's entry point (App.tsx) calls
+// once at startup, mirroring apps/mobile's services/sessionGuard.ts pattern.
+let onUnauthorized: (() => void) | null = null;
+export const setUnauthorizedHandler = (handler: () => void) => {
+  onUnauthorized = handler;
+};
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error?.response?.status === 401) {
+      try {
+        await SecureStore.deleteItemAsync('token');
+      } catch {
+        // Best-effort -- the handler below still fires either way.
+      }
+      onUnauthorized?.();
+    }
+    return Promise.reject(error);
+  }
+);

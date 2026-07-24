@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import {
-  getVendors, 
-  createVendor, 
+  getVendors,
+  getTopVendors,
+  createVendor,
   updateVendor, 
   updateVendorStatus,
   loginVendor,
@@ -17,6 +18,7 @@ import {
   updateOrderStatus,
   getWalletDetails,
   requestPayout,
+  getSalesChart,
   getAllSettlements,
   updateSettlementStatus,
   // New endpoints
@@ -36,6 +38,7 @@ const admins = [Role.ADMIN, Role.SUPER_ADMIN, Role.VENDOR_MANAGER];
 // ----------------------------------------------------
 // VENDOR PORTAL APIs (Public/Vendor Auth)
 // ----------------------------------------------------
+router.get('/top', getTopVendors);
 router.post('/login', loginVendor);
 router.post('/register', registerPersonal);
 router.post('/business', authenticate, authorize([Role.VENDOR]), updateBusinessDetails);
@@ -49,6 +52,7 @@ router.put('/profile', authenticate, authorize([Role.VENDOR]), updateMyProfile);
 
 // Dashboard
 router.get('/dashboard', authenticate, authorize([Role.VENDOR]), getDashboardStats);
+router.get('/dashboard/sales-chart', authenticate, authorize([Role.VENDOR]), getSalesChart);
 
 // Products
 router.get('/products', authenticate, authorize([Role.VENDOR]), getMyProducts);

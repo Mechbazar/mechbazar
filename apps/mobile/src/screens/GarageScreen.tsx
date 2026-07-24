@@ -25,7 +25,7 @@ import CompactBookingShell from '../components/desktop/shared/CompactBookingShel
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 
 const colors = {
-  primary: '#034C8C',
+  primary: '#DA3830',
   secondary: '#F29F05',
   accent: '#BF3617',
   dark: '#111111',

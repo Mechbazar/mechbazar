@@ -1,6 +1,7 @@
 import prisma from '../config/prisma';
 import { Role } from '@prisma/client';
 import { sendExpoPush } from './expoPush';
+import { sendFcmPush } from './fcmPush';
 
 const ADMIN_ROLES: Role[] = [Role.ADMIN, Role.SUPER_ADMIN, Role.OPERATIONS_MANAGER];
 
@@ -19,8 +20,14 @@ export const notifyUser = async (
       prisma.user.findUnique({ where: { id: userId } }),
       prisma.notification.create({ data: { userId, title, body } }),
     ]);
+    // Independent channels -- a user can have a device (Expo) token, a
+    // browser (FCM) token, both, or neither. One failing must not block the
+    // other; sendExpoPush/sendFcmPush already swallow their own errors.
     if (user?.expoPushToken) {
       await sendExpoPush(user.expoPushToken, title, body, data);
+    }
+    if (user?.fcmToken) {
+      await sendFcmPush(user.fcmToken, title, body, data);
     }
   } catch (error) {
     console.error('notifyUser error:', error);

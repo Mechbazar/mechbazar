@@ -1,53 +1,100 @@
-import React from 'react';
-import { View, Text, Pressable, Alert, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../../store';
+import { fetchServiceCategories } from '../../../services/service.service';
+import { fetchMyVehicles } from '../../../services/garage.service';
+import { ServiceCategory } from '../../../types/service';
 import { colors, spacing, radius, shadows } from '../../../theme/tokens';
 
-// Same four actions the mobile Home screen's "Quick Actions" row already
-// exposes (Home Mechanic / Video Call / Breakdown / Garage Tools) -- same
-// navigation targets and the same Alert-based flows for the two that don't
-// have a dedicated screen yet, just presented as a desktop highlight strip.
-const HIGHLIGHTS: {
-  icon: keyof typeof Ionicons.glyphMap; iconBg: string; iconColor: string;
-  title: string; desc: string; action: (nav: NavigationProp<any>) => void;
-}[] = [
-  {
-    icon: 'build', iconBg: '#EBFBEE', iconColor: '#2B8A3E',
-    title: 'Home Mechanic', desc: 'Book a verified mechanic at your doorstep',
-    action: nav => nav.navigate('MainTabs', { screen: 'Services' }),
-  },
-  {
-    icon: 'flash', iconBg: '#FFF9DB', iconColor: '#F59F00',
-    title: 'Breakdown Assistance', desc: '24x7 emergency roadside dispatch',
-    action: () => Alert.alert(
-      'Emergency Roadside Help',
-      'Need immediate breakdown dispatch? A local service technician will be directed to your current location.',
-      [{ text: 'Cancel', style: 'cancel' }, { text: 'Call Dispatcher', style: 'destructive', onPress: () => Alert.alert('Request Sent', 'A verification agent is calling you back in 60 seconds.') }],
-    ),
-  },
-  {
-    icon: 'videocam', iconBg: '#E8F7FF', iconColor: '#1C7ED6',
-    title: 'Video Consultation', desc: 'Diagnose issues live with an expert',
-    action: () => Alert.alert('Video Consultation', 'Connecting with a live consulting technician...'),
-  },
-  {
-    icon: 'construct', iconBg: '#F8F0FC', iconColor: '#9C36B5',
-    title: 'Garage Tools', desc: 'Rent or buy professional-grade tools',
-    action: nav => nav.navigate('MainTabs', { screen: 'Services' }),
-  },
-];
-
-export default function ServiceHighlights() {
+// Previously a fixed 4-card list where two of the four ("Breakdown
+// Assistance", "Video Consultation") triggered a hardcoded Alert.alert
+// flow with no real backend behind it -- a dead end dressed up as a
+// working feature. Replaced with real ServiceCategory rows fetched from
+// the same endpoint the Services module's own home screen uses
+// (fetchServiceCategories), so every card here opens a real, bookable
+// category. "Video Consultation" is dropped entirely -- there is no
+// backend concept for it anywhere in this codebase.
+export function MechanicServicesSection() {
   const navigation = useNavigation<NavigationProp<any>>();
+  const vehicleType = useSelector((state: RootState) => state.app.vehicleType);
+  const [categories, setCategories] = useState<ServiceCategory[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchServiceCategories(vehicleType).then(cats => {
+      if (cancelled || !cats) return;
+      // Emergency categories (e.g. "Emergency Breakdown Assistance") float to
+      // the front of the homepage strip since they're the most time-critical.
+      const sorted = [...cats].sort((a, b) => Number(b.isEmergency) - Number(a.isEmergency));
+      setCategories(sorted.slice(0, 4));
+    });
+    return () => { cancelled = true; };
+  }, [vehicleType]);
+
+  if (categories.length === 0) return null;
 
   return (
     <View style={styles.grid}>
-      {HIGHLIGHTS.map(item => (
+      {categories.map(cat => (
+        <Pressable
+          key={cat.id}
+          style={({ hovered }: any) => [styles.card, hovered && styles.cardHovered]}
+          onPress={() => navigation.navigate('ServiceCategory', { categoryId: cat.id, categoryName: cat.name })}
+        >
+          <View style={[styles.iconCircle, cat.isEmergency ? styles.iconCircleEmergency : styles.iconCircleDefault]}>
+            {cat.icon ? <Text style={styles.iconEmoji}>{cat.icon}</Text> : <Ionicons name="build" size={26} color={colors.primary} />}
+          </View>
+          <Text style={styles.title}>{cat.name}</Text>
+          {cat.description ? <Text style={styles.desc} numberOfLines={2}>{cat.description}</Text> : null}
+          {cat.isEmergency && <Text style={styles.emergencyBadge}>24x7 EMERGENCY</Text>}
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+// Promotes the real Vehicle Garage feature (add/manage vehicles, see
+// vehicle-specific compatible parts) rather than a "Garage Tools" concept
+// that has no backend model anywhere in this codebase.
+export function GarageServicesSection() {
+  const navigation = useNavigation<NavigationProp<any>>();
+  const token = useSelector((state: RootState) => state.auth.token);
+  const [vehicleCount, setVehicleCount] = useState(0);
+
+  useEffect(() => {
+    if (!token) { setVehicleCount(0); return; }
+    let cancelled = false;
+    fetchMyVehicles(token).then(vs => { if (!cancelled) setVehicleCount(vs.length); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [token]);
+
+  const CARDS = [
+    {
+      icon: 'car-sport' as const, iconBg: '#EBFBEE', iconColor: '#2B8A3E',
+      title: vehicleCount > 0 ? 'My Garage' : 'Add Your Vehicle',
+      desc: vehicleCount > 0
+        ? `${vehicleCount} vehicle${vehicleCount > 1 ? 's' : ''} saved — manage them here`
+        : 'Save your car or bike for faster checkout and compatible-parts filtering',
+      onPress: () => navigation.navigate('Garage'),
+    },
+    {
+      icon: 'search' as const, iconBg: '#E8F7FF', iconColor: '#1C7ED6',
+      title: 'Find Compatible Parts',
+      desc: 'Browse categories and filter by your saved vehicle',
+      onPress: () => navigation.navigate('MainTabs', { screen: 'Categories' }),
+    },
+  ];
+
+  return (
+    <View style={styles.grid}>
+      {CARDS.map(item => (
         <Pressable
           key={item.title}
           style={({ hovered }: any) => [styles.card, hovered && styles.cardHovered]}
-          onPress={() => item.action(navigation)}
+          onPress={item.onPress}
         >
           <View style={[styles.iconCircle, { backgroundColor: item.iconBg }]}>
             <Ionicons name={item.icon} size={26} color={item.iconColor} />
@@ -73,6 +120,10 @@ const styles = StyleSheet.create({
   },
   cardHovered: { ...shadows.md, borderColor: colors.primary },
   iconCircle: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: spacing.sm },
+  iconCircleDefault: { backgroundColor: '#EBFBEE' },
+  iconCircleEmergency: { backgroundColor: '#FFF0F0' },
+  iconEmoji: { fontSize: 24 },
   title: { fontSize: 16, fontWeight: '700', color: colors.textDark, marginBottom: 4 },
   desc: { fontSize: 13, color: colors.textMuted, lineHeight: 18 },
+  emergencyBadge: { marginTop: 6, fontSize: 10, fontWeight: '800', color: colors.danger, letterSpacing: 0.5 },
 });

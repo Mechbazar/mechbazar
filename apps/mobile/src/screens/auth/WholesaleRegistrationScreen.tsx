@@ -22,8 +22,8 @@ import Container from '../../components/desktop/shared/Container';
 import { spacing as deskSpacing, radius as deskRadius } from '../../theme/tokens';
 
 const colors = {
-  primary: '#E23B22',
-  secondary: '#161B21',
+  primary: '#DA3830',
+  secondary: '#1B1B1B',
   steel: '#242C35',
   white: '#FFFFFF',
   textMuted: '#9AA5B1',

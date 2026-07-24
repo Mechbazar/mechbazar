@@ -5,6 +5,7 @@ import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
 import { generateToken } from '../utils/jwt';
 import { notifyUser } from '../utils/notify';
 import { sanitizeUser, sanitizeUsers } from '../utils/sanitizeUser';
+import { recordAuditLog } from '../utils/auditLog';
 import prisma from '../config/prisma';
 
 // Every /me endpoint below re-derives the ServiceTechnician row from the JWT's
@@ -199,14 +200,13 @@ export const updateTechnicianVerificationStatus = async (req: AuthRequest, res: 
       },
     });
 
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.userId,
-        action: 'TECHNICIAN_STATUS_CHANGE',
-        entity: 'ServiceTechnician',
-        entityId: id,
-        details: `${technician.status} -> ${status}${remarks ? ` (${remarks})` : ''}`,
-      },
+    recordAuditLog({
+      userId: req.user!.userId,
+      action: 'TECHNICIAN_STATUS_CHANGE',
+      entity: 'ServiceTechnician',
+      entityId: id,
+      details: `${technician.status} -> ${status}${remarks ? ` (${remarks})` : ''}`,
+      req,
     });
 
     notifyUser(
@@ -666,6 +666,57 @@ export const getMyEarnings = async (req: AuthRequest, res: Response): Promise<vo
   } catch (error) {
     console.error('Error fetching own earnings:', error);
     res.status(500).json({ error: 'Failed to fetch earnings' });
+  }
+};
+
+// Previously a technician could only see their denormalized average rating
+// (ServiceTechnician.rating) with no way to read what customers actually
+// wrote -- ServiceReview rows existed but nothing exposed them to the
+// reviewed technician's own client.
+export const getMyReviews = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const technician = await getOwnTechnician(req.user!.userId);
+    if (!technician) {
+      res.status(404).json({ error: 'Technician profile not found' });
+      return;
+    }
+
+    const page = Math.max(Number(req.query.page) || 1, 1);
+    const pageSize = Math.min(Math.max(Number(req.query.pageSize) || 20, 1), 50);
+
+    const [reviews, total] = await Promise.all([
+      prisma.serviceReview.findMany({
+        where: { technicianId: technician.id },
+        include: {
+          user: { select: { name: true } },
+          booking: { select: { bookingNumber: true, category: { select: { name: true } } } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.serviceReview.count({ where: { technicianId: technician.id } }),
+    ]);
+
+    res.status(200).json({
+      reviews: reviews.map((r) => ({
+        id: r.id,
+        rating: r.rating,
+        comment: r.comment,
+        createdAt: r.createdAt,
+        customerName: r.user?.name || 'Customer',
+        bookingNumber: r.booking?.bookingNumber,
+        category: r.booking?.category?.name,
+      })),
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+      avgRating: technician.rating,
+    });
+  } catch (error) {
+    console.error('Error fetching own reviews:', error);
+    res.status(500).json({ error: 'Failed to fetch reviews' });
   }
 };
 

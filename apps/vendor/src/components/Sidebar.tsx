@@ -3,16 +3,19 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
 import {
-  LayoutDashboard, Package, ShoppingCart, Warehouse, Wallet, Settings, LogOut, Store, X
+  LayoutDashboard, Package, ShoppingCart, Warehouse, Wallet, Settings, LogOut, Store, X, Tag, Bell, RotateCcw
 } from 'lucide-react';
 
 const navItems = [
-  { to: '/dashboard',  icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/products',   icon: Package,         label: 'Products' },
-  { to: '/orders',     icon: ShoppingCart,    label: 'Orders' },
-  { to: '/inventory',  icon: Warehouse,       label: 'Inventory' },
-  { to: '/wallet',     icon: Wallet,          label: 'Wallet & Payouts' },
-  { to: '/profile',    icon: Settings,        label: 'Profile & Settings' },
+  { to: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/products',      icon: Package,         label: 'Products' },
+  { to: '/orders',        icon: ShoppingCart,    label: 'Orders' },
+  { to: '/inventory',     icon: Warehouse,       label: 'Inventory' },
+  { to: '/returns',       icon: RotateCcw,       label: 'Returns' },
+  { to: '/coupons',       icon: Tag,             label: 'Coupons' },
+  { to: '/notifications', icon: Bell,            label: 'Notifications' },
+  { to: '/wallet',        icon: Wallet,          label: 'Wallet & Payouts' },
+  { to: '/profile',       icon: Settings,        label: 'Profile & Settings' },
 ];
 
 interface SidebarProps {

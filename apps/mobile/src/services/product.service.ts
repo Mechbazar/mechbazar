@@ -2,11 +2,6 @@ import { Platform } from 'react-native';
 import { Product, FilterOptions, VehicleType, Category, VehicleBrand, VehicleModel, VehicleTaxonomy } from '../types/product';
 import { API_BASE_URL, SERVER_ORIGIN } from './api';
 
-// getCategoryProducts fetches one batch and does all sorting/filtering/
-// pagination client-side (see there) -- this is how many products it asks
-// the backend for per request, independent of the UI's own page size.
-const FETCH_BATCH_SIZE = 200;
-
 // Every fetch function below swallows failures and returns an empty
 // array/undefined by default -- that's deliberate existing behavior mobile
 // depends on for resilience (a flaky network shouldn't blank-crash the app).
@@ -258,33 +253,6 @@ export const BIKE_MODELS: VehicleModel[] = [
 ];
 
 
-export const ALL_TAXONOMIES: VehicleTaxonomy[] = [
-  // CARS
-  { id: 'tax_c1', vehicleType: VehicleType.CAR, brand: 'Honda', model: 'City', year: '2020', fuelType: 'Petrol', engine: '1.5L i-VTEC', transmission: 'Automatic', trim: 'ZX' },
-  { id: 'tax_c2', vehicleType: VehicleType.CAR, brand: 'Honda', model: 'City', year: '2020', fuelType: 'Petrol', engine: '1.5L i-VTEC', transmission: 'Manual', trim: 'VX' },
-  { id: 'tax_c3', vehicleType: VehicleType.CAR, brand: 'Honda', model: 'Amaze', year: '2021', fuelType: 'Diesel', engine: '1.5L i-DTEC', transmission: 'Manual', trim: 'VX' },
-  { id: 'tax_c4', vehicleType: VehicleType.CAR, brand: 'Hyundai', model: 'Creta', year: '2023', fuelType: 'Diesel', engine: '1.5L CRDi', transmission: 'Automatic', trim: 'SX' },
-  { id: 'tax_c5', vehicleType: VehicleType.CAR, brand: 'Maruti Suzuki', model: 'Swift', year: '2021', fuelType: 'Petrol', engine: '1.2L DualJet', transmission: 'Manual', trim: 'ZXi' },
-  { id: 'tax_c6', vehicleType: VehicleType.CAR, brand: 'Tata', model: 'Nexon', year: '2022', fuelType: 'Petrol', engine: '1.2L Turbo', transmission: 'Automatic', trim: 'XZA+' },
-  { id: 'tax_c7', vehicleType: VehicleType.CAR, brand: 'Mahindra', model: 'Thar', year: '2022', fuelType: 'Diesel', engine: '2.2L mHawk', transmission: 'Automatic', trim: 'LX 4-Str Hard Top' },
-  // BIKES
-  { id: 'tax_b1', vehicleType: VehicleType.BIKE, brand: 'Royal Enfield', model: 'Classic 350', year: '2022', fuelType: 'Petrol', engine: '349cc', transmission: 'Manual', trim: 'Standard' },
-  { id: 'tax_b2', vehicleType: VehicleType.BIKE, brand: 'Bajaj', model: 'Pulsar 150', year: '2019', fuelType: 'Petrol', engine: '149cc', transmission: 'Manual', trim: 'Twin Disc' },
-  { id: 'tax_b3', vehicleType: VehicleType.BIKE, brand: 'KTM', model: 'Duke 390', year: '2021', fuelType: 'Petrol', engine: '373cc', transmission: 'Manual', trim: 'Standard' },
-  { id: 'tax_b4', vehicleType: VehicleType.BIKE, brand: 'Yamaha', model: 'R15 V4', year: '2023', fuelType: 'Petrol', engine: '155cc', transmission: 'Manual', trim: 'Racing Blue' },
-];
-
-// ==== PRODUCT DATA ====
-export const ALL_PRODUCTS: Product[] = [
-  // Car Products
-  { id: '1', name: 'Castrol MAGNATEC 10W-40 Engine Oil 3.5L', brand: 'Castrol', price: 1650, originalPrice: 1950, discountPercentage: 15, time: '15 MINS', image: 'https://images.unsplash.com/photo-1606169429760-4b2e88a38a7c?w=400&q=80', isB2B: false, category: 'Engine Oils', stockStatus: 'In Stock', rating: 4.8, reviewsCount: 124, vehicleType: VehicleType.CAR, compatibleVehicleIds: ['tax_c1', 'tax_c2', 'tax_c4', 'tax_c5'], oemNumber: 'CAS-10W40-3.5', specs: { 'Viscosity': '10W-40', 'Volume': '3.5L', 'Type': 'Synthetic Blend' }, warranty: 'No Warranty', description: 'Premium engine oil providing instant protection from the moment you start.' },
-  { id: '4', name: 'Bosch Premium Disc Brake Pad Set', brand: 'Bosch', price: 850, originalPrice: 1100, discountPercentage: 22, time: '20 MINS', image: 'https://images.unsplash.com/photo-1596773356073-670d8a57e930?w=400&q=80', isB2B: false, category: 'Brake Pads', stockStatus: 'In Stock', rating: 4.5, reviewsCount: 201, vehicleType: VehicleType.CAR, compatibleVehicleIds: ['tax_c1', 'tax_c2', 'tax_c3'], oemNumber: 'BOSCH-BP-1234', specs: { 'Material': 'Semi-Metallic', 'Position': 'Front' }, warranty: '6 Months', description: 'High performance brake pads for superior stopping power and reduced dust.' },
-  
-  // Bike Products
-  { id: 'b_1', name: 'Motul 7100 4T 20W-50 API SN Fully Synthetic', brand: 'Motul', price: 850, originalPrice: 950, discountPercentage: 10, time: '20 MINS', image: 'https://images.unsplash.com/photo-1610444585868-b35cb611b849?w=400&q=80', isB2B: false, category: 'Engine Oils', stockStatus: 'In Stock', rating: 4.9, reviewsCount: 312, vehicleType: VehicleType.BIKE, compatibleVehicleIds: ['tax_b1', 'tax_b2', 'tax_b3'], oemNumber: 'MOT-7100-1L', specs: { 'Viscosity': '20W-50', 'Volume': '1L', 'Type': 'Fully Synthetic' }, warranty: 'No Warranty', description: '100% Synthetic 4-Stroke motorcycle racing lubricant.' },
-  { id: 'b_2', name: 'Rolon Brass Chain Sprocket Kit', brand: 'Rolon', price: 1200, originalPrice: 1500, discountPercentage: 20, time: 'SAME DAY', image: 'https://images.unsplash.com/photo-1596773356073-670d8a57e930?w=400&q=80', isB2B: false, category: 'Chains & Sprockets', stockStatus: 'Limited Stock', rating: 4.7, reviewsCount: 45, vehicleType: VehicleType.BIKE, compatibleVehicleIds: ['tax_b2'], oemNumber: 'ROL-CS-P150', specs: { 'Material': 'Brass/Steel', 'Teeth': '42T/14T' }, warranty: '3 Months', description: 'Durable brass plated chain and sprocket kit for enhanced life.' },
-];
-
 // Shared by getCategoryProducts/getTrendingProducts/getProductById/the wishlist
 // service below -- was duplicated identically in all three before this.
 // Inline SVG data URI so products with no uploaded image still render something
@@ -324,17 +292,40 @@ export const mapBackendProduct = (p: any, opts?: { vehicleType?: VehicleType; ca
     moq: p.moq || 1,
     category: p.category?.name || opts?.categoryFallback || 'Unknown',
     stockStatus: p.stock > 0 ? (p.stock > (p.lowStockThreshold ?? 10) ? 'In Stock' : 'Limited Stock') : 'Out of Stock',
-    rating: 4.5,
-    reviewsCount: p.reviews?.length || 0,
+    // Real average from the backend's `reviews` relation (0 when the product
+    // has no reviews yet -- callers show a "New" badge instead of a star in
+    // that case rather than a fabricated rating).
+    rating: typeof p.avgRating === 'number' ? p.avgRating : 0,
+    reviewsCount: typeof p.reviewCount === 'number' ? p.reviewCount : (p.reviews?.length || 0),
     vehicleType: opts?.vehicleType ?? (p.vehicleType === 'BIKE' ? VehicleType.BIKE : VehicleType.CAR),
     compatibleVehicleIds: p.compatibilities?.map((c: any) => c.vehicleId) || [],
     oemNumber: p.oemNumber,
     description: p.description,
+    // Real spec sheet from Product.specifications (Json?) -- previously this
+    // was never set for backend products, so ProductDetailsScreen's specs
+    // section only ever rendered for the local ALL_PRODUCTS mock data.
+    specs: p.specifications && typeof p.specifications === 'object' ? p.specifications : undefined,
     salesCount: p.salesCount ?? 0,
     createdAt: p.createdAt,
     isFeatured: !!p.isFeatured,
     isDeal: !!p.isDeal,
   };
+};
+
+// Real brand list for the catalog page's filter sidebar -- previously that
+// sidebar derived "available brands" from whatever products happened to be
+// in the currently-fetched batch, which shrank to just the current page's
+// ~24 items once pagination went server-side (see getCategoryProducts).
+export const fetchBrands = async (vehicleType: VehicleType): Promise<string[]> => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/products/brands?vehicleType=${encodeURIComponent(vehicleType)}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.map((b: any) => b.name).sort();
+  } catch (err) {
+    console.error(err);
+    return [];
+  }
 };
 
 export const getCategoryProducts = async (
@@ -348,7 +339,7 @@ export const getCategoryProducts = async (
   page: number = 1,
   limit: number = 10,
   opts?: FetchOpts
-): Promise<{ products: Product[], hasMore: boolean }> => {
+): Promise<{ products: Product[], hasMore: boolean, total: number }> => {
   try {
     let url = `${API_BASE_URL}/products?`;
     url += `vehicleType=${encodeURIComponent(vehicleType)}&`;
@@ -362,89 +353,45 @@ export const getCategoryProducts = async (
     // screen's own compatibility filter) already pass vehicle BRAND/MODEL
     // NAMES here (e.g. activeVehicle.brand from UserVehicle, which is a
     // string name, not a manufacturer UUID) -- so these map directly onto
-    // the backend's vehicleMake/vehicleModel compatibility filter. Wiring
-    // them into the request fixes a pre-existing gap where vehicle-based
-    // filtering was silently dropped despite being threaded through from
-    // every call site.
+    // the backend's vehicleMake/vehicleModel compatibility filter.
     if (brandId) {
       url += `vehicleMake=${encodeURIComponent(brandId)}&`;
     }
     if (modelId) {
       url += `vehicleModel=${encodeURIComponent(modelId)}&`;
     }
-    // Sorting/filtering below happens entirely client-side over this one
-    // batch (the backend has no sort-by-discount/rating/etc. or brand-list
-    // support), so fetch a large batch up front rather than the small
-    // per-page `limit` -- otherwise pages beyond the first would just
-    // re-slice the same handful of already-fetched items instead of
-    // reaching real additional products.
-    url += `limit=${FETCH_BATCH_SIZE}&`;
+    // Sorting/filtering/pagination all happen server-side now (GET
+    // /products supports brand/priceMin/priceMax/inStock/minRating/sortBy
+    // and returns X-Total-Count/X-Has-More headers) -- this used to fetch a
+    // flat 200-item batch and do all of that in JS, which silently capped
+    // every category at 200 products and re-filtered the same batch on
+    // every page.
+    if (filters) {
+      if (filters.inStockOnly) url += `inStock=true&`;
+      if (filters.brands && filters.brands.length > 0) url += `brand=${encodeURIComponent(filters.brands.join(','))}&`;
+      if (typeof filters.priceMin === 'number') url += `priceMin=${filters.priceMin}&`;
+      if (typeof filters.priceMax === 'number') url += `priceMax=${filters.priceMax}&`;
+      if (typeof filters.minRating === 'number') url += `minRating=${filters.minRating}&`;
+      if (filters.sortBy) url += `sortBy=${encodeURIComponent(filters.sortBy)}&`;
+    }
+    url += `page=${page}&limit=${limit}&`;
 
     const response = await fetch(url, { signal: opts?.signal });
     if (!response.ok) {
       throw new ApiError('Failed to fetch products', { status: response.status, kind: 'http' });
     }
     const data = await response.json();
+    const total = Number(response.headers.get('X-Total-Count') ?? data.length);
+    const hasMore = response.headers.get('X-Has-More') === 'true';
 
-    // Map backend products to mobile frontend format
-    let results: Product[] = data.map((p: any) => mapBackendProduct(p, { vehicleType, categoryFallback: categoryName }));
+    const products: Product[] = data.map((p: any) => mapBackendProduct(p, { vehicleType, categoryFallback: categoryName }));
 
-    if (filters) {
-      if (filters.inStockOnly) {
-        results = results.filter(p => p.stockStatus === 'In Stock');
-      }
-
-      if (filters.brands && filters.brands.length > 0) {
-        results = results.filter(p => filters.brands.includes(p.brand));
-      }
-
-      if (typeof filters.priceMin === 'number') {
-        results = results.filter(p => p.price >= filters.priceMin!);
-      }
-      if (typeof filters.priceMax === 'number') {
-        results = results.filter(p => p.price <= filters.priceMax!);
-      }
-      if (typeof filters.minRating === 'number') {
-        results = results.filter(p => (p.rating ?? 0) >= filters.minRating!);
-      }
-
-      switch (filters.sortBy) {
-        case 'price_low_high':
-          results.sort((a, b) => a.price - b.price);
-          break;
-        case 'price_high_low':
-          results.sort((a, b) => b.price - a.price);
-          break;
-        case 'discount':
-          results.sort((a, b) => (b.discountPercentage || 0) - (a.discountPercentage || 0));
-          break;
-        case 'popular':
-          results.sort((a, b) => (b.reviewsCount || 0) - (a.reviewsCount || 0));
-          break;
-        case 'newest':
-          results.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-          break;
-        case 'best_selling':
-          results.sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0));
-          break;
-        case 'rating':
-          results.sort((a, b) => (b.rating || 0) - (a.rating || 0));
-          break;
-      }
-    }
-
-    const startIndex = (page - 1) * limit;
-    const paginated = results.slice(startIndex, startIndex + limit);
-
-    return {
-      products: paginated,
-      hasMore: startIndex + limit < results.length
-    };
+    return { products, hasMore, total };
   } catch (err) {
     if (opts?.rethrow) throw toApiError(err);
     console.error(err);
     // Fallback to empty if api fails for any reason
-    return { products: [], hasMore: false };
+    return { products: [], hasMore: false, total: 0 };
   }
 };
 
@@ -477,5 +424,51 @@ export const getProductById = async (id: string): Promise<Product | undefined> =
   } catch(err) {
     console.error(err);
     return undefined;
+  }
+};
+
+export const getRelatedProducts = async (id: string): Promise<Product[]> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/products/${id}/related`);
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.map((p: any) => mapBackendProduct(p));
+  } catch (err) {
+    console.error(err);
+    return [];
+  }
+};
+
+export interface SearchSuggestion {
+  id: string;
+  name: string;
+  image: string;
+  price: number;
+  categoryName: string;
+}
+
+export const fetchSearchSuggestions = async (
+  query: string,
+  vehicleType?: VehicleType,
+  opts?: { signal?: AbortSignal },
+): Promise<SearchSuggestion[]> => {
+  try {
+    if (query.trim().length < 2) return [];
+    let url = `${API_BASE_URL}/products/suggestions?q=${encodeURIComponent(query.trim())}`;
+    if (vehicleType) url += `&vehicleType=${encodeURIComponent(vehicleType)}`;
+    const res = await fetch(url, { signal: opts?.signal });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.map((p: any) => ({
+      id: p.id,
+      name: p.name,
+      image: Array.isArray(p.images) && p.images[0]
+        ? (p.images[0].startsWith('/') ? `${SERVER_ORIGIN}${p.images[0]}` : p.images[0])
+        : NO_IMAGE_PLACEHOLDER,
+      price: p.price,
+      categoryName: p.category?.name || '',
+    }));
+  } catch (err) {
+    return [];
   }
 };

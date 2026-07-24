@@ -6,13 +6,17 @@ import {
   ScrollView,
   Image,
   TouchableOpacity,
-  ActivityIndicator
+  ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { Product } from '../types/product';
-import { getProductById, NO_IMAGE_PLACEHOLDER } from '../services/product.service';
+import { getProductById, getRelatedProducts, NO_IMAGE_PLACEHOLDER } from '../services/product.service';
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../services/wishlist.service';
+import { fetchProductReviews, submitProductReview, ProductReview } from '../services/review.service';
+import ProductRail from '../components/desktop/home/ProductRail';
 import { useDispatch, useSelector } from 'react-redux';
 import { addToCart, RootState } from '../store';
 import { HeaderCartButton } from '../components/HeaderCartButton';
@@ -40,6 +44,14 @@ export default function ProductDetailsScreen() {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [wishlistBusy, setWishlistBusy] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [relatedWishlist, setRelatedWishlist] = useState<Record<string, boolean>>({});
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewMessage, setReviewMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
   const { isDesktopUp } = useBreakpoint();
   useFocusEffect(
@@ -67,8 +79,56 @@ export default function ProductDetailsScreen() {
     if (!token) return;
     fetchMyWishlist(token).then(items => {
       setIsWishlisted(items.some(item => item.id === productId));
+      setRelatedWishlist(Object.fromEntries(items.map(i => [i.id, true])));
     });
   }, [token, productId]);
+
+  useEffect(() => {
+    getRelatedProducts(productId).then(setRelatedProducts);
+  }, [productId]);
+
+  const loadReviews = useCallback(() => {
+    setReviewsLoading(true);
+    fetchProductReviews(productId).then(setReviews).finally(() => setReviewsLoading(false));
+  }, [productId]);
+
+  useEffect(() => { loadReviews(); }, [loadReviews]);
+
+  const handleRelatedWishlistToggle = async (id: string) => {
+    if (!token) {
+      alert('Please log in to save items to your wishlist.');
+      return;
+    }
+    const was = !!relatedWishlist[id];
+    setRelatedWishlist(prev => ({ ...prev, [id]: !was }));
+    const result = was ? await removeFromWishlist(token, id) : await addToWishlist(token, id);
+    if (!result.ok) setRelatedWishlist(prev => ({ ...prev, [id]: was }));
+  };
+
+  const handleSubmitReview = async () => {
+    if (!token) {
+      alert('Please log in to write a review.');
+      return;
+    }
+    if (reviewRating < 1) {
+      setReviewMessage({ text: 'Please select a star rating.', ok: false });
+      return;
+    }
+    setReviewSubmitting(true);
+    setReviewMessage(null);
+    const result = await submitProductReview(token, productId, reviewRating, reviewComment);
+    setReviewSubmitting(false);
+    if (result.ok) {
+      setReviewMessage({ text: 'Thanks for your review!', ok: true });
+      setReviewRating(0);
+      setReviewComment('');
+      loadReviews();
+      // Refresh the product's own avgRating/reviewCount badge too.
+      getProductById(productId).then(data => { if (data) setProduct(data); });
+    } else {
+      setReviewMessage({ text: result.error || 'Failed to submit review.', ok: false });
+    }
+  };
 
   const handleToggleWishlist = async () => {
     if (!token) {
@@ -133,7 +193,7 @@ export default function ProductDetailsScreen() {
   if (loading) {
     return (
       <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#034C8C" />
+        <ActivityIndicator size="large" color="#DA3830" />
       </View>
     );
   }
@@ -143,7 +203,7 @@ export default function ProductDetailsScreen() {
       <View style={styles.loaderContainer}>
         <Text style={{ fontSize: 16 }}>Product not found</Text>
         <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 20 }}>
-          <Text style={{ color: '#034C8C', fontWeight: 'bold' }}>Go Back</Text>
+          <Text style={{ color: '#DA3830', fontWeight: 'bold' }}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -183,9 +243,15 @@ export default function ProductDetailsScreen() {
           <Text style={styles.name}>{product.name}</Text>
           
           <View style={styles.ratingRow}>
-            <Text style={styles.star}>★</Text>
-            <Text style={styles.rating}>{product.rating}</Text>
-            <Text style={styles.reviews}>({product.reviewsCount} reviews)</Text>
+            {product.reviewsCount ? (
+              <>
+                <Text style={styles.star}>★</Text>
+                <Text style={styles.rating}>{product.rating}</Text>
+                <Text style={styles.reviews}>({product.reviewsCount} reviews)</Text>
+              </>
+            ) : (
+              <Text style={styles.reviews}>No reviews yet — be the first to review</Text>
+            )}
           </View>
 
           <View style={styles.priceRow}>
@@ -198,7 +264,7 @@ export default function ProductDetailsScreen() {
           <View style={styles.metaBox}>
             <View style={styles.metaItem}>
               <Text style={styles.metaIcon}>📦</Text>
-              <Text style={[styles.metaText, { color: product.stockStatus === 'In Stock' ? '#1E9E5A' : '#E23B22' }]}>
+              <Text style={[styles.metaText, { color: product.stockStatus === 'In Stock' ? '#1E9E5A' : '#DA3830' }]}>
                 {product.stockStatus}
               </Text>
             </View>
@@ -252,6 +318,87 @@ export default function ProductDetailsScreen() {
               <Text style={styles.descriptionText}>{product.warranty}</Text>
             </View>
           )}
+
+          <View style={styles.specBox}>
+            <Text style={styles.sectionTitle}>Ratings & Reviews</Text>
+
+            {reviewsLoading ? (
+              <ActivityIndicator size="small" color="#DA3830" style={{ marginVertical: 12 }} />
+            ) : reviews.length === 0 ? (
+              <Text style={styles.descriptionText}>No reviews yet — be the first to review this product.</Text>
+            ) : (
+              reviews.map(r => (
+                <View key={r.id} style={styles.reviewRow}>
+                  <View style={styles.reviewHeader}>
+                    <View style={{ flexDirection: 'row' }}>
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Ionicons key={i} name={i < r.rating ? 'star' : 'star-outline'} size={14} color="#F5A300" />
+                      ))}
+                    </View>
+                    <Text style={styles.reviewAuthor}>{r.userName || 'MechBazar Customer'}</Text>
+                    {r.verifiedPurchase && (
+                      <View style={styles.verifiedBadge}>
+                        <Ionicons name="checkmark-circle" size={12} color="#1E9E5A" />
+                        <Text style={styles.verifiedBadgeText}>Verified Purchase</Text>
+                      </View>
+                    )}
+                  </View>
+                  {!!r.comment && <Text style={styles.reviewComment}>{r.comment}</Text>}
+                  <Text style={styles.reviewDate}>{new Date(r.createdAt).toLocaleDateString()}</Text>
+                </View>
+              ))
+            )}
+
+            <View style={styles.writeReviewBox}>
+              <Text style={styles.writeReviewTitle}>Write a Review</Text>
+              <View style={{ flexDirection: 'row', marginBottom: 10 }}>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <TouchableOpacity key={i} onPress={() => setReviewRating(i + 1)} hitSlop={6}>
+                    <Ionicons
+                      name={i < reviewRating ? 'star' : 'star-outline'}
+                      size={26}
+                      color="#F5A300"
+                      style={{ marginRight: 4 }}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <TextInput
+                style={styles.reviewInput}
+                placeholder="Share your experience with this product (optional)"
+                placeholderTextColor="#8E8E93"
+                value={reviewComment}
+                onChangeText={setReviewComment}
+                multiline
+                numberOfLines={3}
+              />
+              {reviewMessage && (
+                <Text style={[styles.reviewMessage, { color: reviewMessage.ok ? '#1E9E5A' : '#D32F2F' }]}>
+                  {reviewMessage.text}
+                </Text>
+              )}
+              <TouchableOpacity
+                style={[styles.submitReviewBtn, reviewSubmitting && { opacity: 0.6 }]}
+                onPress={handleSubmitReview}
+                disabled={reviewSubmitting}
+              >
+                {reviewSubmitting
+                  ? <ActivityIndicator size="small" color="#FFFFFF" />
+                  : <Text style={styles.submitReviewBtnText}>Submit Review</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {relatedProducts.length > 0 && (
+            <View style={styles.relatedBox}>
+              <ProductRail
+                title="Related Products"
+                products={relatedProducts}
+                wishlist={relatedWishlist}
+                onWishlistToggle={handleRelatedWishlistToggle}
+              />
+            </View>
+          )}
         </View>
         <MinimalFooter />
       </ScrollView>
@@ -274,7 +421,7 @@ export default function ProductDetailsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F4F6' },
+  container: { flex: 1, backgroundColor: '#F8F9FA' },
   flexFill: { flex: 1 },
   loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
@@ -289,7 +436,7 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   backBtn: { width: 44, height: 44, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  backText: { fontSize: 24, color: '#161B21', marginTop: -2 },
+  backText: { fontSize: 24, color: '#1B1B1B', marginTop: -2 },
   wishlistBtn: { width: 44, height: 44, backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   imageContainer: {
     width: '100%',
@@ -304,7 +451,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 20,
     left: 20,
-    backgroundColor: '#E23B22',
+    backgroundColor: '#DA3830',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
@@ -312,13 +459,13 @@ const styles = StyleSheet.create({
   discountText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
   detailsContainer: { padding: 16 },
   brand: { fontSize: 13, color: '#6B7480', fontWeight: '600', marginBottom: 4, textTransform: 'uppercase' },
-  name: { fontSize: 18, fontWeight: '900', color: '#161B21', marginBottom: 12, lineHeight: 24 },
+  name: { fontSize: 18, fontWeight: '900', color: '#1B1B1B', marginBottom: 12, lineHeight: 24 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   star: { color: '#F5A300', fontSize: 16, marginRight: 4 },
-  rating: { fontSize: 14, fontWeight: '600', color: '#161B21', marginRight: 6 },
+  rating: { fontSize: 14, fontWeight: '600', color: '#1B1B1B', marginRight: 6 },
   reviews: { fontSize: 14, color: '#6B7480' },
   priceRow: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 20 },
-  price: { fontSize: 26, fontWeight: '900', color: '#161B21', marginRight: 12 },
+  price: { fontSize: 26, fontWeight: '900', color: '#1B1B1B', marginRight: 12 },
   originalPrice: { fontSize: 16, color: '#6B7480', textDecorationLine: 'line-through', marginBottom: 4 },
   metaBox: {
     flexDirection: 'row',
@@ -331,7 +478,7 @@ const styles = StyleSheet.create({
   },
   metaItem: { flex: 1, flexDirection: 'row', alignItems: 'center' },
   metaIcon: { fontSize: 18, marginRight: 8 },
-  metaText: { fontSize: 13, fontWeight: 'bold', color: '#161B21' },
+  metaText: { fontSize: 13, fontWeight: 'bold', color: '#1B1B1B' },
   descriptionBox: { 
     marginBottom: 20, 
     backgroundColor: '#FFFFFF', 
@@ -340,8 +487,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E3E6EA',
   },
-  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#161B21', marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: 'bold', color: '#1B1B1B', marginBottom: 12 },
   descriptionText: { fontSize: 14, color: '#6B7480', lineHeight: 22 },
+  relatedBox: { marginTop: 8, marginBottom: 20 },
+  reviewRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F0F0F0' },
+  reviewHeader: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  reviewAuthor: { fontSize: 13, fontWeight: '600', color: '#1B1B1B' },
+  verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#EBFBEE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
+  verifiedBadgeText: { fontSize: 10, fontWeight: '700', color: '#1E9E5A' },
+  reviewComment: { fontSize: 13, color: '#4A4A4A', lineHeight: 19, marginBottom: 4 },
+  reviewDate: { fontSize: 11, color: '#8E8E93' },
+  writeReviewBox: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: '#E3E6EA' },
+  writeReviewTitle: { fontSize: 14, fontWeight: '700', color: '#1B1B1B', marginBottom: 10 },
+  reviewInput: {
+    borderWidth: 1, borderColor: '#E3E6EA', borderRadius: 10, padding: 12,
+    fontSize: 13, color: '#1B1B1B', minHeight: 70, textAlignVertical: 'top', marginBottom: 8,
+  },
+  reviewMessage: { fontSize: 12, fontWeight: '600', marginBottom: 8 },
+  submitReviewBtn: {
+    backgroundColor: '#DA3830', borderRadius: 10, paddingVertical: 12,
+    alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start', paddingHorizontal: 24,
+  },
+  submitReviewBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
   specBox: { 
     marginBottom: 20,
     backgroundColor: '#FFFFFF', 
@@ -351,13 +518,13 @@ const styles = StyleSheet.create({
     borderColor: '#E3E6EA',
   },
   specTitle: { fontSize: 13, fontWeight: '600', color: '#6B7480', marginBottom: 4 },
-  specValue: { fontSize: 15, color: '#161B21', fontWeight: 'bold' },
+  specValue: { fontSize: 15, color: '#1B1B1B', fontWeight: 'bold' },
   bulletRow: { flexDirection: 'row', marginBottom: 6 },
-  bullet: { fontSize: 16, color: '#E23B22', marginRight: 8 },
-  bulletText: { fontSize: 14, color: '#161B21' },
+  bullet: { fontSize: 16, color: '#DA3830', marginRight: 8 },
+  bulletText: { fontSize: 14, color: '#1B1B1B' },
   specRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderColor: '#E3E6EA' },
   specKey: { fontSize: 14, color: '#6B7480' },
-  specVal: { fontSize: 14, color: '#161B21', fontWeight: 'bold' },
+  specVal: { fontSize: 14, color: '#1B1B1B', fontWeight: 'bold' },
   bottomBar: {
     position: 'absolute',
     bottom: 0,
@@ -373,7 +540,7 @@ const styles = StyleSheet.create({
   addToCartBtn: {
     flex: 1,
     paddingVertical: 13,
-    backgroundColor: '#161B21',
+    backgroundColor: '#1B1B1B',
     borderRadius: 10,
     alignItems: 'center',
     marginRight: 10,
@@ -382,7 +549,7 @@ const styles = StyleSheet.create({
   buyNowBtn: {
     flex: 1,
     paddingVertical: 13,
-    backgroundColor: '#E23B22',
+    backgroundColor: '#DA3830',
     borderRadius: 10,
     alignItems: 'center',
   },

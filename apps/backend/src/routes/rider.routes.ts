@@ -23,7 +23,7 @@ import {
   getAllRiderSettlements,
   updateRiderSettlementStatus,
 } from '../controllers/rider.controller';
-import { updateMyDeliveryStatus } from '../controllers/order.controller';
+import { updateMyDeliveryStatus, generateDeliveryOtp } from '../controllers/order.controller';
 import { authenticate, authorize, requireApprovedRider } from '../middlewares/auth';
 import { riderUpload } from '../middlewares/riderUpload';
 import { Role } from '@prisma/client';
@@ -48,6 +48,7 @@ router.patch('/me/location', authenticate, authorize(riderOnly), requireApproved
 router.post('/me/push-token', authenticate, authorize(riderOnly), registerMyPushToken);
 router.delete('/me/push-token', authenticate, authorize(riderOnly), clearMyPushToken);
 router.patch('/me/deliveries/:id/status', authenticate, authorize(riderOnly), requireApprovedRider, updateMyDeliveryStatus);
+router.post('/me/deliveries/:id/generate-otp', authenticate, authorize(riderOnly), requireApprovedRider, generateDeliveryOtp);
 router.get('/me/earnings', authenticate, authorize(riderOnly), getMyEarnings);
 router.post('/me/bank', authenticate, authorize(riderOnly), addMyBankAccount);
 router.post('/me/wallet/withdraw', authenticate, authorize(riderOnly), requireApprovedRider, requestMyPayout);

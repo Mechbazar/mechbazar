@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import { Prisma, PrismaClient, VehicleType } from '@prisma/client';
 import { normalizeVehicleType } from '../utils/vehicleType';
+import { AuthRequest } from '../middlewares/auth';
+import { recordAuditLog } from '../utils/auditLog';
 import prisma from '../config/prisma';
 
 // Shared by validateCoupon (standalone "apply coupon" check in the cart UI)
@@ -48,7 +50,7 @@ export const getCoupons = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
-export const createCoupon = async (req: Request, res: Response): Promise<void> => {
+export const createCoupon = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { code, discountType, discountValue, minOrderValue, isActive, vehicleType } = req.body;
 
@@ -70,7 +72,11 @@ export const createCoupon = async (req: Request, res: Response): Promise<void> =
         vehicleType: vehicleType ? normalizeVehicleType(vehicleType) : null
       }
     });
-    
+
+    if (req.user) {
+      recordAuditLog({ userId: req.user.userId, action: 'COUPON_CREATE', entity: 'Coupon', entityId: coupon.id, details: code, req });
+    }
+
     res.status(201).json(coupon);
   } catch (error) {
     console.error('Error creating coupon:', error);
@@ -78,7 +84,7 @@ export const createCoupon = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-export const updateCoupon = async (req: Request, res: Response): Promise<void> => {
+export const updateCoupon = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);
     const { code, discountType, discountValue, minOrderValue, isActive, vehicleType } = req.body;
@@ -101,7 +107,11 @@ export const updateCoupon = async (req: Request, res: Response): Promise<void> =
         vehicleType: vehicleType !== undefined ? (vehicleType ? normalizeVehicleType(vehicleType) : null) : undefined
       }
     });
-    
+
+    if (req.user) {
+      recordAuditLog({ userId: req.user.userId, action: 'COUPON_UPDATE', entity: 'Coupon', entityId: id, details: code, req });
+    }
+
     res.status(200).json(coupon);
   } catch (error) {
     console.error('Error updating coupon:', error);
@@ -109,14 +119,20 @@ export const updateCoupon = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-export const deleteCoupon = async (req: Request, res: Response): Promise<void> => {
+export const deleteCoupon = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);
-    
+
+    const existing = await prisma.coupon.findUnique({ where: { id } });
+
     await prisma.coupon.delete({
       where: { id }
     });
-    
+
+    if (req.user) {
+      recordAuditLog({ userId: req.user.userId, action: 'COUPON_DELETE', entity: 'Coupon', entityId: id, details: existing?.code, req });
+    }
+
     res.status(200).json({ message: 'Coupon deleted successfully' });
   } catch (error) {
     console.error('Error deleting coupon:', error);

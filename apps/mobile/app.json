@@ -2,7 +2,7 @@
   "expo": {
     "name": "mobile",
     "slug": "mobile",
-    "owner": "tanu40647",
+    "owner": "mechbazar",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,7 +20,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.mechbazar.mobile",
-      "usesCleartextTraffic": true
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -33,11 +33,14 @@
     },
     "plugins": [
       "expo-asset",
-      "expo-sharing"
+      "expo-sharing",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      "expo-status-bar"
     ],
     "extra": {
       "eas": {
-        "projectId": "a75bfd4d-5a07-4900-a738-dc59e5a3b710"
+        "projectId": "b2a858ee-509a-41a2-97f3-4c079c3ddebc"
       }
     }
   }

@@ -6,8 +6,8 @@
   /* Brand accent matches the real customer app (apps/mobile) palette;
      the dashboard keeps its dark shell, aligned to Tailwind's own neutral scale. */
   --color-brand-primary: #171717;
-  --color-brand-secondary: #E23B22;
-  --color-brand-accent: #C0362C;
+  --color-brand-secondary: #DA3830;
+  --color-brand-accent: #C6301B;
   --color-brand-dark: #0a0a0a;
   --color-brand-light: #F8F8F8;
   --color-brand-muted: #404040;

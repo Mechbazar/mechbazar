@@ -29,6 +29,7 @@ import homeRoutes from './routes/home.routes';
 import offerRoutes from './routes/offer.routes';
 import couponRoutes from './routes/coupon.routes';
 import uploadRoutes from './routes/upload.routes';
+import newsletterRoutes from './routes/newsletter.routes';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
 import path from 'path';
@@ -123,6 +124,7 @@ app.use('/api/home', homeRoutes);
 app.use('/api/offers', offerRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/newsletter', newsletterRoutes);
 
 // Serve static files from uploads directory
 // These are public product/category images meant to be displayed by other

@@ -748,8 +748,14 @@ export default function HomeScreen({ navigation }: any) {
                     
                     {/* Ratings */}
                     <View style={styles.ratingRow}>
-                      <Ionicons name="star" size={12} color="#F5A300" />
-                      <Text style={styles.ratingText}>{prod.rating} ({prod.reviewsCount} reviews)</Text>
+                      {prod.reviewsCount ? (
+                        <>
+                          <Ionicons name="star" size={12} color="#F5A300" />
+                          <Text style={styles.ratingText}>{prod.rating} ({prod.reviewsCount} reviews)</Text>
+                        </>
+                      ) : (
+                        <Text style={styles.ratingText}>New</Text>
+                      )}
                     </View>
 
                     {/* Stock status */}

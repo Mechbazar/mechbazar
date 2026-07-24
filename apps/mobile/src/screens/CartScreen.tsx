@@ -56,13 +56,13 @@ export default function CartScreen() {
 
   // MechBazar Brand Colors (New Design System)
   const colors = {
-    primary: '#E23B22',
-    darkInk: '#161B21',
+    primary: '#DA3830',
+    darkInk: '#1B1B1B',
     steel: '#242C35',
-    pageBg: '#F3F4F6',
+    pageBg: '#F8F9FA',
     white: '#FFFFFF',
     borderLight: '#E3E6EA',
-    textDark: '#161B21',
+    textDark: '#1B1B1B',
     textMuted: '#6B7480',
     success: '#1E9E5A',
   };
@@ -179,7 +179,7 @@ export default function CartScreen() {
               
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                 {item.vehicleType && (
-                  <View style={[styles.b2bBadge, { backgroundColor: item.vehicleType === 'CAR' ? '#034C8C' : '#BF3617' }]}>
+                  <View style={[styles.b2bBadge, { backgroundColor: item.vehicleType === 'CAR' ? '#DA3830' : '#BF3617' }]}>
                     <Text style={styles.b2bText}>{item.vehicleType === 'CAR' ? '🚗 CAR PART' : '🏍️ BIKE PART'}</Text>
                   </View>
                 )}
@@ -373,13 +373,13 @@ export default function CartScreen() {
 }
 
 const colors = {
-  primary: '#E23B22',
-  darkInk: '#161B21',
+  primary: '#DA3830',
+  darkInk: '#1B1B1B',
   steel: '#242C35',
-  pageBg: '#F3F4F6',
+  pageBg: '#F8F9FA',
   white: '#FFFFFF',
   borderLight: '#E3E6EA',
-  textDark: '#161B21',
+  textDark: '#1B1B1B',
   textMuted: '#6B7480',
   success: '#1E9E5A',
 };

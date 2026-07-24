@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, TextInput, ScrollView, Alert, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation, useRoute, NavigationProp, RouteProp } from '@react-navigation/native';
@@ -6,7 +6,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import { addToCart, updateQuantity } from '../../../store/cartSlice';
 import { Category, FilterOptions, Product } from '../../../types/product';
-import { fetchCategories, getCategoryProducts } from '../../../services/product.service';
+import { fetchCategories, fetchBrands, getCategoryProducts } from '../../../services/product.service';
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../../../services/wishlist.service';
 import { setDesktopFullPageScreenActive } from '../../../navigation/desktopFullPageScreenStore';
 import { colors, spacing, radius } from '../../../theme/tokens';
@@ -36,36 +36,14 @@ type ParamList = {
 };
 
 const PAGE_SIZE = 24;
-const FETCH_LIMIT = 200;
-
-function applyFiltersAndSort(products: Product[], filters: FilterOptions): Product[] {
-  let results = products;
-  if (filters.inStockOnly) results = results.filter(p => p.stockStatus === 'In Stock');
-  if (filters.brands.length > 0) results = results.filter(p => filters.brands.includes(p.brand));
-  if (typeof filters.priceMin === 'number') results = results.filter(p => p.price >= filters.priceMin!);
-  if (typeof filters.priceMax === 'number') results = results.filter(p => p.price <= filters.priceMax!);
-  if (typeof filters.minRating === 'number') results = results.filter(p => (p.rating ?? 0) >= filters.minRating!);
-
-  results = [...results];
-  switch (filters.sortBy) {
-    case 'price_low_high': results.sort((a, b) => a.price - b.price); break;
-    case 'price_high_low': results.sort((a, b) => b.price - a.price); break;
-    case 'discount': results.sort((a, b) => (b.discountPercentage || 0) - (a.discountPercentage || 0)); break;
-    case 'popular': results.sort((a, b) => (b.reviewsCount || 0) - (a.reviewsCount || 0)); break;
-    case 'newest': results.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()); break;
-    case 'best_selling': results.sort((a, b) => (b.salesCount || 0) - (a.salesCount || 0)); break;
-    case 'rating': results.sort((a, b) => (b.rating || 0) - (a.rating || 0)); break;
-  }
-  return results;
-}
 
 // Desktop-only catalog page (rendered by CategoryProductsScreen.web.tsx at
-// desktop widths). Fetches one batch via the existing getCategoryProducts
-// service (same as mobile, no new endpoints, no filters/sort passed so the
-// batch stays complete for brand-facet purposes) and does all
-// filtering/sorting/pagination client-side over that batch -- no network
-// round-trip per filter/sort/page change, which is what keeps this
-// responsive against a large catalog.
+// desktop widths). Filtering/sorting/pagination all happen server-side via
+// getCategoryProducts (GET /products' brand/priceMin/priceMax/inStock/
+// minRating/sortBy/page/limit params) -- this used to fetch one flat
+// 200-item batch and filter/sort/paginate it client-side, which silently
+// capped every category at 200 products and made "available brands" shrink
+// to whatever page was loaded.
 export default function CategoryProductsDesktop() {
   const route = useRoute<RouteProp<ParamList, 'CategoryProducts'>>();
   const navigation = useNavigation<NavigationProp<any>>();
@@ -81,12 +59,15 @@ export default function CategoryProductsDesktop() {
   const [vehicleModelName, setVehicleModelName] = useState(routeParams.modelId);
   const [vehicleYear, setVehicleYear] = useState(routeParams.year);
 
-  const [rawProducts, setRawProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ErrorKind | null>(null);
   const [retryToken, setRetryToken] = useState(0);
   const [page, setPage] = useState(1);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [availableBrands, setAvailableBrands] = useState<string[]>([]);
   const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
   const [filters, setFilters] = useState<FilterOptions>({ sortBy: 'popular', brands: [], inStockOnly: false });
@@ -101,6 +82,7 @@ export default function CategoryProductsDesktop() {
 
   useEffect(() => {
     fetchCategories(vehicleType).then(setCategories);
+    fetchBrands(vehicleType).then(setAvailableBrands);
   }, [vehicleType]);
 
   useEffect(() => {
@@ -108,10 +90,16 @@ export default function CategoryProductsDesktop() {
     fetchMyWishlist(token).then(items => setWishlist(Object.fromEntries(items.map(i => [i.id, true]))));
   }, [token]);
 
+  // Filters/sort changing resets to page 1 (a stale page 4 could easily be
+  // out of range against a newly-filtered result set); page changing on its
+  // own does not reset itself, obviously.
+  useEffect(() => {
+    setPage(1);
+  }, [vehicleType, categoryName, searchQuery, vehicleBrandName, vehicleModelName, filters]);
+
   useEffect(() => {
     setLoading(true);
     setError(null);
-    setPage(1);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     const debounce = setTimeout(() => {
@@ -122,25 +110,19 @@ export default function CategoryProductsDesktop() {
         vehicleBrandName,
         vehicleModelName,
         vehicleYear,
-        undefined,
-        1,
-        FETCH_LIMIT,
+        filters,
+        page,
+        PAGE_SIZE,
         { rethrow: true, signal: controller.signal },
       )
-        .then(res => setRawProducts(res.products))
+        .then(res => { setProducts(res.products); setTotal(res.total); setHasMore(res.hasMore); })
         .catch(err => setError(classifyError(err)))
         .finally(() => { clearTimeout(timeoutId); setLoading(false); });
     }, 300);
     return () => { clearTimeout(debounce); clearTimeout(timeoutId); controller.abort(); };
-  }, [vehicleType, categoryName, searchQuery, vehicleBrandName, vehicleModelName, retryToken]);
+  }, [vehicleType, categoryName, searchQuery, vehicleBrandName, vehicleModelName, filters, page, retryToken]);
 
-  const availableBrands = useMemo(
-    () => Array.from(new Set(rawProducts.map(p => p.brand))).sort(),
-    [rawProducts],
-  );
-  const filteredSorted = useMemo(() => applyFiltersAndSort(rawProducts, filters), [rawProducts, filters]);
-  const pageItems = filteredSorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const hasMore = page * PAGE_SIZE < filteredSorted.length;
+  const pageItems = products;
   const hasActiveFilters = filters.brands.length > 0 || filters.inStockOnly || filters.priceMin != null || filters.priceMax != null || filters.minRating != null;
 
   const getQty = (id: string) => cartItems.find(i => i.id === id)?.qty ?? 0;
@@ -214,7 +196,7 @@ export default function CategoryProductsDesktop() {
           />
 
           <View style={styles.main}>
-            <SortBar sortBy={filters.sortBy} onChange={(sortBy) => setFilters(f => ({ ...f, sortBy }))} resultCount={filteredSorted.length} />
+            <SortBar sortBy={filters.sortBy} onChange={(sortBy) => setFilters(f => ({ ...f, sortBy }))} resultCount={total} />
 
             {loading ? (
               <SkeletonSection label={`Loading ${categoryName}`}>
@@ -249,7 +231,7 @@ export default function CategoryProductsDesktop() {
                   ))}
                 </View>
 
-                <Pagination page={page} hasMore={hasMore} loading={false} onPrev={() => setPage(p => Math.max(1, p - 1))} onNext={() => setPage(p => p + 1)} />
+                <Pagination page={page} hasMore={hasMore} loading={false} total={total} pageSize={PAGE_SIZE} onPrev={() => setPage(p => Math.max(1, p - 1))} onNext={() => setPage(p => p + 1)} />
               </>
             )}
           </View>

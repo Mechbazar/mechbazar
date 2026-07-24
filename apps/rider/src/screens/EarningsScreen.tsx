@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { colors, Typography, Card, Badge, Button, Input, Loader, riderService } from '@mechbazar/shared';
-import { WalletCards, Building2 } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
+import { WalletCards, Building2, History, ChevronRight } from 'lucide-react-native';
 import { Delivery, isCompleted, isDeliveredToday } from '../utils/deliveries';
 import { formatINR } from '../utils/currency';
 
@@ -43,6 +44,7 @@ const settlementBadge = (status: string) => {
 
 export const EarningsScreen = () => {
   const queryClient = useQueryClient();
+  const navigation = useNavigation<any>();
 
   const { data: earnings, isLoading: earningsLoading, refetch, isRefetching } = useQuery<Earnings>({
     queryKey: ['rider-earnings'],
@@ -170,6 +172,17 @@ export const EarningsScreen = () => {
           </Card>
         </View>
 
+        <TouchableOpacity onPress={() => navigation.getParent()?.navigate('DeliveryHistory')} activeOpacity={0.7}>
+          <Card style={styles.historyLink}>
+            <History color={colors.primary} size={22} />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Typography variant="body" style={{ fontWeight: '700' }}>Delivery History</Typography>
+              <Typography variant="caption">See all your completed and returned deliveries</Typography>
+            </View>
+            <ChevronRight color={colors.textSecondary} size={20} />
+          </Card>
+        </TouchableOpacity>
+
         <Card style={{ marginTop: 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <Building2 color={colors.textSecondary} size={20} />
@@ -252,6 +265,7 @@ const styles = StyleSheet.create({
   walletCard: { alignItems: 'center', padding: 24, backgroundColor: colors.primary },
   statsRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
   statCard: { flex: 1, alignItems: 'center' },
+  historyLink: { flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingVertical: 16 },
   settlementRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -3,11 +3,13 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { colors } from '@mechbazar/shared';
 import { TabNavigator } from './TabNavigator';
 import { DeliveryDetailScreen } from '../screens/DeliveryDetailScreen';
+import { DeliveryHistoryScreen } from '../screens/DeliveryHistoryScreen';
 import { registerForPushNotificationsAsync } from '../services/notifications';
 
 export type MainStackParamList = {
   Tabs: undefined;
   DeliveryDetail: { orderId: string };
+  DeliveryHistory: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -28,6 +30,15 @@ export const MainStack = () => {
         component={DeliveryDetailScreen}
         options={{
           title: 'Delivery Details',
+          headerStyle: { backgroundColor: colors.card },
+          headerTintColor: colors.text,
+        }}
+      />
+      <Stack.Screen
+        name="DeliveryHistory"
+        component={DeliveryHistoryScreen}
+        options={{
+          title: 'Delivery History',
           headerStyle: { backgroundColor: colors.card },
           headerTintColor: colors.text,
         }}

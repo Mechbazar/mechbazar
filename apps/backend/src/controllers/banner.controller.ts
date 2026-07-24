@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { normalizeVehicleType, parseVehicleTypeFilter } from '../utils/vehicleType';
+import { AuthRequest } from '../middlewares/auth';
+import { recordAuditLog } from '../utils/auditLog';
 import prisma from '../config/prisma';
 
 export const getBanners = async (req: Request, res: Response): Promise<void> => {
@@ -35,7 +37,7 @@ export const getPublicBanners = async (req: Request, res: Response): Promise<voi
   }
 };
 
-export const createBanner = async (req: Request, res: Response): Promise<void> => {
+export const createBanner = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { title, image, type, link, buttonText, redirectLink, vehicleType, isActive, startDate, endDate } = req.body;
 
@@ -54,6 +56,10 @@ export const createBanner = async (req: Request, res: Response): Promise<void> =
       },
     });
 
+    if (req.user) {
+      recordAuditLog({ userId: req.user.userId, action: 'BANNER_CREATE', entity: 'Banner', entityId: banner.id, details: title, req });
+    }
+
     res.status(201).json(banner);
   } catch (error) {
     console.error('Error creating banner:', error);
@@ -61,7 +67,7 @@ export const createBanner = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-export const updateBanner = async (req: Request, res: Response): Promise<void> => {
+export const updateBanner = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { title, image, type, link, buttonText, redirectLink, vehicleType, isActive, startDate, endDate } = req.body;
@@ -82,6 +88,10 @@ export const updateBanner = async (req: Request, res: Response): Promise<void> =
       },
     });
 
+    if (req.user) {
+      recordAuditLog({ userId: req.user.userId, action: 'BANNER_UPDATE', entity: 'Banner', entityId: String(id), details: title, req });
+    }
+
     res.status(200).json(banner);
   } catch (error) {
     console.error('Error updating banner:', error);
@@ -89,14 +99,20 @@ export const updateBanner = async (req: Request, res: Response): Promise<void> =
   }
 };
 
-export const deleteBanner = async (req: Request, res: Response): Promise<void> => {
+export const deleteBanner = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    
+
+    const existing = await prisma.banner.findUnique({ where: { id: String(id) } });
+
     await prisma.banner.delete({
       where: { id: String(id) }
     });
-    
+
+    if (req.user) {
+      recordAuditLog({ userId: req.user.userId, action: 'BANNER_DELETE', entity: 'Banner', entityId: String(id), details: existing?.title, req });
+    }
+
     res.status(200).json({ message: 'Banner deleted successfully' });
   } catch (error) {
     console.error('Error deleting banner:', error);

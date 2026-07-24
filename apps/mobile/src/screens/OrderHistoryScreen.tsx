@@ -40,13 +40,13 @@ export default function OrderHistoryScreen() {
 
   // MechBazar Brand Colors (New Design System)
   const colors = {
-    primary: '#E23B22',
-    darkInk: '#161B21',
+    primary: '#DA3830',
+    darkInk: '#1B1B1B',
     steel: '#242C35',
-    pageBg: '#F3F4F6',
+    pageBg: '#F8F9FA',
     white: '#FFFFFF',
     borderLight: '#E3E6EA',
-    textDark: '#161B21',
+    textDark: '#1B1B1B',
     textMuted: '#6B7480',
     success: '#1E9E5A',
     warning: '#F5A300'
@@ -386,17 +386,17 @@ export default function OrderHistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F4F6' },
+  container: { flex: 1, backgroundColor: '#F8F9FA' },
   flexFill: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#161B21' },
+  header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#1B1B1B' },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: '#FFFFFF', fontWeight: 'bold' },
   headerTitle: { fontSize: 18, fontWeight: '800', color: '#FFFFFF' },
   headerSubtitle: { fontSize: 13, color: '#6B7480', marginTop: 2 },
 
-  tabsRow: { flexDirection: 'row', backgroundColor: '#161B21', paddingHorizontal: 14, paddingBottom: 12, gap: 10 },
+  tabsRow: { flexDirection: 'row', backgroundColor: '#1B1B1B', paddingHorizontal: 14, paddingBottom: 12, gap: 10 },
   tabBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)' },
-  tabBtnActive: { backgroundColor: '#E23B22' },
+  tabBtnActive: { backgroundColor: '#DA3830' },
   tabText: { color: '#9AA5B1', fontSize: 13, fontWeight: '700' },
   tabTextActive: { color: '#FFFFFF' },
 
@@ -404,33 +404,33 @@ const styles = StyleSheet.create({
 
   orderCard: { backgroundColor: '#FFFFFF', borderRadius: 14, padding: 14, marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: '#E3E6EA' },
   orderHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  orderId: { fontSize: 16, fontWeight: '900', color: '#161B21' },
+  orderId: { fontSize: 16, fontWeight: '900', color: '#1B1B1B' },
   orderDate: { fontSize: 12, color: '#6B7480', marginTop: 3 },
-  orderTotal: { fontSize: 16, fontWeight: '900', color: '#161B21', marginLeft: 8 },
+  orderTotal: { fontSize: 16, fontWeight: '900', color: '#1B1B1B', marginLeft: 8 },
   paymentMeta: { fontSize: 11, color: '#6B7480', marginTop: 2 },
 
   productRow: { flexDirection: 'row', alignItems: 'center' },
-  productThumbWrap: { width: 52, height: 52, borderRadius: 10, backgroundColor: '#F3F4F6', justifyContent: 'center', alignItems: 'center', marginRight: 12, overflow: 'hidden' },
+  productThumbWrap: { width: 52, height: 52, borderRadius: 10, backgroundColor: '#F8F9FA', justifyContent: 'center', alignItems: 'center', marginRight: 12, overflow: 'hidden' },
   productThumb: { width: 52, height: 52, borderRadius: 10 },
-  productName: { fontSize: 14, fontWeight: '700', color: '#161B21' },
+  productName: { fontSize: 14, fontWeight: '700', color: '#1B1B1B' },
 
   detailsBox: { backgroundColor: '#F9FAFB', borderRadius: 10, padding: 12, marginTop: 12 },
   detailsRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  detailsItemName: { flex: 1, fontSize: 12, color: '#161B21', marginRight: 8 },
-  detailsItemPrice: { fontSize: 12, fontWeight: '700', color: '#161B21' },
+  detailsItemName: { flex: 1, fontSize: 12, color: '#1B1B1B', marginRight: 8 },
+  detailsItemPrice: { fontSize: 12, fontWeight: '700', color: '#1B1B1B' },
   detailsDivider: { height: 1, backgroundColor: '#E3E6EA', marginVertical: 8 },
   detailsLabel: { fontSize: 12, color: '#6B7480' },
-  detailsValue: { fontSize: 12, fontWeight: '700', color: '#161B21' },
+  detailsValue: { fontSize: 12, fontWeight: '700', color: '#1B1B1B' },
   detailsAddress: { fontSize: 12, color: '#6B7480', marginTop: 8 },
 
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
   badgeText: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
 
   actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  primaryBtn: { backgroundColor: '#E23B22', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  primaryBtn: { backgroundColor: '#DA3830', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
   primaryBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: 'bold' },
-  outlineBtn: { borderWidth: 1.5, borderColor: '#E23B22', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
-  outlineBtnText: { color: '#E23B22', fontSize: 12, fontWeight: 'bold' },
+  outlineBtn: { borderWidth: 1.5, borderColor: '#DA3830', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
+  outlineBtnText: { color: '#DA3830', fontSize: 12, fontWeight: 'bold' },
   dangerBtn: { borderWidth: 1.5, borderColor: '#DC2626', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8 },
   dangerBtnText: { color: '#DC2626', fontSize: 12, fontWeight: 'bold' },
 
@@ -438,10 +438,10 @@ const styles = StyleSheet.create({
   emptyArt: { alignItems: 'center', marginBottom: 18 },
   emptyArtEmoji: { fontSize: 64 },
   emptyArtEmojiSmall: { fontSize: 20, marginTop: 6, letterSpacing: 2 },
-  emptyTitle: { fontSize: 18, fontWeight: '800', color: '#161B21', marginBottom: 8 },
+  emptyTitle: { fontSize: 18, fontWeight: '800', color: '#1B1B1B', marginBottom: 8 },
   emptySubtitle: { fontSize: 13, color: '#6B7480', textAlign: 'center', marginBottom: 22 },
-  emptyPrimaryBtn: { backgroundColor: '#E23B22', paddingHorizontal: 28, paddingVertical: 13, borderRadius: 12, marginBottom: 10, minWidth: 220, alignItems: 'center' },
+  emptyPrimaryBtn: { backgroundColor: '#DA3830', paddingHorizontal: 28, paddingVertical: 13, borderRadius: 12, marginBottom: 10, minWidth: 220, alignItems: 'center' },
   emptyPrimaryBtnText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
-  emptyOutlineBtn: { borderWidth: 1.5, borderColor: '#E23B22', paddingHorizontal: 28, paddingVertical: 13, borderRadius: 12, minWidth: 220, alignItems: 'center' },
-  emptyOutlineBtnText: { color: '#E23B22', fontSize: 14, fontWeight: '800' },
+  emptyOutlineBtn: { borderWidth: 1.5, borderColor: '#DA3830', paddingHorizontal: 28, paddingVertical: 13, borderRadius: 12, minWidth: 220, alignItems: 'center' },
+  emptyOutlineBtnText: { color: '#DA3830', fontSize: 14, fontWeight: '800' },
 });

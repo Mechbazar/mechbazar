@@ -70,7 +70,7 @@ export default function DeliveryTrackingScreen() {
 
   // MechBazar Brand Colors
   const colors = {
-    primary: '#034C8C',
+    primary: '#DA3830',
     secondary: '#F29F05',
     accent: '#BF3617',
     dark: '#111111',
@@ -255,6 +255,14 @@ export default function DeliveryTrackingScreen() {
         </View>
       )}
 
+      {status === 'ON_THE_WAY' && order?.deliveryOtp && (
+        <View style={styles.otpCard}>
+          <Text style={styles.otpTitle}>Delivery Code</Text>
+          <Text style={styles.otpCode}>{order.deliveryOtp}</Text>
+          <Text style={styles.otpHint}>Share this code with your delivery partner once your order arrives to confirm delivery.</Text>
+        </View>
+      )}
+
       <View style={styles.trackingCard}>
         <Text style={styles.trackingTitle}>Delivery Status</Text>
 
@@ -289,9 +297,14 @@ const styles = StyleSheet.create({
   mapEmoji: { fontSize: 40, marginBottom: 8 },
   mapText: { fontSize: 13, color: '#777777', fontWeight: '600', paddingHorizontal: 24, textAlign: 'center' },
 
+  otpCard: { backgroundColor: '#FFFFFF', marginHorizontal: 16, marginTop: 14, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#E3E6EA', alignItems: 'center' },
+  otpTitle: { fontSize: 13, fontWeight: '800', color: '#1B1B1B' },
+  otpCode: { fontSize: 28, fontWeight: '900', color: '#DA3830', letterSpacing: 4, marginVertical: 6 },
+  otpHint: { fontSize: 12, color: '#6B7480', textAlign: 'center' },
+
   riderCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', marginHorizontal: 16, marginTop: 14, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: '#E3E6EA' },
   riderAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F4F6F8', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  riderName: { fontSize: 14, fontWeight: '800', color: '#161B21', marginBottom: 3 },
+  riderName: { fontSize: 14, fontWeight: '800', color: '#1B1B1B', marginBottom: 3 },
   riderMeta: { fontSize: 12, color: '#6B7480' },
   iconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#F4F6F8', justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
 
@@ -302,7 +315,7 @@ const styles = StyleSheet.create({
   timelineNodeContainer: { flexDirection: 'row', minHeight: 80 },
 
   nodeColumn: { alignItems: 'center', width: 30, marginRight: 16, position: 'relative' },
-  pulseRing: { position: 'absolute', top: 0, width: 20, height: 20, borderRadius: 10, backgroundColor: '#034C8C', zIndex: 1 },
+  pulseRing: { position: 'absolute', top: 0, width: 20, height: 20, borderRadius: 10, backgroundColor: '#DA3830', zIndex: 1 },
   nodeCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#D1D5DB', backgroundColor: '#FFFFFF', justifyContent: 'center', alignItems: 'center', zIndex: 2 },
   nodeIcon: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
   nodeLine: { width: 2, flex: 1, backgroundColor: '#D1D5DB', marginVertical: -2 },

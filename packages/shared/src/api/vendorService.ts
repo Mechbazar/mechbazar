@@ -42,6 +42,25 @@ export const vendorService = {
     const response = await apiClient.get('/vendors/dashboard');
     return response.data;
   },
+  getSalesChart: async (days: number = 30) => {
+    const response = await apiClient.get(`/vendors/dashboard/sales-chart?days=${days}`);
+    return response.data as { date: string; revenue: number; orders: number }[];
+  },
+
+  // Notifications -- reuses the generic /customers/notifications endpoints
+  // (scoped by the authenticated user's own id server-side, not by role, so
+  // this works for a vendor's own login the same as the customer app).
+  getNotifications: async () => {
+    const response = await apiClient.get('/customers/notifications');
+    return response.data as { id: string; title: string; body: string; isRead: boolean; createdAt: string }[];
+  },
+  markNotificationRead: async (id: string) => {
+    const response = await apiClient.patch(`/customers/notifications/${id}/read`);
+    return response.data;
+  },
+  deleteNotification: async (id: string) => {
+    await apiClient.delete(`/customers/notifications/${id}`);
+  },
 
   // Products
   getProducts: async () => {

@@ -44,7 +44,7 @@ export const ProductGridCard: React.FC<ProductGridCardProps> = ({ product, onPre
           </View>
         )}
         <TouchableOpacity style={styles.wishlistBtn} onPress={() => onToggleWishlist?.(product)}>
-          <Text style={{ fontSize: 18, color: isWishlisted ? '#E23B22' : '#999' }}>{isWishlisted ? '♥' : '♡'}</Text>
+          <Text style={{ fontSize: 18, color: isWishlisted ? '#DA3830' : '#999' }}>{isWishlisted ? '♥' : '♡'}</Text>
         </TouchableOpacity>
       </View>
       
@@ -57,7 +57,7 @@ export const ProductGridCard: React.FC<ProductGridCardProps> = ({ product, onPre
           <Text style={styles.originalPrice}>₹{product.originalPrice}</Text>
         </View>
 
-        <Text style={[styles.stockText, { color: product.stockStatus === 'In Stock' ? '#1E9E5A' : product.stockStatus === 'Limited Stock' ? '#F5A300' : '#E23B22' }]}>
+        <Text style={[styles.stockText, { color: product.stockStatus === 'In Stock' ? '#1E9E5A' : product.stockStatus === 'Limited Stock' ? '#F5A300' : '#DA3830' }]}>
           {product.stockStatus}
         </Text>
         <Text style={styles.deliveryText}>⏱ {product.time}</Text>
@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    backgroundColor: '#E23B22',
+    backgroundColor: '#DA3830',
     paddingHorizontal: 6,
     paddingVertical: 4,
     borderRadius: 4,
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#161B21',
+    color: '#1B1B1B',
     height: 36, // max 2 lines
     lineHeight: 18,
     marginBottom: 6,
@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#161B21',
+    color: '#1B1B1B',
     marginRight: 6,
   },
   originalPrice: {
@@ -168,7 +168,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   addButton: {
-    backgroundColor: '#E23B22',
+    backgroundColor: '#DA3830',
     paddingVertical: 13,
     borderRadius: 10,
     alignItems: 'center',

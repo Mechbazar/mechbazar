@@ -1,30 +1,43 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, radius } from '../../../theme/tokens';
+import { API_BASE_URL } from '../../../services/api';
 
-// PLACEHOLDER COPY: there is no reviews/testimonials API today, so these are
-// illustrative quotes (no real customer names/photos attached) rather than
-// claims of genuine reviews. Swap for real content once a testimonials
-// endpoint exists.
-const TESTIMONIALS = [
-  { quote: 'Ordered brake pads in the evening, fitted by a mechanic the next morning. Genuinely simple.', role: 'Car owner, Delhi' },
-  { quote: 'The home mechanic service saved me a trip to the garage for a battery replacement.', role: 'Bike owner, Pune' },
-  { quote: 'Parts matched my exact model on the first try -- no guesswork needed.', role: 'Car owner, Bengaluru' },
-];
+interface FeaturedReview {
+  id: string;
+  rating: number;
+  comment: string;
+  userName: string | null;
+  productName: string;
+}
 
+// Real 5-star reviews (GET /products/reviews/featured), not the illustrative
+// quotes with fabricated names/cities this section used to hardcode -- those
+// were added before a reviews API existed; one exists now (review.controller.ts).
 export default function Testimonials() {
+  const [reviews, setReviews] = useState<FeaturedReview[]>([]);
+
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/products/reviews/featured`)
+      .then(res => (res.ok ? res.json() : []))
+      .then(setReviews)
+      .catch(() => setReviews([]));
+  }, []);
+
+  if (reviews.length === 0) return null;
+
   return (
     <View style={styles.grid}>
-      {TESTIMONIALS.map((t, i) => (
-        <View key={i} style={styles.card}>
+      {reviews.slice(0, 3).map(r => (
+        <View key={r.id} style={styles.card}>
           <View style={styles.starRow}>
             {Array.from({ length: 5 }).map((_, s) => (
-              <Ionicons key={s} name="star" size={14} color="#F5A300" />
+              <Ionicons key={s} name={s < r.rating ? 'star' : 'star-outline'} size={14} color="#F5A300" />
             ))}
           </View>
-          <Text style={styles.quote}>&ldquo;{t.quote}&rdquo;</Text>
-          <Text style={styles.role}>{t.role}</Text>
+          <Text style={styles.quote} numberOfLines={4}>&ldquo;{r.comment}&rdquo;</Text>
+          <Text style={styles.role}>{r.userName || 'MechBazar Customer'} &middot; {r.productName}</Text>
         </View>
       ))}
     </View>

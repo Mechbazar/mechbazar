@@ -185,7 +185,7 @@ export default function CategoryProductsScreen() {
 
       {loading && !loadingMore ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#034C8C" />
+          <ActivityIndicator size="large" color="#DA3830" />
         </View>
       ) : (
         <FlatList
@@ -205,15 +205,16 @@ export default function CategoryProductsScreen() {
           ListEmptyComponent={renderEmpty}
           onEndReached={() => fetchProducts(true)}
           onEndReachedThreshold={0.5}
-          ListFooterComponent={loadingMore ? <ActivityIndicator style={{ margin: 20 }} color="#034C8C" /> : null}
+          ListFooterComponent={loadingMore ? <ActivityIndicator style={{ margin: 20 }} color="#DA3830" /> : null}
         />
       )}
 
-      <FilterSortSheet 
+      <FilterSortSheet
         visible={showFilterSheet}
         onClose={() => setShowFilterSheet(false)}
         currentFilters={filters}
         onApply={setFilters}
+        vehicleType={vehicleType}
       />
     </SafeAreaView>
   );

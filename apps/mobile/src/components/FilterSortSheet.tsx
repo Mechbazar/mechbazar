@@ -1,29 +1,61 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView } from 'react-native';
-import { FilterOptions } from '../types/product';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, TextInput, StyleSheet, Modal, ScrollView } from 'react-native';
+import { FilterOptions, VehicleType } from '../types/product';
+import { fetchBrands } from '../services/product.service';
 
 interface FilterSortSheetProps {
   visible: boolean;
   onClose: () => void;
   currentFilters: FilterOptions;
   onApply: (filters: FilterOptions) => void;
+  // Powers the Brand section -- optional so any existing caller that hasn't
+  // been updated yet just doesn't get a brand list, rather than crashing.
+  vehicleType?: VehicleType;
 }
 
-export const FilterSortSheet: React.FC<FilterSortSheetProps> = ({ visible, onClose, currentFilters, onApply }) => {
+const RATING_OPTIONS = [4, 3, 2, 1];
+
+export const FilterSortSheet: React.FC<FilterSortSheetProps> = ({ visible, onClose, currentFilters, onApply, vehicleType }) => {
   const [filters, setFilters] = React.useState<FilterOptions>(currentFilters);
+  const [priceMinText, setPriceMinText] = useState(currentFilters.priceMin != null ? String(currentFilters.priceMin) : '');
+  const [priceMaxText, setPriceMaxText] = useState(currentFilters.priceMax != null ? String(currentFilters.priceMax) : '');
+  const [brands, setBrands] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (visible) setFilters(currentFilters);
+  }, [visible, currentFilters]);
+
+  useEffect(() => {
+    if (visible && vehicleType) fetchBrands(vehicleType).then(setBrands);
+  }, [visible, vehicleType]);
 
   const handleSortChange = (sort: FilterOptions['sortBy']) => {
     setFilters({ ...filters, sortBy: sort });
   };
 
+  const toggleBrand = (brand: string) => {
+    const next = filters.brands.includes(brand)
+      ? filters.brands.filter(b => b !== brand)
+      : [...filters.brands, brand];
+    setFilters({ ...filters, brands: next });
+  };
+
   const handleApply = () => {
-    onApply(filters);
+    const min = priceMinText.trim() ? Number(priceMinText) : undefined;
+    const max = priceMaxText.trim() ? Number(priceMaxText) : undefined;
+    onApply({
+      ...filters,
+      priceMin: Number.isFinite(min!) ? min : undefined,
+      priceMax: Number.isFinite(max!) ? max : undefined,
+    });
     onClose();
   };
 
   const handleClear = () => {
     const defaultFilters: FilterOptions = { sortBy: 'popular', brands: [], inStockOnly: false };
     setFilters(defaultFilters);
+    setPriceMinText('');
+    setPriceMaxText('');
     onApply(defaultFilters);
     onClose();
   };
@@ -33,6 +65,8 @@ export const FilterSortSheet: React.FC<FilterSortSheetProps> = ({ visible, onClo
     { label: 'Price: Low to High', value: 'price_low_high' },
     { label: 'Price: High to Low', value: 'price_high_low' },
     { label: 'Discount', value: 'discount' },
+    { label: 'Rating', value: 'rating' },
+    { label: 'Newest', value: 'newest' },
   ];
 
   return (
@@ -43,13 +77,13 @@ export const FilterSortSheet: React.FC<FilterSortSheetProps> = ({ visible, onClo
             <Text style={styles.title}>Filter & Sort</Text>
             <TouchableOpacity onPress={onClose}><Text style={styles.closeBtn}>✕</Text></TouchableOpacity>
           </View>
-          
+
           <ScrollView style={styles.body}>
             <Text style={styles.sectionTitle}>Sort By</Text>
             {sortOptions.map(option => (
-              <TouchableOpacity 
-                key={option.value} 
-                style={styles.radioRow} 
+              <TouchableOpacity
+                key={option.value}
+                style={styles.radioRow}
                 onPress={() => handleSortChange(option.value)}
               >
                 <Text style={[styles.radioLabel, filters.sortBy === option.value && styles.radioLabelActive]}>
@@ -62,7 +96,7 @@ export const FilterSortSheet: React.FC<FilterSortSheetProps> = ({ visible, onClo
             ))}
 
             <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Availability</Text>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.checkboxRow}
               onPress={() => setFilters({ ...filters, inStockOnly: !filters.inStockOnly })}
             >
@@ -72,7 +106,56 @@ export const FilterSortSheet: React.FC<FilterSortSheetProps> = ({ visible, onClo
               <Text style={styles.checkboxLabel}>In Stock Only</Text>
             </TouchableOpacity>
 
-            {/* In a real app, brands would be dynamic based on the category */}
+            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Price</Text>
+            <View style={styles.priceRow}>
+              <TextInput
+                style={styles.priceInput}
+                placeholder="Min"
+                keyboardType="numeric"
+                value={priceMinText}
+                onChangeText={setPriceMinText}
+              />
+              <Text style={styles.priceDash}>-</Text>
+              <TextInput
+                style={styles.priceInput}
+                placeholder="Max"
+                keyboardType="numeric"
+                value={priceMaxText}
+                onChangeText={setPriceMaxText}
+              />
+            </View>
+
+            <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Rating</Text>
+            {RATING_OPTIONS.map(r => (
+              <TouchableOpacity
+                key={r}
+                style={styles.radioRow}
+                onPress={() => setFilters({ ...filters, minRating: filters.minRating === r ? undefined : r })}
+              >
+                <Text style={styles.radioLabel}>{r}★ &amp; up</Text>
+                <View style={styles.radioCircle}>
+                  {filters.minRating === r && <View style={styles.radioInner} />}
+                </View>
+              </TouchableOpacity>
+            ))}
+
+            {brands.length > 0 && (
+              <>
+                <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Brand</Text>
+                {brands.map(brand => (
+                  <TouchableOpacity
+                    key={brand}
+                    style={styles.checkboxRow}
+                    onPress={() => toggleBrand(brand)}
+                  >
+                    <View style={[styles.checkbox, filters.brands.includes(brand) && styles.checkboxActive]}>
+                      {filters.brands.includes(brand) && <Text style={{ color: '#fff', fontSize: 12 }}>✓</Text>}
+                    </View>
+                    <Text style={styles.checkboxLabel}>{brand}</Text>
+                  </TouchableOpacity>
+                ))}
+              </>
+            )}
           </ScrollView>
 
           <View style={styles.footer}>
@@ -99,7 +182,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    height: '60%',
+    height: '75%',
   },
   header: {
     flexDirection: 'row',
@@ -139,7 +222,7 @@ const styles = StyleSheet.create({
   },
   radioLabelActive: {
     fontWeight: '600',
-    color: '#034C8C',
+    color: '#DA3830',
   },
   radioCircle: {
     width: 20,
@@ -154,7 +237,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#034C8C',
+    backgroundColor: '#DA3830',
   },
   checkboxRow: {
     flexDirection: 'row',
@@ -172,12 +255,30 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   checkboxActive: {
-    backgroundColor: '#034C8C',
-    borderColor: '#034C8C',
+    backgroundColor: '#DA3830',
+    borderColor: '#DA3830',
   },
   checkboxLabel: {
     fontSize: 15,
     color: '#333',
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  priceInput: {
+    flex: 1,
+    height: 44,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 15,
+    color: '#333',
+  },
+  priceDash: {
+    color: '#999',
   },
   footer: {
     flexDirection: 'row',
@@ -206,7 +307,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#034C8C',
+    backgroundColor: '#DA3830',
     borderRadius: 12,
   },
   applyBtnText: {

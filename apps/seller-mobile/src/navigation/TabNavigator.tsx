@@ -1,4 +1,5 @@
 import React from 'react';
+import { TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { ProductsScreen } from '../screens/ProductsScreen';
@@ -7,7 +8,7 @@ import { InventoryScreen } from '../screens/InventoryScreen';
 import { WalletScreen } from '../screens/WalletScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import { colors } from '@mechbazar/shared';
-import { Home, Package, ShoppingBag, Warehouse, Wallet, User } from 'lucide-react-native';
+import { Home, Package, ShoppingBag, Warehouse, Wallet, User, Bell } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
 
@@ -22,10 +23,20 @@ export const TabNavigator = () => {
         tabBarInactiveTintColor: colors.textSecondary,
       }}
     >
-      <Tab.Screen 
-        name="Dashboard" 
-        component={DashboardScreen} 
-        options={{ tabBarIcon: ({ color, size }) => <Home color={color} size={size} /> }}
+      <Tab.Screen
+        name="Dashboard"
+        component={DashboardScreen}
+        options={({ navigation }) => ({
+          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+          // Notifications/Analytics are pushed screens on the parent Stack
+          // (MainStack), not tabs -- getParent() reaches past this
+          // Tab.Navigator to it, same as the mechanic app's BookingDetail push.
+          headerRight: () => (
+            <TouchableOpacity onPress={() => navigation.getParent()?.navigate('Notifications')} style={{ marginRight: 16 }}>
+              <Bell color={colors.text} size={22} />
+            </TouchableOpacity>
+          ),
+        })}
       />
       <Tab.Screen 
         name="Products" 

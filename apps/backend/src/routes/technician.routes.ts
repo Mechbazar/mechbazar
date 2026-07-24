@@ -18,6 +18,7 @@ import {
   clearMyPushToken,
   getMyBookings,
   getMyEarnings,
+  getMyReviews,
   addMyBankAccount,
   requestMyPayout,
   getAllTechnicianSettlements,
@@ -58,6 +59,7 @@ router.post('/me/bookings/:id/reject', authenticate, authorize(technicianOnly), 
 router.post('/me/bookings/:id/generate-otp', authenticate, authorize(technicianOnly), requireApprovedTechnician, generateBookingCompletionOtp);
 router.post('/me/bookings/:id/approval-request', authenticate, authorize(technicianOnly), requireApprovedTechnician, createBookingApprovalRequest);
 router.get('/me/earnings', authenticate, authorize(technicianOnly), getMyEarnings);
+router.get('/me/reviews', authenticate, authorize(technicianOnly), getMyReviews);
 router.post('/me/bank', authenticate, authorize(technicianOnly), addMyBankAccount);
 router.post('/me/wallet/withdraw', authenticate, authorize(technicianOnly), requireApprovedTechnician, requestMyPayout);
 

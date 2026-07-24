@@ -92,9 +92,16 @@ export const riderService = {
   },
   updateDeliveryStatus: async (
     orderId: string,
-    payload: { status: string; proofImageUrl?: string; codCollected?: boolean; issueReason?: string }
+    payload: { status: string; proofImageUrl?: string; codCollected?: boolean; issueReason?: string; otp?: string }
   ) => {
     const response = await apiClient.patch(`/riders/me/deliveries/${orderId}/status`, payload);
+    return response.data;
+  },
+  // Generates a delivery code sent to the customer -- the rider must ask the
+  // customer to read it aloud, then pass it back via updateDeliveryStatus's
+  // `otp` field to confirm DELIVERED. Deliberately never returned here.
+  generateDeliveryOtp: async (orderId: string) => {
+    const response = await apiClient.post(`/riders/me/deliveries/${orderId}/generate-otp`);
     return response.data;
   },
 

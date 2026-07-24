@@ -14,10 +14,10 @@ import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 
 // MechBazar Brand Colors (New Design System) -- matches HomeScreen/CartScreen
 const colors = {
-  primary: '#E23B22',
-  darkInk: '#161B21',
+  primary: '#DA3830',
+  darkInk: '#1B1B1B',
   steel: '#242C35',
-  pageBg: '#F3F4F6',
+  pageBg: '#F8F9FA',
   white: '#FFFFFF',
   borderLight: '#E3E6EA',
   textMuted: '#6B7480',

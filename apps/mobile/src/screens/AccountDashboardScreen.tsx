@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View, Text, Pressable, ScrollView, Image, ActivityIndicator, StyleSheet, findNodeHandle,
+  View, Text, Pressable, ScrollView, Image, ActivityIndicator, StyleSheet, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { Linking } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { logout } from '../store/authSlice';
+import { setThemePreference } from '../store/themeSlice';
 import { API_BASE_URL } from '../services/api';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
@@ -38,7 +39,7 @@ type Row = {
 
 type SectionKey =
   | 'profile' | 'orders' | 'services' | 'vehicles' | 'addresses'
-  | 'payments' | 'shopping' | 'support' | 'notifications' | 'security' | 'account';
+  | 'payments' | 'shopping' | 'support' | 'notifications' | 'preferences' | 'security' | 'account';
 
 const SECTION_META: { key: SectionKey; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { key: 'profile', label: 'Profile', icon: 'person-outline' },
@@ -50,6 +51,7 @@ const SECTION_META: { key: SectionKey; label: string; icon: keyof typeof Ionicon
   { key: 'shopping', label: 'Shopping', icon: 'bag-outline' },
   { key: 'support', label: 'Support', icon: 'help-buoy-outline' },
   { key: 'notifications', label: 'Notifications', icon: 'notifications-outline' },
+  { key: 'preferences', label: 'Preferences', icon: 'color-palette-outline' },
   { key: 'security', label: 'Security', icon: 'shield-checkmark-outline' },
   { key: 'account', label: 'Account', icon: 'log-out-outline' },
 ];
@@ -101,6 +103,8 @@ export default function AccountDashboardScreen() {
   const dispatch = useDispatch();
   const user = useSelector((state: RootState) => state.auth.user);
   const token = useSelector((state: RootState) => state.auth.token);
+  const themePreference = useSelector((state: RootState) => state.theme.preference);
+  const isDarkMode = useSelector((state: RootState) => state.theme.resolvedScheme === 'dark');
   const { isTabletUp } = useBreakpoint();
 
   const [activeSection, setActiveSection] = useState<SectionKey>('profile');
@@ -142,15 +146,16 @@ export default function AccountDashboardScreen() {
 
   const scrollToSection = (key: SectionKey) => {
     setActiveSection(key);
-    const node = sectionRefs.current[key];
-    const scrollNode = scrollRef.current;
-    if (!node || !scrollNode) return;
-    const handle = findNodeHandle(scrollNode);
-    if (!handle) return;
-    // @ts-ignore -- measureLayout exists on host View refs (RN + RN Web)
-    node.measureLayout(handle, (_x: number, y: number) => {
-      scrollNode.scrollTo({ y: Math.max(y - 16, 0), animated: true });
-    });
+    const node = sectionRefs.current[key] as any;
+    // findNodeHandle + measureLayout (the RN-native way to do this) throws
+    // "findNodeHandle is not supported on web" on React Native Web -- this
+    // screen only ever renders on desktop web (see the file-level comment),
+    // so every sidebar click was silently crashing instead of scrolling.
+    // On web, a View ref *is* the underlying DOM node, so scrollIntoView
+    // works directly with no host View/handle indirection needed.
+    if (node && typeof node.scrollIntoView === 'function') {
+      node.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   const avatarLetter = (user?.name || 'U').charAt(0).toUpperCase();
@@ -305,6 +310,27 @@ export default function AccountDashboardScreen() {
               <SectionCard title="Notifications" sectionKey="notifications" sectionRefs={sectionRefs}>
                 <RowItem row={{ label: 'View Notifications', onPress: goTo('Notifications') }} />
                 <RowItem row={{ label: 'Notification Settings', caption: 'Coming soon', disabled: true }} />
+              </SectionCard>
+
+              {/* PREFERENCES */}
+              <SectionCard title="Preferences" sectionKey="preferences" sectionRefs={sectionRefs}>
+                <View style={styles.row}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowLabel}>Dark Mode</Text>
+                    <Text style={styles.rowCaption}>
+                      {themePreference === 'system' ? 'Following your system setting' : themePreference === 'dark' ? 'On' : 'Off'}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={isDarkMode}
+                    onValueChange={(value) => { dispatch(setThemePreference(value ? 'dark' : 'light')); }}
+                    trackColor={{ false: '#767577', true: colors.primary }}
+                    thumbColor={isDarkMode ? '#FFFFFF' : '#f4f3f4'}
+                  />
+                </View>
+                {themePreference !== 'system' && (
+                  <RowItem row={{ label: 'Match System Setting', onPress: () => dispatch(setThemePreference('system')) }} />
+                )}
               </SectionCard>
 
               {/* SECURITY */}

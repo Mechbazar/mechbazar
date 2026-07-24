@@ -5,7 +5,7 @@ import { AuthRequest } from '../middlewares/auth';
 import { sendExpoPush } from '../utils/expoPush';
 import { resolveCoupon } from './coupon.controller';
 import { notifyUser } from '../utils/notify';
-import { sanitizeOrder, sanitizeOrders } from '../utils/sanitizeUser';
+import { sanitizeOrder, sanitizeOrders, stripDeliveryOtp, stripDeliveryOtps } from '../utils/sanitizeUser';
 import { pendingPaymentCreateInput, creditWalletForOnlineRefund } from '../services/payment.service';
 
 // Thrown from inside the createOrder $transaction to carry an intended HTTP
@@ -43,10 +43,13 @@ export const restoreOrderStock = async (
   const mainWarehouse = await tx.warehouse.findUnique({ where: { code: 'MAIN_WH_01' } });
   if (!mainWarehouse) return;
 
+  const inventoryRows = await tx.inventory.findMany({
+    where: { warehouseId: mainWarehouse.id, productId: { in: items.map((i) => i.productId) } },
+  });
+  const inventoryByProductId = new Map(inventoryRows.map((inv) => [inv.productId, inv]));
+
   for (const item of items) {
-    const inventory = await tx.inventory.findUnique({
-      where: { productId_warehouseId: { productId: item.productId, warehouseId: mainWarehouse.id } },
-    });
+    const inventory = inventoryByProductId.get(item.productId);
     if (!inventory) continue;
 
     await tx.inventory.update({
@@ -171,9 +174,16 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       const validatedItems: { productId: string; quantity: number; price: number }[] = [];
       const cartVehicleTypes = new Set<VehicleType>();
 
-      // Verify products against real DB and that enough stock exists
+      // Verify products against real DB and that enough stock exists. Fetched
+      // as one batch (not per-item) -- for an N-line cart this was N
+      // sequential awaited queries before, purely from lookups the DB can
+      // satisfy in a single IN (...) query.
+      const productIds = [...new Set(items.map((item: any) => String(item.id)))];
+      const products = await tx.product.findMany({ where: { id: { in: productIds } } });
+      const productById = new Map(products.map((p) => [p.id, p]));
+
       for (const item of items) {
-        const product = await tx.product.findUnique({ where: { id: String(item.id) } });
+        const product = productById.get(String(item.id));
 
         if (!product) {
           throw new OrderError(400, `Product ID ${item.id} not found.`);
@@ -271,10 +281,13 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       // trail) remains optional and only applies where MAIN_WH_01 inventory has been set up.
       const mainWarehouse = await tx.warehouse.findUnique({ where: { code: 'MAIN_WH_01' } });
       if (mainWarehouse) {
+        const inventoryRows = await tx.inventory.findMany({
+          where: { warehouseId: mainWarehouse.id, productId: { in: validatedItems.map((i) => i.productId) } },
+        });
+        const inventoryByProductId = new Map(inventoryRows.map((inv) => [inv.productId, inv]));
+
         for (const item of validatedItems) {
-          const inventory = await tx.inventory.findUnique({
-            where: { productId_warehouseId: { productId: item.productId, warehouseId: mainWarehouse.id } }
-          });
+          const inventory = inventoryByProductId.get(item.productId);
           if (inventory) {
             const updatedInventory = await tx.inventory.updateMany({
               where: { id: inventory.id, availableStock: { gte: item.quantity } },
@@ -393,7 +406,12 @@ export const getOrderById = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ error: 'Order not found' });
     }
 
-    res.status(200).json(sanitizeOrder(order));
+    // Only the order's owner (the customer) ever sees the raw code -- the
+    // rider is who's supposed to receive it FROM the customer, so leaking it
+    // here would defeat the point. Mirrors service.controller.ts's handling
+    // of ServiceBooking.completionOtp for the technician-facing endpoint.
+    const sanitized = sanitizeOrder(order);
+    res.status(200).json(isOwner ? sanitized : { ...sanitized, deliveryOtp: undefined, deliveryOtpGeneratedAt: undefined });
   } catch (error: any) {
     console.error('Error fetching order:', error.message);
     res.status(500).json({ error: error.message || 'Internal server error' });
@@ -421,7 +439,7 @@ export const getAllOrders = async (req: Request, res: Response) => {
       orderBy: { createdAt: 'desc' }
     });
 
-    res.status(200).json(sanitizeOrders(orders));
+    res.status(200).json(stripDeliveryOtps(sanitizeOrders(orders)));
   } catch (error: any) {
     console.error('Error fetching all orders:', error.message);
     res.status(500).json({ error: 'Failed to fetch orders' });
@@ -476,7 +494,7 @@ export const assignRider = async (req: Request, res: Response) => {
       { orderId: order.id }
     );
 
-    res.status(200).json(sanitizeOrder(order));
+    res.status(200).json(stripDeliveryOtp(sanitizeOrder(order)));
   } catch (error: any) {
     console.error('Error assigning rider:', error.message);
     res.status(500).json({ error: 'Failed to assign rider' });
@@ -568,7 +586,7 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
       { orderId: id, status: order.status }
     );
 
-    res.status(200).json(order);
+    res.status(200).json(stripDeliveryOtp(order));
   } catch (error: any) {
     if (error instanceof OrderError) {
       return res.status(error.status).json({ error: error.message });
@@ -661,7 +679,7 @@ const RIDER_STATUS_FLOW: Record<string, string[]> = {
 export const updateMyDeliveryStatus = async (req: AuthRequest, res: Response) => {
   try {
     const id = String(req.params.id);
-    const { status, proofImageUrl, codCollected, issueReason } = req.body;
+    const { status, proofImageUrl, codCollected, issueReason, otp } = req.body;
 
     if (!status) {
       return res.status(400).json({ error: 'Status is required' });
@@ -692,6 +710,18 @@ export const updateMyDeliveryStatus = async (req: AuthRequest, res: Response) =>
       if (order.payment?.method === 'COD' && !codCollected) {
         return res.status(400).json({ error: 'COD collection must be confirmed to mark as delivered' });
       }
+      // Only enforced once an OTP has actually been generated for this order
+      // -- keeps this backward-compatible with any order that reached
+      // ON_THE_WAY before this feature existed / where generate-otp was
+      // never called.
+      if (order.deliveryOtp) {
+        if (!otp) {
+          return res.status(400).json({ error: 'Ask the customer for their delivery code and enter it to confirm delivery.' });
+        }
+        if (String(otp) !== order.deliveryOtp) {
+          return res.status(400).json({ error: 'Incorrect delivery code.' });
+        }
+      }
     }
     if (status === 'RETURNED' && !issueReason) {
       return res.status(400).json({ error: 'issueReason is required when reporting a delivery issue' });
@@ -713,6 +743,7 @@ export const updateMyDeliveryStatus = async (req: AuthRequest, res: Response) =>
           ...(proofImageUrl && { proofImageUrl }),
           ...(typeof codCollected === 'boolean' && { codCollected }),
           ...(issueReason && { issueReason }),
+          ...(status === 'DELIVERED' && { deliveryOtp: null, deliveryOtpGeneratedAt: null }),
         },
       });
       if (claim.count === 0) {
@@ -737,12 +768,47 @@ export const updateMyDeliveryStatus = async (req: AuthRequest, res: Response) =>
       { orderId: id, status: updated.status }
     );
 
-    res.status(200).json(updated);
+    res.status(200).json(stripDeliveryOtp(updated));
   } catch (error: any) {
     if (error instanceof OrderError) {
       return res.status(error.status).json({ error: error.message });
     }
     console.error('Error updating delivery status:', error.message);
     res.status(500).json({ error: 'Failed to update delivery status' });
+  }
+};
+
+// Rider calls this once ON_THE_WAY -- generates a fresh code, notifies the
+// customer (never in the push title/body itself, only the data payload,
+// same privacy rule as service.controller.ts's generateBookingCompletionOtp),
+// and deliberately never echoes it back here.
+export const generateDeliveryOtp = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const partner = await prisma.deliveryPartner.findUnique({ where: { userId: req.user!.userId } });
+    if (!partner) {
+      return res.status(404).json({ error: 'Rider profile not found' });
+    }
+
+    const order = await prisma.order.findFirst({ where: { id, deliveryPartnerId: partner.id } });
+    if (!order) {
+      return res.status(404).json({ error: 'Delivery not found or not assigned to you' });
+    }
+    if (order.status !== 'ON_THE_WAY') {
+      return res.status(400).json({ error: 'OTP can only be generated once the order is out for delivery' });
+    }
+
+    const otp = String(Math.floor(1000 + Math.random() * 9000));
+    await prisma.order.update({
+      where: { id },
+      data: { deliveryOtp: otp, deliveryOtpGeneratedAt: new Date() },
+    });
+
+    notifyUser(order.userId, 'Delivery code ready', 'Open the app to view your delivery confirmation code.', { orderId: id, deliveryOtp: otp });
+
+    res.status(200).json({ message: 'OTP sent to the customer' });
+  } catch (error: any) {
+    console.error('Error generating delivery OTP:', error.message);
+    res.status(500).json({ error: 'Failed to generate OTP' });
   }
 };

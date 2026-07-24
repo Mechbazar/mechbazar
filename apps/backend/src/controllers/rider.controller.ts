@@ -4,7 +4,8 @@ import { AuthRequest } from '../middlewares/auth';
 import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
 import { generateToken } from '../utils/jwt';
 import { notifyUser } from '../utils/notify';
-import { sanitizeUser, sanitizeUsers, sanitizeOrders } from '../utils/sanitizeUser';
+import { sanitizeUser, sanitizeUsers, sanitizeOrders, stripDeliveryOtps } from '../utils/sanitizeUser';
+import { recordAuditLog } from '../utils/auditLog';
 import prisma from '../config/prisma';
 
 // Every /me endpoint below re-derives the DeliveryPartner row from the JWT's
@@ -213,14 +214,13 @@ export const updateRiderVerificationStatus = async (req: AuthRequest, res: Respo
       },
     });
 
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.userId,
-        action: 'RIDER_STATUS_CHANGE',
-        entity: 'DeliveryPartner',
-        entityId: id,
-        details: `${partner.status} -> ${status}${remarks ? ` (${remarks})` : ''}`,
-      },
+    recordAuditLog({
+      userId: req.user!.userId,
+      action: 'RIDER_STATUS_CHANGE',
+      entity: 'DeliveryPartner',
+      entityId: id,
+      details: `${partner.status} -> ${status}${remarks ? ` (${remarks})` : ''}`,
+      req,
     });
 
     notifyUser(
@@ -640,7 +640,10 @@ export const getMyDeliveries = async (req: AuthRequest, res: Response): Promise<
       },
       orderBy: { createdAt: 'desc' },
     });
-    res.status(200).json(sanitizeOrders(orders));
+    // Never let the rider read the code directly off their own delivery list
+    // -- it must come from the customer reading it aloud, or the OTP step is
+    // pointless.
+    res.status(200).json(stripDeliveryOtps(sanitizeOrders(orders)));
   } catch (error) {
     console.error('Error fetching own deliveries:', error);
     res.status(500).json({ error: 'Failed to fetch deliveries' });

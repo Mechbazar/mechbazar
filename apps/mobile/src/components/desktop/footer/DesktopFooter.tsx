@@ -12,28 +12,28 @@ interface FooterLink {
   onPress?: (nav: NavigationProp<any>) => void;
 }
 
-// Links only navigate/open a URL when a real destination already exists
-// today (an existing screen, or the live vendor.mechbazar.com portal).
-// Entries without a backing page (About/Careers/policies/app-store links)
-// are intentionally rendered as plain, non-interactive text rather than
-// wired to a placeholder or guessed URL -- avoids shipping a dead link.
+// Every link now navigates to a real destination -- either an existing
+// screen, the live vendor.mechbazar.com portal, or StaticPageScreen (backed
+// by real content in data/staticPages.ts). App-store badges are the one
+// remaining static exception (no confirmed live store listing URLs to link
+// to yet).
 const COMPANY_LINKS: FooterLink[] = [
-  { label: 'About Us' },
-  { label: 'Careers' },
+  { label: 'About Us', onPress: nav => nav.navigate('StaticPage', { page: 'about' }) },
+  { label: 'Careers', onPress: nav => nav.navigate('StaticPage', { page: 'careers' }) },
   { label: 'Contact Us', onPress: nav => nav.navigate('HelpCenter') },
   { label: 'Help Center', onPress: nav => nav.navigate('HelpCenter') },
 ];
 
 const POLICY_LINKS: FooterLink[] = [
-  { label: 'Privacy Policy' },
-  { label: 'Terms of Service' },
-  { label: 'Return & Refund Policy' },
-  { label: 'Shipping Policy' },
+  { label: 'Privacy Policy', onPress: nav => nav.navigate('StaticPage', { page: 'privacy' }) },
+  { label: 'Terms of Service', onPress: nav => nav.navigate('StaticPage', { page: 'terms' }) },
+  { label: 'Return & Refund Policy', onPress: nav => nav.navigate('StaticPage', { page: 'returns' }) },
+  { label: 'Shipping Policy', onPress: nav => nav.navigate('StaticPage', { page: 'shipping' }) },
 ];
 
 const PARTNER_LINKS: FooterLink[] = [
   { label: 'Become a Vendor', onPress: nav => nav.navigate('WholesaleRegistration') },
-  { label: 'Become a Mechanic' },
+  { label: 'Become a Mechanic', onPress: nav => nav.navigate('StaticPage', { page: 'become-mechanic' }) },
 ];
 
 const SOCIAL_ICONS: (keyof typeof Ionicons.glyphMap)[] = ['logo-facebook', 'logo-instagram', 'logo-twitter', 'logo-youtube'];

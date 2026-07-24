@@ -2,7 +2,7 @@
   "expo": {
     "name": "MechBazar Admin",
     "slug": "mechbazar-admin",
-    "owner": "tanu40647",
+    "owner": "mechbazar",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

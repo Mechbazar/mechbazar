@@ -1,71 +1,16 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { useQuery } from '@tanstack/react-query';
-import { colors, vendorService, Loader } from '@mechbazar/shared';
-import { RootState, setAuth, logout } from '../store';
+import { colors } from '@mechbazar/shared';
+import { RootState, setAuth } from '../store';
 import { LoginScreen } from '../screens/LoginScreen';
 import { RegisterScreen } from '../screens/registration/RegisterScreen';
-import { OnboardingWizard } from '../screens/registration/OnboardingWizard';
-import { StatusScreen } from '../screens/registration/StatusScreen';
-import { TabNavigator } from './TabNavigator';
+import { MainStack } from './MainStack';
 
 const Stack = createNativeStackNavigator();
-
-// Once authenticated, whether a vendor sees the onboarding wizard, a status
-// screen, or the real app depends on Vendor.status -- only APPROVED reaches
-// TabNavigator. PENDING (registered but hasn't finished business/bank/docs)
-// and REJECTED (editable) go to the wizard; UNDER_VERIFICATION/SUSPENDED/
-// BLOCKED/INACTIVE are informational-only until an admin acts.
-const VendorGate = () => {
-  const dispatch = useDispatch();
-  const [showWizard, setShowWizard] = useState(false);
-  const { data: profile, isLoading, isError } = useQuery({
-    queryKey: ['vendor-profile'],
-    queryFn: vendorService.getProfile,
-    retry: false,
-  });
-
-  React.useEffect(() => {
-    if (isError) {
-      SecureStore.deleteItemAsync('token').then(() => {
-        dispatch(logout());
-      });
-    }
-  }, [isError, dispatch]);
-
-  // Resubmitting from the wizard (OnboardingWizard's "Submit for Review")
-  // moves status to UNDER_VERIFICATION -- without this, showWizard stayed
-  // true forever after the first "Edit & Continue" tap, so a successful
-  // resubmission kept rendering the wizard instead of the status screen, with
-  // no visible confirmation it went through.
-  React.useEffect(() => {
-    if (profile?.status === 'UNDER_VERIFICATION') {
-      setShowWizard(false);
-    }
-  }, [profile?.status]);
-
-  if (isLoading) {
-    return <Loader fullScreen />;
-  }
-
-  if (isError || !profile) {
-    return null;
-  }
-
-  if (profile.status === 'APPROVED') {
-    return <TabNavigator />;
-  }
-
-  if (showWizard || profile.status === 'PENDING') {
-    return <OnboardingWizard />;
-  }
-
-  return <StatusScreen status={profile.status} onEdit={() => setShowWizard(true)} />;
-};
 
 export const RootNavigator = () => {
   const dispatch = useDispatch();
@@ -97,7 +42,7 @@ export const RootNavigator = () => {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
-          <Stack.Screen name="Main" component={VendorGate} />
+          <Stack.Screen name="Main" component={MainStack} />
         ) : (
           <>
             <Stack.Screen name="Login" component={LoginScreen} />

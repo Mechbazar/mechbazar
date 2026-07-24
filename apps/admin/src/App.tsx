@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Car, ShoppingBag, Users, Layers, Package, LogOut, Store, Navigation, Warehouse, Image, Tag, CreditCard, Bike, Wrench, ClipboardList, Layers3, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Car, ShoppingBag, Users, Layers, Package, LogOut, Store, Navigation, Warehouse, Image, Tag, CreditCard, Bike, Wrench, ClipboardList, Layers3, Menu, X, FileText, ScrollText } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { useDispatch } from 'react-redux';
 import { logout } from './store';
@@ -22,6 +22,8 @@ import ServiceBookingsPage from './pages/ServiceBookingsPage';
 import MechanicsPage from './pages/MechanicsPage';
 import Payouts from './pages/Payouts';
 import RiderPayouts from './pages/RiderPayouts';
+import Reports from './pages/Reports';
+import AuditLogs from './pages/AuditLogs';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import NotificationBell from './components/NotificationBell';
 import OfflineBanner from './components/OfflineBanner';
@@ -52,6 +54,8 @@ function MainLayout({ children }: { children: React.ReactNode }) {
     { to: '/coupons', icon: Tag, label: 'Coupons' },
     { to: '/payouts', icon: CreditCard, label: 'Payouts' },
     { to: '/rider-payouts', icon: Bike, label: 'Rider Payouts' },
+    { to: '/reports', icon: FileText, label: 'Reports' },
+    { to: '/audit-logs', icon: ScrollText, label: 'Audit Logs' },
   ];
 
   return (
@@ -155,6 +159,8 @@ function App() {
                 <Route path="coupons" element={<Coupons />} />
                 <Route path="payouts" element={<Payouts />} />
                 <Route path="rider-payouts" element={<RiderPayouts />} />
+                <Route path="reports" element={<Reports />} />
+                <Route path="audit-logs" element={<AuditLogs />} />
                 <Route path="vehicles" element={<Vehicles />} />
                 <Route path="/categories" element={<Categories />} />
                 <Route path="/products" element={<Products />} />

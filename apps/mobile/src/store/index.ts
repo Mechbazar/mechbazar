@@ -2,12 +2,14 @@ import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './authSlice';
 import cartReducer from './cartSlice';
 import appReducer from './appSlice';
+import themeReducer from './themeSlice';
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     cart: cartReducer,
     app: appReducer,
+    theme: themeReducer,
   },
 });
 
@@ -17,3 +19,4 @@ export type AppDispatch = typeof store.dispatch;
 export * from './cartSlice';
 export * from './authSlice';
 export * from './appSlice';
+export * from './themeSlice';

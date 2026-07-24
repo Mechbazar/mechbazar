@@ -5,12 +5,48 @@ import { generateToken } from '../utils/jwt';
 import { AuthRequest } from '../middlewares/auth';
 import { restoreOrderStock, creditOrderDelivery } from './order.controller';
 import { notifyUser } from '../utils/notify';
-import { sanitizeUser, sanitizeUsers, sanitizeOrders } from '../utils/sanitizeUser';
+import { sanitizeUser, sanitizeUsers, sanitizeOrders, stripDeliveryOtp, stripDeliveryOtps } from '../utils/sanitizeUser';
+import { recordAuditLog } from '../utils/auditLog';
 import prisma from '../config/prisma';
 
 // ----------------------------------------------------
 // VENDOR PORTAL APIs (Used by Vendor Frontend)
 // ----------------------------------------------------
+
+// Public, customer-facing "Top Vendors" homepage widget. Deliberately
+// separate from the admin-only getVendors below, which includes documents
+// and bank accounts -- this only ever selects storeName/categories/product
+// stats, never anything from the vendor's KYC/banking records.
+export const getTopVendors = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const vendors = await prisma.vendor.findMany({
+      where: { status: VendorStatus.APPROVED, isActive: true },
+      select: {
+        id: true,
+        storeName: true,
+        categories: true,
+        products: { where: { status: 'APPROVED' }, select: { salesCount: true } },
+      },
+    });
+
+    const ranked = vendors
+      .map(v => ({
+        id: v.id,
+        storeName: v.storeName,
+        categories: v.categories,
+        productCount: v.products.length,
+        salesCount: v.products.reduce((sum, p) => sum + (p.salesCount || 0), 0),
+      }))
+      .filter(v => v.productCount > 0)
+      .sort((a, b) => b.salesCount - a.salesCount || b.productCount - a.productCount)
+      .slice(0, 8)
+      .map(({ id, storeName, categories, productCount, salesCount }) => ({ id, storeName, categories, productCount, salesCount }));
+
+    res.json(ranked);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch top vendors' });
+  }
+};
 
 export const loginVendor = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -353,7 +389,7 @@ export const getMyOrders = async (req: Request, res: Response): Promise<void> =>
       orderBy: { createdAt: 'desc' }
     });
 
-    res.status(200).json(sanitizeOrders(orders));
+    res.status(200).json(stripDeliveryOtps(sanitizeOrders(orders)));
   } catch (error) {
     console.error('Error fetching vendor orders:', error);
     res.status(500).json({ error: 'Failed to fetch vendor orders' });
@@ -467,7 +503,7 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       { orderId: id, status: updatedOrder.status }
     );
 
-    res.status(200).json(updatedOrder);
+    res.status(200).json(stripDeliveryOtp(updatedOrder));
   } catch (error: any) {
     if (error instanceof Error && error.message.startsWith('Order status changed concurrently')) {
       res.status(409).json({ error: error.message });
@@ -693,10 +729,12 @@ export const updateSettlementStatus = async (req: Request, res: Response): Promi
   }
 };
 
-export const updateVendorStatus = async (req: Request, res: Response): Promise<void> => {
+export const updateVendorStatus = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id); // Vendor ID
     const { status, remarks } = req.body; // APPROVED, REJECTED, etc.
+
+    const previous = await prisma.vendor.findUnique({ where: { id } });
 
     const vendor = await prisma.vendor.update({
       where: { id },
@@ -704,6 +742,17 @@ export const updateVendorStatus = async (req: Request, res: Response): Promise<v
         status
       }
     });
+
+    if (req.user) {
+      recordAuditLog({
+        userId: req.user.userId,
+        action: 'VENDOR_STATUS_CHANGE',
+        entity: 'Vendor',
+        entityId: id,
+        details: `${previous?.status ?? 'UNKNOWN'} -> ${status}${remarks ? ` (${remarks})` : ''}`,
+        req,
+      });
+    }
 
     // Rider/technician KYC status changes already notify the applicant --
     // this was the one role left silent, so a vendor had no way to learn
@@ -879,6 +928,43 @@ export const getDashboardStats = async (req: Request, res: Response): Promise<vo
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard stats' });
+  }
+};
+
+// Daily revenue for this vendor over the last N days, for the Dashboard's
+// sales chart. Grouped in SQL (date_trunc) rather than fetched-and-bucketed
+// in JS -- a busy vendor's order-item history could be thousands of rows.
+export const getSalesChart = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.userId;
+    const vendor = await prisma.vendor.findUnique({ where: { userId } });
+    if (!vendor) { res.status(404).json({ error: 'Vendor not found' }); return; }
+
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 90);
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    since.setHours(0, 0, 0, 0);
+
+    const rows = await prisma.$queryRaw<{ day: Date; revenue: number; orders: bigint }[]>`
+      SELECT date_trunc('day', o."createdAt") AS day,
+             SUM(oi.price * oi.quantity)::float AS revenue,
+             COUNT(DISTINCT o.id) AS orders
+      FROM "OrderItem" oi
+      JOIN "Order" o ON o.id = oi."orderId"
+      JOIN "Product" p ON p.id = oi."productId"
+      WHERE p."vendorId" = ${vendor.id}
+        AND o.status != 'CANCELLED'
+        AND o."createdAt" >= ${since}
+      GROUP BY day
+      ORDER BY day ASC
+    `;
+
+    res.status(200).json(
+      rows.map((r) => ({ date: r.day.toISOString().slice(0, 10), revenue: r.revenue, orders: Number(r.orders) }))
+    );
+  } catch (error) {
+    console.error('Error fetching vendor sales chart:', error);
+    res.status(500).json({ error: 'Failed to fetch sales chart' });
   }
 };
 

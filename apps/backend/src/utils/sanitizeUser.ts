@@ -40,6 +40,20 @@ export function sanitizeOrders<T extends OrderWithUsers>(orders: T[]): T[] {
   return orders.map(sanitizeOrder);
 }
 
+// deliveryOtp must only ever reach the order's own owner (the customer) --
+// the rider is who's supposed to receive it FROM the customer, and
+// admin/vendor list views have no legitimate reason to see it either.
+// Apply to any order-shaped response that ISN'T the customer's own
+// getMyOrders/getOrderById(isOwner) -- admin/vendor/rider list & action
+// endpoints. Mirrors ServiceBooking.completionOtp's handling.
+export function stripDeliveryOtp<T extends Record<string, unknown>>(order: T): T {
+  return { ...order, deliveryOtp: undefined, deliveryOtpGeneratedAt: undefined };
+}
+
+export function stripDeliveryOtps<T extends Record<string, unknown>>(orders: T[]): T[] {
+  return orders.map(stripDeliveryOtp);
+}
+
 // service.controller.ts nests a raw User both directly (booking.user) and one
 // level deeper (booking.technician.user) via Prisma `include` -- same shape
 // as sanitizeOrder above.

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet, Platform } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Platform, Appearance } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -12,8 +12,10 @@ import { store, RootState } from './src/store';
 import { loginSuccess } from './src/store/authSlice';
 import { hydrateCart } from './src/store/cartSlice';
 import { hydrateGarage, setVehicleTypeHydrated, loadVehicleType } from './src/store/appSlice';
+import { setThemePreferenceHydrated, loadThemePreference, systemSchemeChanged } from './src/store/themeSlice';
 import './src/services/sessionGuard';
 import { registerForPushNotificationsAsync } from './src/services/notifications';
+import { registerForWebPushAsync } from './src/services/webPush';
 import { API_BASE_URL } from './src/services/api';
 import { fetchMyVehicles } from './src/services/garage.service';
 import { OfflineBanner } from './src/components/OfflineBanner';
@@ -47,8 +49,7 @@ import WishlistScreen from './src/screens/WishlistScreen';
 import AddressManagementScreen from './src/screens/AddressManagementScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
 import HelpCenterScreen from './src/screens/HelpCenterScreen';
-import MechanicDetailScreen from './src/screens/MechanicDetailScreen';
-import VideoCallScreen from './src/screens/VideoCallScreen';
+import StaticPageScreen from './src/screens/StaticPageScreen';
 
 // Same key App.js already used for its session cache -- reusing it means an
 // already-logged-in user isn't logged out by this rewrite. Cart and garage get
@@ -187,6 +188,7 @@ function RootNavigator() {
         }
 
         dispatch(setVehicleTypeHydrated(await loadVehicleType()));
+        dispatch(setThemePreferenceHydrated(await loadThemePreference()));
       } catch (e) {
         console.error('Failed to hydrate app state from storage', e);
       } finally {
@@ -256,6 +258,27 @@ function RootNavigator() {
     })();
   }, [token]);
 
+  // Browser push (web build only -- see services/webPush.ts). Separate from
+  // the Expo push token above: writes to User.fcmToken instead of
+  // expoPushToken, so both channels can be registered for the same account
+  // without overwriting each other.
+  useEffect(() => {
+    if (!token) return;
+    (async () => {
+      try {
+        const fcmToken = await registerForWebPushAsync();
+        if (!fcmToken) return;
+        await fetch(`${API_BASE_URL}/auth/push-token`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ token: fcmToken, type: 'fcm' }),
+        });
+      } catch (e) {
+        console.error('Failed to register web push token:', e);
+      }
+    })();
+  }, [token]);
+
   useEffect(() => {
     if (!hydratedRef.current) return;
     AsyncStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems)).catch(e => console.error('Failed to persist cart:', e));
@@ -276,6 +299,16 @@ function RootNavigator() {
       dispatch(hydrateGarage({ myGarage: vehicles, activeVehicleId: active?.id ?? null }));
     });
   }, [token]);
+
+  // Only matters while the user's theme preference is 'system' (see
+  // systemSchemeChanged) -- an explicit light/dark choice stays put if the
+  // OS theme changes underneath the app.
+  useEffect(() => {
+    const sub = Appearance.addChangeListener(({ colorScheme }) => {
+      dispatch(systemSchemeChanged(colorScheme === 'dark' ? 'dark' : 'light'));
+    });
+    return () => sub.remove();
+  }, [dispatch]);
 
   if (!isReady) {
     return (
@@ -306,8 +339,7 @@ function RootNavigator() {
             <Stack.Screen name="AddressManagement" component={AddressManagementScreen} />
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
-            <Stack.Screen name="MechanicDetail" component={MechanicDetailScreen} />
-            <Stack.Screen name="VideoCall" component={VideoCallScreen} />
+            <Stack.Screen name="StaticPage" component={StaticPageScreen} />
             {/* Cart is reached via the header cart icon (HeaderCartButton) rather
                 than a persistent bottom tab -- see the Services module plan for why
                 Cart moved out of MainTabs' Tab.Navigator. */}

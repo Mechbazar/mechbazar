@@ -113,6 +113,7 @@ model User {
   dob       String?
   wallet    Float    @default(0.0)
   expoPushToken String?
+  fcmToken  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -421,6 +422,17 @@ model Product {
   isDeal             Boolean  @default(false)
   salesCount         Int      @default(0)
   compatibleModels   String?
+  // Free-form key/value spec sheet (e.g. {"Viscosity":"10W-40","Volume":"3.5L"}),
+  // shown on ProductDetailsScreen's Specifications tab. Nullable/optional --
+  // most existing rows have none, and the product form doesn't require it.
+  specifications     Json?
+  // Denormalized from Review rows, kept in sync by
+  // recomputeProductRating() (review.controller.ts) on every review
+  // create/update/delete. Lets GET /products sort/filter by rating directly
+  // in SQL instead of pulling every product's full review list into Node to
+  // average client-side on every request.
+  avgRating          Float    @default(0)
+  reviewCount        Int      @default(0)
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -435,6 +447,7 @@ model Product {
 
   @@index([vendorId])
   @@index([categoryId])
+  @@index([avgRating])
 }
 
 model ProductCompatibility {
@@ -472,6 +485,13 @@ model Order {
   codCollected      Boolean          @default(false)
   issueReason       String?
 
+  // Set when a rider calls "Generate OTP" once ON_THE_WAY; the customer reads
+  // the code aloud and the rider enters it to confirm delivery. Cleared once
+  // used. Mirrors ServiceBooking.completionOtp -- never returned to the
+  // rider's own client, only to the order's owner.
+  deliveryOtp             String?
+  deliveryOtpGeneratedAt  DateTime?
+
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
@@ -481,6 +501,7 @@ model Order {
   @@index([status])
   @@index([userId])
   @@index([deliveryPartnerId])
+  @@index([createdAt])
 }
 
 model OrderItem {
@@ -531,6 +552,9 @@ model Review {
   rating    Int
   comment   String?
   createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([productId])
 }
 
 model Wishlist {
@@ -552,6 +576,17 @@ model Notification {
   body      String
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+// Homepage newsletter signup -- no user account required (name matches
+// common e-commerce UX: any visitor can subscribe with just an email).
+model NewsletterSubscriber {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  subscribedAt DateTime @default(now())
 }
 
 // =======================
@@ -568,6 +603,10 @@ model AuditLog {
   details     String?  @db.Text
   ipAddress   String?
   createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
 }
 
 model Banner {
@@ -940,6 +979,7 @@ model ServiceBooking {
   @@index([userId])
   @@index([technicianId])
   @@index([status])
+  @@index([createdAt])
   @@index([scheduledDate])
 }
 
@@ -987,6 +1027,8 @@ model ServiceReview {
   rating       Int
   comment      String?
   createdAt    DateTime          @default(now())
+
+  @@index([technicianId])
 }
 
 model ServiceInvoice {
