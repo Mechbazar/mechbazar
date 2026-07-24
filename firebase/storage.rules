@@ -5,8 +5,7 @@ service firebase.storage {
       // All uploads go through apps/backend/src/controllers/upload.controller.ts
       // using the Admin SDK, which bypasses these rules entirely -- so writes
       // here are locked to nobody, and reads are public to match the public
-      // URL this backend already returns (mirrors the pre-existing Vercel
-      // Blob behavior it sits alongside).
+      // URL this backend already returns.
       allow read: if true;
       allow write: if false;
     }

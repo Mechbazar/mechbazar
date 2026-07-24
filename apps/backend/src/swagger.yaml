@@ -5,7 +5,7 @@ info:
   version: 1.0.0
 servers:
   - url: https://mechbazar.com
-    description: Production (Vercel)
+    description: Production
   - url: http://localhost:5001
     description: Local server
 paths:

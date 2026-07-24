@@ -1,8 +1,0 @@
-{
-  "installCommand": "npm install",
-  "buildCommand": "npm run build:web --workspace=mechanic",
-  "outputDirectory": "dist",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}

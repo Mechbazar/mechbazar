@@ -1,8 +1,0 @@
-{
-  "installCommand": "npm install",
-  "buildCommand": "npm run build:web --workspace=admin-mobile",
-  "outputDirectory": "apps/admin-mobile/dist",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}

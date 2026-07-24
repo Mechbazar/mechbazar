@@ -1,8 +1,8 @@
 // Handles FCM web push while the site is not the focused tab (Firebase's
 // required convention: this exact filename, served from the origin root --
-// see vercel.json's rewrite exception carving this path out of the SPA
-// catch-all). Foreground messages are handled in src/services/webPush.ts
-// instead, via onMessage().
+// nginx's `try_files $uri ... /index.html` serves this real file directly
+// before falling back to the SPA, see apps/mobile/nginx.conf). Foreground
+// messages are handled in src/services/webPush.ts instead, via onMessage().
 importScripts('https://www.gstatic.com/firebasejs/12.16.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/12.16.0/firebase-messaging-compat.js');
 

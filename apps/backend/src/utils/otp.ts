@@ -30,9 +30,9 @@ const hashOtp = (otp: string): string => {
  * Generates a local 6-digit OTP, stores its hash in the PhoneOtp table with a
  * 5-minute expiry, and logs it clearly to the console for testing.
  *
- * Stored in Postgres rather than Redis: production runs on serverless Vercel
- * where no Redis is provisioned, and the database is the only store that is
- * always available.
+ * Stored in Postgres rather than Redis: Redis is an optional cache that isn't
+ * guaranteed to be provisioned or reachable, and the database is the only
+ * store that is always available.
  */
 export const generateAndSendOtp = async (phone: string): Promise<{ otp: string; expiredInSeconds: number }> => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();

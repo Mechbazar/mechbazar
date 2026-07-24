@@ -14,7 +14,7 @@ MechBazar/
 │   ├── admin-mobile/            Admin companion app (Expo)
 │   └── seller-mobile/             Seller companion app (Expo)
 ├── packages/shared/      Shared code used by the workspace apps
-├── docker-compose.yml    Postgres + Redis + backend + admin + vendor, containerized
+├── docker-compose.yml    backend + admin + vendor + mobile, containerized (Postgres is Hostinger-managed, not in Docker)
 └── package.json          Root orchestration scripts (this file)
 ```
 
@@ -36,14 +36,14 @@ Copy each `.env.example` to `.env` (or `.env.local` for the Vite apps) and fill 
 
 | App | File | Notes |
 |---|---|---|
-| `apps/backend` | `.env.example` → `.env` | **Required.** Server refuses to start without `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`. |
+| `apps/backend` | `.env.example` → `.env` | **Required.** Server refuses to start without `DATABASE_URL`, `JWT_SECRET`. |
 | `apps/mobile` | `.env.example` → `.env` | Optional in dev -- the app auto-detects your dev machine's LAN IP. |
 | `apps/admin` | `.env.example` → `.env.local` | Optional in dev -- defaults to `http://<hostname>:5001`. |
 | `apps/vendor` | `.env.example` → `.env.local` | Optional in dev -- defaults to `http://localhost:5001`. |
 
 **The backend port is `5001` everywhere by default.** If you change `PORT` in `apps/backend/.env`, update `EXPO_PUBLIC_BACKEND_PORT` / `VITE_BACKEND_PORT` in the frontend `.env` files to match, or the frontends will fail to reach the backend even though it's running.
 
-You also need Postgres and (optionally) Redis reachable at the URLs in `apps/backend/.env`. Easiest path: `docker compose up postgres redis`.
+You also need a reachable Postgres database at `DATABASE_URL` in `apps/backend/.env` (a local install, or point it at the Hostinger database) and, optionally, Redis at `REDIS_URL` (the backend runs fine without it -- it's cache-only).
 
 ## 3. Run everything
 
@@ -78,7 +78,7 @@ npm run dev:seller-mobile
 npm start
 ```
 
-Runs `apps/backend`'s production script: `prisma db push --accept-data-loss=false && node dist/index.js` (requires `npm --prefix apps/backend run build` first). In practice, production deploys go through Vercel (`npx vercel --prod` from `apps/backend`) or Render (`render.yaml`), not this script directly -- see **Production deployment** below.
+Runs `apps/backend`'s production script: `prisma db push --accept-data-loss=false && node dist/index.js` (requires `npm --prefix apps/backend run build` first). In practice this runs inside the `backend` Docker container on the Hostinger VPS, not directly on a dev machine -- see **Production deployment** below.
 
 ---
 
@@ -95,12 +95,24 @@ Use `/status` for anything that needs to know "is this instance actually able to
 
 ## Production deployment
 
-- **Backend**: Vercel, deployed straight from the working tree — `npx vercel --prod` run from `apps/backend` (project `mechbazar-backend`). Vercel runs the TypeScript source directly via `api/index.ts`; `vercel.json`'s build command is a no-op. There is no git remote wired to this repo, so nothing auto-deploys from a push — you have to run the CLI yourself, and whatever is in your working tree at that moment is what ships.
-- **Mobile**: EAS cloud builds from `apps/mobile` — `npx eas-cli build --platform android --profile preview --non-interactive`. The `preview`/`production` profiles in `eas.json` bake in `EXPO_PUBLIC_API_URL=https://mechbazar-backend.vercel.app/api`, so production/preview builds never depend on your dev machine's LAN IP.
-- **Render** (`render.yaml`): an alternative Node deploy target for the backend. Not the current production path (see above) but kept working — `PORT` there is fixed at `5000`, independent of the `5001` local-dev default.
-- **Docker** (`docker-compose.yml`): full local stack (Postgres, Redis, backend, admin, vendor) with the backend on port `5005` inside that stack specifically. This is intentionally different from the bare `npm run dev` local default (`5001`) -- pick one workflow (native `npm run dev` *or* `docker compose up`) rather than mixing them, since a frontend configured for one won't reach the backend on the other without overriding its `.env`.
+**MechBazar has exactly one production environment: a Hostinger VPS.** Docker Compose builds and runs `backend`, `admin`, `vendor`, and `mobile` as containers on the VPS, each bound to `127.0.0.1` only; Nginx on the VPS host is the sole public entry point (Let's Encrypt TLS, reference vhost configs in `deploy/nginx/`) and proxies:
 
-After shipping a new backend feature, it is not live for APK/production users until you've run `prisma db push` (and any needed seed scripts) against the **production** database and redeployed — see the Troubleshooting section.
+- `mechbazar.com` / `www.mechbazar.com` → `/api`, `/uploads` to the `backend` container (`:5005`), everything else to the `mobile` container (`:3002`)
+- `admin.mechbazar.com` → the `admin` container (`:3000`)
+- `vendor.mechbazar.com` → the `vendor` container (`:3001`)
+
+The `admin`/`vendor`/`mobile` Docker builds bake in `VITE_API_URL` / `EXPO_PUBLIC_API_URL=https://mechbazar.com/api` at build time (see `docker-compose.yml`'s build `args`), and `apps/mobile/eas.json`'s `preview`/`production` profiles do the same for APK builds via EAS.
+
+**Deploy workflow:**
+1. Develop and commit locally, push to GitHub (`main`)
+2. SSH into the Hostinger VPS
+3. `git pull`
+4. `docker compose up -d --build` (rebuilds and restarts whichever containers changed)
+5. Verify: `curl https://mechbazar.com/api/health`, then check `mechbazar.com`, `admin.mechbazar.com`, `vendor.mechbazar.com` in a browser
+
+There is no auto-deploy on push (no CI/CD wired up) — a VPS redeploy is always a manual `git pull` + `docker compose up -d --build` over SSH.
+
+After shipping a new backend feature, it is not live for APK/production users until you've run `prisma db push` (and any needed seed scripts) against the **production** (Hostinger) database and redeployed — see the Troubleshooting section.
 
 ---
 
@@ -108,12 +120,12 @@ After shipping a new backend feature, it is not live for APK/production users un
 
 **"Backend Not Running" / frontend can't reach the API**
 1. Is the backend process actually up? `curl http://localhost:5001/status` (or open it in a browser). If nothing responds, check the backend terminal for a `[FATAL]` line — most commonly a missing env var or `EADDRINUSE` (something else is already using port 5001; find and stop it, or change `PORT`).
-2. If `/status` responds but returns `"database": "down"`, Postgres isn't reachable at `DATABASE_URL` — start it (`docker compose up postgres`) or fix the connection string.
+2. If `/status` responds but returns `"database": "down"`, Postgres isn't reachable at `DATABASE_URL` — confirm the Hostinger Postgres instance is up and the connection string is correct.
 3. If the backend is healthy but the app still can't reach it, it's a port/host mismatch: confirm the frontend's configured port (`EXPO_PUBLIC_BACKEND_PORT` / `VITE_BACKEND_PORT`, or their `.env` files) matches the backend's actual `PORT`. This exact mismatch (frontends defaulting to `5000`, backend running on `5001`/`5005` depending on how it was started) was the root cause of most historical "backend not running" reports — it wasn't down, everyone was just pointed at the wrong port.
 4. On a physical phone: `localhost` never works from the phone's perspective. `apps/mobile` auto-detects your dev machine's LAN IP from the Expo dev server; if that fails (e.g. VPN, unusual network setup), set `EXPO_PUBLIC_API_URL` explicitly in `apps/mobile/.env`.
 
 **Server exits immediately on `npm run dev` / `npm start`**
-Check for a `[FATAL] Missing required environment variable(s): ...` message — copy `apps/backend/.env.example` to `.env` and fill in `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`.
+Check for a `[FATAL] Missing required environment variable(s): ...` message — copy `apps/backend/.env.example` to `.env` and fill in `DATABASE_URL`, `JWT_SECRET`.
 
 **`EADDRINUSE` on startup**
 Another process (often a previous backend instance that didn't shut down cleanly) is already bound to the port. On Windows: `netstat -ano | findstr :5001` then `taskkill /PID <pid> /F`. Prefer `Ctrl+C` (not killing the terminal window) to stop the dev server next time — the graceful-shutdown handler releases the port properly.
@@ -121,7 +133,7 @@ Another process (often a previous backend instance that didn't shut down cleanly
 **Database connection errors on startup**
 The server retries the DB connection every 3 seconds and logs each attempt instead of crashing — check the logged error for the actual cause (wrong credentials, Postgres container not started, network issue) rather than assuming the backend itself is broken.
 
-**Local dev needs Docker Desktop running** for Postgres/Redis unless you've pointed `DATABASE_URL`/`REDIS_URL` at externally-hosted instances.
+**Local dev** needs a reachable Postgres instance at `DATABASE_URL` (local install or remote) and, optionally, Redis at `REDIS_URL`.
 
 ---
 

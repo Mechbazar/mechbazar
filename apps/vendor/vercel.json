@@ -1,8 +1,0 @@
-{
-  "installCommand": "cd ../.. && npm install --legacy-peer-deps",
-  "buildCommand": "cd ../.. && node -e \"['VITE_API_URL','VITE_SERVER_ORIGIN'].forEach(k => { if (!process.env[k]) { console.error('[FATAL] Missing required env var: ' + k); process.exit(1); } })\" && npm run build --workspace=vendor",
-  "outputDirectory": "dist",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
-}

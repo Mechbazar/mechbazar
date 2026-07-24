@@ -27,8 +27,8 @@ function resolveDevHost(): string {
 }
 
 // EXPO_PUBLIC_API_URL overrides the dev-host guess entirely -- required in
-// production (Vercel web build, or any build not sitting on the same LAN as
-// the backend), where there's no dev server host to derive an address from.
+// production (the Docker web build, or any build not sitting on the same LAN
+// as the backend), where there's no dev server host to derive an address from.
 export const SERVER_ORIGIN = `http://${resolveDevHost()}:${BACKEND_PORT}`;
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || `${SERVER_ORIGIN}/api`;
 

@@ -4,9 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -234,7 +233,7 @@ model RiderDocument {
   deliveryPartner   DeliveryPartner @relation(fields: [deliveryPartnerId], references: [id])
   type              String   // AADHAAR, DL_FRONT, DL_BACK, RC, INSURANCE, PUC, SELFIE, PROFILE_PHOTO
   filePath          String   // legacy disk path for pre-serverless rows; new rows store the original filename here for display only
-  fileData          Bytes?   // file bytes, stored in Postgres instead of disk -- Vercel's serverless functions have no persistent filesystem, and this data is private KYC content that must not sit in public object storage
+  fileData          Bytes?   // file bytes, stored in Postgres instead of disk -- this is private KYC content that must not sit in public object storage
   mimeType          String?
   status            String   @default("PENDING") // PENDING, VERIFIED, REJECTED
   remarks           String?
@@ -825,7 +824,7 @@ model TechnicianDocument {
   technician    ServiceTechnician @relation(fields: [technicianId], references: [id])
   type          String   // AADHAAR, CERTIFICATION, SELFIE, PROFILE_PHOTO
   filePath      String   // original filename, display only -- bytes are the source of truth
-  fileData      Bytes?   // stored in Postgres, not disk -- see RiderDocument for rationale (no persistent FS on Vercel serverless, and this is private KYC content)
+  fileData      Bytes?   // stored in Postgres, not disk -- see RiderDocument for rationale (private KYC content)
   mimeType      String?
   status        String   @default("PENDING") // PENDING, VERIFIED, REJECTED
   remarks       String?

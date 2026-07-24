@@ -37,9 +37,9 @@ import fs from 'fs';
 
 const app = express();
 
-// Behind Vercel's proxy the client IP arrives via X-Forwarded-For; without
-// this, express-rate-limit rejects the header and rate-limits all traffic
-// as a single client.
+// Behind the VPS Nginx reverse proxy the client IP arrives via
+// X-Forwarded-For; without this, express-rate-limit rejects the header and
+// rate-limits all traffic as a single client.
 app.set('trust proxy', 1);
 
 // Middlewares
@@ -146,14 +146,7 @@ app.get('/', (req, res) => {
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Vercel's Node runtime imports `app` and calls it directly as a request
-// handler (see api/index.ts) -- it never runs this file as a long-lived
-// process, so binding a port or blocking on DB connectivity here would just
-// leak a listener/delay that's never reached. Docker/local dev still needs
-// the real listen() + startup sequence below.
-if (!env.IS_VERCEL) {
-  startServer();
-}
+startServer();
 
 async function startServer() {
   console.log(`[startup] Starting MechBazar backend (${env.NODE_ENV})...`);

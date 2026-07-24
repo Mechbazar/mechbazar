@@ -3,7 +3,7 @@
 // customer app's Add to Garage screen browses. Manufacturers carry a CAR/BIKE type so the
 // screen's Cars/Bikes toggle filters server-side. Idempotent: safe to re-run against a DB
 // that already holds part or all of this catalog (upserts + skipDuplicates throughout).
-// Run: npx tsx prisma/seed-vehicle-master.ts   (set DATABASE_URL/DIRECT_URL for prod)
+// Run: npx tsx prisma/seed-vehicle-master.ts   (set DATABASE_URL for prod)
 import prisma from '../src/config/prisma';
 
 const FUEL_TYPES = ['Petrol', 'Diesel', 'CNG', 'Electric', 'Hybrid'];

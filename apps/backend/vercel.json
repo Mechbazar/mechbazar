@@ -1,6 +1,0 @@
-{
-  "buildCommand": "echo skip",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/api" }
-  ]
-}

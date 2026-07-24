@@ -3,11 +3,11 @@ import { getApps } from 'firebase-admin/app';
 import fs from 'fs';
 import path from 'path';
 
-// Production/Vercel: credentials come from FIREBASE_* env vars -- no key file
-// is ever uploaded there (src/config/firebaseServiceAccount.json is
-// gitignored). Local dev: falls back to that gitignored JSON file if present.
-// The file path is resolved at runtime (not a literal `require(...)`) so a
-// missing file can't break the Vercel build, only this catch block.
+// Production: credentials come from FIREBASE_* env vars -- no key file is
+// ever committed (src/config/firebaseServiceAccount.json is gitignored).
+// Local dev: falls back to that gitignored JSON file if present. The file
+// path is resolved at runtime (not a literal `require(...)`) so a missing
+// file can't break the build, only this catch block.
 function loadServiceAccount(): admin.ServiceAccount | null {
   const { FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY } = process.env;
   if (FIREBASE_PROJECT_ID && FIREBASE_CLIENT_EMAIL && FIREBASE_PRIVATE_KEY) {
