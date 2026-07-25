@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
-import { Users, Plus, Phone, Mail, Building } from 'lucide-react';
+import { Users, Plus, Phone, Mail, Building, MapPin } from 'lucide-react';
 import { Button, Badge, Dialog, Input, Loader } from '@mechbazar/shared/web';
 import { API_URL } from '../../config/api';
+import AddressMapPicker from '../../components/maps/AddressMapPicker';
+import PlaceAutocompleteField from '../../components/maps/PlaceAutocompleteField';
+import type { GeocodeSuccess } from '../../services/geocode.service';
 
 export default function Suppliers() {
   const { token } = useSelector((state: RootState) => state.auth);
@@ -20,9 +23,46 @@ export default function Suppliers() {
     phone: '',
     email: '',
     gstNumber: '',
-    address: ''
+    address: '',
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    state: '',
+    pincode: '',
+    country: '',
+    lat: null as number | null,
+    lng: null as number | null,
+    placeId: '',
+    formattedAddress: '',
   };
   const [formData, setFormData] = useState(emptyForm);
+
+  // Unconditional overwrite from an autocomplete selection -- also
+  // re-synthesizes the legacy free-text `address` field so it never goes
+  // stale relative to the structured fields (matches the backend's own
+  // create-time synthesizeAddress fallback in supplier.controller.ts).
+  const applyGeocodeResult = (result: GeocodeSuccess) => {
+    setFormData((prev) => {
+      const addressLine1 = result.components.line1 || prev.addressLine1;
+      const city = result.components.city || prev.city;
+      const state = result.components.state || prev.state;
+      const pincode = result.components.pincode || prev.pincode;
+      const country = result.components.country || prev.country;
+      return {
+        ...prev,
+        addressLine1,
+        city,
+        state,
+        pincode,
+        country,
+        lat: result.lat,
+        lng: result.lng,
+        placeId: result.placeId,
+        formattedAddress: result.formattedAddress,
+        address: result.formattedAddress || [addressLine1, prev.addressLine2, city, state, pincode].filter(Boolean).join(', '),
+      };
+    });
+  };
 
   useEffect(() => {
     fetchSuppliers();
@@ -78,7 +118,17 @@ export default function Suppliers() {
       phone: supplier.phone || '',
       email: supplier.email || '',
       gstNumber: supplier.gstNumber || '',
-      address: supplier.address || ''
+      address: supplier.address || '',
+      addressLine1: supplier.addressLine1 || '',
+      addressLine2: supplier.addressLine2 || '',
+      city: supplier.city || '',
+      state: supplier.state || '',
+      pincode: supplier.pincode || '',
+      country: supplier.country || '',
+      lat: supplier.lat ?? null,
+      lng: supplier.lng ?? null,
+      placeId: supplier.placeId || '',
+      formattedAddress: supplier.formattedAddress || '',
     });
     setShowModal(true);
   };
@@ -116,6 +166,7 @@ export default function Suppliers() {
                 <th className="p-4 text-sm font-semibold text-brand-muted">Supplier / Company</th>
                 <th className="p-4 text-sm font-semibold text-brand-muted">Contact Info</th>
                 <th className="p-4 text-sm font-semibold text-brand-muted">GST Number</th>
+                <th className="p-4 text-sm font-semibold text-brand-muted">Location</th>
                 <th className="p-4 text-sm font-semibold text-brand-muted">Purchase Orders</th>
                 <th className="p-4 text-sm font-semibold text-brand-muted">Status</th>
                 <th className="p-4 text-sm font-semibold text-brand-muted text-right">Actions</th>
@@ -143,6 +194,14 @@ export default function Suppliers() {
                   </td>
                   <td className="p-4 text-sm text-brand-light">
                     {supplier.gstNumber || 'N/A'}
+                  </td>
+                  <td className="p-4 text-xs text-brand-muted max-w-[200px]">
+                    {(supplier.formattedAddress || supplier.address) ? (
+                      <div className="flex items-start">
+                        <MapPin className="w-3.5 h-3.5 mr-1 mt-0.5 flex-shrink-0" />
+                        <span className="truncate">{supplier.formattedAddress || supplier.address}</span>
+                      </div>
+                    ) : 'N/A'}
                   </td>
                   <td className="p-4 text-sm text-brand-light font-medium">
                     {supplier._count?.purchaseOrders || 0} POs
@@ -221,6 +280,24 @@ export default function Suppliers() {
                   onChange={(e) => setFormData({...formData, address: e.target.value})}
                   className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-primary-500 resize-none"
                 ></textarea>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-sm font-bold text-white flex items-center"><MapPin className="w-4 h-4 mr-2" /> Precise Location (optional)</p>
+                <PlaceAutocompleteField onSelect={applyGeocodeResult} placeholder="Search for supplier address" />
+                <AddressMapPicker
+                  latitude={formData.lat}
+                  longitude={formData.lng}
+                  onChange={({ latitude, longitude }) => setFormData({ ...formData, lat: latitude, lng: longitude })}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="Address Line 1" type="text" value={formData.addressLine1} onChange={(e) => setFormData({...formData, addressLine1: e.target.value})} />
+                  <Input label="Address Line 2" type="text" value={formData.addressLine2} onChange={(e) => setFormData({...formData, addressLine2: e.target.value})} />
+                  <Input label="City" type="text" value={formData.city} onChange={(e) => setFormData({...formData, city: e.target.value})} />
+                  <Input label="State" type="text" value={formData.state} onChange={(e) => setFormData({...formData, state: e.target.value})} />
+                  <Input label="Pincode" type="text" value={formData.pincode} onChange={(e) => setFormData({...formData, pincode: e.target.value})} />
+                  <Input label="Country" type="text" value={formData.country} onChange={(e) => setFormData({...formData, country: e.target.value})} />
+                </div>
               </div>
 
               <div className="flex space-x-4 mt-6 pt-2">

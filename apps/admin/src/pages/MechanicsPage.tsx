@@ -9,6 +9,10 @@ import {
 } from 'lucide-react';
 import { Button, Card, Badge, Dialog, Input, Loader } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
+import AddressMapPicker from '../components/maps/AddressMapPicker';
+import PlaceAutocompleteField from '../components/maps/PlaceAutocompleteField';
+import LocationMapView from '../components/maps/LocationMapView';
+import type { GeocodeSuccess } from '../services/geocode.service';
 
 const KYC_REVIEWABLE = new Set(['PENDING', 'UNDER_VERIFICATION', 'RESUBMISSION_REQUIRED']);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -41,7 +45,27 @@ export default function MechanicsPage() {
     id: '', name: '', phone: '', email: '', city: '', state: '',
     specializations: ['CAR', 'BIKE'] as string[], skills: '', experienceYears: '',
     isActive: true, isOnline: false,
+    addressLine: '', pincode: '', country: '',
+    lat: null as number | null, lng: null as number | null,
+    placeId: '', formattedAddress: '',
   });
+
+  // Unconditional overwrite from an autocomplete selection -- matches the
+  // applyGeocodeResult pattern used in apps/vendor's Register/Profile pages.
+  const applyGeocodeResult = (result: GeocodeSuccess) => {
+    setFormData((prev) => ({
+      ...prev,
+      addressLine: result.components.line1 || prev.addressLine,
+      city: result.components.city || prev.city,
+      state: result.components.state || prev.state,
+      pincode: result.components.pincode || prev.pincode,
+      country: result.components.country || prev.country,
+      lat: result.lat,
+      lng: result.lng,
+      placeId: result.placeId,
+      formattedAddress: result.formattedAddress,
+    }));
+  };
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState('');
 
@@ -108,22 +132,34 @@ export default function MechanicsPage() {
     setFormError('');
     if (technician) {
       setIsEditing(true);
+      const tp = technician.technicianProfile || {};
       setFormData({
         id: technician.id,
         name: technician.name || '',
         phone: technician.phone || '',
         email: technician.email || '',
-        city: technician.city || '',
-        state: technician.state || '',
-        specializations: technician.technicianProfile?.specializations || [],
-        skills: (technician.technicianProfile?.skills || []).join(', '),
-        experienceYears: technician.technicianProfile?.experienceYears != null ? String(technician.technicianProfile.experienceYears) : '',
-        isActive: technician.technicianProfile?.isActive ?? true,
-        isOnline: technician.technicianProfile?.isOnline ?? false,
+        city: tp.city || technician.city || '',
+        state: tp.state || technician.state || '',
+        specializations: tp.specializations || [],
+        skills: (tp.skills || []).join(', '),
+        experienceYears: tp.experienceYears != null ? String(tp.experienceYears) : '',
+        isActive: tp.isActive ?? true,
+        isOnline: tp.isOnline ?? false,
+        addressLine: tp.addressLine || '',
+        pincode: tp.pincode || '',
+        country: tp.country || '',
+        lat: tp.lat ?? null,
+        lng: tp.lng ?? null,
+        placeId: tp.placeId || '',
+        formattedAddress: tp.formattedAddress || '',
       });
     } else {
       setIsEditing(false);
-      setFormData({ id: '', name: '', phone: '', email: '', city: '', state: '', specializations: ['CAR', 'BIKE'], skills: '', experienceYears: '', isActive: true, isOnline: false });
+      setFormData({
+        id: '', name: '', phone: '', email: '', city: '', state: '',
+        specializations: ['CAR', 'BIKE'], skills: '', experienceYears: '', isActive: true, isOnline: false,
+        addressLine: '', pincode: '', country: '', lat: null, lng: null, placeId: '', formattedAddress: '',
+      });
     }
     setShowModal(true);
   };
@@ -397,13 +433,19 @@ export default function MechanicsPage() {
                   {getKycStatusBadge(technician.technicianProfile?.status)}
                 </div>
                 {technician.technicianProfile?.currentLat != null && technician.technicianProfile?.currentLng != null && (
-                  <a
-                    href={`https://www.google.com/maps?q=${technician.technicianProfile.currentLat},${technician.technicianProfile.currentLng}`}
-                    target="_blank" rel="noreferrer"
-                    className="flex items-center justify-between text-brand-primary hover:text-brand-secondary text-xs font-bold"
-                  >
-                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> Track Live Location</span>
-                  </a>
+                  <div className="pt-1 space-y-1.5">
+                    <LocationMapView
+                      markers={[{ id: technician.id, lat: technician.technicianProfile.currentLat, lng: technician.technicianProfile.currentLng, label: technician.name, color: 'green' }]}
+                      height={120}
+                    />
+                    <a
+                      href={`https://www.google.com/maps?q=${technician.technicianProfile.currentLat},${technician.technicianProfile.currentLng}`}
+                      target="_blank" rel="noreferrer"
+                      className="flex items-center justify-between text-brand-primary hover:text-brand-secondary text-xs font-bold"
+                    >
+                      <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> Open in Google Maps</span>
+                    </a>
+                  </div>
                 )}
               </div>
 
@@ -495,6 +537,16 @@ export default function MechanicsPage() {
                 <div><p className="text-sm text-brand-muted">Experience</p><p className="font-medium text-brand-light">{activeTechnician.technicianProfile?.experienceYears != null ? `${activeTechnician.technicianProfile.experienceYears} years` : 'N/A'}</p></div>
                 <div><p className="text-sm text-brand-muted">Emergency Contact</p><p className="font-medium text-brand-light">{activeTechnician.technicianProfile?.emergencyContactName || 'N/A'} — {activeTechnician.technicianProfile?.emergencyContactPhone || ''}</p></div>
               </div>
+              {(activeTechnician.technicianProfile?.formattedAddress || activeTechnician.technicianProfile?.lat != null) && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-sm text-brand-muted flex items-center"><MapPin className="w-4 h-4 mr-1" /> {activeTechnician.technicianProfile.formattedAddress || 'KYC address location'}</p>
+                  <LocationMapView
+                    markers={activeTechnician.technicianProfile.lat != null ? [{ id: 'kyc-address', lat: activeTechnician.technicianProfile.lat, lng: activeTechnician.technicianProfile.lng }] : []}
+                    height={200}
+                    emptyLabel="No geocoded address on file"
+                  />
+                </div>
+              )}
             </div>
 
             <div>
@@ -600,6 +652,22 @@ export default function MechanicsPage() {
               {fieldErrors.email ? <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p> : null}
             </div>
             <Input label="City" type="text" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} />
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <p className="text-sm font-bold text-brand-light flex items-center"><MapPin className="w-4 h-4 mr-2" /> KYC Address / Service Location</p>
+            <PlaceAutocompleteField onSelect={applyGeocodeResult} placeholder="Search for mechanic's address" />
+            <AddressMapPicker
+              latitude={formData.lat}
+              longitude={formData.lng}
+              onChange={({ latitude, longitude }) => setFormData({ ...formData, lat: latitude, lng: longitude })}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Address Line" type="text" value={formData.addressLine} onChange={(e) => setFormData({ ...formData, addressLine: e.target.value })} />
+              <Input label="State" type="text" value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value })} />
+              <Input label="Pincode" type="text" value={formData.pincode} onChange={(e) => setFormData({ ...formData, pincode: e.target.value })} />
+              <Input label="Country" type="text" value={formData.country} onChange={(e) => setFormData({ ...formData, country: e.target.value })} />
+            </div>
           </div>
 
           <div>

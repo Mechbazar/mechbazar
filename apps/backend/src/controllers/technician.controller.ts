@@ -127,7 +127,10 @@ export const createTechnician = async (req: Request, res: Response): Promise<voi
 export const updateTechnician = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);
-    const { name, phone, email, city, state, specializations, skills, experienceYears, isActive, isOnline } = req.body;
+    const {
+      name, phone, email, city, state, specializations, skills, experienceYears, isActive, isOnline,
+      addressLine, pincode, country, lat, lng, placeId, formattedAddress,
+    } = req.body;
 
     const existingUser = await prisma.user.findUnique({ where: { id } });
     if (!existingUser) {
@@ -150,6 +153,22 @@ export const updateTechnician = async (req: Request, res: Response): Promise<voi
             ...(experienceYears !== undefined && { experienceYears }),
             ...(isActive !== undefined && { isActive }),
             ...(isOnline !== undefined && { isOnline }),
+            // Admin-side KYC address editing (Phase 4 Maps integration) --
+            // same fields/conditional-update pattern as the technician's own
+            // updateMyRegistration above, just reachable from the admin panel.
+            // city/state are also mirrored here (not just onto User above) --
+            // the KYC review modal reads technicianProfile.city/.pincode, so
+            // leaving them User-only meant the edit form's City field never
+            // actually reached what the review modal displays.
+            ...(city !== undefined && { city }),
+            ...(state !== undefined && { state }),
+            ...(addressLine !== undefined && { addressLine }),
+            ...(pincode !== undefined && { pincode }),
+            ...(country !== undefined && { country }),
+            ...(lat !== undefined && { lat }),
+            ...(lng !== undefined && { lng }),
+            ...(placeId !== undefined && { placeId }),
+            ...(formattedAddress !== undefined && { formattedAddress }),
           },
         },
       },

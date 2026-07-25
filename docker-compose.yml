@@ -40,6 +40,11 @@ services:
         VITE_FIREBASE_STORAGE_BUCKET: mech-bazar-8fd86.firebasestorage.app
         VITE_FIREBASE_MESSAGING_SENDER_ID: "42514698096"
         VITE_FIREBASE_APP_ID: "1:42514698096:web:2da09e89e77068173149b5"
+        # Google Maps JavaScript API + Places API key for the location maps
+        # across Vendors, Warehouses, Suppliers, Technicians, Customers, and
+        # Orders pages -- same key/convention as the vendor service below.
+        # Missing/empty degrades gracefully to plain address text.
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY}
     container_name: mechbazar_admin
     ports:
       # Loopback only -- see the backend service's port comment above.

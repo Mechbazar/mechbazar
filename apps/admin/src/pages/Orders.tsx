@@ -6,6 +6,7 @@ import type { RootState } from '../store';
 import { Package, Search, Clock, Truck, CheckCircle, MoreVertical, UserPlus, X } from 'lucide-react';
 import { Badge, Card } from '@mechbazar/shared/web';
 import { API_URL, SERVER_ORIGIN } from '../config/api';
+import LocationMapView from '../components/maps/LocationMapView';
 
 const ORDERS_POLL_INTERVAL_MS = 20000;
 
@@ -446,6 +447,26 @@ export default function Orders() {
                   {getStatusBadge(selectedOrder.status)}
                 </div>
               </div>
+
+              {(selectedOrder.address?.lat != null || selectedOrder.deliveryPartner?.currentLat != null) && (
+                <div className="mb-6">
+                  <h4 className="font-bold text-white mb-2 border-b border-neutral-800 pb-2">Delivery Tracking</h4>
+                  <LocationMapView
+                    markers={[
+                      ...(selectedOrder.address?.lat != null
+                        ? [{ id: 'destination', lat: selectedOrder.address.lat, lng: selectedOrder.address.lng, label: 'Delivery Address', color: 'red' as const }]
+                        : []),
+                      ...(selectedOrder.deliveryPartner?.currentLat != null
+                        ? [{ id: 'rider', lat: selectedOrder.deliveryPartner.currentLat, lng: selectedOrder.deliveryPartner.currentLng, label: selectedOrder.deliveryPartner.user?.name || 'Rider', color: 'green' as const }]
+                        : []),
+                    ]}
+                    height={220}
+                  />
+                  {selectedOrder.deliveryPartner?.currentLat == null && selectedOrder.deliveryPartner && (
+                    <p className="text-xs text-neutral-500 mt-1.5 italic">Rider's live location not yet available.</p>
+                  )}
+                </div>
+              )}
 
               <h4 className="font-bold text-white mb-4 border-b border-neutral-800 pb-2">Order Items</h4>
               <div className="space-y-4 mb-6">

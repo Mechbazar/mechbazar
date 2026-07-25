@@ -2,9 +2,18 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
-import { Store, Phone, Search, Plus, Eye, FileText, Landmark, Building, FileCheck } from 'lucide-react';
+import { Store, Phone, Search, Plus, Eye, FileText, Landmark, Building, FileCheck, MapPin } from 'lucide-react';
 import { Button, Badge, Dialog, Input, Loader } from '@mechbazar/shared/web';
 import { API_URL, SERVER_ORIGIN } from '../config/api';
+import AddressMapPicker from '../components/maps/AddressMapPicker';
+import PlaceAutocompleteField from '../components/maps/PlaceAutocompleteField';
+import LocationMapView from '../components/maps/LocationMapView';
+import type { GeocodeSuccess } from '../services/geocode.service';
+
+const emptyAddress = {
+  addressLine1: '', addressLine2: '', city: '', state: '', pincode: '', country: '',
+  lat: null as number | null, lng: null as number | null, placeId: '', formattedAddress: '',
+};
 
 export default function Vendors() {
   const { token } = useSelector((state: RootState) => state.auth);
@@ -19,7 +28,7 @@ export default function Vendors() {
   const [activeVendor, setActiveVendor] = useState<any>(null);
 
   const [formData, setFormData] = useState({
-    id: '', name: '', phone: '', email: '', city: '', state: '', storeName: '', gstNumber: '', isActive: true
+    id: '', name: '', phone: '', email: '', storeName: '', gstNumber: '', isActive: true, ...emptyAddress
   });
 
   useEffect(() => {
@@ -45,23 +54,49 @@ export default function Vendors() {
 
   const handleOpenEditModal = (vendor?: any) => {
     if (vendor) {
+      const vp = vendor.vendorProfile || {};
       setFormData({
         id: vendor.id,
         name: vendor.name || '',
         phone: vendor.phone || '',
         email: vendor.email || '',
-        city: vendor.city || '',
-        state: vendor.state || '',
-        storeName: vendor.vendorProfile?.storeName || '',
-        gstNumber: vendor.vendorProfile?.gstNumber || '',
-        isActive: vendor.vendorProfile?.isActive ?? true
+        storeName: vp.storeName || '',
+        gstNumber: vp.gstNumber || '',
+        isActive: vp.isActive ?? true,
+        addressLine1: vp.addressLine1 || '',
+        addressLine2: vp.addressLine2 || '',
+        city: vp.city || vendor.city || '',
+        state: vp.state || vendor.state || '',
+        pincode: vp.pincode || '',
+        country: vp.country || '',
+        lat: vp.lat ?? null,
+        lng: vp.lng ?? null,
+        placeId: vp.placeId || '',
+        formattedAddress: vp.formattedAddress || '',
       });
     } else {
       setFormData({
-        id: '', name: '', phone: '', email: '', city: '', state: '', storeName: '', gstNumber: '', isActive: true
+        id: '', name: '', phone: '', email: '', storeName: '', gstNumber: '', isActive: true, ...emptyAddress
       });
     }
     setShowEditModal(true);
+  };
+
+  // Unconditional overwrite from an autocomplete selection -- matches the
+  // applyGeocodeResult pattern used in apps/vendor's Register/Profile pages.
+  const applyGeocodeResult = (result: GeocodeSuccess) => {
+    setFormData((prev) => ({
+      ...prev,
+      addressLine1: result.components.line1 || prev.addressLine1,
+      city: result.components.city || prev.city,
+      state: result.components.state || prev.state,
+      pincode: result.components.pincode || prev.pincode,
+      country: result.components.country || prev.country,
+      lat: result.lat,
+      lng: result.lng,
+      placeId: result.placeId,
+      formattedAddress: result.formattedAddress,
+    }));
   };
 
   const handleOpenReviewModal = (vendor: any) => {
@@ -243,6 +278,16 @@ export default function Vendors() {
                   <div><p className="text-sm text-brand-muted">PAN Number</p><p className="font-medium text-brand-light">{activeVendor.vendorProfile.panNumber}</p></div>
                   <div><p className="text-sm text-brand-muted">Location</p><p className="font-medium text-brand-light">{activeVendor.city}, {activeVendor.state}</p></div>
                 </div>
+                {(activeVendor.vendorProfile.formattedAddress || activeVendor.vendorProfile.lat != null) && (
+                  <div className="mt-4 space-y-2">
+                    <p className="text-sm text-brand-muted flex items-center"><MapPin className="w-4 h-4 mr-1" /> {activeVendor.vendorProfile.formattedAddress || 'Store location'}</p>
+                    <LocationMapView
+                      markers={activeVendor.vendorProfile.lat != null ? [{ id: 'store', lat: activeVendor.vendorProfile.lat, lng: activeVendor.vendorProfile.lng, label: activeVendor.vendorProfile.storeName }] : []}
+                      height={200}
+                      emptyLabel="No store location set"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Bank Details */}
@@ -305,6 +350,24 @@ export default function Vendors() {
                     <input type="checkbox" id="isActive" checked={formData.isActive} onChange={(e) => setFormData({...formData, isActive: e.target.checked})} className="mr-2" />
                     <label htmlFor="isActive" className="text-sm font-medium text-brand-muted">Vendor is Active (can sell on platform)</label>
                   </div>
+               </div>
+
+               <div className="pt-4 border-t border-brand-border space-y-3">
+                 <p className="text-sm font-bold text-brand-light flex items-center"><MapPin className="w-4 h-4 mr-2" /> Store Location</p>
+                 <PlaceAutocompleteField onSelect={applyGeocodeResult} placeholder="Search for store address" />
+                 <AddressMapPicker
+                   latitude={formData.lat}
+                   longitude={formData.lng}
+                   onChange={({ latitude, longitude }) => setFormData({ ...formData, lat: latitude, lng: longitude })}
+                 />
+                 <div className="grid grid-cols-2 gap-4">
+                   <Input label="Address Line 1" type="text" value={formData.addressLine1} onChange={(e) => setFormData({...formData, addressLine1: e.target.value})} />
+                   <Input label="Address Line 2" type="text" value={formData.addressLine2} onChange={(e) => setFormData({...formData, addressLine2: e.target.value})} />
+                   <Input label="City" type="text" value={formData.city} onChange={(e) => setFormData({...formData, city: e.target.value})} />
+                   <Input label="State" type="text" value={formData.state} onChange={(e) => setFormData({...formData, state: e.target.value})} />
+                   <Input label="Pincode" type="text" value={formData.pincode} onChange={(e) => setFormData({...formData, pincode: e.target.value})} />
+                   <Input label="Country" type="text" value={formData.country} onChange={(e) => setFormData({...formData, country: e.target.value})} />
+                 </div>
                </div>
 
                <div className="flex space-x-4 mt-6 pt-4 border-t border-brand-border">

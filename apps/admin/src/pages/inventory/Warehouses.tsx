@@ -5,6 +5,10 @@ import type { RootState } from '../../store';
 import { Warehouse as WarehouseIcon, MapPin, Plus } from 'lucide-react';
 import { Button, Card, Badge, Dialog, Input, Loader } from '@mechbazar/shared/web';
 import { API_URL } from '../../config/api';
+import AddressMapPicker from '../../components/maps/AddressMapPicker';
+import PlaceAutocompleteField from '../../components/maps/PlaceAutocompleteField';
+import LocationMapView from '../../components/maps/LocationMapView';
+import type { GeocodeSuccess } from '../../services/geocode.service';
 
 interface WarehousesProps {
   // Warehouses and the stock ledger are separate tabs under the same parent
@@ -26,9 +30,46 @@ export default function Warehouses({ onViewStock }: WarehousesProps) {
     address: '',
     managerName: '',
     phone: '',
-    capacity: 0
+    capacity: 0,
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    state: '',
+    pincode: '',
+    country: '',
+    lat: null as number | null,
+    lng: null as number | null,
+    placeId: '',
+    formattedAddress: '',
   };
   const [formData, setFormData] = useState(emptyForm);
+
+  // Unconditional overwrite from an autocomplete selection -- also
+  // re-synthesizes the legacy free-text `address` field so it never goes
+  // stale relative to the structured fields (matches the backend's own
+  // create-time synthesizeAddress fallback in warehouse.controller.ts).
+  const applyGeocodeResult = (result: GeocodeSuccess) => {
+    setFormData((prev) => {
+      const addressLine1 = result.components.line1 || prev.addressLine1;
+      const city = result.components.city || prev.city;
+      const state = result.components.state || prev.state;
+      const pincode = result.components.pincode || prev.pincode;
+      const country = result.components.country || prev.country;
+      return {
+        ...prev,
+        addressLine1,
+        city,
+        state,
+        pincode,
+        country,
+        lat: result.lat,
+        lng: result.lng,
+        placeId: result.placeId,
+        formattedAddress: result.formattedAddress,
+        address: result.formattedAddress || [addressLine1, prev.addressLine2, city, state, pincode].filter(Boolean).join(', '),
+      };
+    });
+  };
 
   useEffect(() => {
     fetchWarehouses();
@@ -83,7 +124,17 @@ export default function Warehouses({ onViewStock }: WarehousesProps) {
       address: wh.address || '',
       managerName: wh.managerName || '',
       phone: wh.phone || '',
-      capacity: wh.capacity || 0
+      capacity: wh.capacity || 0,
+      addressLine1: wh.addressLine1 || '',
+      addressLine2: wh.addressLine2 || '',
+      city: wh.city || '',
+      state: wh.state || '',
+      pincode: wh.pincode || '',
+      country: wh.country || '',
+      lat: wh.lat ?? null,
+      lng: wh.lng ?? null,
+      placeId: wh.placeId || '',
+      formattedAddress: wh.formattedAddress || '',
     });
     setShowModal(true);
   };
@@ -121,8 +172,11 @@ export default function Warehouses({ onViewStock }: WarehousesProps) {
               <div className="space-y-2 mb-6">
                 <div className="flex items-start text-sm text-neutral-400">
                   <MapPin className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
-                  <span>{wh.address}</span>
+                  <span>{wh.formattedAddress || wh.address}</span>
                 </div>
+                {wh.lat != null && wh.lng != null && (
+                  <LocationMapView markers={[{ id: wh.id, lat: wh.lat, lng: wh.lng, label: wh.name }]} height={120} />
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-neutral-400">Capacity:</span>
                   <span className="text-white font-medium">{wh.capacity.toLocaleString()} units</span>
@@ -181,6 +235,25 @@ export default function Warehouses({ onViewStock }: WarehousesProps) {
                 value={formData.address}
                 onChange={(e) => setFormData({...formData, address: e.target.value})}
               />
+
+              <div className="space-y-3">
+                <p className="text-sm font-bold text-white flex items-center"><MapPin className="w-4 h-4 mr-2" /> Precise Location (optional)</p>
+                <PlaceAutocompleteField onSelect={applyGeocodeResult} placeholder="Search for warehouse address" />
+                <AddressMapPicker
+                  latitude={formData.lat}
+                  longitude={formData.lng}
+                  onChange={({ latitude, longitude }) => setFormData({ ...formData, lat: latitude, lng: longitude })}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <Input label="Address Line 1" type="text" value={formData.addressLine1} onChange={(e) => setFormData({...formData, addressLine1: e.target.value})} />
+                  <Input label="Address Line 2" type="text" value={formData.addressLine2} onChange={(e) => setFormData({...formData, addressLine2: e.target.value})} />
+                  <Input label="City" type="text" value={formData.city} onChange={(e) => setFormData({...formData, city: e.target.value})} />
+                  <Input label="State" type="text" value={formData.state} onChange={(e) => setFormData({...formData, state: e.target.value})} />
+                  <Input label="Pincode" type="text" value={formData.pincode} onChange={(e) => setFormData({...formData, pincode: e.target.value})} />
+                  <Input label="Country" type="text" value={formData.country} onChange={(e) => setFormData({...formData, country: e.target.value})} />
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <Input
                   label="Manager"

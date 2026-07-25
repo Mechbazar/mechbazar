@@ -52,6 +52,14 @@ ENV VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET}
 ENV VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID}
 ENV VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID}
 
+# Google Maps JavaScript API + Places API key for the store-location picker
+# (Register.tsx business step, Profile.tsx store info) -- docker-compose.yml
+# has passed this as a build-arg since 3b1b523, but this Dockerfile never
+# declared it, so Docker silently discarded the arg and every production
+# build shipped with an empty key (maps silently degraded to MapPlaceholder).
+ARG VITE_GOOGLE_MAPS_API_KEY
+ENV VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY}
+
 # Fail loudly if the build context leaked a node_modules directory in on top of
 # the tree `npm install` just created. Two copies of @firebase/app mean
 # initializeApp() and getAuth() read different component registries, and the app
