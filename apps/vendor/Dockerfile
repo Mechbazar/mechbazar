@@ -24,16 +24,6 @@ COPY packages/shared/package.json packages/shared/package.json
 # package.json's firebase/react overrides were verified to fix it locally.
 RUN npm install --legacy-peer-deps
 
-# TEMPORARY diagnostic -- remove once the blank-screen Firebase bug is found.
-RUN echo "=== firebase resolution debug ===" && \
-    npm ls firebase --all 2>&1 | head -30 && \
-    echo "=== @firebase/app ===" && \
-    npm ls @firebase/app --all 2>&1 | head -30 && \
-    echo "=== @firebase/auth ===" && \
-    npm ls @firebase/auth --all 2>&1 | head -30 && \
-    echo "=== find all @firebase/app dirs on disk ===" && \
-    find / -maxdepth 8 -type d -path "*/node_modules/@firebase/app" 2>/dev/null
-
 COPY apps/vendor apps/vendor
 COPY packages/shared packages/shared
 
