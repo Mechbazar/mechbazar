@@ -87,12 +87,32 @@ async function main() {
       { hash: { algorithm: 'BCRYPT' } as const }
     );
 
-    const failedIndexes = new Set(result.errors.map(e => e.index));
+    const errorByIndex = new Map(result.errors.map(e => [e.index, e]));
     for (let j = 0; j < batch.length; j++) {
       const u = batch[j];
-      if (failedIndexes.has(j)) {
-        const err = result.errors.find(e => e.index === j);
-        console.error(`  FAILED importing ${u.email}: ${err?.error?.message}`);
+      const err = errorByIndex.get(j);
+      if (err) {
+        // A partial prior run (Firebase account created, but the DB write
+        // that links firebaseUid crashed/was interrupted before completing)
+        // would otherwise get "stuck": firebaseUid stays null in Postgres,
+        // so the row is re-selected on the next run, but Firebase now
+        // rejects it as a duplicate. Recognize that case and self-heal by
+        // just linking to the account that already exists, same as the
+        // fallback path below already does for auth/uid-already-exists.
+        const code = String((err.error as any)?.code || '').toLowerCase();
+        const message = String(err.error?.message || '').toLowerCase();
+        if (code.includes('already-exists') || message.includes('already exists')) {
+          try {
+            const existing = await firebaseAdmin.auth().getUser(u.id);
+            await prisma.user.update({ where: { id: u.id }, data: { firebaseUid: existing.uid } });
+            console.log(`  ${u.email} already exists in Firebase (uid=${existing.uid}) -- backfilled firebaseUid only.`);
+            counts['skipped-already-migrated']++;
+            continue;
+          } catch (lookupErr) {
+            console.error(`  ${u.email} reported as duplicate but could not be found by uid -- leaving unlinked:`, lookupErr);
+          }
+        }
+        console.error(`  FAILED importing ${u.email}: ${err.error?.message}`);
         counts.failed++;
         continue;
       }
