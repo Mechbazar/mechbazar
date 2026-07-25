@@ -127,17 +127,20 @@ export default function AddressManagementScreen() {
 
   // Shared by GPS detect, pin drag, and Places Autocomplete selection -- all
   // three represent the user pointing at a new location, so all three sync
-  // every field (including overwriting whatever was typed before) to match.
+  // every field to match, INCLUDING clearing a field this result has no
+  // component for (e.g. switching from an address with a pincode to one
+  // without) -- a component that's merely absent must not leave a previous
+  // location's stale value sitting in the form.
   const applyGeocodeResult = (result: GeocodeSuccess) => {
     setLat(result.lat);
     setLng(result.lng);
     setPlaceId(result.placeId);
     setFormattedAddress(result.formattedAddress);
-    if (result.components.line1) setLine1(result.components.line1);
-    if (result.components.city) setCity(result.components.city);
-    if (result.components.state) setState(result.components.state);
-    if (result.components.pincode) setPincode(result.components.pincode);
-    if (result.components.country) setCountry(result.components.country);
+    setLine1(result.components.line1 || '');
+    setCity(result.components.city || '');
+    setState(result.components.state || '');
+    setPincode(result.components.pincode || '');
+    setCountry(result.components.country || null);
   };
 
   const handleGPSDetect = async () => {

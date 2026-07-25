@@ -30,18 +30,21 @@ export const AddressPickerSheet: React.FC<AddressPickerSheetProps> = ({ visible,
   const [error, setError] = useState<string | null>(null);
 
   // Shared by "use my current location", pin drag, and Places Autocomplete
-  // selection -- all three mean "sync everything to this new location".
+  // selection -- all three mean "sync everything to this new location",
+  // INCLUDING clearing a field this result has no component for, so a
+  // previous location's value never lingers (title is preserved since it's
+  // user-authored; line1/city/state/pincode/country all replace outright).
   const applyGeocodeResult = (result: GeocodeSuccess) => {
     setCoords({ lat: result.lat, lng: result.lng });
     setPlaceId(result.placeId);
     setFormattedAddress(result.formattedAddress);
     setForm((f) => ({
       ...f,
-      line1: result.components.line1 || f.line1,
-      city: result.components.city || f.city,
-      state: result.components.state || f.state,
-      pincode: result.components.pincode || f.pincode,
-      country: result.components.country || f.country,
+      line1: result.components.line1 || '',
+      city: result.components.city || '',
+      state: result.components.state || '',
+      pincode: result.components.pincode || '',
+      country: result.components.country || null,
     }));
   };
 
