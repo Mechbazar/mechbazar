@@ -52,6 +52,18 @@ ENV VITE_FIREBASE_STORAGE_BUCKET=${VITE_FIREBASE_STORAGE_BUCKET}
 ENV VITE_FIREBASE_MESSAGING_SENDER_ID=${VITE_FIREBASE_MESSAGING_SENDER_ID}
 ENV VITE_FIREBASE_APP_ID=${VITE_FIREBASE_APP_ID}
 
+# Fail loudly if the build context leaked a node_modules directory in on top of
+# the tree `npm install` just created. Two copies of @firebase/app mean
+# initializeApp() and getAuth() read different component registries, and the app
+# dies at startup with "Component auth has not been registered yet" -- a blank
+# white screen, with the bundle itself still serving 200. See .dockerignore.
+RUN dupes="$(find . -path '*/node_modules/@firebase/app/package.json' -not -path '*/dist/*')"; \
+    if [ "$(echo "$dupes" | wc -l)" != "1" ]; then \
+        echo 'FATAL: expected exactly one @firebase/app, found:'; \
+        echo "$dupes"; \
+        exit 1; \
+    fi
+
 RUN npm run build --workspace=apps/vendor
 
 FROM nginx:alpine

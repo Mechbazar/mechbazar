@@ -1,0 +1,21 @@
+# The image builds its own dependency tree (`npm install`) and its own bundle
+# (`npm run build`). The later `COPY apps/<app> apps/<app>` must never overlay
+# the build context's copies on top of them: a host-side
+# apps/<app>/node_modules/@firebase/app shadows the hoisted one, so
+# initializeApp() and getAuth() read different component registries and the app
+# dies at startup with "Component auth has not been registered yet" -- a blank
+# white screen, with the bundle itself still serving 200.
+# Note that .gitignore does NOT apply to a Docker build context -- only this file does.
+node_modules
+**/node_modules
+**/dist
+
+# Never ship local secrets or dev TLS keys into a build layer. The .cert
+# exclusion is safe: those files are read only by vite.config.ts for the dev
+# server's `server.https`, which `vite build` never evaluates.
+**/.env
+**/.env.*
+!**/.env.example
+**/.cert
+
+.git
