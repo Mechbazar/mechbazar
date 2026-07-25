@@ -339,7 +339,7 @@ export const updateMyRegistration = async (req: AuthRequest, res: Response): Pro
     }
 
     const {
-      addressLine, city, state, pincode, aadhaarNumber,
+      addressLine, city, state, pincode, country, lat, lng, placeId, formattedAddress, aadhaarNumber,
       specializations, skills, experienceYears,
       emergencyContactName, emergencyContactPhone,
     } = req.body;
@@ -351,6 +351,11 @@ export const updateMyRegistration = async (req: AuthRequest, res: Response): Pro
         ...(city !== undefined && { city }),
         ...(state !== undefined && { state }),
         ...(pincode !== undefined && { pincode }),
+        ...(country !== undefined && { country }),
+        ...(lat !== undefined && { lat }),
+        ...(lng !== undefined && { lng }),
+        ...(placeId !== undefined && { placeId }),
+        ...(formattedAddress !== undefined && { formattedAddress }),
         ...(aadhaarNumber !== undefined && { aadhaarNumber }),
         ...(specializations !== undefined && { specializations }),
         ...(skills !== undefined && { skills }),

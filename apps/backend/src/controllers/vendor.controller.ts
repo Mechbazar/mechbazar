@@ -205,7 +205,10 @@ export const registerPersonal = async (req: Request, res: Response): Promise<voi
 export const updateBusinessDetails = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user.userId;
-    const { storeName, gstNumber, panNumber, businessType, categories, city, state } = req.body;
+    const {
+      storeName, gstNumber, panNumber, businessType, categories, city, state,
+      addressLine1, addressLine2, pincode, country, lat, lng, placeId, formattedAddress,
+    } = req.body;
 
     const vendor = await prisma.vendor.update({
       where: { userId },
@@ -215,6 +218,22 @@ export const updateBusinessDetails = async (req: Request, res: Response): Promis
         panNumber,
         businessType,
         categories: categories || [],
+        // Store address, persisted directly on Vendor now (previously only
+        // written onto User below). Fields left undefined are ignored by
+        // Prisma, so a caller that hasn't adopted the new fields yet keeps
+        // working unchanged.
+        city,
+        state,
+        addressLine1,
+        addressLine2,
+        pincode,
+        country,
+        lat,
+        lng,
+        placeId,
+        formattedAddress,
+        // Kept for backward compat -- existing admin/vendor UIs read
+        // city/state off User, not Vendor.
         user: {
           update: {
             city,
@@ -855,8 +874,11 @@ export const updateVendorStatus = async (req: AuthRequest, res: Response): Promi
 // Old createVendor & updateVendor maintained for backward compatibility with existing Admin Portal
 export const createVendor = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, phone, email, city, state, storeName, gstNumber } = req.body;
-    
+    const {
+      name, phone, email, city, state, storeName, gstNumber,
+      addressLine1, addressLine2, pincode, country, lat, lng, placeId, formattedAddress,
+    } = req.body;
+
     const existingUser = await prisma.user.findUnique({ where: { phone } });
     if (existingUser) {
       res.status(400).json({ error: 'User with this phone number already exists' });
@@ -875,6 +897,16 @@ export const createVendor = async (req: Request, res: Response): Promise<void> =
           create: {
             storeName,
             gstNumber,
+            city,
+            state,
+            addressLine1,
+            addressLine2,
+            pincode,
+            country,
+            lat,
+            lng,
+            placeId,
+            formattedAddress,
             status: VendorStatus.APPROVED, // Admin created vendors are automatically approved
             isActive: true
           }
@@ -895,8 +927,11 @@ export const createVendor = async (req: Request, res: Response): Promise<void> =
 export const updateVendor = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id); // User ID
-    const { name, phone, email, city, state, storeName, gstNumber, isActive } = req.body;
-    
+    const {
+      name, phone, email, city, state, storeName, gstNumber, isActive,
+      addressLine1, addressLine2, pincode, country, lat, lng, placeId, formattedAddress,
+    } = req.body;
+
     const vendor = await prisma.user.update({
       where: { id },
       data: {
@@ -909,7 +944,17 @@ export const updateVendor = async (req: Request, res: Response): Promise<void> =
           update: {
             storeName,
             gstNumber,
-            isActive
+            isActive,
+            city,
+            state,
+            addressLine1,
+            addressLine2,
+            pincode,
+            country,
+            lat,
+            lng,
+            placeId,
+            formattedAddress,
           }
         }
       },
@@ -1148,7 +1193,10 @@ export const getVendorInventory = async (req: Request, res: Response): Promise<v
 export const updateMyProfile = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user.userId;
-    const { name, storeName, gstNumber, panNumber, businessType, categories, city, state } = req.body;
+    const {
+      name, storeName, gstNumber, panNumber, businessType, categories, city, state,
+      addressLine1, addressLine2, pincode, country, lat, lng, placeId, formattedAddress,
+    } = req.body;
 
     const [updatedUser, updatedVendor] = await prisma.$transaction([
       prisma.user.update({
@@ -1157,7 +1205,10 @@ export const updateMyProfile = async (req: Request, res: Response): Promise<void
       }),
       prisma.vendor.update({
         where: { userId },
-        data: { storeName, gstNumber, panNumber, businessType, categories: categories || [] }
+        data: {
+          storeName, gstNumber, panNumber, businessType, categories: categories || [],
+          city, state, addressLine1, addressLine2, pincode, country, lat, lng, placeId, formattedAddress,
+        }
       })
     ]);
 

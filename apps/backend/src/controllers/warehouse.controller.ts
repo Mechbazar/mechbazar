@@ -17,18 +17,34 @@ export const getWarehouses = async (req: Request, res: Response): Promise<void> 
   }
 };
 
+// Synthesizes the legacy free-text `address` field from structured parts when
+// the caller sends only those (e.g. a future map-based picker) and omits
+// `address` -- keeps existing clients that still read `address` as plain
+// text working, even for rows created without ever typing a free-text address.
+function synthesizeAddress(parts: { addressLine1?: string; addressLine2?: string; city?: string; state?: string; pincode?: string }) {
+  return [parts.addressLine1, parts.addressLine2, parts.city, parts.state, parts.pincode].filter(Boolean).join(', ');
+}
+
 export const createWarehouse = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, code, address, managerName, phone, capacity } = req.body;
+    const {
+      name, code, address, managerName, phone, capacity,
+      addressLine1, addressLine2, city, state, pincode, country, lat, lng, placeId, formattedAddress,
+    } = req.body;
     const existing = await prisma.warehouse.findUnique({ where: { code } });
-    
+
     if (existing) {
       res.status(400).json({ error: 'Warehouse code already exists' });
       return;
     }
 
+    const resolvedAddress = address || synthesizeAddress({ addressLine1, addressLine2, city, state, pincode });
+
     const warehouse = await prisma.warehouse.create({
-      data: { name, code, address, managerName, phone, capacity: Number(capacity) || 0 }
+      data: {
+        name, code, address: resolvedAddress, managerName, phone, capacity: Number(capacity) || 0,
+        addressLine1, addressLine2, city, state, pincode, country, lat, lng, placeId, formattedAddress,
+      }
     });
     res.status(201).json(warehouse);
   } catch (error) {
@@ -40,11 +56,17 @@ export const createWarehouse = async (req: Request, res: Response): Promise<void
 export const updateWarehouse = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);
-    const { name, address, managerName, phone, capacity, isActive } = req.body;
-    
+    const {
+      name, address, managerName, phone, capacity, isActive,
+      addressLine1, addressLine2, city, state, pincode, country, lat, lng, placeId, formattedAddress,
+    } = req.body;
+
     const warehouse = await prisma.warehouse.update({
       where: { id },
-      data: { name, address, managerName, phone, capacity: Number(capacity), isActive }
+      data: {
+        name, address, managerName, phone, capacity: Number(capacity), isActive,
+        addressLine1, addressLine2, city, state, pincode, country, lat, lng, placeId, formattedAddress,
+      }
     });
     res.status(200).json(warehouse);
   } catch (error) {

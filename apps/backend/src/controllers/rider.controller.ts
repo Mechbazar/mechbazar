@@ -358,7 +358,7 @@ export const updateMyRegistration = async (req: AuthRequest, res: Response): Pro
     }
 
     const {
-      addressLine, city, state, pincode, aadhaarNumber,
+      addressLine, city, state, pincode, country, lat, lng, placeId, formattedAddress, aadhaarNumber,
       vehicleType, vehicleModel, vehicleRegistrationNumber, licenseNumber,
       insurancePolicyNumber, insuranceExpiry, pucNumber, pucExpiry,
       upiId, emergencyContactName, emergencyContactPhone,
@@ -371,6 +371,11 @@ export const updateMyRegistration = async (req: AuthRequest, res: Response): Pro
         ...(city !== undefined && { city }),
         ...(state !== undefined && { state }),
         ...(pincode !== undefined && { pincode }),
+        ...(country !== undefined && { country }),
+        ...(lat !== undefined && { lat }),
+        ...(lng !== undefined && { lng }),
+        ...(placeId !== undefined && { placeId }),
+        ...(formattedAddress !== undefined && { formattedAddress }),
         ...(aadhaarNumber !== undefined && { aadhaarNumber }),
         ...(vehicleType !== undefined && { vehicleType }),
         ...(vehicleModel !== undefined && { vehicleModel }),

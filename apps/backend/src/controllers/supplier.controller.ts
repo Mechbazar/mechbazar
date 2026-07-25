@@ -20,12 +20,27 @@ export const getSuppliers = async (req: Request, res: Response): Promise<void> =
   }
 };
 
+// Synthesizes the legacy free-text `address` field from structured parts when
+// the caller sends only those and omits `address` -- see warehouse.controller.ts's
+// identical helper.
+function synthesizeAddress(parts: { addressLine1?: string; addressLine2?: string; city?: string; state?: string; pincode?: string }) {
+  return [parts.addressLine1, parts.addressLine2, parts.city, parts.state, parts.pincode].filter(Boolean).join(', ') || undefined;
+}
+
 export const createSupplier = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, companyName, contactPerson, phone, email, gstNumber, address } = req.body;
-    
+    const {
+      name, companyName, contactPerson, phone, email, gstNumber, address,
+      addressLine1, addressLine2, city, state, pincode, country, lat, lng, placeId, formattedAddress,
+    } = req.body;
+
+    const resolvedAddress = address || synthesizeAddress({ addressLine1, addressLine2, city, state, pincode });
+
     const supplier = await prisma.supplier.create({
-      data: { name, companyName, contactPerson, phone, email, gstNumber, address }
+      data: {
+        name, companyName, contactPerson, phone, email, gstNumber, address: resolvedAddress,
+        addressLine1, addressLine2, city, state, pincode, country, lat, lng, placeId, formattedAddress,
+      }
     });
     res.status(201).json(supplier);
   } catch (error) {
@@ -37,11 +52,17 @@ export const createSupplier = async (req: Request, res: Response): Promise<void>
 export const updateSupplier = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);
-    const { name, companyName, contactPerson, phone, email, gstNumber, address, isActive } = req.body;
-    
+    const {
+      name, companyName, contactPerson, phone, email, gstNumber, address, isActive,
+      addressLine1, addressLine2, city, state, pincode, country, lat, lng, placeId, formattedAddress,
+    } = req.body;
+
     const supplier = await prisma.supplier.update({
       where: { id },
-      data: { name, companyName, contactPerson, phone, email, gstNumber, address, isActive }
+      data: {
+        name, companyName, contactPerson, phone, email, gstNumber, address, isActive,
+        addressLine1, addressLine2, city, state, pincode, country, lat, lng, placeId, formattedAddress,
+      }
     });
     res.status(200).json(supplier);
   } catch (error) {

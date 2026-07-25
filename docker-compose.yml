@@ -75,7 +75,13 @@ services:
       args:
         EXPO_PUBLIC_API_URL: https://mechbazar.com/api
         EXPO_PUBLIC_FIREBASE_VAPID_KEY: BKzZ31SGSXlgFaHsazwM9jXwmNqoUUrNfEAA1WJiQle7kipWHVcWi2fyiEhYfHTCJusQWynxPWJQ1wggAHLNjak
-        EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: AIzaSyBtwy6SVkh5E-LjFFKgrCIKy4bp658KQhQ
+        # Unlike the Firebase keys above, this IS a secret (it must stay
+        # unrestricted-by-referrer for the web build, unlike the
+        # referrer-restricted key a browser-only deployment could otherwise
+        # use safely) -- sourced from a root .env (gitignored, see
+        # .env.example), never hardcoded here. Set it on the VPS before
+        # `docker compose up -d --build`.
+        EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: ${EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}
     container_name: mechbazar_mobile
     ports:
       # Loopback only -- see the backend service's port comment above.

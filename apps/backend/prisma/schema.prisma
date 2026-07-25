@@ -90,14 +90,14 @@ enum VehicleType {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  phone     String   @unique
-  email     String?  @unique
-  name      String?
-  password  String?
+  id          String  @id @default(uuid())
+  phone       String  @unique
+  email       String? @unique
+  name        String?
+  password    String?
   firebaseUid String? @unique
-  role      Role     @default(CUSTOMER)
-  
+  role        Role    @default(CUSTOMER)
+
   // B2B & Mode Fields
   accountType        AccountType @default(RETAIL)
   companyName        String?
@@ -108,61 +108,75 @@ model User {
   state              String?
   isBusinessVerified Boolean     @default(false)
 
-  avatar    String?
-  gender    String?
-  dob       String?
-  wallet    Float    @default(0.0)
+  avatar        String?
+  gender        String?
+  dob           String?
+  wallet        Float    @default(0.0)
   expoPushToken String?
-  fcmToken  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  fcmToken      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  addresses     Address[]
-  userVehicles  UserVehicle[]
-  orders        Order[]
-  reviews       Review[]
-  wishlists     Wishlist[]
-  notifications Notification[]
-  auditLogs     AuditLog[]
-  supportTickets SupportTicket[]
-  stockMovements StockMovement[]
-  vendorProfile Vendor?
-  deliveryProfile DeliveryPartner?
+  addresses         Address[]
+  userVehicles      UserVehicle[]
+  orders            Order[]
+  reviews           Review[]
+  wishlists         Wishlist[]
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  supportTickets    SupportTicket[]
+  stockMovements    StockMovement[]
+  vendorProfile     Vendor?
+  deliveryProfile   DeliveryPartner?
   technicianProfile ServiceTechnician?
   serviceBookings   ServiceBooking[]
   serviceReviews    ServiceReview[]
 }
 
 model Vendor {
-  id            String   @id @default(uuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id])
+  id            String       @id @default(uuid())
+  userId        String       @unique
+  user          User         @relation(fields: [userId], references: [id])
   storeName     String
   gstNumber     String?
   panNumber     String?
   businessType  String?
-  categories    String[] 
-  walletBalance Float    @default(0.0)
+  categories    String[]
+  walletBalance Float        @default(0.0)
   status        VendorStatus @default(PENDING)
-  isActive      Boolean  @default(true)
-  
-  products      Product[]
-  documents     VendorDocument[]
-  bankAccounts  VendorBankAccount[]
-  settlements   VendorSettlement[]
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now()) @updatedAt
+  isActive      Boolean      @default(true)
+
+  // Store address -- previously nonexistent; "location" was written onto the
+  // related User's city/state instead (see vendor.controller.ts, which keeps
+  // doing that for backward compat). All nullable/additive.
+  addressLine1     String?
+  addressLine2     String?
+  city             String?
+  state            String?
+  pincode          String?
+  country          String?
+  lat              Float?
+  lng              Float?
+  placeId          String?
+  formattedAddress String?
+
+  products     Product[]
+  documents    VendorDocument[]
+  bankAccounts VendorBankAccount[]
+  settlements  VendorSettlement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model VendorDocument {
-  id          String   @id @default(uuid())
-  vendorId    String
-  vendor      Vendor   @relation(fields: [vendorId], references: [id])
-  type        String   // GST, PAN, AADHAAR, SHOP_PHOTO, OWNER_PHOTO, BUSINESS_LICENSE, CANCELLED_CHEQUE
-  url         String
-  status      String   @default("PENDING") // PENDING, VERIFIED, REJECTED
-  uploadedAt  DateTime @default(now())
+  id         String   @id @default(uuid())
+  vendorId   String
+  vendor     Vendor   @relation(fields: [vendorId], references: [id])
+  type       String // GST, PAN, AADHAAR, SHOP_PHOTO, OWNER_PHOTO, BUSINESS_LICENSE, CANCELLED_CHEQUE
+  url        String
+  status     String   @default("PENDING") // PENDING, VERIFIED, REJECTED
+  uploadedAt DateTime @default(now())
 }
 
 model VendorBankAccount {
@@ -189,56 +203,65 @@ model VendorSettlement {
 }
 
 model DeliveryPartner {
-  id            String   @id @default(uuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id])
+  id            String  @id @default(uuid())
+  userId        String  @unique
+  user          User    @relation(fields: [userId], references: [id])
   vehicleType   String
   licenseNumber String
-  isActive      Boolean  @default(false)
-  isOnline      Boolean  @default(false)
+  isActive      Boolean @default(false)
+  isOnline      Boolean @default(false)
   currentLat    Float?
   currentLng    Float?
   expoPushToken String?
-  walletBalance Float    @default(0.0)
+  walletBalance Float   @default(0.0)
 
   // KYC / registration & verification (app self-registration path; admin
   // quick-created riders default straight to APPROVED, see createRider)
-  status                     RiderStatus @default(PENDING)
-  addressLine                String?
-  city                       String?
-  state                      String?
-  pincode                    String?
-  aadhaarNumber              String?
-  vehicleModel               String?
-  vehicleRegistrationNumber  String?
-  insurancePolicyNumber      String?
-  insuranceExpiry            DateTime?
-  pucNumber                  String?
-  pucExpiry                  DateTime?
-  upiId                      String?
-  emergencyContactName       String?
-  emergencyContactPhone      String?
-  submittedAt                DateTime?
-  reviewedAt                 DateTime?
-  remarks                    String?
+  status                    RiderStatus @default(PENDING)
+  addressLine               String?
+  city                      String?
+  state                     String?
+  pincode                   String?
+  // Geocoded KYC address -- additive alongside the free-text fields above
+  // (which stay untouched: renaming/splitting addressLine would break
+  // currently-deployed rider app builds). currentLat/currentLng above are the
+  // live GPS ping and are a separate concept from this.
+  lat                       Float?
+  lng                       Float?
+  placeId                   String?
+  formattedAddress          String?
+  country                   String?
+  aadhaarNumber             String?
+  vehicleModel              String?
+  vehicleRegistrationNumber String?
+  insurancePolicyNumber     String?
+  insuranceExpiry           DateTime?
+  pucNumber                 String?
+  pucExpiry                 DateTime?
+  upiId                     String?
+  emergencyContactName      String?
+  emergencyContactPhone     String?
+  submittedAt               DateTime?
+  reviewedAt                DateTime?
+  remarks                   String?
 
-  orders        Order[]
-  bankAccounts  RiderBankAccount[]
-  settlements   RiderSettlement[]
-  documents     RiderDocument[]
+  orders       Order[]
+  bankAccounts RiderBankAccount[]
+  settlements  RiderSettlement[]
+  documents    RiderDocument[]
 }
 
 model RiderDocument {
   id                String          @id @default(uuid())
   deliveryPartnerId String
   deliveryPartner   DeliveryPartner @relation(fields: [deliveryPartnerId], references: [id])
-  type              String   // AADHAAR, DL_FRONT, DL_BACK, RC, INSURANCE, PUC, SELFIE, PROFILE_PHOTO
-  filePath          String   // legacy disk path for pre-serverless rows; new rows store the original filename here for display only
-  fileData          Bytes?   // file bytes, stored in Postgres instead of disk -- this is private KYC content that must not sit in public object storage
+  type              String // AADHAAR, DL_FRONT, DL_BACK, RC, INSURANCE, PUC, SELFIE, PROFILE_PHOTO
+  filePath          String // legacy disk path for pre-serverless rows; new rows store the original filename here for display only
+  fileData          Bytes? // file bytes, stored in Postgres instead of disk -- this is private KYC content that must not sit in public object storage
   mimeType          String?
-  status            String   @default("PENDING") // PENDING, VERIFIED, REJECTED
+  status            String          @default("PENDING") // PENDING, VERIFIED, REJECTED
   remarks           String?
-  uploadedAt        DateTime @default(now())
+  uploadedAt        DateTime        @default(now())
 }
 
 model RiderBankAccount {
@@ -265,20 +288,23 @@ model RiderSettlement {
 }
 
 model Address {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  title     String
-  line1     String
-  line2     String?
-  city      String
-  state     String
-  pincode   String
-  lat       Float?
-  lng       Float?
-  isDefault Boolean  @default(false)
-  orders    Order[]
-  serviceBookings ServiceBooking[]
+  id               String           @id @default(uuid())
+  userId           String
+  user             User             @relation(fields: [userId], references: [id])
+  title            String
+  line1            String
+  line2            String?
+  city             String
+  state            String
+  pincode          String
+  country          String?
+  lat              Float?
+  lng              Float?
+  placeId          String?
+  formattedAddress String?
+  isDefault        Boolean          @default(false)
+  orders           Order[]
+  serviceBookings  ServiceBooking[]
 }
 
 // =======================
@@ -307,16 +333,16 @@ model Model {
 }
 
 model Variant {
-  id      String    @id @default(uuid())
-  modelId String
-  model   Model     @relation(fields: [modelId], references: [id])
-  name    String
+  id       String    @id @default(uuid())
+  modelId  String
+  model    Model     @relation(fields: [modelId], references: [id])
+  name     String
   vehicles Vehicle[]
 }
 
 model FuelType {
-  id   String @id @default(uuid())
-  name String @unique // e.g., Petrol, Diesel, CNG, EV
+  id       String    @id @default(uuid())
+  name     String    @unique // e.g., Petrol, Diesel, CNG, EV
   vehicles Vehicle[]
 }
 
@@ -344,9 +370,9 @@ model Vehicle {
 // =======================
 
 model UserVehicle {
-  id                 String  @id @default(uuid())
+  id                 String           @id @default(uuid())
   userId             String
-  user               User    @relation(fields: [userId], references: [id])
+  user               User             @relation(fields: [userId], references: [id])
   // Manufacturer/Model/Variant taxonomy is now seeded (see prisma/seed-vehicle-master.ts),
   // but garage vehicles still snapshot brand/model/etc. as plain strings rather than a
   // required Vehicle FK, same shape as ServiceBooking's vehicleType/vehicleBrand/vehicleModel
@@ -354,7 +380,7 @@ model UserVehicle {
   // pairing) the taxonomy doesn't have an exact Vehicle row for. vehicleId stays optional,
   // populated opportunistically when a matching row exists.
   vehicleId          String?
-  vehicle            Vehicle? @relation(fields: [vehicleId], references: [id])
+  vehicle            Vehicle?         @relation(fields: [vehicleId], references: [id])
   vehicleType        VehicleType
   brand              String
   model              String
@@ -365,7 +391,7 @@ model UserVehicle {
   trim               String?
   registrationNumber String?
   nickname           String?
-  isDefault          Boolean @default(false)
+  isDefault          Boolean          @default(false)
   serviceBookings    ServiceBooking[]
 }
 
@@ -374,68 +400,68 @@ model UserVehicle {
 // =======================
 
 model Category {
-  id       String    @id @default(uuid())
-  name     String
-  image    String?
-  icon     String?   @default("📦")
-  status   String?   @default("Active")
+  id          String      @id @default(uuid())
+  name        String
+  image       String?
+  icon        String?     @default("📦")
+  status      String?     @default("Active")
   vehicleType VehicleType @default(CAR)
-  parentId String?
-  parent   Category? @relation("CategoryToCategory", fields: [parentId], references: [id])
-  children Category[] @relation("CategoryToCategory")
-  products Product[]
+  parentId    String?
+  parent      Category?   @relation("CategoryToCategory", fields: [parentId], references: [id])
+  children    Category[]  @relation("CategoryToCategory")
+  products    Product[]
 
   @@unique([name, vehicleType])
 }
 
 model Brand {
-  id       String    @id @default(uuid())
-  name     String    @unique
-  logo     String?
+  id          String      @id @default(uuid())
+  name        String      @unique
+  logo        String?
   vehicleType VehicleType @default(CAR)
-  products Product[]
+  products    Product[]
 }
 
 model Product {
-  id          String   @id @default(uuid())
-  vendorId    String
-  vendor      Vendor   @relation(fields: [vendorId], references: [id])
-  categoryId  String
-  category    Category @relation(fields: [categoryId], references: [id])
-  brandId     String
-  brand       Brand    @relation(fields: [brandId], references: [id])
-  
-  name        String
-  description String
-  mrp         Float
-  price       Float
-  stock       Int      @default(0)
-  images      String[]
-  oemNumber   String?
-  partNumber  String?
-  status      String   @default("APPROVED") // PENDING, APPROVED, REJECTED
-  vehicleType        VehicleType  @default(CAR)
-  discountPrice      Float?
-  b2bPrice           Float?
-  lowStockThreshold  Int      @default(10)
-  isFeatured         Boolean  @default(false)
-  isDeal             Boolean  @default(false)
-  salesCount         Int      @default(0)
-  compatibleModels   String?
+  id         String   @id @default(uuid())
+  vendorId   String
+  vendor     Vendor   @relation(fields: [vendorId], references: [id])
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+  brandId    String
+  brand      Brand    @relation(fields: [brandId], references: [id])
+
+  name              String
+  description       String
+  mrp               Float
+  price             Float
+  stock             Int         @default(0)
+  images            String[]
+  oemNumber         String?
+  partNumber        String?
+  status            String      @default("APPROVED") // PENDING, APPROVED, REJECTED
+  vehicleType       VehicleType @default(CAR)
+  discountPrice     Float?
+  b2bPrice          Float?
+  lowStockThreshold Int         @default(10)
+  isFeatured        Boolean     @default(false)
+  isDeal            Boolean     @default(false)
+  salesCount        Int         @default(0)
+  compatibleModels  String?
   // Free-form key/value spec sheet (e.g. {"Viscosity":"10W-40","Volume":"3.5L"}),
   // shown on ProductDetailsScreen's Specifications tab. Nullable/optional --
   // most existing rows have none, and the product form doesn't require it.
-  specifications     Json?
+  specifications    Json?
   // Denormalized from Review rows, kept in sync by
   // recomputeProductRating() (review.controller.ts) on every review
   // create/update/delete. Lets GET /products sort/filter by rating directly
   // in SQL instead of pulling every product's full review list into Node to
   // average client-side on every request.
-  avgRating          Float    @default(0)
-  reviewCount        Int      @default(0)
+  avgRating         Float       @default(0)
+  reviewCount       Int         @default(0)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   compatibilities ProductCompatibility[]
   orderItems      OrderItem[]
@@ -474,29 +500,29 @@ model Order {
   deliveryPartner   DeliveryPartner? @relation(fields: [deliveryPartnerId], references: [id])
   couponId          String?
   coupon            Coupon?          @relation(fields: [couponId], references: [id])
-  
-  status            OrderStatus      @default(PLACED)
-  totalAmount       Float
-  discountAmount    Float            @default(0)
-  deliveryFee       Float            @default(0)
-  finalAmount       Float
 
-  proofImageUrl     String?
-  codCollected      Boolean          @default(false)
-  issueReason       String?
+  status         OrderStatus @default(PLACED)
+  totalAmount    Float
+  discountAmount Float       @default(0)
+  deliveryFee    Float       @default(0)
+  finalAmount    Float
+
+  proofImageUrl String?
+  codCollected  Boolean @default(false)
+  issueReason   String?
 
   // Set when a rider calls "Generate OTP" once ON_THE_WAY; the customer reads
   // the code aloud and the rider enters it to confirm delivery. Cleared once
   // used. Mirrors ServiceBooking.completionOtp -- never returned to the
   // rider's own client, only to the order's owner.
-  deliveryOtp             String?
-  deliveryOtpGeneratedAt  DateTime?
+  deliveryOtp            String?
+  deliveryOtpGeneratedAt DateTime?
 
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  items             OrderItem[]
-  payment           Payment?
+  items   OrderItem[]
+  payment Payment?
 
   @@index([status])
   @@index([userId])
@@ -517,29 +543,29 @@ model OrderItem {
 }
 
 model Payment {
-  id            String   @id @default(uuid())
+  id               String          @id @default(uuid())
   // Exactly one of orderId/serviceBookingId is set per row -- enforced in
   // application code (order.controller.ts / service.controller.ts each create
   // Payment as a nested create under their own entity), not at the DB level.
-  orderId       String?  @unique
-  order         Order?   @relation(fields: [orderId], references: [id])
-  serviceBookingId String? @unique
+  orderId          String?         @unique
+  order            Order?          @relation(fields: [orderId], references: [id])
+  serviceBookingId String?         @unique
   serviceBooking   ServiceBooking? @relation(fields: [serviceBookingId], references: [id])
-  method        String   // e.g., UPI, CARD, COD
-  status        String   // PENDING, SUCCESS, FAILED, REFUNDED
-  transactionId String?
-  amount        Float
-  createdAt     DateTime @default(now())
+  method           String // e.g., UPI, CARD, COD
+  status           String // PENDING, SUCCESS, FAILED, REFUNDED
+  transactionId    String?
+  amount           Float
+  createdAt        DateTime        @default(now())
 }
 
 model Coupon {
-  id            String   @id @default(uuid())
-  code          String   @unique
-  discountType  String   // PERCENTAGE, FLAT
+  id            String       @id @default(uuid())
+  code          String       @unique
+  discountType  String // PERCENTAGE, FLAT
   discountValue Float
-  minOrderValue Float    @default(0)
+  minOrderValue Float        @default(0)
   vehicleType   VehicleType? // null = applies to both CAR and BIKE orders
-  isActive      Boolean  @default(true)
+  isActive      Boolean      @default(true)
   orders        Order[]
 }
 
@@ -594,15 +620,15 @@ model NewsletterSubscriber {
 // =======================
 
 model AuditLog {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  action      String
-  entity      String
-  entityId    String?
-  details     String?  @db.Text
-  ipAddress   String?
-  createdAt   DateTime @default(now())
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String?
+  details   String?  @db.Text
+  ipAddress String?
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([entity, entityId])
@@ -610,19 +636,19 @@ model AuditLog {
 }
 
 model Banner {
-  id          String   @id @default(uuid())
-  title       String
-  image       String
-  type        String   @default("HOMEPAGE") // HOMEPAGE, CATEGORY, PROMO
-  link        String?
+  id           String      @id @default(uuid())
+  title        String
+  image        String
+  type         String      @default("HOMEPAGE") // HOMEPAGE, CATEGORY, PROMO
+  link         String?
   vehicleType  VehicleType @default(CAR)
   buttonText   String?
   redirectLink String?
-  isActive    Boolean  @default(true)
-  startDate   DateTime?
-  endDate     DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isActive     Boolean     @default(true)
+  startDate    DateTime?
+  endDate      DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 }
 
 model SupportTicket {
@@ -642,111 +668,134 @@ model SupportTicket {
 // =======================
 
 model Warehouse {
-  id          String   @id @default(uuid())
-  name        String
-  code        String   @unique
-  address     String
-  managerName String?
-  phone       String?
-  capacity    Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  inventory   Inventory[]
+  id               String   @id @default(uuid())
+  name             String
+  code             String   @unique
+  address          String // legacy free-text, still authoritative for existing admin UI; kept as-is
+  // Structured address, additive alongside `address` above -- see
+  // prisma/backfill-warehouse-supplier-address.ts for the one-off copy of
+  // existing `address` values into addressLine1.
+  addressLine1     String?
+  addressLine2     String?
+  city             String?
+  state            String?
+  pincode          String?
+  country          String?
+  lat              Float?
+  lng              Float?
+  placeId          String?
+  formattedAddress String?
+  managerName      String?
+  phone            String?
+  capacity         Int      @default(0)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  inventory     Inventory[]
   transfersFrom StockTransfer[] @relation("TransferFrom")
   transfersTo   StockTransfer[] @relation("TransferTo")
 }
 
 model Supplier {
-  id             String   @id @default(uuid())
-  name           String
-  companyName    String
-  contactPerson  String?
-  phone          String?
-  email          String?
-  gstNumber      String?
-  address        String?
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id               String   @id @default(uuid())
+  name             String
+  companyName      String
+  contactPerson    String?
+  phone            String?
+  email            String?
+  gstNumber        String?
+  address          String? // legacy free-text, kept as-is -- see Warehouse.address
+  addressLine1     String?
+  addressLine2     String?
+  city             String?
+  state            String?
+  pincode          String?
+  country          String?
+  lat              Float?
+  lng              Float?
+  placeId          String?
+  formattedAddress String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   purchaseOrders PurchaseOrder[]
 }
 
 model Inventory {
-  id             String    @id @default(uuid())
-  productId      String
-  product        Product   @relation(fields: [productId], references: [id])
-  warehouseId    String
-  warehouse      Warehouse @relation(fields: [warehouseId], references: [id])
-  
+  id          String    @id @default(uuid())
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+
   batchNumber    String?
-  availableStock Int       @default(0)
-  reservedStock  Int       @default(0)
-  damagedStock   Int       @default(0)
-  reorderLevel   Int       @default(0)
-  unitCost       Float     @default(0)
-  
-  mfgDate        DateTime?
-  expiryDate     DateTime?
+  availableStock Int     @default(0)
+  reservedStock  Int     @default(0)
+  damagedStock   Int     @default(0)
+  reorderLevel   Int     @default(0)
+  unitCost       Float   @default(0)
 
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  mfgDate    DateTime?
+  expiryDate DateTime?
 
-  movements      StockMovement[]
-  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movements StockMovement[]
+
   @@unique([productId, warehouseId])
 }
 
 model StockMovement {
-  id           String    @id @default(uuid())
-  inventoryId  String
-  inventory    Inventory @relation(fields: [inventoryId], references: [id])
-  userId       String
-  user         User      @relation(fields: [userId], references: [id])
-  
-  action       String    // PURCHASE, SALE, RETURN, DAMAGE, ADJUSTMENT, TRANSFER
+  id          String    @id @default(uuid())
+  inventoryId String
+  inventory   Inventory @relation(fields: [inventoryId], references: [id])
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+
+  action       String // PURCHASE, SALE, RETURN, DAMAGE, ADJUSTMENT, TRANSFER
   prevQuantity Int
   newQuantity  Int
-  quantityDiff Int       // Can be negative or positive
+  quantityDiff Int // Can be negative or positive
   reason       String?
-  
-  createdAt    DateTime  @default(now())
+
+  createdAt DateTime @default(now())
 }
 
 model StockTransfer {
-  id             String    @id @default(uuid())
-  productId      String
-  product        Product   @relation(fields: [productId], references: [id])
+  id              String    @id @default(uuid())
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id])
   fromWarehouseId String
-  fromWarehouse  Warehouse @relation("TransferFrom", fields: [fromWarehouseId], references: [id])
-  toWarehouseId  String
-  toWarehouse    Warehouse @relation("TransferTo", fields: [toWarehouseId], references: [id])
-  
-  quantity       Int
-  status         String    @default("PENDING") // PENDING, APPROVED, SHIPPED, COMPLETED, CANCELLED
-  transferDate   DateTime?
-  receivedDate   DateTime?
-  
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  fromWarehouse   Warehouse @relation("TransferFrom", fields: [fromWarehouseId], references: [id])
+  toWarehouseId   String
+  toWarehouse     Warehouse @relation("TransferTo", fields: [toWarehouseId], references: [id])
+
+  quantity     Int
+  status       String    @default("PENDING") // PENDING, APPROVED, SHIPPED, COMPLETED, CANCELLED
+  transferDate DateTime?
+  receivedDate DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model PurchaseOrder {
-  id             String    @id @default(uuid())
-  supplierId     String
-  supplier       Supplier  @relation(fields: [supplierId], references: [id])
-  status         String    @default("DRAFT") // DRAFT, APPROVED, ORDERED, RECEIVED, COMPLETED, CANCELLED
-  
-  totalCost      Float     @default(0)
-  taxAmount      Float     @default(0)
-  expectedDate   DateTime?
-  
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id         String   @id @default(uuid())
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id])
+  status     String   @default("DRAFT") // DRAFT, APPROVED, ORDERED, RECEIVED, COMPLETED, CANCELLED
 
-  items          PurchaseOrderItem[]
+  totalCost    Float     @default(0)
+  taxAmount    Float     @default(0)
+  expectedDate DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items PurchaseOrderItem[]
 }
 
 model PurchaseOrderItem {
@@ -755,28 +804,28 @@ model PurchaseOrderItem {
   purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
   productId       String
   product         Product       @relation(fields: [productId], references: [id])
-  
-  quantity        Int
-  unitCost        Float
-  taxAmount       Float         @default(0)
-  receivedQty     Int           @default(0)
+
+  quantity    Int
+  unitCost    Float
+  taxAmount   Float @default(0)
+  receivedQty Int   @default(0)
 }
 
 model Offer {
-  id            String   @id @default(uuid())
+  id            String      @id @default(uuid())
   title         String
   description   String?
   image         String?
-  discountType  String   @default("PERCENTAGE") // PERCENTAGE, FLAT
+  discountType  String      @default("PERCENTAGE") // PERCENTAGE, FLAT
   discountValue Float
-  minOrderValue Float    @default(0)
-  code          String?  @unique
-  vehicleType   VehicleType  @default(CAR)
-  isActive      Boolean  @default(true)
+  minOrderValue Float       @default(0)
+  code          String?     @unique
+  vehicleType   VehicleType @default(CAR)
+  isActive      Boolean     @default(true)
   startDate     DateTime?
   endDate       DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 }
 
 // =======================
@@ -784,18 +833,18 @@ model Offer {
 // =======================
 
 model ServiceTechnician {
-  id            String   @id @default(uuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id])
+  id              String        @id @default(uuid())
+  userId          String        @unique
+  user            User          @relation(fields: [userId], references: [id])
   specializations VehicleType[]
-  isActive      Boolean  @default(false)
-  isOnline      Boolean  @default(false)
-  currentLat    Float?
-  currentLng    Float?
-  expoPushToken String?
-  walletBalance Float    @default(0.0)
-  rating        Float    @default(0)
-  totalJobs     Int      @default(0)
+  isActive        Boolean       @default(false)
+  isOnline        Boolean       @default(false)
+  currentLat      Float?
+  currentLng      Float?
+  expoPushToken   String?
+  walletBalance   Float         @default(0.0)
+  rating          Float         @default(0)
+  totalJobs       Int           @default(0)
 
   // KYC / registration & verification -- mirrors DeliveryPartner exactly.
   status                TechnicianStatus @default(PENDING)
@@ -803,6 +852,13 @@ model ServiceTechnician {
   city                  String?
   state                 String?
   pincode               String?
+  // Geocoded KYC address -- see DeliveryPartner's identical block for why
+  // this is additive-only rather than restructuring addressLine.
+  lat                   Float?
+  lng                   Float?
+  placeId               String?
+  formattedAddress      String?
+  country               String?
   aadhaarNumber         String?
   skills                String[]
   experienceYears       Int?
@@ -812,24 +868,24 @@ model ServiceTechnician {
   reviewedAt            DateTime?
   remarks               String?
 
-  bookings      ServiceBooking[]
-  documents     TechnicianDocument[]
-  bankAccounts  TechnicianBankAccount[]
-  settlements   TechnicianSettlement[]
-  reviews       ServiceReview[]
+  bookings     ServiceBooking[]
+  documents    TechnicianDocument[]
+  bankAccounts TechnicianBankAccount[]
+  settlements  TechnicianSettlement[]
+  reviews      ServiceReview[]
 }
 
 model TechnicianDocument {
-  id            String            @id @default(uuid())
-  technicianId  String
-  technician    ServiceTechnician @relation(fields: [technicianId], references: [id])
-  type          String   // AADHAAR, CERTIFICATION, SELFIE, PROFILE_PHOTO
-  filePath      String   // original filename, display only -- bytes are the source of truth
-  fileData      Bytes?   // stored in Postgres, not disk -- see RiderDocument for rationale (private KYC content)
-  mimeType      String?
-  status        String   @default("PENDING") // PENDING, VERIFIED, REJECTED
-  remarks       String?
-  uploadedAt    DateTime @default(now())
+  id           String            @id @default(uuid())
+  technicianId String
+  technician   ServiceTechnician @relation(fields: [technicianId], references: [id])
+  type         String // AADHAAR, CERTIFICATION, SELFIE, PROFILE_PHOTO
+  filePath     String // original filename, display only -- bytes are the source of truth
+  fileData     Bytes? // stored in Postgres, not disk -- see RiderDocument for rationale (private KYC content)
+  mimeType     String?
+  status       String            @default("PENDING") // PENDING, VERIFIED, REJECTED
+  remarks      String?
+  uploadedAt   DateTime          @default(now())
 }
 
 model TechnicianBankAccount {
@@ -868,8 +924,8 @@ model ServiceCategory {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  packages    ServicePackage[]
-  bookings    ServiceBooking[]
+  packages ServicePackage[]
+  bookings ServiceBooking[]
 
   @@unique([name, vehicleType])
 }
@@ -894,87 +950,87 @@ model ServicePackage {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
-  bookings         ServiceBooking[]
+  bookings ServiceBooking[]
 }
 
 model TimeSlot {
-  id                 String   @id @default(uuid())
-  label              String   // e.g. "9:00 AM - 11:00 AM"
-  startTime          String   // "09:00"
-  endTime            String   // "11:00"
-  maxBookingsPerSlot Int      @default(20)
-  isActive           Boolean  @default(true)
-  sortOrder          Int      @default(0)
+  id                 String  @id @default(uuid())
+  label              String // e.g. "9:00 AM - 11:00 AM"
+  startTime          String // "09:00"
+  endTime            String // "11:00"
+  maxBookingsPerSlot Int     @default(20)
+  isActive           Boolean @default(true)
+  sortOrder          Int     @default(0)
 
-  bookings           ServiceBooking[]
+  bookings ServiceBooking[]
 }
 
 model ServiceBooking {
-  id             String    @id @default(uuid())
-  bookingNumber  String    @unique
+  id            String @id @default(uuid())
+  bookingNumber String @unique
 
-  userId         String
-  user           User      @relation(fields: [userId], references: [id])
+  userId                    String
+  user                      User         @relation(fields: [userId], references: [id])
   // The mobile "Garage" (UserVehicle) is currently a client-side/AsyncStorage-only
   // feature with no backend API writing to UserVehicle, and the Manufacturer/Model
   // master-data tables have no CAR/BIKE column and are unseeded -- so vehicle
   // details are snapshotted directly on the booking (like Order/OrderItem
   // snapshot price at order time) rather than hard-required via FK. userVehicleId
   // stays optional so a future Garage-sync API (Phase 2) can link back to it.
-  userVehicleId  String?
-  userVehicle    UserVehicle? @relation(fields: [userVehicleId], references: [id])
-  vehicleType    VehicleType
-  vehicleBrand   String
-  vehicleModel   String
-  vehicleFuelType String?
+  userVehicleId             String?
+  userVehicle               UserVehicle? @relation(fields: [userVehicleId], references: [id])
+  vehicleType               VehicleType
+  vehicleBrand              String
+  vehicleModel              String
+  vehicleFuelType           String?
   vehicleRegistrationNumber String?
 
-  categoryId     String
-  category       ServiceCategory @relation(fields: [categoryId], references: [id])
-  packageId      String
-  package        ServicePackage  @relation(fields: [packageId], references: [id])
+  categoryId String
+  category   ServiceCategory @relation(fields: [categoryId], references: [id])
+  packageId  String
+  package    ServicePackage  @relation(fields: [packageId], references: [id])
 
-  technicianId   String?
-  technician     ServiceTechnician? @relation(fields: [technicianId], references: [id])
+  technicianId String?
+  technician   ServiceTechnician? @relation(fields: [technicianId], references: [id])
 
-  addressId      String
-  address        Address   @relation(fields: [addressId], references: [id])
+  addressId String
+  address   Address @relation(fields: [addressId], references: [id])
 
-  scheduledDate  DateTime
-  timeSlotId     String
-  timeSlot       TimeSlot  @relation(fields: [timeSlotId], references: [id])
+  scheduledDate DateTime
+  timeSlotId    String
+  timeSlot      TimeSlot @relation(fields: [timeSlotId], references: [id])
 
   issueDescription String?
-  status         BookingStatus @default(PENDING)
+  status           BookingStatus @default(PENDING)
 
   estimatedCost  Float
-  additionalCost Float     @default(0)
+  additionalCost Float @default(0)
   finalAmount    Float
 
-  approvalStatus String?   // PENDING, APPROVED, REJECTED -- a non-blocking flag for
+  approvalStatus String? // PENDING, APPROVED, REJECTED -- a non-blocking flag for
   // an in-flight additional-work-cost request while status stays WORK_STARTED; not
   // a booking status itself (see BookingStatus.REJECTED, which is a technician
   // declining the job, an unrelated concept despite the similar string).
   approvalNote   String?
 
-  cancelReason   String?
-  completedAt    DateTime?
+  cancelReason String?
+  completedAt  DateTime?
 
   // Set when a technician calls the "Generate OTP" action from WORK_STARTED; the
   // customer reads the code aloud and the technician enters it to confirm
   // completion. Cleared once used. Never returned to the technician's own client.
-  completionOtp             String?
-  completionOtpGeneratedAt  DateTime?
+  completionOtp            String?
+  completionOtpGeneratedAt DateTime?
 
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  images         ServiceImage[]
-  statusHistory  BookingStatusHistory[]
-  messages       ServiceChatMessage[]
-  payment        Payment?
-  review         ServiceReview?
-  invoice        ServiceInvoice?
+  images        ServiceImage[]
+  statusHistory BookingStatusHistory[]
+  messages      ServiceChatMessage[]
+  payment       Payment?
+  review        ServiceReview?
+  invoice       ServiceInvoice?
 
   @@index([userId])
   @@index([technicianId])
@@ -998,7 +1054,7 @@ model ServiceChatMessage {
   bookingId    String
   booking      ServiceBooking @relation(fields: [bookingId], references: [id])
   senderUserId String
-  senderRole   String         // CUSTOMER, TECHNICIAN
+  senderRole   String // CUSTOMER, TECHNICIAN
   message      String
   createdAt    DateTime       @default(now())
 
@@ -1011,8 +1067,8 @@ model ServiceImage {
   booking        ServiceBooking @relation(fields: [bookingId], references: [id])
   fileData       Bytes?
   mimeType       String?
-  type           String         // ISSUE, BEFORE, AFTER, ADDITIONAL_WORK
-  uploadedByRole String         // CUSTOMER, TECHNICIAN
+  type           String // ISSUE, BEFORE, AFTER, ADDITIONAL_WORK
+  uploadedByRole String // CUSTOMER, TECHNICIAN
   createdAt      DateTime       @default(now())
 }
 

@@ -115,7 +115,7 @@ export const getMyAddresses = async (req: AuthRequest, res: Response): Promise<v
 
 export const createMyAddress = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { title, line1, line2, city, state, pincode, lat, lng, isDefault } = req.body;
+    const { title, line1, line2, city, state, pincode, country, lat, lng, placeId, formattedAddress, isDefault } = req.body;
     if (!title || !line1 || !city || !state || !pincode) {
       res.status(400).json({ error: 'title, line1, city, state and pincode are required' });
       return;
@@ -134,7 +134,9 @@ export const createMyAddress = async (req: AuthRequest, res: Response): Promise<
       return tx.address.create({
         data: {
           userId, title, line1, line2: line2 || null, city, state, pincode,
-          lat: lat ?? null, lng: lng ?? null, isDefault: shouldBeDefault,
+          country: country ?? null, lat: lat ?? null, lng: lng ?? null,
+          placeId: placeId ?? null, formattedAddress: formattedAddress ?? null,
+          isDefault: shouldBeDefault,
         },
       });
     });
@@ -162,7 +164,7 @@ export const updateMyAddress = async (req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    const { title, line1, line2, city, state, pincode, lat, lng, isDefault } = req.body;
+    const { title, line1, line2, city, state, pincode, country, lat, lng, placeId, formattedAddress, isDefault } = req.body;
 
     const address = await prisma.$transaction(async (tx) => {
       if (isDefault === true) {
@@ -177,8 +179,11 @@ export const updateMyAddress = async (req: AuthRequest, res: Response): Promise<
           ...(city !== undefined && { city }),
           ...(state !== undefined && { state }),
           ...(pincode !== undefined && { pincode }),
+          ...(country !== undefined && { country }),
           ...(lat !== undefined && { lat }),
           ...(lng !== undefined && { lng }),
+          ...(placeId !== undefined && { placeId }),
+          ...(formattedAddress !== undefined && { formattedAddress }),
           ...(isDefault !== undefined && { isDefault }),
         },
       });

@@ -38,5 +38,16 @@ export const env = {
   DATABASE_URL: process.env.DATABASE_URL as string,
   JWT_SECRET: process.env.JWT_SECRET as string,
   REDIS_URL: process.env.REDIS_URL || '',
+  // Optional -- server-side Google Maps Platform key (services/geocoding.service.ts).
+  // Distinct from apps/mobile's EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: that one ships in a
+  // public client bundle and must be referrer/package restricted; this one never
+  // leaves the server. Not in REQUIRED_VARS -- nothing depends on it yet, so a
+  // missing key degrades only the geocoding endpoints (503), not the whole API.
+  GOOGLE_MAPS_SERVER_API_KEY: process.env.GOOGLE_MAPS_SERVER_API_KEY || '',
+  GOOGLE_MAPS_TIMEOUT_MS: Number(process.env.GOOGLE_MAPS_TIMEOUT_MS) || 5000,
   VERSION: process.env.npm_package_version || '1.0.0',
 };
+
+if (!env.GOOGLE_MAPS_SERVER_API_KEY) {
+  console.warn('[WARN] GOOGLE_MAPS_SERVER_API_KEY not set -- /api/geocode/* will return 503 (degraded); rest of the API is unaffected.');
+}
