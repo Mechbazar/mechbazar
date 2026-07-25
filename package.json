@@ -37,6 +37,14 @@
     "react-native": "0.86.0"
   },
   "overrides": {
-    "firebase": "12.15.0"
+    "firebase": "12.16.0",
+    "admin": {
+      "react": "19.2.7",
+      "react-dom": "19.2.7"
+    },
+    "vendor": {
+      "react": "19.2.7",
+      "react-dom": "19.2.7"
+    }
   }
 }
