@@ -1,9 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import { colors, Typography, Card, Button, Input, Loader, vendorService } from '@mechbazar/shared';
-import { CheckCircle, Circle } from 'lucide-react-native';
+import { colors, Typography, Card, Button, Input, Loader, vendorService, geocodeService } from '@mechbazar/shared';
+import type { GeocodeSuccess } from '@mechbazar/shared';
+import { CheckCircle, Circle, MapPin } from 'lucide-react-native';
+import { getCurrentLocation } from '../../services/location.service';
+import AddressMapPicker from '../../components/maps/AddressMapPicker';
+import PlaceAutocompleteField from '../../components/maps/PlaceAutocompleteField';
 
 type DocType = 'GST' | 'PAN' | 'CANCELLED_CHEQUE';
 
@@ -27,8 +31,14 @@ export const OnboardingWizard = () => {
 
   const { data: profile, isLoading } = useQuery({ queryKey: ['vendor-profile'], queryFn: vendorService.getProfile });
 
-  const [business, setBusiness] = useState({ storeName: '', gstNumber: '', panNumber: '', businessType: 'RETAIL', city: '', state: '' });
+  const [business, setBusiness] = useState({
+    storeName: '', gstNumber: '', panNumber: '', businessType: 'RETAIL',
+    addressLine1: '', addressLine2: '', city: '', state: '', pincode: '',
+    country: null as string | null, lat: null as number | null, lng: null as number | null,
+    placeId: null as string | null, formattedAddress: null as string | null,
+  });
   const [bank, setBank] = useState({ accountHolderName: '', bankName: '', accountNumber: '', ifscCode: '' });
+  const [locating, setLocating] = useState(false);
 
   useEffect(() => {
     if (!profile) return;
@@ -38,14 +48,67 @@ export const OnboardingWizard = () => {
       gstNumber: profile.gstNumber || '',
       panNumber: profile.panNumber || '',
       businessType: profile.businessType || 'RETAIL',
-      city: profile.user?.city || '',
-      state: profile.user?.state || '',
+      addressLine1: profile.addressLine1 || '',
+      addressLine2: profile.addressLine2 || '',
+      city: profile.city || profile.user?.city || '',
+      state: profile.state || profile.user?.state || '',
+      pincode: profile.pincode || '',
+      country: profile.country || null,
+      lat: profile.lat ?? null,
+      lng: profile.lng ?? null,
+      placeId: profile.placeId || null,
+      formattedAddress: profile.formattedAddress || null,
     }));
     if (profile.bankAccounts?.[0]) {
       const b = profile.bankAccounts[0];
       setBank({ accountHolderName: b.accountHolderName, bankName: b.bankName, accountNumber: b.accountNumber, ifscCode: b.ifscCode });
     }
   }, [profile]);
+
+  // Shared by "use my current location", pin drag, and Places Autocomplete
+  // selection -- syncs every field to the new location, including clearing a
+  // field this result has no component for (mirrors the fix already applied
+  // to apps/mobile's AddressManagementScreen.tsx / AddressPickerSheet.tsx).
+  const applyGeocodeResult = (result: GeocodeSuccess) => {
+    setBusiness((b) => ({
+      ...b,
+      addressLine1: result.components.line1 || '',
+      city: result.components.city || '',
+      state: result.components.state || '',
+      pincode: result.components.pincode || '',
+      country: result.components.country || null,
+      lat: result.lat,
+      lng: result.lng,
+      placeId: result.placeId,
+      formattedAddress: result.formattedAddress,
+    }));
+  };
+
+  const handleUseCurrentLocation = async () => {
+    setLocating(true);
+    try {
+      const location = await getCurrentLocation();
+      if (!location) {
+        Alert.alert('Location unavailable', 'Location permission denied or unavailable.');
+        return;
+      }
+      const result = await geocodeService.reverseGeocode(location.latitude, location.longitude);
+      if (result.ok) {
+        applyGeocodeResult(result);
+      } else {
+        setBusiness((b) => ({ ...b, lat: location.latitude, lng: location.longitude }));
+        Alert.alert('Partial success', 'Got your location, but could not resolve it to an address. You can drop the pin manually.');
+      }
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const handleMapPinChange = async (c: { latitude: number; longitude: number }) => {
+    setBusiness((b) => ({ ...b, lat: c.latitude, lng: c.longitude }));
+    const result = await geocodeService.reverseGeocode(c.latitude, c.longitude);
+    if (result.ok) applyGeocodeResult(result);
+  };
 
   const uploadedTypes = new Set<string>((profile?.documents || []).map((d: any) => d.type));
   const hasBank = !!profile?.bankAccounts?.length;
@@ -131,8 +194,24 @@ export const OnboardingWizard = () => {
             </View>
             <Input label="GST Number (optional)" value={business.gstNumber} onChangeText={(v) => setBusiness({ ...business, gstNumber: v })} />
             <Input label="PAN Number" autoCapitalize="characters" value={business.panNumber} onChangeText={(v) => setBusiness({ ...business, panNumber: v.toUpperCase() })} />
+
+            <Typography variant="body" style={{ fontWeight: '600' }}>Store Location</Typography>
+            <TouchableOpacity style={styles.locationBtn} onPress={handleUseCurrentLocation} disabled={locating}>
+              {locating ? <ActivityIndicator color={colors.primary} /> : (
+                <>
+                  <MapPin size={16} color={colors.primary} />
+                  <Typography variant="caption" style={{ color: colors.primary, fontWeight: '700', marginLeft: 6 }}>Use my current location</Typography>
+                </>
+              )}
+            </TouchableOpacity>
+            <PlaceAutocompleteField onSelect={applyGeocodeResult} placeholder="Search for your store address" />
+            <AddressMapPicker latitude={business.lat} longitude={business.lng} onChange={handleMapPinChange} height={180} />
+
+            <Input label="Address Line 1" value={business.addressLine1} onChangeText={(v) => setBusiness({ ...business, addressLine1: v })} />
+            <Input label="Address Line 2 (optional)" value={business.addressLine2} onChangeText={(v) => setBusiness({ ...business, addressLine2: v })} />
             <Input label="City" value={business.city} onChangeText={(v) => setBusiness({ ...business, city: v })} />
             <Input label="State" value={business.state} onChangeText={(v) => setBusiness({ ...business, state: v })} />
+            <Input label="Pincode" keyboardType="number-pad" value={business.pincode} onChangeText={(v) => setBusiness({ ...business, pincode: v })} />
           </View>
         )}
 
@@ -199,4 +278,5 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.primary },
   docRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   missingBox: { marginTop: 12, padding: 12, borderRadius: 8, backgroundColor: '#FEE2E2' },
+  locationBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceHover, borderRadius: 10, paddingVertical: 12 },
 });

@@ -14,7 +14,11 @@ export const vendorService = {
     const response = await apiClient.post('/vendors/register', data);
     return response.data; // { token, user, vendor }
   },
-  updateBusiness: async (data: { storeName: string; gstNumber?: string; panNumber: string; businessType: string; city: string; state: string }) => {
+  updateBusiness: async (data: {
+    storeName: string; gstNumber?: string; panNumber: string; businessType: string; city: string; state: string;
+    addressLine1?: string; addressLine2?: string; pincode?: string; country?: string | null;
+    lat?: number | null; lng?: number | null; placeId?: string | null; formattedAddress?: string | null;
+  }) => {
     const response = await apiClient.post('/vendors/business', data);
     return response.data;
   },

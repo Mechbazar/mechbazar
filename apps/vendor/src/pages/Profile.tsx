@@ -4,10 +4,14 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { loginSuccess } from '../store/slices/authSlice';
 import {
-  User, Store, FileText, CreditCard, Save, CheckCircle, Building2, MapPin, Shield
+  User, Store, FileText, CreditCard, Save, CheckCircle, Building2, MapPin, Shield, Loader2
 } from 'lucide-react';
 import { Button, Badge, Input } from '@mechbazar/shared/web';
 import { API_URL, SERVER_ORIGIN } from '../config/api';
+import { reverseGeocode } from '../services/geocode.service';
+import type { GeocodeSuccess } from '../services/geocode.service';
+import AddressMapPicker from '../components/maps/AddressMapPicker';
+import PlaceAutocompleteField from '../components/maps/PlaceAutocompleteField';
 
 export default function Profile() {
   const { token, user, vendorProfile } = useSelector((state: RootState) => state.auth);
@@ -16,9 +20,13 @@ export default function Profile() {
   const [form, setForm] = useState({
     name: '', city: '', state: '',
     storeName: '', gstNumber: '', panNumber: '', businessType: '',
+    addressLine1: '', addressLine2: '', pincode: '',
+    country: null as string | null, lat: null as number | null, lng: null as number | null,
+    placeId: null as string | null, formattedAddress: null as string | null,
   });
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
 
@@ -31,8 +39,58 @@ export default function Profile() {
       gstNumber: vendorProfile?.gstNumber || '',
       panNumber: vendorProfile?.panNumber || '',
       businessType: vendorProfile?.businessType || '',
+      addressLine1: vendorProfile?.addressLine1 || '',
+      addressLine2: vendorProfile?.addressLine2 || '',
+      pincode: vendorProfile?.pincode || '',
+      country: vendorProfile?.country || null,
+      lat: vendorProfile?.lat ?? null,
+      lng: vendorProfile?.lng ?? null,
+      placeId: vendorProfile?.placeId || null,
+      formattedAddress: vendorProfile?.formattedAddress || null,
     });
   }, [user, vendorProfile]);
+
+  // Shared by "use my current location", pin drag, and Places Autocomplete
+  // selection -- syncs every field to the new location, including clearing a
+  // field this result has no component for (see Register.tsx's identical
+  // helper for the same rationale).
+  const applyGeocodeResult = (result: GeocodeSuccess) => {
+    setForm((f) => ({
+      ...f,
+      addressLine1: result.components.line1 || '',
+      city: result.components.city || '',
+      state: result.components.state || '',
+      pincode: result.components.pincode || '',
+      country: result.components.country || null,
+      lat: result.lat,
+      lng: result.lng,
+      placeId: result.placeId,
+      formattedAddress: result.formattedAddress,
+    }));
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) return;
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const result = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+        setLocating(false);
+        if (result.ok) {
+          applyGeocodeResult(result);
+        } else {
+          setForm((f) => ({ ...f, lat: pos.coords.latitude, lng: pos.coords.longitude }));
+        }
+      },
+      () => setLocating(false)
+    );
+  };
+
+  const handleMapPinChange = async (c: { latitude: number; longitude: number }) => {
+    setForm((f) => ({ ...f, lat: c.latitude, lng: c.longitude }));
+    const result = await reverseGeocode(c.latitude, c.longitude);
+    if (result.ok) applyGeocodeResult(result);
+  };
 
   useEffect(() => {
     // Fetch latest profile including bank accounts and documents
@@ -126,6 +184,28 @@ export default function Profile() {
               <option value="IMPORTER">Importer</option>
               <option value="SERVICE">Service Provider</option>
             </select>
+          </div>
+        </div>
+
+        <div className="mt-5 pt-5 border-t border-brand-muted">
+          <label className="block text-sm font-medium text-gray-300 mb-1">Store Location</label>
+          <button
+            type="button"
+            onClick={handleUseCurrentLocation}
+            disabled={locating}
+            className="w-full mb-3 flex items-center justify-center gap-2 bg-brand-secondary/10 border border-brand-secondary/20 text-brand-secondary rounded-lg py-2.5 text-sm font-semibold disabled:opacity-60"
+          >
+            {locating ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+            {locating ? 'Locating...' : 'Use my current location'}
+          </button>
+          <div className="mb-3">
+            <PlaceAutocompleteField onSelect={applyGeocodeResult} placeholder="Search for your store address" />
+          </div>
+          <AddressMapPicker latitude={form.lat} longitude={form.lng} onChange={handleMapPinChange} height={200} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <Input label="Address Line 1" value={form.addressLine1} onChange={f('addressLine1')} />
+            <Input label="Address Line 2 (Optional)" value={form.addressLine2} onChange={f('addressLine2')} />
+            <Input label="Pincode" value={form.pincode} onChange={f('pincode')} />
           </div>
         </div>
 

@@ -3,6 +3,7 @@ export * from './api/vendorService';
 export * from './api/riderService';
 export * from './api/technicianService';
 export * from './api/adminService';
+export * from './api/geocodeService';
 
 // Design System
 export * from './theme';

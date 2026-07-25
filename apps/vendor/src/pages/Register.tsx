@@ -4,9 +4,13 @@ import axios from 'axios';
 import { useDispatch, useSelector } from 'react-redux';
 import { loginSuccess, updateVendorProfile } from '../store/slices/authSlice';
 import type { RootState } from '../store';
-import { Store, User, Building, Landmark, FileText, ArrowRight, CheckCircle } from 'lucide-react';
+import { Store, User, Building, Landmark, FileText, ArrowRight, CheckCircle, MapPin, Loader2 } from 'lucide-react';
 import { Button, Alert, Input } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
+import { reverseGeocode } from '../services/geocode.service';
+import type { GeocodeSuccess } from '../services/geocode.service';
+import AddressMapPicker from '../components/maps/AddressMapPicker';
+import PlaceAutocompleteField from '../components/maps/PlaceAutocompleteField';
 
 export default function Register() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -21,8 +25,64 @@ export default function Register() {
 
   // Form States
   const [personal, setPersonal] = useState({ name: '', phone: '', email: '', password: '' });
-  const [business, setBusiness] = useState({ storeName: '', gstNumber: '', panNumber: '', businessType: 'RETAIL', city: '', state: '' });
+  const [business, setBusiness] = useState({
+    storeName: '', gstNumber: '', panNumber: '', businessType: 'RETAIL',
+    addressLine1: '', addressLine2: '', city: '', state: '', pincode: '',
+    country: null as string | null, lat: null as number | null, lng: null as number | null,
+    placeId: null as string | null, formattedAddress: null as string | null,
+  });
   const [bank, setBank] = useState({ accountHolderName: '', bankName: '', accountNumber: '', ifscCode: '' });
+  const [locating, setLocating] = useState(false);
+
+  // Shared by "use my current location", pin drag, and Places Autocomplete
+  // selection -- all three mean "sync everything to this new location",
+  // including clearing a field this result has no component for, so a
+  // previous location's value never lingers (mirrors the fix already applied
+  // to apps/mobile's AddressManagementScreen.tsx / AddressPickerSheet.tsx).
+  const applyGeocodeResult = (result: GeocodeSuccess) => {
+    setBusiness((b) => ({
+      ...b,
+      addressLine1: result.components.line1 || '',
+      city: result.components.city || '',
+      state: result.components.state || '',
+      pincode: result.components.pincode || '',
+      country: result.components.country || null,
+      lat: result.lat,
+      lng: result.lng,
+      placeId: result.placeId,
+      formattedAddress: result.formattedAddress,
+    }));
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setError('Location is not supported by this browser.');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const result = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+        setLocating(false);
+        if (result.ok) {
+          applyGeocodeResult(result);
+        } else {
+          setBusiness((b) => ({ ...b, lat: pos.coords.latitude, lng: pos.coords.longitude }));
+          setError('Got your location, but could not resolve it to an address. You can drop the pin manually.');
+        }
+      },
+      () => {
+        setLocating(false);
+        setError('Location permission denied or unavailable.');
+      }
+    );
+  };
+
+  const handleMapPinChange = async (c: { latitude: number; longitude: number }) => {
+    setBusiness((b) => ({ ...b, lat: c.latitude, lng: c.longitude }));
+    const result = await reverseGeocode(c.latitude, c.longitude);
+    if (result.ok) applyGeocodeResult(result);
+  };
   
   // Files
   const [gstFile, setGstFile] = useState<File | null>(null);
@@ -215,9 +275,33 @@ export default function Register() {
                 </div>
                 <Input label="GST Number (Optional)" type="text" value={business.gstNumber} onChange={e => setBusiness({...business, gstNumber: e.target.value})} />
                 <Input label="PAN Number" type="text" required value={business.panNumber} onChange={e => setBusiness({...business, panNumber: e.target.value})} />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Store Location</label>
+                <button
+                  type="button"
+                  onClick={handleUseCurrentLocation}
+                  disabled={locating}
+                  className="w-full mb-3 flex items-center justify-center gap-2 bg-brand-secondary/10 border border-brand-secondary/20 text-brand-secondary rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60"
+                >
+                  {locating ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+                  {locating ? 'Locating...' : 'Use my current location'}
+                </button>
+                <div className="mb-3">
+                  <PlaceAutocompleteField onSelect={applyGeocodeResult} placeholder="Search for your store address" />
+                </div>
+                <AddressMapPicker latitude={business.lat} longitude={business.lng} onChange={handleMapPinChange} height={200} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Input label="Address Line 1" type="text" value={business.addressLine1} onChange={e => setBusiness({...business, addressLine1: e.target.value})} />
+                <Input label="Address Line 2 (Optional)" type="text" value={business.addressLine2} onChange={e => setBusiness({...business, addressLine2: e.target.value})} />
                 <Input label="City" type="text" required value={business.city} onChange={e => setBusiness({...business, city: e.target.value})} />
                 <Input label="State" type="text" required value={business.state} onChange={e => setBusiness({...business, state: e.target.value})} />
+                <Input label="Pincode" type="text" value={business.pincode} onChange={e => setBusiness({...business, pincode: e.target.value})} />
               </div>
+
               <Button type="submit" isLoading={loading} className="w-full">
                 Continue to Bank Details <ArrowRight className="ml-2 w-5 h-5" />
               </Button>
