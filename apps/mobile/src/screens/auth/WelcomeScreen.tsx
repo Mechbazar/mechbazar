@@ -24,6 +24,7 @@ import Svg, { Rect, Defs, LinearGradient, Stop, Circle, Path, G } from 'react-na
 import { loginSuccess } from '../../store/authSlice';
 import { API_BASE_URL } from '../../services/api';
 import { sendPhoneOtp, confirmPhoneOtp } from '../../services/phoneAuth';
+import { notify } from '../../utils/notify';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import Container from '../../components/desktop/shared/Container';
@@ -454,6 +455,7 @@ export default function WelcomeScreen() {
     // Timestamped so duplicate/rapid sends are identifiable in client logs.
     console.log(`[otp] ${new Date().toISOString()} send requested (resend=${isResend})`);
     setIsLoading(true);
+    setPhoneError('');
 
     // Firebase Phone Auth sends the SMS itself as part of signInWithPhoneNumber
     // and, once confirmed in handleLogin, yields an ID token the backend
@@ -464,11 +466,14 @@ export default function WelcomeScreen() {
       setIsLoading(false);
       setIsOtpSent(true);
       startResendCooldown();
-      Alert.alert('OTP Sent', 'An OTP has been sent to your phone.');
+      notify('OTP Sent', 'An OTP has been sent to your phone.');
     } catch (err) {
       setIsLoading(false);
       const message = err instanceof Error ? err.message : String(err);
-      Alert.alert('Error', message || 'Failed to send OTP.');
+      // notify() works on web (Alert.alert is a no-op there); also mirror the
+      // failure inline so it is visible even if a browser blocks window.alert.
+      setPhoneError(message || 'Failed to send OTP.');
+      notify('Error', message || 'Failed to send OTP.');
     } finally {
       sendInFlightRef.current = false;
     }
@@ -476,7 +481,7 @@ export default function WelcomeScreen() {
 
   const handleLogin = async () => {
     if (otp.length < 6) {
-      Alert.alert('Validation Error', 'Please enter a valid 6-digit OTP.');
+      notify('Validation Error', 'Please enter a valid 6-digit OTP.');
       return;
     }
     
@@ -515,11 +520,11 @@ export default function WelcomeScreen() {
           token: data.token
         }));
       } else {
-        Alert.alert('Authentication Failed', data.error || 'Authentication failed');
+        notify('Authentication Failed', data.error || 'Authentication failed');
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      Alert.alert('Network Error', `Failed to authenticate: ${message}`);
+      notify('Network Error', `Failed to authenticate: ${message}`);
     } finally {
       setIsLoading(false);
     }
@@ -528,14 +533,14 @@ export default function WelcomeScreen() {
   const saveSettings = () => {
     setActiveBaseUrl(tempBaseUrl);
     setIsSettingsVisible(false);
-    Alert.alert('Settings Updated', `API base URL set to:\n${tempBaseUrl}`);
+    notify('Settings Updated', `API base URL set to:\n${tempBaseUrl}`);
   };
 
   const resetSettings = () => {
     setTempBaseUrl(API_BASE_URL);
     setActiveBaseUrl(API_BASE_URL);
     setIsSettingsVisible(false);
-    Alert.alert('Settings Reset', `API base URL reset to default:\n${API_BASE_URL}`);
+    notify('Settings Reset', `API base URL reset to default:\n${API_BASE_URL}`);
   };
 
   if (isDesktopUp) {
