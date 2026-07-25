@@ -1,5 +1,11 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+// Note: bundled with a classic Rollup-based Vite (not Vite 8's default
+// Rolldown bundler) -- Rolldown was empirically confirmed to drop or
+// misorder @firebase/auth's module-level self-registration call under
+// every tree-shaking/chunking configuration tried, causing "Component auth
+// has not been registered yet" in production. See apps/vendor/package.json's
+// pinned `vite` version.
 
 // Same Firebase project as the customer app (mech-bazar-8fd86) and the
 // backend's Admin SDK -- these are public client identifiers, not secrets
