@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, TextInput, ActivityIndicator } from 'react-native';
-import * as Location from 'expo-location';
 import { ServiceAddress } from '../../types/service';
 import { fetchMyAddresses, createMyAddress } from '../../services/address.service';
+import { locationService } from '../../services/location.service';
+import { reverseGeocode, GeocodeSuccess } from '../../services/geocode.service';
+import AddressMapPicker from '../shared/maps/AddressMapPicker';
+import PlaceAutocompleteField from '../shared/PlaceAutocompleteField';
 import { colors } from '../../screens/services/theme';
 
 interface AddressPickerSheetProps {
@@ -12,7 +15,7 @@ interface AddressPickerSheetProps {
   onSelect: (address: ServiceAddress) => void;
 }
 
-const emptyForm = { title: '', line1: '', line2: '', city: '', state: '', pincode: '' };
+const emptyForm = { title: '', line1: '', line2: '', city: '', state: '', pincode: '', country: null as string | null };
 
 export const AddressPickerSheet: React.FC<AddressPickerSheetProps> = ({ visible, token, onClose, onSelect }) => {
   const [addresses, setAddresses] = useState<ServiceAddress[]>([]);
@@ -20,9 +23,27 @@ export const AddressPickerSheet: React.FC<AddressPickerSheetProps> = ({ visible,
   const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [placeId, setPlaceId] = useState<string | null>(null);
+  const [formattedAddress, setFormattedAddress] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Shared by "use my current location", pin drag, and Places Autocomplete
+  // selection -- all three mean "sync everything to this new location".
+  const applyGeocodeResult = (result: GeocodeSuccess) => {
+    setCoords({ lat: result.lat, lng: result.lng });
+    setPlaceId(result.placeId);
+    setFormattedAddress(result.formattedAddress);
+    setForm((f) => ({
+      ...f,
+      line1: result.components.line1 || f.line1,
+      city: result.components.city || f.city,
+      state: result.components.state || f.state,
+      pincode: result.components.pincode || f.pincode,
+      country: result.components.country || f.country,
+    }));
+  };
 
   const loadAddresses = async () => {
     setLoading(true);
@@ -36,6 +57,8 @@ export const AddressPickerSheet: React.FC<AddressPickerSheetProps> = ({ visible,
       setShowAddForm(false);
       setForm(emptyForm);
       setCoords(null);
+      setPlaceId(null);
+      setFormattedAddress(null);
       setError(null);
       loadAddresses();
     }
@@ -44,32 +67,30 @@ export const AddressPickerSheet: React.FC<AddressPickerSheetProps> = ({ visible,
   const handleUseCurrentLocation = async () => {
     setLocating(true);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setError('Location permission denied');
+      const location = await locationService.getCurrentLocation();
+      if (!location) {
+        setError('Location permission denied or unavailable');
         return;
       }
-      const location = await Location.getCurrentPositionAsync({});
-      setCoords({ lat: location.coords.latitude, lng: location.coords.longitude });
-      const geocode = await Location.reverseGeocodeAsync({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-      });
-      if (geocode.length > 0) {
-        const place = geocode[0];
-        setForm((f) => ({
-          ...f,
-          line1: f.line1 || [place.streetNumber, place.street].filter(Boolean).join(' '),
-          city: f.city || place.city || place.district || '',
-          state: f.state || place.region || '',
-          pincode: f.pincode || place.postalCode || '',
-        }));
+      const result = await reverseGeocode(token, location.latitude, location.longitude);
+      if (result.ok) {
+        applyGeocodeResult(result);
+      } else {
+        // Keep the raw coordinates even if reverse geocoding is unavailable.
+        setCoords({ lat: location.latitude, lng: location.longitude });
+        setError('Got your location, but could not resolve it to an address. You can drop the pin manually.');
       }
     } catch (err) {
       setError('Could not fetch current location');
     } finally {
       setLocating(false);
     }
+  };
+
+  const handleMapPinChange = async (c: { latitude: number; longitude: number }) => {
+    setCoords({ lat: c.latitude, lng: c.longitude });
+    const result = await reverseGeocode(token, c.latitude, c.longitude);
+    if (result.ok) applyGeocodeResult(result);
   };
 
   const handleSave = async () => {
@@ -83,6 +104,8 @@ export const AddressPickerSheet: React.FC<AddressPickerSheetProps> = ({ visible,
       ...form,
       lat: coords?.lat ?? null,
       lng: coords?.lng ?? null,
+      placeId,
+      formattedAddress,
     });
     setSaving(false);
     if (err || !address) {
@@ -136,6 +159,14 @@ export const AddressPickerSheet: React.FC<AddressPickerSheetProps> = ({ visible,
                   <Text style={styles.locationBtnText}>📍 Use my current location</Text>
                 )}
               </TouchableOpacity>
+
+              <View style={{ marginBottom: 12 }}>
+                <PlaceAutocompleteField token={token} onSelect={applyGeocodeResult} placeholder="Search for an address" />
+              </View>
+
+              <View style={{ marginBottom: 12 }}>
+                <AddressMapPicker latitude={coords?.lat ?? null} longitude={coords?.lng ?? null} onChange={handleMapPinChange} height={150} />
+              </View>
 
               <TextInput style={styles.input} placeholder="Address label (e.g. Home, Office)" placeholderTextColor={colors.textMuted} value={form.title} onChangeText={(v) => setForm({ ...form, title: v })} />
               <TextInput style={styles.input} placeholder="House no, building, street" placeholderTextColor={colors.textMuted} value={form.line1} onChangeText={(v) => setForm({ ...form, line1: v })} />

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Linking, Platform, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Linking, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -11,18 +11,9 @@ import { useBreakpoint } from '../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
+import LiveTrackingMap from '../components/shared/maps/LiveTrackingMap';
 
 const TRACKING_POLL_INTERVAL_MS = 10000;
-
-let MapView: any = null;
-let Marker: any = null;
-if (Platform.OS !== 'web') {
-  // Native-only -- react-native-maps has no reliable web target, mirrors the
-  // guard pattern already used in services/ServiceTrackingScreen.tsx.
-  const maps = require('react-native-maps');
-  MapView = maps.default;
-  Marker = maps.Marker;
-}
 
 // Small local haversine for a client-side-only ETA estimate -- no backend
 // change, no new dependency. Same approach as ServiceTrackingScreen.tsx.
@@ -197,37 +188,15 @@ export default function DeliveryTrackingScreen() {
       <CompactBookingShell maxWidth={880} style={styles.flexFill}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
       {rider && hasRiderLocation ? (
-        MapView ? (
-          <MapView
-            style={styles.map}
-            initialRegion={{
-              latitude: rider.currentLat,
-              longitude: rider.currentLng,
-              latitudeDelta: 0.02,
-              longitudeDelta: 0.02,
-            }}
-            region={{
-              latitude: rider.currentLat,
-              longitude: rider.currentLng,
-              latitudeDelta: 0.02,
-              longitudeDelta: 0.02,
-            }}
-          >
-            <Marker coordinate={{ latitude: rider.currentLat, longitude: rider.currentLng }} title="Your rider" />
-            {address?.lat != null && address?.lng != null && (
-              <Marker
-                coordinate={{ latitude: address.lat, longitude: address.lng }}
-                title="Delivery address"
-                pinColor={colors.accent}
-              />
-            )}
-          </MapView>
-        ) : (
-          <View style={styles.mapPlaceholder}>
-            <Text style={styles.mapEmoji}>🗺️</Text>
-            <Text style={styles.mapText}>Live map is available on the mobile app</Text>
-          </View>
-        )
+        <LiveTrackingMap
+          height={220}
+          markers={[
+            { latitude: rider.currentLat, longitude: rider.currentLng, title: 'Your rider' },
+            ...(address?.lat != null && address?.lng != null
+              ? [{ latitude: address.lat, longitude: address.lng, title: 'Delivery address', color: colors.accent }]
+              : []),
+          ]}
+        />
       ) : (
         <View style={styles.mapPlaceholder}>
           <Text style={styles.mapEmoji}>{rider ? '📍' : '🗺️'}</Text>

@@ -18,7 +18,8 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { RootState } from '../store';
-import MapPlaceholder from '../components/shared/MapPlaceholder';
+import AddressMapPicker from '../components/shared/maps/AddressMapPicker';
+import PlaceAutocompleteField from '../components/shared/PlaceAutocompleteField';
 import {
   fetchMyAddresses,
   createMyAddress,
@@ -26,6 +27,7 @@ import {
   deleteMyAddress
 } from '../services/address.service';
 import { locationService } from '../services/location.service';
+import { reverseGeocode, GeocodeSuccess } from '../services/geocode.service';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
@@ -60,6 +62,11 @@ export default function AddressManagementScreen() {
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [pincode, setPincode] = useState('');
+  const [country, setCountry] = useState<string | null>(null);
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
+  const [placeId, setPlaceId] = useState<string | null>(null);
+  const [formattedAddress, setFormattedAddress] = useState<string | null>(null);
   const [isDefault, setIsDefault] = useState(false);
   const [fetchingGPS, setFetchingGPS] = useState(false);
 
@@ -92,6 +99,11 @@ export default function AddressManagementScreen() {
     setCity('');
     setState('');
     setPincode('');
+    setCountry(null);
+    setLat(null);
+    setLng(null);
+    setPlaceId(null);
+    setFormattedAddress(null);
     setIsDefault(false);
     setModalVisible(true);
   };
@@ -104,28 +116,49 @@ export default function AddressManagementScreen() {
     setCity(addr.city);
     setState(addr.state);
     setPincode(addr.pincode);
+    setCountry(addr.country ?? null);
+    setLat(addr.lat ?? null);
+    setLng(addr.lng ?? null);
+    setPlaceId(addr.placeId ?? null);
+    setFormattedAddress(addr.formattedAddress ?? null);
     setIsDefault(addr.isDefault);
     setModalVisible(true);
+  };
+
+  // Shared by GPS detect, pin drag, and Places Autocomplete selection -- all
+  // three represent the user pointing at a new location, so all three sync
+  // every field (including overwriting whatever was typed before) to match.
+  const applyGeocodeResult = (result: GeocodeSuccess) => {
+    setLat(result.lat);
+    setLng(result.lng);
+    setPlaceId(result.placeId);
+    setFormattedAddress(result.formattedAddress);
+    if (result.components.line1) setLine1(result.components.line1);
+    if (result.components.city) setCity(result.components.city);
+    if (result.components.state) setState(result.components.state);
+    if (result.components.pincode) setPincode(result.components.pincode);
+    if (result.components.country) setCountry(result.components.country);
   };
 
   const handleGPSDetect = async () => {
     setFetchingGPS(true);
     try {
       const coords = await locationService.getCurrentLocation();
-      if (coords) {
-        const address = await locationService.reverseGeocode(coords.latitude, coords.longitude);
-        if (address) {
-          setLine1(address.street || address.name || '');
-          setLine2(address.city || '');
-          setCity(address.city || '');
-          setState(address.region || '');
-          setPincode(address.postalCode || '');
-          Alert.alert('GPS Success', 'Location loaded successfully!');
-        } else {
-          Alert.alert('GPS Error', 'Failed to resolve location address.');
-        }
-      } else {
+      if (!coords) {
         Alert.alert('GPS Error', 'Failed to retrieve coordinates. Please check your permissions.');
+        return;
+      }
+      if (!token) return;
+      const result = await reverseGeocode(token, coords.latitude, coords.longitude);
+      if (result.ok) {
+        applyGeocodeResult(result);
+        Alert.alert('GPS Success', 'Location loaded successfully!');
+      } else {
+        // Still keep the raw coordinates even if reverse geocoding is
+        // unavailable -- the pin/lat/lng are still useful without an address.
+        setLat(coords.latitude);
+        setLng(coords.longitude);
+        Alert.alert('GPS Error', 'Got your location, but could not resolve it to an address. You can drop the pin manually.');
       }
     } catch (e) {
       console.error(e);
@@ -133,6 +166,21 @@ export default function AddressManagementScreen() {
     } finally {
       setFetchingGPS(false);
     }
+  };
+
+  const handleMapPinChange = async (coords: { latitude: number; longitude: number }) => {
+    // Always reflect the pin's raw position immediately; the address text
+    // fields catch up once reverse geocoding resolves (or don't, if it's
+    // unavailable -- the coordinates alone are still saved correctly).
+    setLat(coords.latitude);
+    setLng(coords.longitude);
+    if (!token) return;
+    const result = await reverseGeocode(token, coords.latitude, coords.longitude);
+    if (result.ok) applyGeocodeResult(result);
+  };
+
+  const handleAutocompleteSelect = (result: GeocodeSuccess) => {
+    applyGeocodeResult(result);
   };
 
   const handleSave = async () => {
@@ -149,6 +197,11 @@ export default function AddressManagementScreen() {
       city,
       state,
       pincode,
+      country,
+      lat,
+      lng,
+      placeId,
+      formattedAddress,
       isDefault,
     };
 
@@ -311,11 +364,17 @@ export default function AddressManagementScreen() {
                 </Text>
               </TouchableOpacity>
 
-              {/* Pin-on-map confirmation for the detected/entered address --
-                  see config/maps.ts for how to enable this once a Google Maps
-                  API key is available. */}
-              <View style={{ marginTop: 12, marginBottom: 4 }}>
-                <MapPlaceholder label="Confirm pin location on map" height={140} />
+              {token && (
+                <View style={{ marginTop: 4, marginBottom: 12 }}>
+                  <PlaceAutocompleteField token={token} onSelect={handleAutocompleteSelect} placeholder="Search for an address" />
+                </View>
+              )}
+
+              {/* Draggable pin confirmation for the detected/searched/entered
+                  address -- falls back to an honest placeholder when no
+                  Google Maps key is configured (see config/maps.ts). */}
+              <View style={{ marginBottom: 4 }}>
+                <AddressMapPicker latitude={lat} longitude={lng} onChange={handleMapPinChange} height={160} />
               </View>
 
               <View style={styles.form}>

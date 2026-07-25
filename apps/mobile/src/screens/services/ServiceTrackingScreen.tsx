@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Linking, Platform, Alert, ScrollView, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Linking, Alert, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -11,17 +11,8 @@ import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
+import LiveTrackingMap from '../../components/shared/maps/LiveTrackingMap';
 import { colors } from './theme';
-
-let MapView: any = null;
-let Marker: any = null;
-if (Platform.OS !== 'web') {
-  // Native-only -- react-native-maps has no reliable web target, mirrors the
-  // guard pattern already used for other native-only modules in this app.
-  const maps = require('react-native-maps');
-  MapView = maps.default;
-  Marker = maps.Marker;
-}
 
 type ParamList = { ServiceTracking: { bookingId: string } };
 const POLL_INTERVAL_MS = 10000;
@@ -238,33 +229,10 @@ export default function ServiceTrackingScreen() {
         ) : (
           <>
             {technician && technician.currentLat != null && technician.currentLng != null ? (
-              MapView ? (
-                <MapView
-                  style={styles.map}
-                  initialRegion={{
-                    latitude: technician.currentLat,
-                    longitude: technician.currentLng,
-                    latitudeDelta: 0.02,
-                    longitudeDelta: 0.02,
-                  }}
-                  region={{
-                    latitude: technician.currentLat,
-                    longitude: technician.currentLng,
-                    latitudeDelta: 0.02,
-                    longitudeDelta: 0.02,
-                  }}
-                >
-                  <Marker
-                    coordinate={{ latitude: technician.currentLat, longitude: technician.currentLng }}
-                    title="Your mechanic"
-                  />
-                </MapView>
-              ) : (
-                <View style={styles.mapPlaceholder}>
-                  <Text style={styles.mapEmoji}>🗺️</Text>
-                  <Text style={styles.mapText}>Live map is available on the mobile app</Text>
-                </View>
-              )
+              <LiveTrackingMap
+                height={220}
+                markers={[{ latitude: technician.currentLat, longitude: technician.currentLng, title: 'Your mechanic' }]}
+              />
             ) : (
               <View style={styles.mapPlaceholder}>
                 <Text style={styles.mapEmoji}>📍</Text>

@@ -25,7 +25,7 @@ export type GeocodeSuccess = {
   lng: number;
   formattedAddress: string;
   placeId: string;
-  components: { city?: string; state?: string; pincode?: string; country?: string };
+  components: { line1?: string; city?: string; state?: string; pincode?: string; country?: string };
 };
 
 export type GeocodeResult = GeocodeSuccess | GeocodeFailure;
@@ -38,7 +38,15 @@ type GoogleAddressComponent = { long_name: string; short_name: string; types: st
 
 function extractComponents(components: GoogleAddressComponent[]): GeocodeSuccess['components'] {
   const find = (type: string) => components.find((c) => c.types.includes(type))?.long_name;
+  // Best-effort street line -- "<number> <route>" when both are present
+  // (typical for a precise pin/place selection), falling back to whatever
+  // premise/sublocality Google did return for coarser results (e.g. a city
+  // centroid from a text search with no exact street match).
+  const streetNumber = find('street_number');
+  const route = find('route');
+  const line1 = [streetNumber, route].filter(Boolean).join(' ') || find('premise') || find('sublocality_level_1') || find('sublocality');
   return {
+    line1,
     city: find('locality') || find('administrative_area_level_2'),
     state: find('administrative_area_level_1'),
     pincode: find('postal_code'),

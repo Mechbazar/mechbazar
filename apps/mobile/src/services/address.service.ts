@@ -24,8 +24,11 @@ export interface NewAddressInput {
   city: string;
   state: string;
   pincode: string;
+  country?: string | null;
   lat?: number | null;
   lng?: number | null;
+  placeId?: string | null;
+  formattedAddress?: string | null;
   isDefault?: boolean;
 }
 

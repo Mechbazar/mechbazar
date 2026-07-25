@@ -3,8 +3,8 @@ import { reverseGeocode, forwardGeocode, placesAutocomplete, placeDetails } from
 
 // Thin proxy over services/geocoding.service.ts -- lets every frontend call
 // the backend instead of embedding a raw, quota-metered Google Places/
-// Geocoding key in more client bundles. Any authenticated role may call
-// these (see geocode.routes.ts); there's nothing user-specific here.
+// Geocoding key in more client bundles. Public, unauthenticated (see
+// geocode.routes.ts); there's nothing user-specific here.
 
 function degradedStatus(reason: 'disabled' | 'not_found' | 'error' | 'timeout'): number {
   if (reason === 'not_found') return 404;

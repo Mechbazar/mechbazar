@@ -5,16 +5,6 @@ export interface LocationCoordinates {
   longitude: number;
 }
 
-export interface GeocodedAddress {
-  name: string | null;
-  street: string | null;
-  city: string | null;
-  region: string | null; // State
-  postalCode: string | null;
-  country: string | null;
-  formattedAddress: string;
-}
-
 class LocationService {
   /**
    * Request foreground location permission.
@@ -52,43 +42,6 @@ class LocationService {
       };
     } catch (error) {
       console.error('Error getting current location:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Reverse geocode a set of coordinates to a human-readable address.
-   */
-  async reverseGeocode(latitude: number, longitude: number): Promise<GeocodedAddress | null> {
-    try {
-      const results = await Location.reverseGeocodeAsync({ latitude, longitude });
-      if (results && results.length > 0) {
-        const address = results[0];
-        
-        // Build a nice formatted address string
-        const parts = [
-          address.name || address.street,
-          address.district,
-          address.city,
-          address.region,
-          address.postalCode
-        ].filter(Boolean);
-        
-        const formattedAddress = parts.join(', ');
-        
-        return {
-          name: address.name,
-          street: address.street,
-          city: address.city,
-          region: address.region,
-          postalCode: address.postalCode,
-          country: address.country,
-          formattedAddress: formattedAddress || 'Unknown Location',
-        };
-      }
-      return null;
-    } catch (error) {
-      console.error('Error in reverse geocoding:', error);
       return null;
     }
   }

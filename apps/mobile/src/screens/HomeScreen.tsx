@@ -31,7 +31,8 @@ import { setVehicleType } from '../store/appSlice';
 import { fetchCategories, getTrendingProducts, fetchBanners, fetchOffers, HomeOffer } from '../services/product.service';
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../services/wishlist.service';
 import { VehicleType, Category, Product } from '../types/product';
-import * as Location from 'expo-location';
+import { locationService } from '../services/location.service';
+import { reverseGeocode } from '../services/geocode.service';
 
 const { width } = Dimensions.get('window');
 
@@ -283,29 +284,18 @@ export default function HomeScreen({ navigation }: any) {
     });
   }, [token]);
 
-  // Request location
+  // Request location -- device GPS read via locationService, reverse
+  // geocoded through the backend (services/geocode.service.ts) rather than
+  // on-device, so there's exactly one geocoding implementation in this app.
   useEffect(() => {
     (async () => {
-      try {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setLocationName('New Delhi');
-          return;
-        }
-
-        let location = await Location.getCurrentPositionAsync({});
-        let geocode = await Location.reverseGeocodeAsync({
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude
-        });
-        
-        if (geocode.length > 0) {
-          const place = geocode[0];
-          setLocationName(`${place.city || place.district || place.region || 'Delhi'}`);
-        }
-      } catch (error) {
+      const coords = await locationService.getCurrentLocation();
+      if (!coords) {
         setLocationName('New Delhi');
+        return;
       }
+      const result = await reverseGeocode(token, coords.latitude, coords.longitude);
+      setLocationName(result.ok ? result.components.city || 'Delhi' : 'New Delhi');
     })();
   }, []);
 
