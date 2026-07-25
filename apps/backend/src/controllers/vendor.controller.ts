@@ -85,11 +85,23 @@ export const loginVendor = async (req: Request, res: Response): Promise<void> =>
 export const registerPersonal = async (req: Request, res: Response): Promise<void> => {
   try {
     const { name, phone, email, password } = req.body;
-    
+
     const existingUser = await prisma.user.findUnique({ where: { phone } });
     if (existingUser) {
       res.status(400).json({ error: 'User with this phone number already exists' });
       return;
+    }
+
+    // email is also @unique on User -- without this check, an email already
+    // tied to another account (e.g. an existing customer signup) hit the DB's
+    // unique constraint directly and surfaced as an unhandled 500 ("Failed to
+    // register vendor") instead of a clear, actionable message.
+    if (email) {
+      const existingEmail = await prisma.user.findUnique({ where: { email } });
+      if (existingEmail) {
+        res.status(400).json({ error: 'An account with this email already exists' });
+        return;
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
