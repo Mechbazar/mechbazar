@@ -10,9 +10,18 @@ COPY apps/admin/package.json apps/admin/package.json
 COPY apps/admin-mobile/package.json apps/admin-mobile/package.json
 COPY apps/seller-mobile/package.json apps/seller-mobile/package.json
 COPY apps/rider/package.json apps/rider/package.json
+COPY apps/mechanic/package.json apps/mechanic/package.json
 COPY apps/vendor/package.json apps/vendor/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
+# apps/mechanic was missing from the COPY list above until now -- since it's
+# a real npm workspace (see root package.json), omitting its package.json
+# silently dropped its @react-native-firebase/* peer requirements from this
+# install's dependency graph entirely, so `npm install` here resolved a
+# DIFFERENT tree than the one that produced the committed package-lock.json
+# (generated locally with all 7 workspaces present). That's what caused
+# "Component auth has not been registered yet" in production even after
+# package.json's firebase/react overrides were verified to fix it locally.
 RUN npm install --legacy-peer-deps
 
 COPY apps/vendor apps/vendor
