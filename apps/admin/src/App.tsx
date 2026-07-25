@@ -3,7 +3,9 @@ import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } f
 import { LayoutDashboard, Car, ShoppingBag, Users, Layers, Package, LogOut, Store, Navigation, Warehouse, Image, Tag, CreditCard, Bike, Wrench, ClipboardList, Layers3, Menu, X, FileText, ScrollText } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { useDispatch } from 'react-redux';
+import { signOut } from 'firebase/auth';
 import { logout } from './store';
+import { auth } from './config/firebase';
 import Vehicles from './pages/Vehicles';
 import Products from './pages/Products';
 import Customers from './pages/Customers';
@@ -15,6 +17,7 @@ import Categories from './pages/Categories';
 import Orders from './pages/Orders';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
+import VerifyEmail from './pages/VerifyEmail';
 import Dashboard from './pages/Dashboard';
 import InventorySystem from './pages/inventory';
 import ServicesManagement from './pages/services';
@@ -35,6 +38,9 @@ function MainLayout({ children }: { children: React.ReactNode }) {
 
   const handleLogout = () => {
     dispatch(logout());
+    // Best-effort -- app-JWT logout must succeed even if this fails (e.g.
+    // Firebase session already gone), so it's not awaited/blocking.
+    signOut(auth).catch(() => {});
   };
 
   const navLinks = [
@@ -143,7 +149,8 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
-        
+        <Route path="/verify-email" element={<VerifyEmail />} />
+
         <Route path="/*" element={
           <ProtectedRoute>
             <MainLayout>

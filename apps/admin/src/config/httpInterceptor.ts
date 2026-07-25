@@ -9,7 +9,9 @@
 // to /login. This clears the stored session and redirects, mirroring the vendor app's
 // existing (page-scoped) 401 handling in App.tsx.
 import axios from 'axios';
+import { signOut } from 'firebase/auth';
 import { store, logout } from '../store';
+import { auth } from './firebase';
 
 let redirecting = false;
 
@@ -19,6 +21,7 @@ axios.interceptors.response.use(
     if (error?.response?.status === 401 && !redirecting) {
       redirecting = true;
       store.dispatch(logout());
+      signOut(auth).catch(() => {});
       if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
         window.location.href = '/login';
       }

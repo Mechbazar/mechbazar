@@ -2,13 +2,18 @@ import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { Eye, EyeOff } from 'lucide-react';
 import { loginSuccess } from '../store';
 import { Button, Card, Alert, Input } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
+import { auth } from '../config/firebase';
+import { mapFirebaseAuthError } from '../utils/firebaseErrors';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const dispatch = useDispatch();
@@ -20,10 +25,15 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const response = await axios.post(`${API_URL}/auth/admin/login`, {
-        email,
-        password,
-      });
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+
+      if (!credential.user.emailVerified) {
+        navigate('/verify-email', { state: { email: credential.user.email } });
+        return;
+      }
+
+      const idToken = await credential.user.getIdToken();
+      const response = await axios.post(`${API_URL}/auth/admin/login`, { idToken });
 
       if (response.data && response.data.token) {
         dispatch(loginSuccess({
@@ -33,7 +43,13 @@ export default function Login() {
         navigate('/');
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Invalid credentials or server error.');
+      if (err?.code?.startsWith?.('auth/')) {
+        setError(mapFirebaseAuthError(err.code));
+      } else if (err?.response?.data?.error === 'EMAIL_NOT_VERIFIED') {
+        navigate('/verify-email', { state: { email } });
+      } else {
+        setError(err.response?.data?.error || 'Invalid credentials or server error.');
+      }
     } finally {
       setLoading(false);
     }
@@ -59,6 +75,7 @@ export default function Login() {
             onChange={(e) => setEmail(e.target.value)}
             required
             placeholder="admin@mechbazar.com"
+            disabled={loading}
           />
 
           <div>
@@ -68,16 +85,29 @@ export default function Login() {
                 Forgot password?
               </Link>
             </div>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                placeholder="••••••••"
+                disabled={loading}
+                className="pr-11"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
 
-          <Button type="submit" isLoading={loading} className="w-full">
+          <Button type="submit" isLoading={loading} disabled={loading} className="w-full">
             {loading ? 'Authenticating...' : 'Sign In'}
           </Button>
         </form>

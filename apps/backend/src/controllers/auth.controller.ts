@@ -4,8 +4,30 @@ import bcrypt from 'bcryptjs';
 import { generateToken } from '../utils/jwt';
 import { AuthRequest } from '../middlewares/auth';
 import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
+import { verifyFirebaseIdTokenAndResolveUser, FirebaseAuthError, FirebaseAuthErrorCode } from '../utils/firebaseAuth';
 import { sanitizeUser } from '../utils/sanitizeUser';
 import prisma from '../config/prisma';
+
+// Maps a FirebaseAuthError to the HTTP response for the admin/vendor login
+// endpoints. EMAIL_NOT_VERIFIED is surfaced as a machine-readable code so the
+// frontend can route to the verify-email gate; NO_LINKED_ACCOUNT/FORBIDDEN
+// collapse into the same generic message as a bad password would today, so
+// an unauthorized caller can't learn *why* they were rejected.
+const respondToFirebaseAuthError = (res: Response, err: FirebaseAuthError): void => {
+  const statusByCode: Record<FirebaseAuthErrorCode, number> = {
+    INVALID_TOKEN: 401,
+    EMAIL_NOT_VERIFIED: 403,
+    NO_LINKED_ACCOUNT: 401,
+    FORBIDDEN: 401,
+  };
+  const bodyByCode: Record<FirebaseAuthErrorCode, Record<string, string>> = {
+    INVALID_TOKEN: { error: 'Invalid or expired session. Please sign in again.' },
+    EMAIL_NOT_VERIFIED: { error: 'EMAIL_NOT_VERIFIED', message: 'Please verify your email before signing in.' },
+    NO_LINKED_ACCOUNT: { error: 'Invalid credentials or unauthorized' },
+    FORBIDDEN: { error: 'Invalid credentials or unauthorized' },
+  };
+  res.status(statusByCode[err.code]).json(bodyByCode[err.code]);
+};
 
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -150,27 +172,48 @@ export const switchMode = async (req: Request, res: Response): Promise<void> => 
   }
 };
 
+const adminRoles: Role[] = [
+  Role.ADMIN,
+  Role.SUPER_ADMIN,
+  Role.OPERATIONS_MANAGER,
+  Role.INVENTORY_MANAGER,
+  Role.VENDOR_MANAGER,
+  Role.FINANCE_MANAGER,
+  Role.CUSTOMER_SUPPORT
+];
+
 export const adminLogin = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body;
+    const { idToken, email, password } = req.body;
 
+    // Firebase path: client already authenticated with
+    // signInWithEmailAndPassword and is forwarding the resulting ID token.
+    if (idToken) {
+      try {
+        const user = await verifyFirebaseIdTokenAndResolveUser(idToken, adminRoles);
+        const token = generateToken(user.id, user.role, { accountType: user.accountType }, '1d');
+        res.status(200).json({ user: sanitizeUser(user), token });
+      } catch (err) {
+        if (err instanceof FirebaseAuthError) {
+          respondToFirebaseAuthError(res, err);
+          return;
+        }
+        throw err;
+      }
+      return;
+    }
+
+    // Legacy path -- kept during the migration transition window so the
+    // currently-deployed admin frontend keeps working until it's redeployed
+    // on the Firebase flow. Remove once that rollout's burn-in period ends
+    // (see the auth migration plan's rollout section).
     if (!email || !password) {
       res.status(400).json({ error: 'Email and password are required' });
       return;
     }
 
     const user = await prisma.user.findUnique({ where: { email } });
-    
-    const adminRoles: Role[] = [
-      Role.ADMIN,
-      Role.SUPER_ADMIN,
-      Role.OPERATIONS_MANAGER,
-      Role.INVENTORY_MANAGER,
-      Role.VENDOR_MANAGER,
-      Role.FINANCE_MANAGER,
-      Role.CUSTOMER_SUPPORT
-    ];
-    
+
     if (!user || !adminRoles.includes(user.role as Role)) {
       res.status(401).json({ error: 'Invalid credentials or unauthorized' });
       return;

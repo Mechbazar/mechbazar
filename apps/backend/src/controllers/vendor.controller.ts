@@ -7,7 +7,29 @@ import { restoreOrderStock, creditOrderDelivery } from './order.controller';
 import { notifyUser } from '../utils/notify';
 import { sanitizeUser, sanitizeUsers, sanitizeOrders, stripDeliveryOtp, stripDeliveryOtps } from '../utils/sanitizeUser';
 import { recordAuditLog } from '../utils/auditLog';
+import { verifyFirebaseIdTokenAndResolveUser, FirebaseAuthError, FirebaseAuthErrorCode } from '../utils/firebaseAuth';
+import firebaseAdmin from '../config/firebase';
 import prisma from '../config/prisma';
+
+// Same mapping shape as auth.controller.ts's admin-login handler --
+// EMAIL_NOT_VERIFIED is machine-readable for the frontend's verify-email
+// gate, everything else collapses into a generic "invalid credentials" so an
+// unauthorized caller can't learn which check failed.
+const respondToFirebaseAuthError = (res: Response, err: FirebaseAuthError): void => {
+  const statusByCode: Record<FirebaseAuthErrorCode, number> = {
+    INVALID_TOKEN: 401,
+    EMAIL_NOT_VERIFIED: 403,
+    NO_LINKED_ACCOUNT: 401,
+    FORBIDDEN: 401,
+  };
+  const bodyByCode: Record<FirebaseAuthErrorCode, Record<string, string>> = {
+    INVALID_TOKEN: { error: 'Invalid or expired session. Please sign in again.' },
+    EMAIL_NOT_VERIFIED: { error: 'EMAIL_NOT_VERIFIED', message: 'Please verify your email before signing in.' },
+    NO_LINKED_ACCOUNT: { error: 'Invalid credentials or not a vendor' },
+    FORBIDDEN: { error: 'Invalid credentials or not a vendor' },
+  };
+  res.status(statusByCode[err.code]).json(bodyByCode[err.code]);
+};
 
 // ----------------------------------------------------
 // VENDOR PORTAL APIs (Used by Vendor Frontend)
@@ -50,13 +72,35 @@ export const getTopVendors = async (req: Request, res: Response): Promise<void> 
 
 export const loginVendor = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { email, password } = req.body;
+    const { idToken, email, password } = req.body;
 
-    const user = await prisma.user.findUnique({ 
+    // Firebase path: client already authenticated with
+    // signInWithEmailAndPassword and is forwarding the resulting ID token.
+    if (idToken) {
+      try {
+        const user = await verifyFirebaseIdTokenAndResolveUser(idToken, [Role.VENDOR]);
+        const vendor = await prisma.vendor.findUnique({ where: { userId: user.id } });
+        const token = generateToken(user.id, user.role);
+        res.status(200).json({ token, user: sanitizeUser(user), vendor });
+      } catch (err) {
+        if (err instanceof FirebaseAuthError) {
+          respondToFirebaseAuthError(res, err);
+          return;
+        }
+        throw err;
+      }
+      return;
+    }
+
+    // Legacy path -- kept during the migration transition window so the
+    // currently-deployed vendor frontend keeps working until it's redeployed
+    // on the Firebase flow. Remove once that rollout's burn-in period ends
+    // (see the auth migration plan's rollout section).
+    const user = await prisma.user.findUnique({
       where: { email },
-      include: { vendorProfile: true } 
+      include: { vendorProfile: true }
     });
-    
+
     if (!user || user.role !== Role.VENDOR) {
       res.status(401).json({ error: 'Invalid credentials or not a vendor' });
       return;
@@ -106,7 +150,7 @@ export const registerPersonal = async (req: Request, res: Response): Promise<voi
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const user = await prisma.user.create({
+    let user = await prisma.user.create({
       data: {
         name,
         phone,
@@ -115,6 +159,31 @@ export const registerPersonal = async (req: Request, res: Response): Promise<voi
         role: Role.VENDOR,
       }
     });
+
+    // Create the linked Firebase account here, at the point email+password
+    // are first collected (the rest of the wizard -- business/bank/docs --
+    // only ever gets an authenticated userId, no credentials). Registration
+    // without an email is technically allowed by the schema, but login (both
+    // legacy and Firebase) always requires one, so this mirrors that existing
+    // constraint rather than introducing a new one. A Firebase failure here
+    // doesn't fail registration -- firebaseUid stays null and can be
+    // backfilled later; the vendor's KYC flow isn't blocked on it.
+    if (email) {
+      try {
+        const firebaseUser = await firebaseAdmin.auth().createUser({
+          uid: user.id,
+          email,
+          password,
+          emailVerified: false,
+        });
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: { firebaseUid: firebaseUser.uid },
+        });
+      } catch (err) {
+        console.error('Failed to create Firebase account for new vendor:', err);
+      }
+    }
 
     const vendor = await prisma.vendor.create({
       data: {

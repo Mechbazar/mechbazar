@@ -3,12 +3,18 @@
 // these records reach res.json(), so every endpoint that serializes a User
 // (login/register responses, admin list endpoints) was leaking it to the
 // client. Wrap any User-shaped object/array with this before sending it out.
-export function sanitizeUser<T extends { password?: string | null }>(user: T): Omit<T, 'password'> {
-  const { password, ...rest } = user;
+// firebaseUid is stripped alongside it -- an internal linkage identifier with
+// no legitimate reason to reach the frontend.
+export function sanitizeUser<T extends { password?: string | null; firebaseUid?: string | null }>(
+  user: T
+): Omit<T, 'password' | 'firebaseUid'> {
+  const { password, firebaseUid, ...rest } = user;
   return rest;
 }
 
-export function sanitizeUsers<T extends { password?: string | null }>(users: T[]): Omit<T, 'password'>[] {
+export function sanitizeUsers<T extends { password?: string | null; firebaseUid?: string | null }>(
+  users: T[]
+): Omit<T, 'password' | 'firebaseUid'>[] {
   return users.map(sanitizeUser);
 }
 

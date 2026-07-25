@@ -1,4 +1,5 @@
 import { useDispatch } from 'react-redux';
+import { signOut } from 'firebase/auth';
 import { logout } from '../store/slices/authSlice';
 import { ShieldAlert, LogOut, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -9,6 +10,7 @@ import type { RootState } from '../store';
 import { updateVendorProfile } from '../store/slices/authSlice';
 import { Card } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
+import { auth } from '../config/firebase';
 
 export default function PendingApproval() {
   const dispatch = useDispatch();
@@ -39,6 +41,7 @@ export default function PendingApproval() {
 
   const handleLogout = () => {
     dispatch(logout());
+    signOut(auth).catch(() => {});
     navigate('/login');
   };
 

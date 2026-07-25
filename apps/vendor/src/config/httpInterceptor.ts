@@ -8,8 +8,10 @@
 // page's API calls left a 401 as a plain error toast with stale/blank data on screen.
 // This clears the stored session and redirects to /login for any request, anywhere.
 import axios from 'axios';
+import { signOut } from 'firebase/auth';
 import { store } from '../store';
 import { logout } from '../store/slices/authSlice';
+import { auth } from './firebase';
 
 let redirecting = false;
 
@@ -19,6 +21,7 @@ axios.interceptors.response.use(
     if (error?.response?.status === 401 && !redirecting) {
       redirecting = true;
       store.dispatch(logout());
+      signOut(auth).catch(() => {});
       if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
         window.location.href = '/login';
       }

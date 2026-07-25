@@ -13,7 +13,9 @@
     "db:deploy": "prisma db push --accept-data-loss=false",
     "seed:live": "tsx src/scripts/seed-from-live.ts",
     "seed:vehicle": "tsx prisma/seed-vehicle-data.ts",
-    "seed:services": "tsx prisma/seed-doorstep-services.ts"
+    "seed:services": "tsx prisma/seed-doorstep-services.ts",
+    "seed:admin": "tsx prisma/seed-admin.ts",
+    "backfill:firebase-users": "tsx prisma/backfill-firebase-users.ts"
   },
   "keywords": [],
   "author": "",

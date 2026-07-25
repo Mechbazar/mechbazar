@@ -1,7 +1,9 @@
 import { NavLink } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { signOut } from 'firebase/auth';
 import type { RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
+import { auth } from '../config/firebase';
 import {
   LayoutDashboard, Package, ShoppingCart, Warehouse, Wallet, Settings, LogOut, Store, X, Tag, Bell, RotateCcw
 } from 'lucide-react';
@@ -86,7 +88,10 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
           </div>
         </div>
         <button
-          onClick={() => dispatch(logout())}
+          onClick={() => {
+            dispatch(logout());
+            signOut(auth).catch(() => {});
+          }}
           className="flex items-center gap-3 w-full px-4 py-3 rounded-2xl text-sm font-medium text-danger-300 hover:bg-danger-300/10 transition-all"
         >
           <LogOut className="w-4 h-4" /> Sign Out

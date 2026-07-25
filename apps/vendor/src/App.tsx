@@ -2,11 +2,15 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import axios from 'axios';
+import { signOut } from 'firebase/auth';
 import { useDispatch } from 'react-redux';
 import { useSelector } from 'react-redux';
 import type { RootState } from './store';
 import { updateVendorProfile, logout } from './store/slices/authSlice';
+import { auth } from './config/firebase';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
+import VerifyEmail from './pages/VerifyEmail';
 import Register from './pages/Register';
 import PendingApproval from './pages/PendingApproval';
 import Dashboard from './pages/Dashboard';
@@ -44,6 +48,7 @@ function App() {
       } catch (error: any) {
         if (error?.response?.status === 401 || error?.response?.status === 403) {
           dispatch(logout());
+          signOut(auth).catch(() => {});
         }
       }
     };
@@ -61,6 +66,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/register" element={<Register />} />
           <Route path="/pending-approval" element={<PendingApproval />} />
           <Route path="/dashboard" element={Wrapped(Dashboard)} />
