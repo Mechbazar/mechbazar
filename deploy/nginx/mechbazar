@@ -2,6 +2,14 @@ server {
     server_name mechbazar.com www.mechbazar.com;
 
     location /api/ {
+        # Nginx's default (1m) is below multer's 5MB per-file limit
+        # (apps/backend/src/middlewares/upload.ts), so KYC document/image
+        # uploads were rejected here with a bare 413 before ever reaching the
+        # backend -- a response with no Access-Control-Allow-Origin header
+        # (only the Express app's cors() middleware adds that), which the
+        # browser then misreports as a CORS failure instead of a size limit.
+        client_max_body_size 10m;
+
         proxy_pass http://127.0.0.1:5005;
         proxy_http_version 1.1;
 
