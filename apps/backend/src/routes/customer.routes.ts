@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
-  getCustomers, updateCustomer, getMyNotifications, markNotificationRead, deleteMyNotification,
+  getCustomers, getCustomerById, updateCustomer, deleteCustomer,
+  getMyNotifications, markNotificationRead, deleteMyNotification,
   getMyAddresses, createMyAddress, updateMyAddress, deleteMyAddress,
   getMyProfile, updateMyProfile,
   confirmPhoneChange,
@@ -16,6 +17,9 @@ const admins = [Role.ADMIN, Role.SUPER_ADMIN, Role.CUSTOMER_SUPPORT];
 
 router.get('/', authenticate, authorize(admins), getCustomers);
 router.patch('/:id', authenticate, authorize(admins), updateCustomer);
+// Deleting an account is destructive, so unlike the read/approve routes above
+// it is not open to CUSTOMER_SUPPORT.
+router.delete('/:id', authenticate, authorize([Role.ADMIN, Role.SUPER_ADMIN]), deleteCustomer);
 
 // Self-service, any authenticated role -- not admin-gated like the routes above.
 router.get('/notifications', authenticate, getMyNotifications);
@@ -39,5 +43,9 @@ router.get('/me/vehicles', authenticate, getMyVehicles);
 router.post('/me/vehicles', authenticate, createMyVehicle);
 router.put('/me/vehicles/:id', authenticate, updateMyVehicle);
 router.delete('/me/vehicles/:id', authenticate, deleteMyVehicle);
+
+// Registered last so the literal '/notifications' and '/me/...' paths above are
+// matched before this catch-all id param.
+router.get('/:id', authenticate, authorize(admins), getCustomerById);
 
 export default router;

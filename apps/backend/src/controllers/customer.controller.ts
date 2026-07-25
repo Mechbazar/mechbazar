@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Role, VehicleType } from '@prisma/client';
+import { Prisma, Role, VehicleType } from '@prisma/client';
 import { AuthRequest } from '../middlewares/auth';
 import { sanitizeUser, sanitizeUsers } from '../utils/sanitizeUser';
 import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
@@ -14,7 +14,11 @@ export const getCustomers = async (req: Request, res: Response): Promise<void> =
       include: {
         _count: {
           select: { orders: true }
-        }
+        },
+        // Admin panel's Customers page shows each customer's saved addresses
+        // on a read-only map (Phase 4 Maps integration) -- additive, no
+        // schema change, same Address rows the customer app already writes.
+        addresses: true
       },
       orderBy: {
         createdAt: 'desc'
@@ -26,6 +30,118 @@ export const getCustomers = async (req: Request, res: Response): Promise<void> =
     res.status(500).json({ error: 'Failed to fetch customers' });
   }
 };
+// Backs the admin panel's "View Details" drawer. The list endpoint above stays
+// deliberately light (it polls); everything a single customer's detail view
+// needs -- garage, recent orders, recent bookings -- is fetched on demand here.
+export const getCustomerById = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = String(req.params.id);
+    const customer = await prisma.user.findUnique({
+      where: { id },
+      include: {
+        _count: { select: { orders: true, serviceBookings: true, reviews: true, wishlists: true } },
+        addresses: true,
+        userVehicles: { orderBy: [{ isDefault: 'desc' }] },
+        // Order has no human-facing order number column -- admin screens show a
+        // shortened id, so send the id and let the UI truncate it.
+        orders: {
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          select: { id: true, status: true, finalAmount: true, createdAt: true },
+        },
+        serviceBookings: {
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          select: { id: true, bookingNumber: true, status: true, finalAmount: true, createdAt: true },
+        },
+      },
+    });
+
+    if (!customer || customer.role !== Role.CUSTOMER) {
+      res.status(404).json({ error: 'Customer not found' });
+      return;
+    }
+
+    res.status(200).json(sanitizeUser(customer));
+  } catch (error) {
+    console.error('Error fetching customer:', error);
+    res.status(500).json({ error: 'Failed to fetch customer' });
+  }
+};
+
+// Hard-deletes a customer account. No relation in the schema cascades, so every
+// dependent row has to go explicitly. Rows that are the customer's own data
+// (addresses, garage, wishlist, notifications, reviews, tickets) are removed
+// with them; anything that is a business record -- orders, service bookings,
+// audit/stock trails -- blocks the delete instead, so history is never silently
+// destroyed. Admins who need those gone must deal with the orders first.
+export const deleteCustomer = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const id = String(req.params.id);
+
+    const customer = await prisma.user.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: { orders: true, serviceBookings: true, auditLogs: true, stockMovements: true },
+        },
+      },
+    });
+
+    if (!customer) {
+      res.status(404).json({ error: 'Customer not found' });
+      return;
+    }
+    if (customer.role !== Role.CUSTOMER) {
+      res.status(400).json({ error: 'Only customer accounts can be deleted from this screen.' });
+      return;
+    }
+
+    const blockers: string[] = [];
+    if (customer._count.orders > 0) blockers.push(`${customer._count.orders} order(s)`);
+    if (customer._count.serviceBookings > 0) blockers.push(`${customer._count.serviceBookings} service booking(s)`);
+    if (customer._count.auditLogs > 0 || customer._count.stockMovements > 0) blockers.push('activity logs');
+    if (blockers.length > 0) {
+      res.status(400).json({
+        error: `This customer has ${blockers.join(', ')} and cannot be deleted. Delete or reassign that history first.`,
+      });
+      return;
+    }
+
+    await prisma.$transaction([
+      prisma.serviceReview.deleteMany({ where: { userId: id } }),
+      prisma.review.deleteMany({ where: { userId: id } }),
+      prisma.wishlist.deleteMany({ where: { userId: id } }),
+      prisma.notification.deleteMany({ where: { userId: id } }),
+      prisma.supportTicket.deleteMany({ where: { userId: id } }),
+      prisma.userVehicle.deleteMany({ where: { userId: id } }),
+      prisma.address.deleteMany({ where: { userId: id } }),
+      prisma.user.delete({ where: { id } }),
+      prisma.auditLog.create({
+        data: {
+          userId: req.user!.userId,
+          action: 'CUSTOMER_DELETE',
+          entity: 'User',
+          entityId: id,
+          details: `Deleted customer ${customer.name || 'Unknown'} (${customer.phone})`,
+          ipAddress: req.ip || null,
+        },
+      }),
+    ]);
+
+    res.status(200).json({ message: 'Customer deleted' });
+  } catch (error) {
+    // P2003 = some other table still references this user (a relation added
+    // after this endpoint was written); report it instead of a blank 500.
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003') {
+      res.status(400).json({ error: 'This customer still has linked records and cannot be deleted.' });
+      return;
+    }
+    console.error('Error deleting customer:', error);
+    res.status(500).json({ error: 'Failed to delete customer' });
+  }
+};
+
 export const updateCustomer = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);
