@@ -69,6 +69,10 @@ export default function AddressManagementScreen() {
   const [formattedAddress, setFormattedAddress] = useState<string | null>(null);
   const [isDefault, setIsDefault] = useState(false);
   const [fetchingGPS, setFetchingGPS] = useState(false);
+  // Kept separate from `loading` (which drives the list spinner) so the modal's
+  // save button reflects only the save request -- and so an in-flight save can
+  // actually disable the button instead of just relabelling it.
+  const [saving, setSaving] = useState(false);
 
   const { isDesktopUp } = useBreakpoint();
   useFocusEffect(
@@ -188,18 +192,35 @@ export default function AddressManagementScreen() {
 
   const handleSave = async () => {
     if (!token) return;
-    if (!title.trim() || !line1.trim() || !city.trim() || !pincode.trim()) {
-      Alert.alert('Validation Error', 'Please fill in all required fields.');
+    if (saving) return; // guard against a double tap creating two addresses
+
+    // `state` is required by POST/PUT /customers/me/addresses (see
+    // customer.controller.ts). It was missing from this check, so a blank
+    // State field passed client validation and came back as a 400 -- the
+    // single most common "I can't save my address" failure. Validate exactly
+    // the set the backend enforces, and name the offending fields.
+    const missing = [
+      [title, 'Address label'],
+      [line1, 'Address line 1'],
+      [city, 'City'],
+      [state, 'State'],
+      [pincode, 'Pincode'],
+    ].filter(([value]) => !String(value ?? '').trim()).map(([, label]) => label);
+
+    if (missing.length > 0) {
+      Alert.alert('Missing details', `Please fill in: ${missing.join(', ')}.`);
       return;
     }
 
+    // Trim on the way out so a stray space can't satisfy validation here and
+    // then be stored (or fail) server-side.
     const payload = {
-      title,
-      line1,
-      line2,
-      city,
-      state,
-      pincode,
+      title: title.trim(),
+      line1: line1.trim(),
+      line2: line2.trim(),
+      city: city.trim(),
+      state: state.trim(),
+      pincode: pincode.trim(),
       country,
       lat,
       lng,
@@ -208,29 +229,34 @@ export default function AddressManagementScreen() {
       isDefault,
     };
 
-    setLoading(true);
-    if (editingAddress) {
-      // Edit mode
-      const res = await updateMyAddress(token, editingAddress.id, payload);
-      if (res.address) {
-        setModalVisible(false);
-        loadAddresses();
-        Alert.alert('Success', 'Address updated successfully!');
+    setSaving(true);
+    try {
+      if (editingAddress) {
+        // Edit mode
+        const res = await updateMyAddress(token, editingAddress.id, payload);
+        if (res.address) {
+          setModalVisible(false);
+          await loadAddresses();
+          Alert.alert('Success', 'Address updated successfully!');
+        } else {
+          Alert.alert('Error', res.error || 'Failed to update address.');
+        }
       } else {
-        Alert.alert('Error', res.error || 'Failed to update address.');
+        // Create mode
+        const res = await createMyAddress(token, payload);
+        if (res.address) {
+          setModalVisible(false);
+          await loadAddresses();
+          Alert.alert('Success', 'Address created successfully!');
+        } else {
+          Alert.alert('Error', res.error || 'Failed to create address.');
+        }
       }
-    } else {
-      // Create mode
-      const res = await createMyAddress(token, payload);
-      if (res.address) {
-        setModalVisible(false);
-        loadAddresses();
-        Alert.alert('Success', 'Address created successfully!');
-      } else {
-        Alert.alert('Error', res.error || 'Failed to create address.');
-      }
+    } finally {
+      // Always clear, so a thrown/rejected save can't wedge the button in a
+      // permanently disabled "Saving..." state.
+      setSaving(false);
     }
-    setLoading(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -448,9 +474,13 @@ export default function AddressManagementScreen() {
                   <Switch value={isDefault} onValueChange={setIsDefault} />
                 </View>
 
-                <TouchableOpacity style={styles.modalSaveBtn} onPress={handleSave}>
+                <TouchableOpacity
+                  style={[styles.modalSaveBtn, saving && styles.modalSaveBtnDisabled]}
+                  onPress={handleSave}
+                  disabled={saving}
+                >
                   <Text style={styles.modalSaveText}>
-                    {loading ? 'Saving...' : 'Save Address'}
+                    {saving ? 'Saving...' : 'Save Address'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -552,5 +582,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
   },
+  modalSaveBtnDisabled: { opacity: 0.6 },
   modalSaveText: { color: colors.white, fontSize: 14, fontWeight: 'bold' }
 });

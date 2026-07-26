@@ -42,3 +42,8 @@ yarn-error.*
 
 .vercel
 .env*
+# ...but the example file carries no secrets and documents the vars this app
+# needs (notably the Maps key format). The root .gitignore already allows it;
+# the blanket '.env*' above was silently re-ignoring it, so it never got
+# committed and nobody cloning the repo saw it.
+!.env.example

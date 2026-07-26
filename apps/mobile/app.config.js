@@ -1,7 +1,21 @@
 // Dynamic Expo config (was app.json) so the native Google Maps SDK keys and
 // build-profile-dependent settings can be injected from the environment at
 // config-eval time -- app.json couldn't reference an env var.
-const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+// Shape-checked for the same reason as src/config/maps.ts: a credential from
+// another Google product (e.g. an AI Studio "AQ." key) baked into the native
+// Maps SDK config yields a blank grey map on device with no error surfaced.
+// Leaving it undefined instead makes the failure explicit at build time.
+const RAW_GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+const GOOGLE_MAPS_API_KEY = /^AIza[0-9A-Za-z_-]{35}$/.test(RAW_GOOGLE_MAPS_API_KEY)
+  ? RAW_GOOGLE_MAPS_API_KEY
+  : '';
+
+if (RAW_GOOGLE_MAPS_API_KEY && !GOOGLE_MAPS_API_KEY) {
+  console.warn(
+    '[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY is not a Google Maps Platform key ("AIza..."); ' +
+      'native Maps SDK config omitted.'
+  );
+}
 
 // EAS sets EAS_BUILD_PROFILE to the profile being built. Cleartext HTTP is
 // needed only for local development against a LAN backend (services/api.ts

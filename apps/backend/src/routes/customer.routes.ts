@@ -18,9 +18,6 @@ const admins = [Role.ADMIN, Role.SUPER_ADMIN, Role.CUSTOMER_SUPPORT];
 
 router.get('/', authenticate, authorize(admins), getCustomers);
 router.patch('/:id', authenticate, authorize(admins), updateCustomer);
-// Deleting an account is destructive, so unlike the read/approve routes above
-// it is not open to CUSTOMER_SUPPORT.
-router.delete('/:id', authenticate, authorize([Role.ADMIN, Role.SUPER_ADMIN]), deleteCustomer);
 
 // Self-service, any authenticated role -- not admin-gated like the routes above.
 router.get('/notifications', authenticate, getMyNotifications);
@@ -52,7 +49,17 @@ router.put('/me/vehicles/:id', authenticate, updateMyVehicle);
 router.delete('/me/vehicles/:id', authenticate, deleteMyVehicle);
 
 // Registered last so the literal '/notifications' and '/me/...' paths above are
-// matched before this catch-all id param.
+// matched before these catch-all id params.
+//
+// DELETE '/:id' in particular MUST stay below DELETE '/me': it used to sit at
+// the top of this file, where it swallowed DELETE /customers/me as id="me" and
+// bounced the caller with 403 "Forbidden: Insufficient privileges" (its
+// authorize() gate rejects the customer deleting their own account). That made
+// the self-service account deletion required by Google Play's data deletion
+// policy and Apple Guideline 5.1.1(v) unreachable in production.
 router.get('/:id', authenticate, authorize(admins), getCustomerById);
+// Deleting another user's account is destructive, so unlike the read/approve
+// routes above it is not open to CUSTOMER_SUPPORT.
+router.delete('/:id', authenticate, authorize([Role.ADMIN, Role.SUPER_ADMIN]), deleteCustomer);
 
 export default router;

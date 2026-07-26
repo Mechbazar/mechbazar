@@ -323,9 +323,19 @@ export const deleteMyAddress = async (req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    const inUse = await prisma.serviceBooking.count({ where: { addressId: id } });
-    if (inUse > 0) {
-      res.status(400).json({ error: 'Cannot delete an address that has bookings against it.' });
+    // Order.addressId and ServiceBooking.addressId are both required FKs onto
+    // this row. Only bookings were checked here, so deleting an address that a
+    // product order referenced fell through to prisma.address.delete(), tripped
+    // the foreign-key constraint, and surfaced as a generic 500 -- any customer
+    // who had ever placed an order hit this while tidying up their address list.
+    const [bookingCount, orderCount] = await Promise.all([
+      prisma.serviceBooking.count({ where: { addressId: id } }),
+      prisma.order.count({ where: { addressId: id } }),
+    ]);
+    if (bookingCount > 0 || orderCount > 0) {
+      res.status(400).json({
+        error: 'This address is attached to an existing order or booking and cannot be deleted. You can edit it instead.',
+      });
       return;
     }
 
