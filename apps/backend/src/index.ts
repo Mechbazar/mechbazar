@@ -84,6 +84,39 @@ app.use(
   })
 );
 
+// File upload is authenticated but open to every role, including CUSTOMER, and
+// each accepted request writes up to 5 MB into a publicly-readable Firebase
+// Storage bucket that nothing ever garbage-collects. Under the global /api
+// limit alone a single account could push ~3 GB per 15 minutes. This caps it at
+// something a real user (a return photo, a KYC document) never reaches.
+app.use(
+  '/api/upload',
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 40,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (req, res) => req.headers.authorization || req.ip || 'unknown',
+  })
+);
+
+// Account deletion is irreversible and authenticated, so the risk isn't
+// brute-force but a repeated/duplicated call storm; and the account-mutating
+// endpoints below (phone change, profile) are the ones worth spending an
+// attacker's stolen-token budget on. Tighter bucket, keyed per user when a
+// token is present so one abusive account can't exhaust an entire NAT's quota.
+app.use(
+  ['/api/customers/me'],
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Falls back to the default IP key when unauthenticated.
+    keyGenerator: (req, res) => req.headers.authorization || req.ip || 'unknown',
+  })
+);
+
 // Health/readiness -- checked by orchestrators and by this project's own dev
 // tooling to distinguish "server not started" from "server started, DB down".
 // Mounted both at the root and under /api so external monitors that only know

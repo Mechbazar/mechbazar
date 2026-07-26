@@ -28,8 +28,33 @@ if (missing.length > 0) {
   );
 }
 
-if (process.env.NODE_ENV === 'production' && process.env.JWT_SECRET === 'supersecretkey123') {
-  fail('JWT_SECRET is still set to the local development default. Set a real secret before running in production.');
+// Weak or known-default secrets are rejected outright in production: a JWT
+// here authenticates every role including SUPER_ADMIN, so a guessable secret
+// is a full platform compromise, not a hardening nit.
+const WEAK_JWT_SECRETS = ['supersecretkey123', 'secret', 'changeme', 'jwt_secret', 'mechbazar'];
+if (process.env.NODE_ENV === 'production') {
+  const secret = process.env.JWT_SECRET as string;
+  if (WEAK_JWT_SECRETS.includes(secret.toLowerCase())) {
+    fail('JWT_SECRET is a known default/placeholder value. Set a real, random secret before running in production.');
+  }
+  // Warnings, not fail(), for the two checks below: both describe a
+  // configuration that is weaker than it should be but still functional, and
+  // refusing to boot on them would take a running production deployment
+  // offline on its next restart. They are tracked as required manual actions.
+  if (secret.length < 32) {
+    console.error(
+      `[SECURITY] JWT_SECRET is only ${secret.length} characters. Rotate it to at least 32 random ` +
+        `characters (\`openssl rand -base64 48\`). A short secret is brute-forceable offline, and a ` +
+        `forged token authenticates as any role including SUPER_ADMIN.`
+    );
+  }
+  if (!process.env.CORS_ALLOWED_ORIGINS || process.env.CORS_ALLOWED_ORIGINS.trim() === '') {
+    console.error(
+      '[SECURITY] CORS_ALLOWED_ORIGINS is not set, so the API answers cross-origin requests from ' +
+        'ANY website. Set a comma-separated allowlist ' +
+        '(e.g. https://mechbazar.com,https://admin.mechbazar.com,https://vendor.mechbazar.com).'
+    );
+  }
 }
 
 export const env = {

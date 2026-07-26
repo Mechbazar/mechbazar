@@ -1,28 +1,35 @@
 import { Prisma } from '@prisma/client';
 
-// Payment integration seam.
+// Payment policy: CASH ON DELIVERY ONLY.
 //
-// TEST MODE (current state): no real payment gateway is wired up anywhere in
-// this codebase. Every Order/ServiceBooking Payment is created PENDING and
-// nothing ever marks it SUCCESS except an explicit admin action -- COD and
-// "online" are both fulfilled without an actual charge. This file exists so
-// order.controller.ts and service.controller.ts don't each hand-roll the
-// same payment-shape/refund logic, and so a real gateway (Razorpay, etc.) has
-// exactly one place to plug into later. See the integration notes at the
-// bottom of this file.
+// MechBazar has no payment gateway. There is no Razorpay, Stripe, PhonePe,
+// Paytm, UPI collect, card, net-banking or wallet integration anywhere in this
+// codebase, and no code path that can charge a customer. Every Order and
+// ServiceBooking is settled in cash at the door / on service completion.
+//
+// This used to accept a client-supplied `paymentMethod` and record 'ONLINE'
+// whenever the request body said so. Nothing ever charged those orders -- they
+// were fulfilled exactly like COD -- so the platform could hand a customer a
+// record saying their order was paid online when no money had moved. That is a
+// misrepresentation under the Consumer Protection (E-Commerce) Rules, 2020 and
+// contradicts every published policy page, so the method is now server-decided
+// and the client's value is ignored entirely.
 
-export type PaymentMethodInput = 'COD' | 'online' | string | undefined | null;
+export type PaymentMethodInput = 'COD' | string | undefined | null;
 
-// Normalizes whatever the client sent into the Prisma PaymentMethod enum.
-// Anything other than the literal string 'online' is treated as COD -- this
-// mirrors the two controllers' previous inline ternary exactly.
-export function resolvePaymentMethod(paymentMethod: PaymentMethodInput): 'COD' | 'ONLINE' {
-  return paymentMethod === 'online' ? 'ONLINE' : 'COD';
+/**
+ * Always resolves to COD. The parameter is retained so the two call sites
+ * (order.controller.ts, service.controller.ts) don't need to change shape, and
+ * so the one place that has to be edited when a gateway is finally integrated
+ * stays obvious -- but the client no longer gets a vote.
+ */
+export function resolvePaymentMethod(_paymentMethod?: PaymentMethodInput): 'COD' {
+  return 'COD';
 }
 
 // Shape for a nested Prisma `payment: { create: ... }` write on Order/
-// ServiceBooking. Every payment starts PENDING: TEST MODE has no gateway to
-// confirm a charge synchronously, whether the customer picked COD or online.
+// ServiceBooking. Payments start PENDING and are marked SUCCESS when the rider
+// or technician records cash collected at fulfilment.
 export function pendingPaymentCreateInput(paymentMethod: PaymentMethodInput, amount: number) {
   return {
     method: resolvePaymentMethod(paymentMethod),
@@ -33,21 +40,27 @@ export function pendingPaymentCreateInput(paymentMethod: PaymentMethodInput, amo
 
 type RefundablePayment = { id: string; method: string; status: string; amount: number };
 
-// Shared half of the refund path used by both order cancellation and booking
-// refunds: credits the paying user's wallet if (and only if) the payment
-// actually reached SUCCESS through a non-COD method. COD has nothing to
-// refund since no money ever moved through the platform. Returns whether a
-// credit happened, so callers can decide independently whether to flip the
-// Payment row to REFUNDED and whether to notify the user -- those two
-// callers have always had slightly different rules there, so this function
-// intentionally does not touch Payment.status itself.
-export async function creditWalletForOnlineRefund(
+/**
+ * Refund path for cancellations.
+ *
+ * Under COD no money reaches the platform before fulfilment, so a cancelled
+ * order has nothing to refund and this is a no-op for every order placed
+ * today. It still handles the historical case: rows written before the
+ * COD-only lock could carry method='ONLINE', and if such a row ever reached
+ * SUCCESS the amount is credited to the user's ledger rather than silently
+ * dropped. Returns whether a credit happened so callers can decide separately
+ * whether to flip Payment.status to REFUNDED and whether to notify the user.
+ */
+export async function creditWalletForLegacyOnlineRefund(
   tx: Prisma.TransactionClient,
   payment: RefundablePayment,
   walletOwnerId: string
 ): Promise<boolean> {
   const shouldCredit = payment.method !== 'COD' && payment.status === 'SUCCESS';
   if (shouldCredit) {
+    console.warn(
+      `[payment] crediting legacy non-COD refund for payment ${payment.id} (method=${payment.method})`
+    );
     await tx.user.update({
       where: { id: walletOwnerId },
       data: { wallet: { increment: payment.amount } },
@@ -56,21 +69,16 @@ export async function creditWalletForOnlineRefund(
   return shouldCredit;
 }
 
+// Kept as an alias so existing imports keep compiling; prefer the explicit
+// `creditWalletForLegacyOnlineRefund` name in new code.
+export const creditWalletForOnlineRefund = creditWalletForLegacyOnlineRefund;
+
 // ---------------------------------------------------------------------------
-// Future gateway integration point
+// If a payment gateway is ever introduced
 // ---------------------------------------------------------------------------
-// When a real provider (Razorpay, etc.) is ready to be wired in:
-//   1. Add a `createGatewayOrder(amount, receiptId)` export here that calls
-//      the provider's order-create API and returns a client-facing
-//      order/session id for the app to open a checkout with.
-//   2. Add a `verifyGatewayPayment(payload, signature)` export here that
-//      verifies the provider's webhook/callback signature and returns the
-//      paid amount, then have that handler flip the matching Payment row to
-//      SUCCESS (nothing else does today -- see resolvePaymentMethod above).
-//   3. Call these from order.controller.ts / service.controller.ts only when
-//      resolvePaymentMethod(...) === 'ONLINE', gated by an env flag (e.g.
-//      PAYMENT_PROVIDER=RAZORPAY) so COD keeps working unchanged if the
-//      gateway is ever unconfigured or down.
-// Until then, ONLINE payments are recorded accurately (so ops can see what
-// the customer picked) but are functionally identical to COD: fulfilled
-// without a real charge.
+// Do NOT simply re-enable a client-supplied payment method. A gateway needs,
+// at minimum: a server-side order-create call, signature-verified webhook
+// handling that flips Payment.status to SUCCESS, idempotency on that webhook,
+// a reconciliation job, and refund-to-source. Until all of that exists, every
+// customer-facing surface (app UI, policy pages, store listings) must continue
+// to say Cash on Delivery only.

@@ -29,7 +29,12 @@ type ParamList = {
 export default function StaticPageScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<ParamList, 'StaticPage'>>();
-  const content = STATIC_PAGES[route.params.page];
+  // `page` is typed, but the type is only a compile-time promise. Now that the
+  // app declares a `mechbazar://` URL scheme, this route is reachable from an
+  // external deep link that can carry any string at all -- and an unguarded
+  // lookup here would throw on `content.title` and white-screen the app. Fall
+  // back to a real page instead of trusting the param.
+  const content = STATIC_PAGES[route.params?.page] ?? STATIC_PAGES.about;
 
   const { isDesktopUp } = useBreakpoint();
   useFocusEffect(

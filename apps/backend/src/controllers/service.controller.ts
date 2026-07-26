@@ -483,7 +483,13 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
       console.warn(`[booking] rejected ${error.status} (user ${req.user?.userId}): ${error.message}`);
       return res.status(error.status).json({ error: error.message });
     }
-    console.error(`[booking] create failed (user ${req.user?.userId}, body ${JSON.stringify(req.body)}):`, error);
+    // Field names only -- a booking body carries the address id, vehicle
+    // registration number and free-text issue description, none of which
+    // belong in application logs.
+    console.error(
+      `[booking] create failed (user ${req.user?.userId}, fields: ${Object.keys(req.body || {}).join(',')}):`,
+      error
+    );
     res.status(500).json({ error: 'Failed to create booking. Please try again.' });
   }
 };

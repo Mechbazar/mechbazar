@@ -64,13 +64,19 @@ const FAQS: FAQItem[] = [
     id: 5,
     category: 'payments',
     question: 'What payment options do you support?',
-    answer: 'Cash on Delivery (COD) is currently the only supported payment method for both parts and services. Online payment (UPI/Cards/Net Banking) is coming soon.'
+    answer: 'Cash on Delivery is the only payment method on MechBazar. You pay in cash when your parts are delivered, or to the mechanic once your service is complete. MechBazar does not accept online payments, and you will never be asked to pay before delivery.'
   },
   {
     id: 6,
     category: 'payments',
-    question: 'When will I get my refund for a cancelled booking?',
-    answer: 'For a cancelled order or booking that was already paid, the amount is credited to your MechBazar wallet balance, which you can view under Account > Wallet.'
+    question: 'What happens if I cancel an order or booking?',
+    answer: 'Nothing is charged. Because every order is Cash on Delivery, you have not paid anything at the time you cancel, so there is no refund to process. If you have already paid cash for a delivered order and later return it, the refund is paid to the bank account or UPI ID you provide with your return request.'
+  },
+  {
+    id: 7,
+    category: 'payments',
+    question: 'Someone asked me to pay online or share an OTP. Is that MechBazar?',
+    answer: 'No. MechBazar never asks for advance payment, card details, UPI PIN, or your login OTP. Pay only in cash, only at delivery or on service completion, and always collect a receipt. Report any such request to our support team immediately.'
   }
 ];
 

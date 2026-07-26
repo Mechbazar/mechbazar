@@ -31,6 +31,20 @@ import { sendPhoneOtp, confirmPhoneOtp } from '../services/phoneAuth';
 
 const { width } = Dimensions.get('window');
 
+// Backed by StaticPageKey / STATIC_PAGES in src/data/staticPages.ts, rendered
+// by the StaticPage route registered in App.tsx.
+const LEGAL_PAGES: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: 'privacy', label: 'Privacy Policy', icon: 'lock-closed-outline' },
+  { key: 'terms', label: 'Terms of Service', icon: 'reader-outline' },
+  { key: 'shipping', label: 'Shipping & Delivery Policy', icon: 'cube-outline' },
+  { key: 'cancellation', label: 'Cancellation Policy', icon: 'close-circle-outline' },
+  { key: 'returns', label: 'Return & Replacement Policy', icon: 'swap-horizontal-outline' },
+  { key: 'refund', label: 'Refund Policy', icon: 'cash-outline' },
+  { key: 'account-deletion', label: 'Account Deletion Policy', icon: 'trash-outline' },
+  { key: 'contact', label: 'Contact Us', icon: 'call-outline' },
+  { key: 'about', label: 'About MechBazar', icon: 'information-circle-outline' },
+];
+
 const colors = {
   primary: '#E53935',     // Brand Red
   primaryLight: '#FF573C',
@@ -73,6 +87,7 @@ export default function AccountScreen() {
   const [addressCount, setAddressCount] = useState(0);
   const [notificationCount, setNotificationCount] = useState(0);
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   // UI States
   const [isCouponsVisible, setIsCouponsVisible] = useState(false);
@@ -102,6 +117,7 @@ export default function AccountScreen() {
   const [isSupportExpanded, setIsSupportExpanded] = useState(true);
   const [isSettingsExpanded, setIsSettingsExpanded] = useState(false);
   const [isSecurityExpanded, setIsSecurityExpanded] = useState(false);
+  const [isLegalExpanded, setIsLegalExpanded] = useState(false);
 
   useEffect(() => {
     // Hydrate application settings from cache
@@ -237,18 +253,71 @@ export default function AccountScreen() {
     }
   };
 
-  // There is no account-deletion API -- deleting a customer touches orders,
-  // bookings, wallet balance, and financial/GST records with no cascade rules
-  // in the schema, so a real "delete" needs its own design (hard vs soft
-  // delete, refund handling, invoice retention), not a same-pass patch. This
-  // used to fake a 2-second "success" and log the user out while their account
-  // and data were untouched -- tell them plainly instead of lying.
+  // Self-service account deletion. Required by Google Play's data deletion
+  // policy and Apple Guideline 5.1.1(v) -- an app that creates accounts must
+  // let the user delete one from inside the app, not just via a support email.
+  // Backed by DELETE /customers/me, which anonymises the account in place and
+  // keeps only the invoice/tax records Indian law obliges us to retain.
   const handleDeleteAccount = () => {
     Alert.alert(
       'Delete Account',
-      'Account deletion isn\'t self-service yet. Please contact MechBazar support and we\'ll process the deletion of your account and data for you.',
-      [{ text: 'OK' }]
+      'This permanently deletes your MechBazar account.\n\n' +
+        '• Your profile, saved addresses, garage vehicles, wishlist and notifications are erased\n' +
+        '• Your order and booking history will no longer be available to you\n' +
+        '• Invoices and tax records are retained for 8 years, as required by Indian law\n\n' +
+        'This cannot be undone.',
+      [
+        { text: 'Keep My Account', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          // Second confirmation: a single destructive tap on a list row is too
+          // easy to hit by accident for an irreversible action.
+          onPress: () =>
+            Alert.alert('Are you sure?', 'Deleting your account is permanent and cannot be reversed.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete Permanently', style: 'destructive', onPress: confirmDeleteAccount },
+            ]),
+        },
+      ]
     );
+  };
+
+  const confirmDeleteAccount = async () => {
+    if (!token) return;
+    setIsDeletingAccount(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/customers/me`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        // 409 is the expected "you still have work in flight" case, which the
+        // user can actually act on -- surface the backend's wording verbatim.
+        Alert.alert(
+          res.status === 409 ? 'Finish your active orders first' : 'Could not delete account',
+          data?.error || 'Something went wrong. Please try again or contact support.'
+        );
+        return;
+      }
+
+      // Clear the persisted session before logging out, otherwise App.tsx
+      // rehydrates the now-invalid token on next launch. Keys must match
+      // App.tsx's USER_STORAGE_KEY / CART_STORAGE_KEY.
+      await AsyncStorage.multiRemove(['mb-user', 'mb-cart-v2']).catch(() => {});
+      Alert.alert(
+        'Account Deleted',
+        data?.message ||
+          'Your account has been deleted. Personal data has been removed. Invoices and tax records are retained as required by Indian law.',
+        [{ text: 'OK', onPress: () => dispatch(logout()) }]
+      );
+    } catch (e) {
+      Alert.alert('Could not delete account', 'Please check your connection and try again.');
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   const loadDatabaseData = async () => {
@@ -812,10 +881,54 @@ export default function AccountScreen() {
                 <Text style={styles.collapsibleItemText}>Change Phone Number</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.collapsibleItem} onPress={handleDeleteAccount}>
-                <Ionicons name="trash-outline" size={16} color={colors.primary} />
-                <Text style={[styles.collapsibleItemText, { color: colors.primary }]}>Delete Account</Text>
+              <TouchableOpacity
+                style={styles.collapsibleItem}
+                onPress={handleDeleteAccount}
+                disabled={isDeletingAccount}
+              >
+                {isDeletingAccount ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons name="trash-outline" size={16} color={colors.primary} />
+                )}
+                <Text style={[styles.collapsibleItemText, { color: colors.primary }]}>
+                  {isDeletingAccount ? 'Deleting Account…' : 'Delete Account'}
+                </Text>
               </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {/* LEGAL & POLICIES COLLAPSIBLE CARD
+            These pages previously existed only in DesktopFooter, i.e. only on
+            the web build -- so on the actual iOS/Android app there was no route
+            to the Privacy Policy or Terms at all. Both stores require the
+            privacy policy to be reachable from inside the app. */}
+        <View style={styles.collapsibleCard}>
+          <TouchableOpacity
+            style={styles.collapsibleHeader}
+            onPress={() => setIsLegalExpanded(!isLegalExpanded)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.collapsibleTitleRow}>
+              <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+              <Text style={styles.collapsibleTitle}>Legal & Policies</Text>
+            </View>
+            <Ionicons name={isLegalExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+
+          {isLegalExpanded && (
+            <View style={styles.collapsibleContent}>
+              {LEGAL_PAGES.map(({ key, label, icon }) => (
+                <TouchableOpacity
+                  key={key}
+                  style={styles.collapsibleItem}
+                  onPress={() => navigation.navigate('StaticPage', { page: key })}
+                >
+                  <Ionicons name={icon} size={16} color={colors.secondary} />
+                  <Text style={styles.collapsibleItemText}>{label}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
           )}
         </View>

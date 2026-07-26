@@ -107,7 +107,11 @@ interface CreateBookingPayload {
   scheduledDate: string;
   timeSlotId: string;
   issueDescription?: string;
-  payment_method: 'COD' | 'online';
+  // COD is the only payment method MechBazar supports. The backend ignores
+  // this field entirely and hard-locks to COD (see payment.service.ts), but
+  // narrowing the type here stops any future caller from constructing a
+  // payload that implies an online payment exists.
+  payment_method: 'COD';
 }
 
 export const createServiceBooking = async (

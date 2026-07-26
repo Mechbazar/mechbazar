@@ -7,6 +7,7 @@ import {
   confirmPhoneChange,
   getMyWishlist, addToMyWishlist, removeFromMyWishlist,
   getMyVehicles, createMyVehicle, updateMyVehicle, deleteMyVehicle,
+  deleteMyAccount,
 } from '../controllers/customer.controller';
 import { authenticate, authorize } from '../middlewares/auth';
 import { Role } from '@prisma/client';
@@ -38,6 +39,12 @@ router.patch('/me/phone', authenticate, confirmPhoneChange);
 router.get('/me/wishlist', authenticate, getMyWishlist);
 router.post('/me/wishlist', authenticate, addToMyWishlist);
 router.delete('/me/wishlist/:productId', authenticate, removeFromMyWishlist);
+
+// Self-service account deletion. Must be registered before the '/:id'
+// catch-all below, and is deliberately NOT admin-gated -- it acts only on the
+// caller's own account (req.user.userId), which is what Google Play's data
+// deletion policy and Apple Guideline 5.1.1(v) require.
+router.delete('/me', authenticate, deleteMyAccount);
 
 router.get('/me/vehicles', authenticate, getMyVehicles);
 router.post('/me/vehicles', authenticate, createMyVehicle);

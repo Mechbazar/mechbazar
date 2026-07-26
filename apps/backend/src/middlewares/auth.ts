@@ -9,7 +9,14 @@ export interface AuthRequest extends Request {
   };
 }
 
-export const authenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
+// Sessions are a flat 7-day JWT with no refresh/revocation list, so a token
+// signed before an account was deleted, banned, or had its role changed would
+// otherwise keep working for up to a week. Re-resolving the user against the
+// database on each request is what actually revokes it -- one indexed
+// primary-key lookup, and the request cannot do anything useful without the
+// database anyway. `role` is taken from the row rather than the token so a
+// demoted admin loses privileges immediately instead of at token expiry.
+export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     console.warn(`[auth] 401 no token: ${req.method} ${req.originalUrl}`);
@@ -17,13 +24,30 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   }
 
   const token = authHeader.split(' ')[1];
+  let decoded: { userId: string; role: string };
   try {
-    const decoded = verifyToken(token) as { userId: string; role: string };
-    req.user = decoded;
-    next();
+    decoded = verifyToken(token) as { userId: string; role: string };
   } catch (error) {
     console.warn(`[auth] 401 invalid/expired token: ${req.method} ${req.originalUrl}`);
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: { id: true, role: true, deletedAt: true },
+    });
+
+    if (!user || user.deletedAt) {
+      console.warn(`[auth] 401 deleted/missing account ${decoded.userId}: ${req.method} ${req.originalUrl}`);
+      return res.status(401).json({ error: 'Unauthorized: Account no longer active' });
+    }
+
+    req.user = { userId: user.id, role: user.role };
+    next();
+  } catch (error) {
+    console.error('[auth] session lookup failed:', error);
+    return res.status(503).json({ error: 'Authentication temporarily unavailable' });
   }
 };
 
@@ -32,13 +56,23 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
 // routes that are genuinely public (anonymous browsing) but should behave
 // differently for a logged-in caller with elevated privileges, e.g. the
 // public product list including non-APPROVED products for an admin caller.
-export const optionalAuthenticate = (req: AuthRequest, res: Response, next: NextFunction) => {
+export const optionalAuthenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith('Bearer ')) {
     try {
-      req.user = verifyToken(authHeader.split(' ')[1]) as { userId: string; role: string };
+      const decoded = verifyToken(authHeader.split(' ')[1]) as { userId: string; role: string };
+      // Same DB re-resolution as `authenticate` -- otherwise a deleted admin's
+      // stale token would still unlock the elevated view on public routes.
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: { id: true, role: true, deletedAt: true },
+      });
+      if (user && !user.deletedAt) {
+        req.user = { userId: user.id, role: user.role };
+      }
     } catch {
-      // Invalid/expired token on an otherwise-public route -- treat as anonymous.
+      // Invalid/expired token, or a transient lookup failure, on an otherwise
+      // public route -- treat as anonymous rather than failing the request.
     }
   }
   next();

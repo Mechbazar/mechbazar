@@ -1,3 +1,12 @@
+// Deploy with:  firebase deploy --only storage
+// (wired up by /firebase.json at the repo root)
+//
+// IMPORTANT: until this file is actually deployed, the bucket runs whatever
+// rules are set in the Firebase console. The console default for a new bucket
+// is `allow read, write: if request.auth != null`, which would let ANY signed-in
+// customer write arbitrary objects straight into the bucket -- bypassing the
+// backend's mimetype allowlist and 5 MB size cap in upload.controller.ts
+// entirely. Deploying this file is what closes that hole.
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {

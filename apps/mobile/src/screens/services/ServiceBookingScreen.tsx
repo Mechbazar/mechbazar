@@ -65,8 +65,11 @@ export default function ServiceBookingScreen() {
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedSlotId, setSelectedSlotId] = useState<string | null>(null);
 
-  // Payment / submit
-  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'online'>('COD');
+  // Payment / submit. COD is the only method MechBazar supports -- there is no
+  // payment gateway anywhere in the product, so this is a constant rather than
+  // selectable state. The radio row below is kept purely so the user can see
+  // what they are being charged and how.
+  const paymentMethod = 'COD' as const;
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -384,18 +387,19 @@ export default function ServiceBookingScreen() {
       </View>
 
       <Text style={styles.fieldLabel}>Payment Method</Text>
-      <TouchableOpacity style={[styles.paymentRow, paymentMethod === 'COD' && styles.paymentRowActive]} onPress={() => setPaymentMethod('COD')}>
-        <View style={[styles.radioCircle, paymentMethod === 'COD' && styles.radioCircleActive]}>{paymentMethod === 'COD' && <View style={styles.radioDot} />}</View>
+      <View style={[styles.paymentRow, styles.paymentRowActive]}>
+        <View style={[styles.radioCircle, styles.radioCircleActive]}><View style={styles.radioDot} /></View>
         <Text style={styles.paymentText}>Cash on Service Completion</Text>
-      </TouchableOpacity>
-      {/* No payment gateway is integrated yet -- disabled rather than
-          selectable, so this can't silently create a booking with a payment
-          method that will never actually be charged or confirmed. */}
-      <View style={[styles.paymentRow, { opacity: 0.5 }]}>
-        <View style={styles.radioCircle} />
-        <Text style={styles.paymentText}>Pay Online (UPI / Card / Net Banking)</Text>
-        <Text style={styles.comingSoonBadge}>Coming soon</Text>
       </View>
+      {/* MechBazar is Cash on Delivery only -- no payment gateway is
+          integrated. A greyed-out "Pay Online (UPI / Card / Net Banking)" row
+          used to sit here; it advertised a payment method that does not exist,
+          which both stores treat as misleading functionality and which
+          contradicts every published policy page. */}
+      <Text style={styles.helperText}>
+        MechBazar currently accepts Cash on Delivery only. You pay the mechanic in cash once the
+        service is complete — nothing is charged in advance.
+      </Text>
 
       {error && <Text style={styles.errorText}>{error}</Text>}
     </ScrollView>

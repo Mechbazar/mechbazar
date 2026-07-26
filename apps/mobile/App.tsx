@@ -14,6 +14,7 @@ import { hydrateCart } from './src/store/cartSlice';
 import { hydrateGarage, setVehicleTypeHydrated, loadVehicleType } from './src/store/appSlice';
 import { setThemePreferenceHydrated, loadThemePreference, systemSchemeChanged } from './src/store/themeSlice';
 import './src/services/sessionGuard';
+import ErrorBoundary from './src/components/shared/ErrorBoundary';
 import { registerForPushNotificationsAsync } from './src/services/notifications';
 import { registerForWebPushAsync } from './src/services/webPush';
 import { API_BASE_URL } from './src/services/api';
@@ -367,9 +368,13 @@ function RootNavigator() {
 
 export default function App() {
   return (
-    <Provider store={store}>
-      <RootNavigator />
-    </Provider>
+    // Outside the Provider so that a failure in store hydration itself is still
+    // caught and shown, rather than taking the tree down before any UI exists.
+    <ErrorBoundary>
+      <Provider store={store}>
+        <RootNavigator />
+      </Provider>
+    </ErrorBoundary>
   );
 }
 

@@ -147,6 +147,20 @@ const GradientButton = ({ onPress, children, disabled, isLoading }: any) => {
   );
 };
 
+// The API base-URL switcher below is a DEVELOPMENT tool. It used to be
+// reachable in every build from a gear icon on the login screen, which meant a
+// shipped production app let anyone repoint it at an arbitrary server. That is
+// a credential-theft vector, not just untidy: the login flow posts the phone
+// number and the Firebase ID token -- the credential the real backend trusts --
+// to whatever host is configured, so a single "tap settings and paste this URL"
+// social-engineering call would hand an attacker a working session. It is also
+// exactly the kind of development/test functionality Apple rejects under
+// Guideline 2.1.
+//
+// __DEV__ is false in any release bundle, so this compiles the entry points out
+// of production builds entirely.
+const DEV_TOOLS_ENABLED = __DEV__;
+
 // Shared by both the native/mobile-web layout and the desktop layout below
 // -- same dev-only API base URL switcher, just rendered from either branch.
 const ApiSettingsModal = ({
@@ -204,14 +218,17 @@ function DesktopWelcomeLayout({
 }: any) {
   return (
     <View style={desktopStyles.page}>
-      <Pressable
-        style={desktopStyles.settingsIconBtn}
-        onPress={onOpenSettings}
-        accessibilityRole="button"
-        accessibilityLabel="Developer settings"
-      >
-        <Ionicons name="settings-outline" size={16} color={colors.textMuted} />
-      </Pressable>
+      {/* Development builds only -- see the note on DEV_TOOLS_ENABLED. */}
+      {DEV_TOOLS_ENABLED && (
+        <Pressable
+          style={desktopStyles.settingsIconBtn}
+          onPress={onOpenSettings}
+          accessibilityRole="button"
+          accessibilityLabel="Developer settings"
+        >
+          <Ionicons name="settings-outline" size={16} color={colors.textMuted} />
+        </Pressable>
+      )}
 
       <Container style={desktopStyles.center}>
         <View style={desktopStyles.splitRow}>
@@ -581,16 +598,19 @@ export default function WelcomeScreen() {
       
       {/* Top Header Settings Bar */}
       <View style={styles.topHeader}>
-        <TouchableOpacity 
-          style={styles.settingsIconBtn} 
-          onPress={() => {
-            setTempBaseUrl(activeBaseUrl);
-            setIsSettingsVisible(true);
-          }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="settings-outline" size={22} color={colors.white} />
-        </TouchableOpacity>
+        {/* Development builds only -- see the note on DEV_TOOLS_ENABLED. */}
+        {DEV_TOOLS_ENABLED && (
+          <TouchableOpacity
+            style={styles.settingsIconBtn}
+            onPress={() => {
+              setTempBaseUrl(activeBaseUrl);
+              setIsSettingsVisible(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="settings-outline" size={22} color={colors.white} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <KeyboardAvoidingView 

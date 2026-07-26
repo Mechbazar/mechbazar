@@ -24,11 +24,17 @@ const COMPANY_LINKS: FooterLink[] = [
   { label: 'Help Center', onPress: nav => nav.navigate('HelpCenter') },
 ];
 
+// Both stores expect every policy a commerce app relies on to be reachable,
+// and Google Play requires the account-deletion route in particular to be
+// discoverable without hunting through settings.
 const POLICY_LINKS: FooterLink[] = [
   { label: 'Privacy Policy', onPress: nav => nav.navigate('StaticPage', { page: 'privacy' }) },
   { label: 'Terms of Service', onPress: nav => nav.navigate('StaticPage', { page: 'terms' }) },
-  { label: 'Return & Refund Policy', onPress: nav => nav.navigate('StaticPage', { page: 'returns' }) },
+  { label: 'Return & Replacement', onPress: nav => nav.navigate('StaticPage', { page: 'returns' }) },
+  { label: 'Refund Policy', onPress: nav => nav.navigate('StaticPage', { page: 'refund' }) },
+  { label: 'Cancellation Policy', onPress: nav => nav.navigate('StaticPage', { page: 'cancellation' }) },
   { label: 'Shipping Policy', onPress: nav => nav.navigate('StaticPage', { page: 'shipping' }) },
+  { label: 'Account Deletion', onPress: nav => nav.navigate('StaticPage', { page: 'account-deletion' }) },
 ];
 
 const PARTNER_LINKS: FooterLink[] = [

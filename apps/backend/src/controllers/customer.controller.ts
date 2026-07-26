@@ -4,6 +4,7 @@ import { AuthRequest } from '../middlewares/auth';
 import { sanitizeUser, sanitizeUsers } from '../utils/sanitizeUser';
 import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
 import prisma from '../config/prisma';
+import admin from '../config/firebase';
 
 export const getCustomers = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -554,7 +555,13 @@ export const createMyVehicle = async (req: AuthRequest, res: Response): Promise<
 
     res.status(201).json(vehicle);
   } catch (error) {
-    console.error(`[garage] create vehicle failed (user ${req.user?.userId}, body ${JSON.stringify(req.body)}):`, error);
+    // Log the shape of the request, not its contents -- a garage vehicle body
+    // carries the registration number, which is personal data and must not be
+    // written into application logs that get shipped to a collector.
+    console.error(
+      `[garage] create vehicle failed (user ${req.user?.userId}, fields: ${Object.keys(req.body || {}).join(',')}):`,
+      error
+    );
     res.status(500).json({ error: 'Failed to create vehicle' });
   }
 };
@@ -642,5 +649,168 @@ export const deleteMyVehicle = async (req: AuthRequest, res: Response): Promise<
   } catch (error) {
     console.error(`[garage] delete vehicle ${req.params.id} failed (user ${req.user?.userId}):`, error);
     res.status(500).json({ error: 'Failed to delete vehicle' });
+  }
+};
+
+// ============ Self-service account deletion (any authenticated user) ============
+// Required by Google Play's "Data deletion" policy and Apple Guideline
+// 5.1.1(v): an app that lets a user create an account must let them delete it
+// from inside the app, not just via a support email.
+//
+// This is an ANONYMISE-IN-PLACE, not a row delete, and deliberately so:
+//   * Order / ServiceBooking / Payment rows are statutory financial records.
+//     The Companies Act 2013 (s.128) and the CGST Act 2017 (s.36) both require
+//     books of account and tax invoices to be preserved for 8 years, and GST
+//     credit notes must remain traceable to the original supply.
+//   * Those rows carry a non-nullable FK to User, so a hard delete would
+//     either fail or cascade away the very records we are obliged to keep.
+// So the User row survives with every piece of personal data stripped, and
+// `phone` is rewritten to a non-dialable sentinel -- which both frees the
+// unique constraint (the number can be used to register a fresh account
+// later) and guarantees the deleted account can never be logged into again,
+// since login looks the user up by the E.164 phone Firebase verified.
+//
+// Addresses are anonymised rather than deleted for the same FK reason (Order
+// and ServiceBooking both reference Address). Street-level detail is wiped;
+// state/pincode survive because "place of supply" is a mandatory field on a
+// GST invoice.
+
+const DELETION_BLOCKING_ORDER_STATUSES = [
+  'PLACED', 'ACCEPTED', 'PACKING', 'PICKUP', 'ON_THE_WAY',
+] as const;
+
+const DELETION_BLOCKING_BOOKING_STATUSES = [
+  'PENDING', 'CONFIRMED', 'MECHANIC_ASSIGNED', 'MECHANIC_ACCEPTED',
+  'MECHANIC_ON_THE_WAY', 'ARRIVED', 'WORK_STARTED',
+] as const;
+
+export const deleteMyAccount = async (req: AuthRequest, res: Response): Promise<void> => {
+  const userId = req.user!.userId;
+  try {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      res.status(404).json({ error: 'Account not found' });
+      return;
+    }
+    if (user.deletedAt) {
+      res.status(410).json({ error: 'This account has already been deleted.' });
+      return;
+    }
+
+    // Partner accounts settle payouts and carry statutory KYC retention
+    // obligations, so they are offboarded by ops rather than self-service.
+    if (user.role !== Role.CUSTOMER) {
+      res.status(403).json({
+        error:
+          'Only customer accounts can be deleted from the app. Partner accounts (vendor, mechanic, delivery) need payout settlement first -- please contact support.',
+      });
+      return;
+    }
+
+    const [activeOrders, activeBookings] = await Promise.all([
+      prisma.order.count({
+        where: { userId, status: { in: [...DELETION_BLOCKING_ORDER_STATUSES] } },
+      }),
+      prisma.serviceBooking.count({
+        where: { userId, status: { in: [...DELETION_BLOCKING_BOOKING_STATUSES] } },
+      }),
+    ]);
+
+    if (activeOrders > 0 || activeBookings > 0) {
+      res.status(409).json({
+        error:
+          'You still have an order or service booking in progress. Please wait for it to be delivered or completed, or cancel it, and then delete your account.',
+        activeOrders,
+        activeBookings,
+      });
+      return;
+    }
+
+    // Sentinel is unique per account and obviously non-dialable, so it can
+    // never collide with a real E.164 number or be matched by a login lookup.
+    const sentinelPhone = `deleted:${userId}`;
+    const deletionReason =
+      typeof req.body?.reason === 'string' ? req.body.reason.slice(0, 500) : null;
+
+    await prisma.$transaction(async (tx) => {
+      // Drop the optional Garage link from historical bookings before the
+      // vehicles go, then remove the vehicles themselves. The booking keeps
+      // its snapshotted vehicleBrand/vehicleModel fields, so service history
+      // stays intelligible without retaining a registration number.
+      const vehicles = await tx.userVehicle.findMany({ where: { userId }, select: { id: true } });
+      const vehicleIds = vehicles.map((v) => v.id);
+      if (vehicleIds.length > 0) {
+        await tx.serviceBooking.updateMany({
+          where: { userVehicleId: { in: vehicleIds } },
+          data: { userVehicleId: null },
+        });
+        await tx.userVehicle.deleteMany({ where: { userId } });
+      }
+
+      // Pure preference/behavioural data -- nothing references these.
+      await tx.wishlist.deleteMany({ where: { userId } });
+      await tx.notification.deleteMany({ where: { userId } });
+
+      // Addresses are referenced by Order/ServiceBooking, so scrub in place.
+      await tx.address.updateMany({
+        where: { userId },
+        data: {
+          title: 'Deleted',
+          line1: '[deleted]',
+          line2: null,
+          lat: null,
+          lng: null,
+          placeId: null,
+          formattedAddress: null,
+        },
+      });
+
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          deletedAt: new Date(),
+          deletionReason,
+          phone: sentinelPhone,
+          email: null,
+          name: 'Deleted User',
+          password: null,
+          firebaseUid: null,
+          avatar: null,
+          gender: null,
+          dob: null,
+          companyName: null,
+          contactPerson: null,
+          gstNumber: null,
+          city: null,
+          state: null,
+          // Revoking the push tokens is what actually stops notifications
+          // reaching the device after deletion.
+          expoPushToken: null,
+          fcmToken: null,
+        },
+      });
+    });
+
+    // Best-effort: remove the Firebase Auth user so the number can be verified
+    // fresh on a future signup and no Firebase session survives. A failure here
+    // must not roll back the deletion the user just asked for -- the Prisma
+    // side is already committed and is what gates login.
+    if (user.firebaseUid) {
+      try {
+        await admin.auth().deleteUser(user.firebaseUid);
+      } catch (err) {
+        console.error(`[account-deletion] Firebase user ${user.firebaseUid} not removed:`, err);
+      }
+    }
+
+    console.warn(`[account-deletion] user ${userId} deleted (anonymised in place)`);
+    res.status(200).json({
+      message:
+        'Your account has been deleted. Personal data has been removed. Invoices and tax records are retained for 8 years as required by Indian law.',
+      deletedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error(`[account-deletion] failed for user ${userId}:`, error);
+    res.status(500).json({ error: 'Failed to delete account. Please contact support.' });
   }
 };

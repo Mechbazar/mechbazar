@@ -57,7 +57,10 @@ export async function registerForPushNotificationsAsync() {
 
       // Get the token that uniquely identifies this device
       token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-      console.log('📱 Expo Push Token:', token);
+      // Never log the token itself: anyone who reads it out of a device log or
+      // a log collector can push arbitrary notifications to that specific
+      // device. Log only that one was obtained.
+      console.log('📱 Expo push token registered');
     } else {
       console.log('⚠️ Must use physical device for Push Notifications');
     }

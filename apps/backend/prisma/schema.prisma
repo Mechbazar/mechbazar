@@ -117,6 +117,16 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // Self-service account deletion (Google Play "Data deletion" requirement and
+  // Apple Guideline 5.1.1(v)). Deletion is an anonymise-in-place, not a row
+  // delete: Order/ServiceBooking/Payment rows are statutory records (Companies
+  // Act s.128, CGST Act s.36 -- 8 years) and several of them FK back to this
+  // row, so the row survives with every piece of personal data stripped.
+  // `phone` is rewritten to a non-dialable sentinel so the unique constraint is
+  // freed and the number can never log in or be matched again.
+  deletedAt      DateTime?
+  deletionReason String?
+
   addresses         Address[]
   userVehicles      UserVehicle[]
   orders            Order[]
