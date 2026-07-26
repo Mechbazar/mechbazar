@@ -101,7 +101,6 @@ module.exports = {
       package: 'com.mechbazar.mobile',
       // versionCode is managed remotely by EAS -- see the ios note above.
       googleServicesFile: './google-services.json',
-      edgeToEdgeEnabled: true,
       config: {
         googleMaps: {
           apiKey: GOOGLE_MAPS_API_KEY || undefined,
