@@ -6,6 +6,7 @@ import { useSelector } from 'react-redux';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import { Logo, logoSvgMarkup } from '@mechbazar/shared';
 import { RootState } from '../../store';
 import { ServiceInvoice, ServiceBooking } from '../../types/service';
 import { fetchBookingInvoice, fetchBookingById } from '../../services/service.service';
@@ -20,7 +21,7 @@ type ParamList = { ServiceInvoice: { bookingId: string } };
 const invoiceHtml = (invoice: ServiceInvoice, booking: ServiceBooking | null) => `
   <html>
     <body style="font-family: -apple-system, sans-serif; padding: 24px; color: #1B1B1B;">
-      <h1 style="color: #DA3830; margin-bottom: 4px;">MechBazar</h1>
+      <div style="margin-bottom: 4px;">${logoSvgMarkup({ width: 180 })}</div>
       <p style="color: #6B7480; margin-top: 0;">Doorstep Service Invoice</p>
       <hr style="border: none; border-top: 1px solid #E3E6EA; margin: 16px 0;" />
       <p><strong>Invoice No:</strong> ${invoice.invoiceNumber}</p>
@@ -160,7 +161,7 @@ export default function ServiceInvoiceScreen() {
       <CompactBookingShell maxWidth={640} style={styles.flexFill}>
       <ScrollView contentContainerStyle={{ padding: 16 }}>
         <View style={styles.invoiceCard}>
-          <Text style={styles.brand}>MechBazar</Text>
+          <Logo width={170} />
           <Text style={styles.invoiceNumber}>{invoice.invoiceNumber}</Text>
           <Text style={styles.invoiceDate}>{new Date(invoice.createdAt).toLocaleDateString()}</Text>
 
@@ -208,7 +209,6 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: '800', color: colors.white },
 
   invoiceCard: { backgroundColor: colors.white, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: colors.borderLight },
-  brand: { fontSize: 20, fontWeight: '900', color: colors.primary },
   invoiceNumber: { fontSize: 13, color: colors.textDark, fontWeight: '700', marginTop: 6 },
   invoiceDate: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
 

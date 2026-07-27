@@ -57,7 +57,13 @@ export default function ServiceCategoryScreen() {
     return (
       <TouchableOpacity
         style={styles.packageCard}
-        onPress={() => navigation.navigate('ServiceBooking', { packageId: item.id, categoryId })}
+        // Emergency packages skip the scheduled wizard entirely -- instant
+        // dispatch, no date, no time slot. See EmergencyRequestScreen.
+        onPress={() =>
+          item.isEmergency
+            ? navigation.navigate('EmergencyRequest', { packageId: item.id, categoryId })
+            : navigation.navigate('ServiceBooking', { packageId: item.id, categoryId })
+        }
       >
         <View style={styles.packageImageWrap}>
           {item.image ? (

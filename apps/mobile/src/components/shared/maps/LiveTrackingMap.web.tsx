@@ -1,9 +1,10 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { GoogleMap, MarkerF, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, MarkerF, PolylineF, useJsApiLoader } from '@react-google-maps/api';
 import MapPlaceholder from '../MapPlaceholder';
 import { GOOGLE_MAPS_API_KEY, MAPS_ENABLED } from '../../../config/maps';
 import { LiveTrackingMapProps } from './LiveTrackingMap.types';
+import { decodePolyline } from './decodePolyline';
 
 // Web implementation -- previously order/service tracking on the web build
 // just showed "Live map is available on the mobile app" instead of a map.
@@ -23,7 +24,7 @@ function colorToSymbol(color?: string): google.maps.Symbol | undefined {
   };
 }
 
-export default function LiveTrackingMap({ markers, height = 200 }: LiveTrackingMapProps) {
+export default function LiveTrackingMap({ markers, height = 200, routePolyline, routeColor }: LiveTrackingMapProps) {
   const { isLoaded } = useJsApiLoader({ googleMapsApiKey: GOOGLE_MAPS_API_KEY, id: 'mechbazar-google-maps' });
 
   if (!MAPS_ENABLED) {
@@ -35,6 +36,7 @@ export default function LiveTrackingMap({ markers, height = 200 }: LiveTrackingM
 
   const anchor = markers[0];
   const center = { lat: anchor.latitude, lng: anchor.longitude };
+  const routeCoords = routePolyline ? decodePolyline(routePolyline).map((p) => ({ lat: p.latitude, lng: p.longitude })) : null;
 
   return (
     <View style={[styles.wrapper, { height }]}>
@@ -42,6 +44,9 @@ export default function LiveTrackingMap({ markers, height = 200 }: LiveTrackingM
         {markers.map((m, i) => (
           <MarkerF key={i} position={{ lat: m.latitude, lng: m.longitude }} title={m.title} icon={colorToSymbol(m.color)} />
         ))}
+        {routeCoords && routeCoords.length > 1 && (
+          <PolylineF path={routeCoords} options={{ strokeColor: routeColor || '#DA3830', strokeWeight: 4 }} />
+        )}
       </GoogleMap>
     </View>
   );

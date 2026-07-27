@@ -32,6 +32,29 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    location /socket.io/ {
+        # The emergency-dispatch realtime gateway (apps/backend/src/realtime/gateway.ts)
+        # mounts Socket.IO at the default '/socket.io' path on the backend's own HTTP
+        # server (port 5005), not under /api/. Without this block, socket handshakes
+        # fall through to the `location /` catch-all below and hit the Customer App
+        # static container (3002) instead of the backend -- every realtime feature
+        # (dispatch offers, live tracking, OTP-issued events, admin live-ops board)
+        # silently fails with no error surfaced to the client beyond a failed upgrade.
+        proxy_pass http://127.0.0.1:5005;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        # Websockets are long-lived; Nginx's default 60s proxy_read_timeout would
+        # silently drop idle-but-open dispatch/tracking connections.
+        proxy_read_timeout 86400s;
+    }
+
     location / {
         proxy_pass http://127.0.0.1:3002;
         proxy_http_version 1.1;

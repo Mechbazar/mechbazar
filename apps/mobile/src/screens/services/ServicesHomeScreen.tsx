@@ -9,6 +9,7 @@ import { setVehicleType } from '../../store/appSlice';
 import { VehicleType } from '../../types/product';
 import { ServiceCategory, ServicePackage, ServiceBooking } from '../../types/service';
 import { fetchServiceCategories, fetchMyBookings } from '../../services/service.service';
+import { jobService, Job } from '@mechbazar/shared';
 import { HeaderCartButton } from '../../components/HeaderCartButton';
 import { colors } from './theme';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
@@ -51,8 +52,20 @@ export default function ServicesHomeScreen({ navigation }: any) {
     setAllBookings(await fetchMyBookings(token));
   }, [token]);
 
+  // A live emergency job survives an app restart/kill on the server side (it
+  // keeps dispatching, tracking, everything) but the customer has no way back
+  // into it without this: reopening the app must resume straight into
+  // tracking rather than presenting the catalog as if nothing were in
+  // progress -- this is the platform's Uber-style "you have a ride in
+  // progress" behavior.
+  const [activeJob, setActiveJob] = useState<Job | null>(null);
+  const loadActiveJob = useCallback(async () => {
+    if (!token) { setActiveJob(null); return; }
+    setActiveJob(await jobService.getMyActiveJob());
+  }, [token]);
+
   useEffect(() => { loadCategories(); }, [loadCategories]);
-  useFocusEffect(useCallback(() => { loadCategories(); loadBookings(); }, [loadCategories, loadBookings]));
+  useFocusEffect(useCallback(() => { loadCategories(); loadBookings(); loadActiveJob(); }, [loadCategories, loadBookings, loadActiveJob]));
 
   const { isDesktopUp } = useBreakpoint();
   useFocusEffect(
@@ -99,10 +112,18 @@ export default function ServicesHomeScreen({ navigation }: any) {
 
   const goToPackage = (pkg: PkgWithCategory) => {
     if (!pkg.isActive) return;
+    // Emergency packages skip the scheduled wizard entirely -- no date, no
+    // time slot, an instant dispatch. See EmergencyRequestScreen.
+    if (pkg.isEmergency) {
+      navigation.navigate('EmergencyRequest', { packageId: pkg.id, categoryId: pkg.categoryId });
+      return;
+    }
     navigation.navigate('ServiceBooking', { packageId: pkg.id, categoryId: pkg.categoryId });
   };
 
   const goToCategory = (category: ServiceCategory) => {
+    // ServiceCategoryScreen itself branches emergency packages to
+    // EmergencyRequest on tap -- no separate screen needed for the list view.
     navigation.navigate('ServiceCategory', { categoryId: category.id, categoryName: category.name });
   };
 
@@ -283,7 +304,21 @@ export default function ServicesHomeScreen({ navigation }: any) {
           contentContainerStyle={{ paddingBottom: 100 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
         >
-          {emergencyCategory && (
+          {activeJob && (
+            <TouchableOpacity
+              style={[styles.emergencyBanner, { backgroundColor: colors.success }]}
+              onPress={() => navigation.navigate('EmergencyTracking', { bookingId: activeJob.id })}
+            >
+              <Text style={styles.emergencyIcon}>🚨</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.emergencyTitle}>Request in progress</Text>
+                <Text style={styles.emergencySubtitle}>{activeJob.statusMessage} · Tap to track</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.white} />
+            </TouchableOpacity>
+          )}
+
+          {!activeJob && emergencyCategory && (
             <TouchableOpacity style={styles.emergencyBanner} onPress={() => goToCategory(emergencyCategory)}>
               <Text style={styles.emergencyIcon}>🚨</Text>
               <View style={{ flex: 1 }}>

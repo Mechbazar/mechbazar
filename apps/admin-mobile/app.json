@@ -14,7 +14,7 @@
     "android": {
       "package": "com.mechbazar.admin",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#1B1B1B",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -26,11 +26,33 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#E23B22",
+          "defaultChannel": "default",
+          "enableBackgroundRemoteNotifications": false
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 240,
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF",
+          "dark": {
+            "image": "./assets/splash-icon-dark.png",
+            "backgroundColor": "#111111"
+          }
+        }
+      ]
     ],
     "extra": {
       "eas": {
-        "projectId": "ec4b96fc-3ab5-46a2-a506-d7333cfd0a80"
+        "projectId": "7e35fa7f-ac3e-4ab9-8238-5aa1205b6718"
       }
     }
   }

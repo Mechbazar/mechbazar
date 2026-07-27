@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
+import { Logo } from '@mechbazar/shared';
 import { colors, spacing, radius } from '../../../theme/tokens';
 import Container from '../shared/Container';
 
@@ -78,7 +79,8 @@ export default function DesktopFooter() {
     <View style={styles.footer}>
       <Container style={styles.grid}>
         <View style={[styles.column, styles.brandColumn]}>
-          <Text style={styles.brand}>MechBazar</Text>
+          {/* Dark tone: the footer is the dark brand surface. */}
+          <Logo tone="dark" width={170} style={styles.brandLogo} />
           <Text style={styles.brandTagline}>
             Genuine auto parts and trusted mechanic services, delivered to your doorstep.
           </Text>
@@ -121,7 +123,7 @@ const styles = StyleSheet.create({
   },
   column: { minWidth: 160, flexGrow: 1, gap: 10 },
   brandColumn: { flexGrow: 2, minWidth: 260, maxWidth: 320 },
-  brand: { color: colors.white, fontSize: 22, fontWeight: '800' },
+  brandLogo: { alignSelf: 'flex-start' },
   brandTagline: { color: colors.mutedOnDark, fontSize: 13, lineHeight: 20 },
   socialRow: { flexDirection: 'row', gap: 10, marginTop: spacing.sm },
   socialIcon: {

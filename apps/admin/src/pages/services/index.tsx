@@ -1,16 +1,19 @@
 import { useState } from 'react';
-import { LayoutDashboard, Layers, Package, Clock3, Wallet } from 'lucide-react';
+import { LayoutDashboard, Layers, Package, Clock3, Wallet, Siren } from 'lucide-react';
 import ServicesDashboard from './ServicesDashboard';
 import ServiceCategories from './ServiceCategories';
 import ServicePackages from './ServicePackages';
 import ServiceTimeSlots from './ServiceTimeSlots';
 import TechnicianPayouts from './TechnicianPayouts';
+import LiveOps from './LiveOps';
 
 // Bookings and Technicians are now dedicated top-level pages (Service
 // Bookings / Mechanics in the sidebar) -- this tab set is just the service
-// catalog/config side (categories, packages, time slots, payouts).
+// catalog/config side (categories, packages, time slots, payouts) plus the
+// emergency-dispatch live-ops board.
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'live-ops', label: 'Live Ops', icon: Siren },
   { id: 'categories', label: 'Categories', icon: Layers },
   { id: 'packages', label: 'Packages', icon: Package },
   { id: 'slots', label: 'Time Slots', icon: Clock3 },
@@ -45,6 +48,7 @@ export default function ServicesManagement() {
 
       <div className="flex-1 overflow-y-auto">
         {activeTab === 'dashboard' && <ServicesDashboard />}
+        {activeTab === 'live-ops' && <LiveOps />}
         {activeTab === 'categories' && <ServiceCategories />}
         {activeTab === 'packages' && <ServicePackages />}
         {activeTab === 'slots' && <ServiceTimeSlots />}

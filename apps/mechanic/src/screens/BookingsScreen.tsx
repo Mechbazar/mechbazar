@@ -76,10 +76,14 @@ export const BookingsScreen = () => {
           </Typography>
         }
         renderItem={({ item }) => (
-          <TouchableOpacity onPress={() => navigation.navigate('BookingDetail', { bookingId: item.id })}>
-            <Card style={styles.card}>
+          <TouchableOpacity
+            onPress={() =>
+              navigation.navigate(item.isEmergency ? 'EmergencyJob' : 'BookingDetail', { bookingId: item.id })
+            }
+          >
+            <Card style={item.isEmergency ? { ...styles.card, ...styles.cardEmergency } : styles.card}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Typography variant="h3">#{item.bookingNumber}</Typography>
+                <Typography variant="h3">{item.isEmergency ? '🚨 ' : ''}#{item.bookingNumber}</Typography>
                 <Typography variant="caption" style={{ color: colors.primary, fontWeight: '600' }}>{item.status}</Typography>
               </View>
               <Typography variant="body" style={{ marginTop: 4 }}>
@@ -90,7 +94,9 @@ export const BookingsScreen = () => {
                   {item.address?.city}
                 </Typography>
                 <Typography variant="caption" style={{ color: colors.textSecondary }}>
-                  {new Date(item.scheduledDate).toLocaleDateString()} • {item.timeSlot?.label}
+                  {item.isEmergency
+                    ? 'Emergency dispatch'
+                    : `${item.scheduledDate ? new Date(item.scheduledDate).toLocaleDateString() : ''} • ${item.timeSlot?.label || ''}`}
                 </Typography>
               </View>
             </Card>
@@ -107,4 +113,5 @@ const styles = StyleSheet.create({
   segment: { flex: 1, paddingVertical: 8, borderRadius: 8, alignItems: 'center', backgroundColor: colors.surfaceHover },
   segmentActive: { backgroundColor: colors.primary },
   card: { marginBottom: 12 },
+  cardEmergency: { borderWidth: 1.5, borderColor: colors.primary },
 });

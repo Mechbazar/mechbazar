@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Menu } from 'lucide-react';
+import { Logo } from '@mechbazar/shared/web';
 import Sidebar from './Sidebar';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -23,7 +24,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           >
             <Menu className="w-6 h-6" />
           </button>
-          <span className="font-bold text-white tracking-wide">MECH<span className="text-primary-500">BAZAR</span></span>
+          {/* Dark tone: the mobile top bar sits on bg-neutral-950. */}
+          <Logo tone="dark" width={130} />
         </div>
         <div className="p-4 sm:p-8 overflow-x-auto">
           {children}

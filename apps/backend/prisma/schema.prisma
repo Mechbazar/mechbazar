@@ -68,6 +68,11 @@ enum TechnicianStatus {
 enum BookingStatus {
   PENDING
   CONFIRMED
+  // Emergency dispatch is in flight: offers have been fanned out to nearby
+  // mechanics and we are waiting for the first accept. Distinct from
+  // MECHANIC_ASSIGNED, which means exactly one mechanic already owns the job
+  // (admin manual assignment, or the legacy scheduled-booking auto-assign).
+  SEARCHING
   MECHANIC_ASSIGNED
   MECHANIC_ACCEPTED
   MECHANIC_ON_THE_WAY
@@ -76,6 +81,32 @@ enum BookingStatus {
   COMPLETED
   CANCELLED
   REJECTED
+  // Every dispatch wave expired with no acceptance. Terminal for the dispatch
+  // engine but NOT for the booking -- an admin can still assign manually, and
+  // the customer can retry or cancel, so it is deliberately not lumped in with
+  // CANCELLED.
+  NO_MECHANIC_FOUND
+}
+
+// Lifecycle of a single offer made to a single mechanic during dispatch.
+// Exactly one offer per job may reach ACCEPTED -- enforced by the conditional
+// UPDATE in dispatch.service.ts (see acceptDispatchOffer), not by a DB
+// constraint, because "at most one row with status=ACCEPTED per bookingId" is
+// not expressible as a Postgres unique index over a mutable column.
+enum DispatchOfferStatus {
+  OFFERED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  // Another mechanic won the race; this offer was closed by the system rather
+  // than by the mechanic it was shown to.
+  SUPERSEDED
+  CANCELLED
+}
+
+enum JobOtpPurpose {
+  START
+  COMPLETION
 }
 
 enum AccountType {
@@ -613,8 +644,19 @@ model Notification {
   isRead    Boolean  @default(false)
   createdAt DateTime @default(now())
 
+  // Event key (e.g. JOB_SEARCHING, JOB_ACCEPTED, JOB_START_OTP) so the app can
+  // route a tap to the right screen and de-duplicate, instead of the previous
+  // situation where every notification was an untyped title/body pair and
+  // clients had to string-match the copy.
+  type String?
+  // Deep-link payload -- normally { bookingId }. Mirrors what goes out in the
+  // Expo/FCM data field so an in-app notification behaves identically to a
+  // push whether or not the push was delivered.
+  data Json?
+
   @@index([userId, isRead])
   @@index([createdAt])
+  @@index([userId, type, createdAt])
 }
 
 // Homepage newsletter signup -- no user account required (name matches
@@ -851,6 +893,13 @@ model ServiceTechnician {
   isOnline        Boolean       @default(false)
   currentLat      Float?
   currentLng      Float?
+  // Freshness guard for dispatch. A mechanic whose last ping is older than
+  // DISPATCH_STALE_LOCATION_SECONDS is treated as unreachable and skipped by
+  // the candidate query, so a phone that died three hours ago while "online"
+  // can't absorb an emergency offer and let it expire.
+  lastLocationAt  DateTime?
+  lastHeadingDeg  Float?
+  lastSpeedMps    Float?
   expoPushToken   String?
   walletBalance   Float         @default(0.0)
   rating          Float         @default(0)
@@ -878,11 +927,17 @@ model ServiceTechnician {
   reviewedAt            DateTime?
   remarks               String?
 
-  bookings     ServiceBooking[]
-  documents    TechnicianDocument[]
-  bankAccounts TechnicianBankAccount[]
-  settlements  TechnicianSettlement[]
-  reviews      ServiceReview[]
+  bookings       ServiceBooking[]
+  documents      TechnicianDocument[]
+  bankAccounts   TechnicianBankAccount[]
+  settlements    TechnicianSettlement[]
+  reviews        ServiceReview[]
+  dispatchOffers JobDispatchOffer[]
+  locationPings  JobLocationPing[]
+
+  // Hot path: the dispatch candidate query filters on exactly these columns.
+  @@index([isOnline, isActive, status])
+  @@index([lastLocationAt])
 }
 
 model TechnicianDocument {
@@ -1006,9 +1061,31 @@ model ServiceBooking {
   addressId String
   address   Address @relation(fields: [addressId], references: [id])
 
-  scheduledDate DateTime
-  timeSlotId    String
-  timeSlot      TimeSlot @relation(fields: [timeSlotId], references: [id])
+  // Nullable as of the emergency-dispatch workflow. An emergency job is an
+  // instant dispatch -- there is no appointment date and no slot to reserve,
+  // and forcing a synthetic "today / first slot" value would corrupt slot
+  // capacity accounting for the scheduled bookings that genuinely use it.
+  // Scheduled (non-emergency) bookings still require both; that requirement
+  // now lives in createBooking rather than in the column type.
+  scheduledDate DateTime?
+  timeSlotId    String?
+  timeSlot      TimeSlot? @relation(fields: [timeSlotId], references: [id])
+
+  // Emergency breakdown job: dispatched instantly to nearby mechanics instead
+  // of being placed into a slot. Drives which validation path createBooking
+  // takes and which screens the customer app renders.
+  isEmergency Boolean @default(false)
+
+  // Exact breakdown pin, snapshotted at request time. Deliberately NOT read
+  // through the Address relation at display time: a saved address can be
+  // edited or deleted afterwards, and a roadside breakdown is frequently not
+  // at any saved address at all. Falls back to the address centroid when the
+  // customer did not drop a precise pin.
+  jobLat           Float?
+  jobLng           Float?
+  jobAddressText   String?
+  landmark         String?
+  customerNotes    String?
 
   issueDescription String?
   status           BookingStatus @default(PENDING)
@@ -1026,27 +1103,210 @@ model ServiceBooking {
   cancelReason String?
   completedAt  DateTime?
 
-  // Set when a technician calls the "Generate OTP" action from WORK_STARTED; the
-  // customer reads the code aloud and the technician enters it to confirm
-  // completion. Cleared once used. Never returned to the technician's own client.
+  // ---- Dispatch state (emergency jobs) ----
+  // Which fan-out wave we are on. Wave N searches a larger radius than N-1;
+  // see dispatch.service.ts DISPATCH_WAVES.
+  dispatchWave      Int       @default(0)
+  dispatchStartedAt DateTime?
+  dispatchEndedAt   DateTime?
+  // Radius the winning offer was made at -- kept for ops analytics ("how far
+  // are we having to reach to fill jobs in this area at this hour").
+  dispatchRadiusKm  Float?
+
+  // ---- Timeline timestamps ----
+  // Each one is written exactly once, inside the same transaction as the
+  // status transition that produces it, so the timeline can never disagree
+  // with `status`. BookingStatusHistory remains the append-only audit trail;
+  // these denormalized columns exist so the common "show me the timeline for
+  // one job" render doesn't need a join, and so admin analytics can aggregate
+  // durations without walking history rows.
+  acceptedAt              DateTime?
+  enRouteAt               DateTime?
+  arrivedAt               DateTime?
+  startedAt               DateTime?
+  startOtpVerifiedAt      DateTime?
+  completionOtpVerifiedAt DateTime?
+  paymentCompletedAt      DateTime?
+  ratedAt                 DateTime?
+
+  // Set true only by a successful START OTP verification. This is the
+  // "customer was physically present and consented to work beginning" flag --
+  // an admin force-transitioning a stuck job to WORK_STARTED deliberately does
+  // NOT set it, so a disputed job can be told apart from a verified one.
+  verifiedByCustomer Boolean @default(false)
+
+  // ---- Live tracking rollups ----
+  // Maintained incrementally by the location ingestion path so neither the
+  // customer's ETA card nor the admin live map has to scan JobLocationPing.
+  distanceTravelledKm Float     @default(0)
+  etaSeconds          Int?
+  distanceRemainingM  Int?
+  etaUpdatedAt        DateTime?
+  // Encoded Google polyline for the current mechanic->customer route. Refreshed
+  // at most once per ETA_ROUTE_REFRESH_SECONDS, not per ping.
+  routePolyline       String?
+
+  // Legacy plaintext completion OTP from the pre-dispatch scheduled-booking
+  // flow. Superseded by JobOtp (encrypted at rest, attempt-limited, expiring).
+  // Retained only so in-flight bookings created before this migration can still
+  // be completed; no new code path writes it.
   completionOtp            String?
   completionOtpGeneratedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  images        ServiceImage[]
-  statusHistory BookingStatusHistory[]
-  messages      ServiceChatMessage[]
-  payment       Payment?
-  review        ServiceReview?
-  invoice       ServiceInvoice?
+  images         ServiceImage[]
+  statusHistory  BookingStatusHistory[]
+  messages       ServiceChatMessage[]
+  payment        Payment?
+  review         ServiceReview?
+  invoice        ServiceInvoice?
+  dispatchOffers JobDispatchOffer[]
+  locationPings  JobLocationPing[]
+  otps           JobOtp[]
+  callSessions   CallSession[]
 
   @@index([userId])
   @@index([technicianId])
   @@index([status])
   @@index([createdAt])
   @@index([scheduledDate])
+  // Admin live-ops board and the dispatch sweeper both scan "emergency jobs
+  // currently in a non-terminal state, newest first".
+  @@index([isEmergency, status, createdAt])
+  // Sweeper: "jobs still SEARCHING whose current wave may have timed out".
+  @@index([status, dispatchStartedAt])
+}
+
+// =======================
+// EMERGENCY DISPATCH
+// =======================
+
+// One row per (job, mechanic) offer. The dispatch engine writes a batch of
+// these per wave; the mechanic app reads its own OFFERED rows; the expiry
+// sweeper closes out the ones nobody answered.
+model JobDispatchOffer {
+  id           String            @id @default(uuid())
+  bookingId    String
+  booking      ServiceBooking    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  technicianId String
+  technician   ServiceTechnician @relation(fields: [technicianId], references: [id])
+
+  wave   Int                 @default(1)
+  status DispatchOfferStatus @default(OFFERED)
+
+  // Snapshot of the mechanic's position relative to the job at offer time --
+  // what the mechanic app shows on the offer card, and what ops uses to audit
+  // why a given mechanic was chosen. Not recomputed later.
+  distanceKm Float?
+  etaSeconds Int?
+
+  offeredAt     DateTime  @default(now())
+  expiresAt     DateTime
+  respondedAt   DateTime?
+  declineReason String?
+
+  // Which delivery channels actually fired for this offer (SOCKET, EXPO_PUSH,
+  // FCM). A mechanic who was offered a job on zero live channels is a
+  // deliverability incident, not a slow mechanic -- ops needs to tell them
+  // apart.
+  notifiedVia String[] @default([])
+
+  // A mechanic is offered a given job at most once, ever. Also makes the
+  // per-wave insert idempotent: a retried wave can use skipDuplicates instead
+  // of re-offering a job someone already declined.
+  @@unique([bookingId, technicianId])
+  // Mechanic app: "my open offers".
+  @@index([technicianId, status])
+  // Expiry sweeper: "offers past their deadline that are still open".
+  @@index([status, expiresAt])
+  @@index([bookingId, status])
+}
+
+// Start and completion OTPs for a job. Replaces ServiceBooking.completionOtp:
+// codes are encrypted at rest, single-use, expiring, and attempt-limited.
+model JobOtp {
+  id        String         @id @default(uuid())
+  bookingId String
+  booking   ServiceBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  purpose   JobOtpPurpose
+
+  // AES-256-GCM ciphertext of the 6-digit code (iv:tag:ciphertext, base64).
+  // Reversible rather than hashed because the customer has to be able to SEE
+  // their own code in-app -- a one-way hash would make the feature impossible.
+  // The key never leaves the server and the plaintext is only ever decrypted
+  // into a response addressed to the job's own customer.
+  codeEnc String
+
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(5)
+  expiresAt   DateTime
+  // Single-use: set on the first successful verification. A consumed row is
+  // never matched again, so a replayed request cannot re-run the transition.
+  consumedAt  DateTime?
+
+  createdAt       DateTime @default(now())
+  createdByUserId String?
+
+  // Only the newest unconsumed row per (booking, purpose) is live; older rows
+  // are kept for the audit trail rather than deleted.
+  @@index([bookingId, purpose, consumedAt])
+  @@index([expiresAt])
+}
+
+// Raw GPS breadcrumb trail. High-write, append-only, and pruned by retention
+// sweep once a job has been settled -- ServiceBooking.distanceTravelledKm and
+// the route polyline are the durable derivatives.
+model JobLocationPing {
+  // autoincrement rather than uuid: this is the hottest insert path in the
+  // system (one row per mechanic per ~4s per active job) and a monotonic key
+  // keeps the btree appends sequential instead of scattering them.
+  id           Int               @id @default(autoincrement())
+  bookingId    String
+  booking      ServiceBooking    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  technicianId String
+  technician   ServiceTechnician @relation(fields: [technicianId], references: [id])
+
+  lat        Float
+  lng        Float
+  accuracyM  Float?
+  headingDeg Float?
+  speedMps   Float?
+  batteryPct Int?
+
+  // Device clock at capture time. Distinct from receivedAt because the app
+  // buffers pings while offline and flushes them in a batch on reconnect --
+  // ordering must follow the device's own capture order, not arrival order.
+  recordedAt DateTime
+  receivedAt DateTime @default(now())
+
+  @@index([bookingId, recordedAt])
+  @@index([technicianId, recordedAt])
+}
+
+// Audit record for every masked call attempt. Also the enforcement point for
+// "calls are only possible between acceptance and completion" -- there is no
+// code path that reveals a raw phone number without writing one of these.
+model CallSession {
+  id        String         @id @default(uuid())
+  bookingId String
+  booking   ServiceBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  initiatedByUserId String
+  fromRole          String // CUSTOMER | TECHNICIAN
+  provider          String // EXOTEL | DIRECT_FALLBACK
+  providerCallSid   String?
+  // The number the caller's handset actually dials. Never a participant's real
+  // number when a masking provider is configured.
+  virtualNumber     String?
+  status            String   @default("INITIATED") // INITIATED | RINGING | ANSWERED | COMPLETED | FAILED
+  failureReason     String?
+  durationSec       Int?
+  createdAt         DateTime @default(now())
+  endedAt           DateTime?
+
+  @@index([bookingId, createdAt])
 }
 
 model BookingStatusHistory {
@@ -1074,12 +1334,28 @@ model ServiceChatMessage {
 model ServiceImage {
   id             String         @id @default(uuid())
   bookingId      String
-  booking        ServiceBooking @relation(fields: [bookingId], references: [id])
+  booking        ServiceBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
   fileData       Bytes?
   mimeType       String?
-  type           String // ISSUE, BEFORE, AFTER, ADDITIONAL_WORK
+  type           String // ISSUE, BEFORE, DURING, AFTER, ADDITIONAL_WORK, FEEDBACK
   uploadedByRole String // CUSTOMER, TECHNICIAN
   createdAt      DateTime       @default(now())
+
+  // Provenance, required by the work-progress spec: every work photo must be
+  // attributable to a person, a moment and (where the device allowed it) a
+  // place. uploadedByUserId is the User id behind uploadedByRole -- the role
+  // alone can't identify which mechanic uploaded it after a reassignment.
+  uploadedByUserId String?
+  capturedAt       DateTime?
+  lat              Float?
+  lng              Float?
+  // Content hash + size: dedupes an app retrying the same upload after a
+  // network drop, and lets a disputed photo be proven unmodified since upload.
+  sha256           String?
+  sizeBytes        Int?
+
+  @@index([bookingId, type])
+  @@index([bookingId, sha256])
 }
 
 model ServiceReview {
@@ -1093,6 +1369,11 @@ model ServiceReview {
   rating       Int
   comment      String?
   createdAt    DateTime          @default(now())
+
+  // Optional feedback photo. Stored inline as bytes for the same reason
+  // ServiceImage does (private content, never a publicly reachable URL).
+  imageData     Bytes?
+  imageMimeType String?
 
   @@index([technicianId])
 }

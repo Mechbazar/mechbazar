@@ -7,7 +7,7 @@ import { OrdersScreen } from '../screens/OrdersScreen';
 import { InventoryScreen } from '../screens/InventoryScreen';
 import { WalletScreen } from '../screens/WalletScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
-import { colors } from '@mechbazar/shared';
+import { colors, Logo } from '@mechbazar/shared';
 import { Home, Package, ShoppingBag, Warehouse, Wallet, User, Bell } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
@@ -28,6 +28,8 @@ export const TabNavigator = () => {
         component={DashboardScreen}
         options={({ navigation }) => ({
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+          // Brand the home tab's header, matching the mechanic/rider apps.
+          headerTitle: () => <Logo width={140} />,
           // Notifications/Analytics are pushed screens on the parent Stack
           // (MainStack), not tabs -- getParent() reaches past this
           // Tab.Navigator to it, same as the mechanic app's BookingDetail push.

@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, Alert, TouchableOpacity } from 'react-native';
+import { View, Alert, TouchableOpacity } from 'react-native';
 import { useDispatch } from 'react-redux';
 import * as SecureStore from 'expo-secure-store';
-import { colors, Button, Typography, Input, riderService, getApiBaseUrl } from '@mechbazar/shared';
-import { Truck } from 'lucide-react-native';
+import { colors, Button, Typography, Input, Logo, riderService, getApiBaseUrl } from '@mechbazar/shared';
 import { setAuth } from '../store';
 import { sendPhoneOtp, confirmPhoneOtp } from '../services/phoneAuth';
 
@@ -107,25 +106,7 @@ export const LoginScreen = () => {
   return (
     <View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#ffffff' }}>
       <View style={{ alignItems: 'center', marginBottom: 48 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View
-            style={{
-              width: 50,
-              height: 50,
-              borderColor: colors.primary,
-              borderWidth: 4,
-              borderRadius: 12,
-              justifyContent: 'center',
-              alignItems: 'center',
-              marginRight: 16,
-            }}
-          >
-            <Truck color={colors.primary} size={26} />
-          </View>
-          <Text style={{ fontSize: 32, fontWeight: '900', color: colors.navy, letterSpacing: 1 }}>
-            MECH<Text style={{ color: colors.primary }}>BAZAR</Text>
-          </Text>
-        </View>
+        <Logo width={240} />
         <Typography variant="body" style={{ color: colors.navy, fontWeight: '700', marginTop: 8, letterSpacing: 2 }}>
           RIDER APP
         </Typography>

@@ -1,11 +1,11 @@
 import React from 'react';
-import { Text, TouchableOpacity } from 'react-native';
+import { TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { HomeScreen } from '../screens/HomeScreen';
 import { BookingsScreen } from '../screens/BookingsScreen';
 import { EarningsScreen } from '../screens/EarningsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
-import { colors } from '@mechbazar/shared';
+import { colors, Logo } from '@mechbazar/shared';
 import { Home, Wrench, Wallet, User, Bell } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
@@ -26,11 +26,7 @@ export const TabNavigator = () => {
         component={HomeScreen}
         options={({ navigation }) => ({
           tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
-          headerTitle: () => (
-            <Text style={{ fontSize: 20, fontWeight: '900', color: colors.navy, letterSpacing: 1 }}>
-              MECH<Text style={{ color: colors.primary }}>BAZAR</Text>
-            </Text>
-          ),
+          headerTitle: () => <Logo width={140} />,
           // Notifications is a pushed screen on the parent Stack (MainStack),
           // not a tab -- getParent() reaches past this Tab.Navigator to it.
           headerRight: () => (

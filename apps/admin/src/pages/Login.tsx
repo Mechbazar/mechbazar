@@ -5,7 +5,7 @@ import axios from 'axios';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { Eye, EyeOff } from 'lucide-react';
 import { loginSuccess } from '../store';
-import { Button, Card, Alert, Input } from '@mechbazar/shared/web';
+import { Button, Card, Alert, Input, Logo } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
 import { auth } from '../config/firebase';
 import { mapFirebaseAuthError } from '../utils/firebaseErrors';
@@ -59,7 +59,8 @@ export default function Login() {
     <div className="flex min-h-screen w-full items-center justify-center bg-neutral-950 px-4">
       <Card variant="dark" className="w-full max-w-md !p-8 shadow-2xl">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-black text-white tracking-wide mb-2">MECH<span className="text-primary-500">BAZAR</span></h1>
+          {/* Dark tone: the login card sits on bg-neutral-950. */}
+          <Logo tone="dark" width={320} className="mx-auto mb-3" />
           <p className="text-neutral-400">Sign in to manage your empire</p>
         </div>
 

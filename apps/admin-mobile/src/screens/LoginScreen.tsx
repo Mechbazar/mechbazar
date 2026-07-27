@@ -3,7 +3,7 @@ import { View, Text, Alert } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
-import { colors, Button, Typography, Input, Card, adminService, getApiBaseUrl } from '@mechbazar/shared';
+import { colors, Button, Typography, Input, Card, Logo, adminService, getApiBaseUrl } from '@mechbazar/shared';
 import { setAuth } from '../store';
 
 // Mirrors apps/admin/src/pages/Login.tsx: email/password -> POST /auth/admin/login.
@@ -47,9 +47,7 @@ export const LoginScreen = () => {
     <View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: colors.background }}>
       <Card variant="elevated" style={{ padding: 32 }}>
         <View style={{ alignItems: 'center', marginBottom: 32 }}>
-          <Text style={{ fontSize: 32, fontWeight: '900', color: colors.text, letterSpacing: 1 }}>
-            MECH<Text style={{ color: colors.primary }}>BAZAR</Text>
-          </Text>
+          <Logo width={220} />
           <Typography variant="body" style={{ color: colors.textSecondary, marginTop: 8 }}>
             Sign in to manage your empire
           </Typography>

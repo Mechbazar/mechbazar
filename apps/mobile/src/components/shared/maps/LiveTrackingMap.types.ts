@@ -11,4 +11,10 @@ export interface LiveTrackingMapProps {
   // previous behavior of always centering on the rider/technician).
   markers: TrackingMarker[];
   height?: number;
+  // Google's encoded polyline format (routing.service.ts's getRoute returns
+  // this directly from the Directions API) -- decoded client-side, not
+  // server-side, since both platform implementations already have a maps SDK
+  // capable of it.
+  routePolyline?: string | null;
+  routeColor?: string;
 }

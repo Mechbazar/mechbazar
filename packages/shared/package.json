@@ -13,15 +13,18 @@
     "axios": "^1.18.1",
     "@tanstack/react-query": "^5.101.2",
     "react-native": "0.86.0",
-    "expo-secure-store": "~57.0.1"
+    "expo-secure-store": "~57.0.1",
+    "socket.io-client": "^4.8.1"
   },
   "peerDependencies": {
     "react": "*",
     "react-native": "*",
+    "react-native-svg": "*",
     "lucide-react": "*"
   },
   "peerDependenciesMeta": {
     "react-native": { "optional": true },
+    "react-native-svg": { "optional": true },
     "lucide-react": { "optional": true }
   }
 }

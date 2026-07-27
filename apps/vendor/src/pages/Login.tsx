@@ -5,7 +5,7 @@ import { useDispatch } from 'react-redux';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { loginSuccess } from '../store/slices/authSlice';
 import { Store, Mail, Lock, ArrowRight, Eye, EyeOff } from 'lucide-react';
-import { Button, Card, Alert, Input } from '@mechbazar/shared/web';
+import { Button, Card, Alert, Input, Logo } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
 import { auth } from '../config/firebase';
 import { mapFirebaseAuthError } from '../utils/firebaseErrors';
@@ -66,7 +66,8 @@ export default function Login() {
     <div className="min-h-screen flex flex-col justify-center items-center bg-neutral-950 px-4 text-neutral-100">
       <Card variant="dark" className="w-full max-w-md !rounded-2xl !p-8 shadow-2xl">
         <div className="flex flex-col items-center mb-8">
-          <h1 className="text-3xl font-black text-white tracking-wide mb-4">MECH<span className="text-primary-500">BAZAR</span></h1>
+          {/* Dark tone: the login card sits on bg-neutral-950. */}
+          <Logo tone="dark" width={280} className="mb-5" />
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/15 text-primary-500 border border-primary-500/30 mb-4">
             <Store className="w-8 h-8" />
           </div>

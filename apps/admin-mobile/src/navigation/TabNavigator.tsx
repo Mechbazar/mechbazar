@@ -4,7 +4,7 @@ import { DashboardScreen } from '../screens/DashboardScreen';
 import { OrdersListScreen } from '../screens/OrdersListScreen';
 import { ProductsScreen } from '../screens/ProductsScreen';
 import { MoreScreen } from '../screens/MoreScreen';
-import { colors } from '@mechbazar/shared';
+import { colors, Logo } from '@mechbazar/shared';
 import { Home, Package, ShoppingBag, Menu } from 'lucide-react-native';
 
 const Tab = createBottomTabNavigator();
@@ -26,7 +26,11 @@ export const TabNavigator = () => {
       <Tab.Screen
         name="Dashboard"
         component={DashboardScreen}
-        options={{ tabBarIcon: ({ color, size }) => <Home color={color} size={size} /> }}
+        options={{
+          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+          // Brand the home tab's header, matching the mechanic/rider apps.
+          headerTitle: () => <Logo width={140} />,
+        }}
       />
       <Tab.Screen
         name="Orders"

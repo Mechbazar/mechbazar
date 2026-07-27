@@ -31,6 +31,13 @@ import couponRoutes from './routes/coupon.routes';
 import uploadRoutes from './routes/upload.routes';
 import newsletterRoutes from './routes/newsletter.routes';
 import geocodeRoutes from './routes/geocode.routes';
+import jobRoutes from './routes/job.routes';
+import { initRealtime, shutdownRealtime } from './realtime/gateway';
+import { startSweepers, stopSweepers } from './jobs/sweeper';
+// Imported for its side effect: registers the socket location-batch handler
+// with the gateway. Without this import the mechanic apps can still POST
+// location over HTTP, but the realtime path is silently absent.
+import './services/tracking.service';
 import swaggerUi from 'swagger-ui-express';
 import YAML from 'yamljs';
 import path from 'path';
@@ -160,6 +167,10 @@ app.use('/api/coupons', couponRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/newsletter', newsletterRoutes);
 app.use('/api/geocode', geocodeRoutes);
+// Emergency breakdown dispatch. Separate from /api/services (which keeps the
+// scheduled, slot-based booking flow) because the two have different
+// lifecycles, different realtime requirements and different failure modes.
+app.use('/api/jobs', jobRoutes);
 
 // Serve static files from uploads directory
 // These are public product/category images meant to be displayed by other
@@ -214,11 +225,29 @@ async function startServer() {
   connectDatabase().catch((err) => console.error('[db] Fatal connection error:', err));
   connectRedis().catch((err) => console.error('[redis] Fatal connection error:', err));
 
+  // Realtime and the dispatch sweepers attach to the same HTTP server, after
+  // it is listening, and on the same non-blocking terms as the DB/Redis
+  // connections above: a Socket.IO failure degrades live tracking to the HTTP
+  // polling fallback but must never stop the REST API from serving.
+  initRealtime(server)
+    .then(() => startSweepers())
+    .catch((err) => {
+      console.error('[realtime] Failed to initialise -- continuing without realtime:', err);
+      // Sweepers are independent of the socket layer and are what guarantee no
+      // job gets stranded, so they start either way.
+      startSweepers();
+    });
+
   let shuttingDown = false;
   const shutdown = async (signal: string) => {
     if (shuttingDown) return;
     shuttingDown = true;
     console.log(`\n[shutdown] Received ${signal}, shutting down gracefully...`);
+
+    // Stop accepting new dispatch work before tearing down connections, so an
+    // in-flight sweep can't fire against a closing pool.
+    stopSweepers();
+    await shutdownRealtime().catch((err) => console.error('[shutdown] realtime close failed:', err));
 
     server.close(() => console.log('[shutdown] HTTP server closed'));
     await disconnectDatabase();

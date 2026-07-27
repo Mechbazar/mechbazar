@@ -7,10 +7,15 @@ export type Booking = {
   id: string;
   bookingNumber: string;
   status: string;
+  // Distinguishes an instant emergency job (no scheduledDate/timeSlot,
+  // reached via /api/jobs/*) from a scheduled booking (this generic
+  // BookingsScreen/BookingDetailScreen flow) -- see EmergencyJobScreen for
+  // the emergency-specific detail view this drives navigation to.
+  isEmergency: boolean;
   createdAt: string;
   updatedAt: string;
   completedAt?: string | null;
-  scheduledDate: string;
+  scheduledDate: string | null;
   estimatedCost: number;
   additionalCost: number;
   finalAmount: number;

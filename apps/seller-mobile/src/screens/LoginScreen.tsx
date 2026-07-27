@@ -2,8 +2,7 @@ import React from 'react';
 import { View, Text, Alert } from 'react-native';
 import { useDispatch } from 'react-redux';
 import * as SecureStore from 'expo-secure-store';
-import { colors, Button, Typography, Input, vendorService } from '@mechbazar/shared';
-import { Wrench } from 'lucide-react-native';
+import { colors, Button, Typography, Input, Logo, vendorService } from '@mechbazar/shared';
 import { setAuth } from '../store';
 
 export const LoginScreen = ({ navigation }: { navigation: any }) => {
@@ -38,22 +37,7 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
   return (
     <View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: '#ffffff' }}>
       <View style={{ alignItems: 'center', marginBottom: 48 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <View style={{
-            width: 50, height: 50,
-            borderColor: colors.primary, borderWidth: 4,
-            borderRadius: 12, justifyContent: 'center', alignItems: 'center',
-            transform: [{ rotate: '45deg' }],
-            marginRight: 16
-          }}>
-            <View style={{ transform: [{ rotate: '-45deg' }] }}>
-              <Wrench color={colors.primary} size={28} />
-            </View>
-          </View>
-          <Text style={{ fontSize: 36, fontWeight: '900', color: colors.primary, fontStyle: 'italic', letterSpacing: -1 }}>
-            Mech Bazar
-          </Text>
-        </View>
+        <Logo width={240} />
         <Typography variant="body" style={{ color: colors.navy, fontWeight: '700', marginTop: 8, letterSpacing: 2 }}>
           VENDOR PORTAL
         </Typography>

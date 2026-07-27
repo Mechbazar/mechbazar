@@ -27,6 +27,10 @@ private-uploads/
 
 # Secrets
 firebaseServiceAccount.json
+# Firebase Admin SDK service-account keys carry a full-privilege private key.
+# The console downloads them as "<project>-firebase-adminsdk-<hash>.json", which
+# the line above does not match -- one was sitting untracked in the repo root.
+*-firebase-adminsdk-*.json
 
 # Logs & local artifacts
 *.log

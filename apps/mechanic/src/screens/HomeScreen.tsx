@@ -2,8 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, Switch, Alert } from 'react-native';
 import { useFocusEffect, useIsFocused, useNavigation } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { colors, Typography, Card, Button, Loader, technicianService } from '@mechbazar/shared';
-import { CheckCircle2, Wrench } from 'lucide-react-native';
+import { colors, Typography, Card, Button, Loader, technicianService, jobService } from '@mechbazar/shared';
+import { CheckCircle2, Wrench, AlertTriangle } from 'lucide-react-native';
 import { Booking, isNew, isActiveForTechnician, isCompletedToday } from '../utils/bookings';
 import { pingLocationOnce } from '../services/location';
 
@@ -27,6 +27,17 @@ export const HomeScreen = () => {
     queryFn: technicianService.getMyBookings,
     refetchInterval: isFocused ? 30000 : false,
   });
+
+  // Live emergency job offers. Polled here too (not just inside
+  // OfferInboxScreen) so a mechanic sitting on the Home tab sees the badge
+  // without having to open the inbox first -- the badge is the whole point of
+  // an emergency offer being time-boxed to ~30s.
+  const { data: offers } = useQuery({
+    queryKey: ['mechanic-offers'],
+    queryFn: jobService.getMyOffers,
+    refetchInterval: isFocused && profile?.isOnline ? 5000 : false,
+  });
+  const offerCount = offers?.length || 0;
 
   useFocusEffect(
     React.useCallback(() => {
@@ -96,6 +107,24 @@ export const HomeScreen = () => {
           />
         </Card>
 
+        {offerCount > 0 && (
+          <Card style={styles.offerBanner}>
+            <View style={{ flex: 1 }}>
+              <Typography variant="h3" style={{ color: '#ffffff' }}>
+                🚨 {offerCount} emergency job{offerCount > 1 ? 's' : ''} nearby
+              </Typography>
+              <Typography variant="caption" style={{ color: 'rgba(255,255,255,0.85)' }}>
+                Respond fast -- offers expire in seconds.
+              </Typography>
+            </View>
+            <Button
+              title="View"
+              onPress={() => navigation.navigate('OfferInbox')}
+              style={{ backgroundColor: '#ffffff' }}
+            />
+          </Card>
+        )}
+
         <View style={styles.statsRow}>
           <Card style={styles.statCard}>
             <CheckCircle2 color={colors.navy} size={22} />
@@ -111,13 +140,18 @@ export const HomeScreen = () => {
 
         {activeBooking && (
           <Card style={{ marginTop: 8 }}>
-            <Typography variant="h3">{newJobs[0] && !active[0] ? 'New job to review' : 'Continue booking'}</Typography>
+            <Typography variant="h3">
+              {activeBooking.isEmergency ? '🚨 ' : ''}
+              {newJobs[0] && !active[0] ? 'New job to review' : 'Continue booking'}
+            </Typography>
             <Typography variant="body" style={{ marginTop: 4 }}>
               #{activeBooking.bookingNumber} — {activeBooking.address.city}
             </Typography>
             <Button
               title="Open"
-              onPress={() => navigation.navigate('BookingDetail', { bookingId: activeBooking.id })}
+              onPress={() =>
+                navigation.navigate(activeBooking.isEmergency ? 'EmergencyJob' : 'BookingDetail', { bookingId: activeBooking.id })
+              }
               style={{ marginTop: 12 }}
             />
           </Card>
@@ -133,4 +167,5 @@ const styles = StyleSheet.create({
   availabilityCard: { flexDirection: 'row', alignItems: 'center' },
   statsRow: { flexDirection: 'row', gap: 12, marginTop: 8 },
   statCard: { flex: 1, alignItems: 'center' },
+  offerBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, marginBottom: 8 },
 });

@@ -9,7 +9,7 @@ If you change Nginx config on the VPS, update these files to match (or vice vers
 
 | File | Domain(s) | Proxies to |
 |---|---|---|
-| `mechbazar` | `mechbazar.com`, `www.mechbazar.com` | `/api/` and `/uploads/` -> backend (5005), everything else -> Customer App (3002) |
+| `mechbazar` | `mechbazar.com`, `www.mechbazar.com` | `/api/`, `/uploads/`, and `/socket.io/` -> backend (5005), everything else -> Customer App (3002) |
 | `admin` | `admin.mechbazar.com` | Admin panel (3000) |
 | `vendor` | `vendor.mechbazar.com` | Vendor panel (3001) |
 

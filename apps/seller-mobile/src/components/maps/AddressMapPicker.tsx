@@ -2,18 +2,19 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, MapPressEvent, MarkerDragStartEndEvent } from 'react-native-maps';
 import MapPlaceholder from './MapPlaceholder';
-import { MAPS_ENABLED } from '../../config/maps';
+import { MAPS_ENABLED_NATIVE } from '../../config/maps';
 import { AddressMapPickerProps } from './AddressMapPicker.types';
 
 // Native implementation (iOS/Android) -- Metro resolves the bare
 // './AddressMapPicker' import to this file on those platforms and to
 // AddressMapPicker.web.tsx on web, mirroring apps/mobile's identical split.
+// Gated on MAPS_ENABLED_NATIVE, not the web MAPS_ENABLED -- see config/maps.ts.
 
 const DEFAULT_REGION = { latitude: 20.5937, longitude: 78.9629, latitudeDelta: 8, longitudeDelta: 8 };
 const PIN_DELTA = 0.01;
 
 export default function AddressMapPicker({ latitude, longitude, onChange, height = 200 }: AddressMapPickerProps) {
-  if (!MAPS_ENABLED) {
+  if (!MAPS_ENABLED_NATIVE) {
     return <MapPlaceholder label="Confirm store location on map" height={height} />;
   }
 

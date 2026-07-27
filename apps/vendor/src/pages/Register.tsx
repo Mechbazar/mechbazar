@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { loginSuccess, updateVendorProfile } from '../store/slices/authSlice';
 import type { RootState } from '../store';
 import { Store, User, Building, Landmark, FileText, ArrowRight, CheckCircle, MapPin, Loader2 } from 'lucide-react';
-import { Button, Alert, Input } from '@mechbazar/shared/web';
+import { Button, Alert, Input, Logo } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
 import { reverseGeocode } from '../services/geocode.service';
 import type { GeocodeSuccess } from '../services/geocode.service';
@@ -217,6 +217,8 @@ export default function Register() {
       <div className="max-w-3xl mx-auto">
         
         <div className="text-center mb-10">
+          {/* Dark tone: this page is bg-brand-dark. */}
+          <Logo tone="dark" width={240} className="mx-auto mb-6" />
           <Store className="w-12 h-12 text-brand-secondary mx-auto mb-4" />
           <h2 className="text-3xl font-extrabold text-white">Become a MechBazar Seller</h2>
           <p className="mt-2 text-gray-400">Complete your profile to start selling products to thousands of customers.</p>

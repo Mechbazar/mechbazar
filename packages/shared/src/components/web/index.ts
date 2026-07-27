@@ -6,3 +6,7 @@ export { Dialog } from './Dialog';
 export { Alert } from './Alert';
 export { Tabs } from './Tabs';
 export { Loader } from './Loader';
+export { Logo } from './Logo';
+export type { LogoProps, LogoTone } from './Logo';
+export { logoSvgMarkup } from '../../brand/logoSvg';
+export type { LogoSvgOptions } from '../../brand/logoSvg';

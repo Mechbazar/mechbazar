@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Car, ShoppingBag, Users, Layers, Package, LogOut, Store, Navigation, Warehouse, Image, Tag, CreditCard, Bike, Wrench, ClipboardList, Layers3, Menu, X, FileText, ScrollText } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
+import { Logo } from '@mechbazar/shared/web';
 import { useDispatch } from 'react-redux';
 import { signOut } from 'firebase/auth';
 import { logout } from './store';
@@ -81,7 +82,8 @@ function MainLayout({ children }: { children: React.ReactNode }) {
       >
         <div className="p-6 border-b border-neutral-200 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-neutral-900 tracking-wide">MECH<span className="text-primary-500">BAZAR</span></h1>
+            {/* Light tone: the sidebar is a white surface. */}
+            <Logo width={190} />
             <p className="text-xs text-neutral-500 mt-1 uppercase tracking-wider font-semibold">Admin Portal</p>
           </div>
           <button

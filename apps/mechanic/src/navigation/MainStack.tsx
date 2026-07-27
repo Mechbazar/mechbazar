@@ -6,6 +6,8 @@ import { BookingDetailScreen } from '../screens/BookingDetailScreen';
 import { BookingChatScreen } from '../screens/BookingChatScreen';
 import { ReviewsScreen } from '../screens/ReviewsScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
+import { OfferInboxScreen } from '../screens/OfferInboxScreen';
+import { EmergencyJobScreen } from '../screens/EmergencyJobScreen';
 import { registerForPushNotificationsAsync } from '../services/notifications';
 
 export type MainStackParamList = {
@@ -14,6 +16,8 @@ export type MainStackParamList = {
   BookingChat: { bookingId: string };
   Reviews: undefined;
   Notifications: undefined;
+  OfferInbox: undefined;
+  EmergencyJob: { bookingId: string };
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -61,6 +65,24 @@ export const MainStack = () => {
         component={NotificationsScreen}
         options={{
           title: 'Notifications',
+          headerStyle: { backgroundColor: colors.card },
+          headerTintColor: colors.text,
+        }}
+      />
+      <Stack.Screen
+        name="OfferInbox"
+        component={OfferInboxScreen}
+        options={{
+          title: '🚨 Emergency Job Offers',
+          headerStyle: { backgroundColor: colors.card },
+          headerTintColor: colors.text,
+        }}
+      />
+      <Stack.Screen
+        name="EmergencyJob"
+        component={EmergencyJobScreen}
+        options={{
+          title: 'Emergency Job',
           headerStyle: { backgroundColor: colors.card },
           headerTintColor: colors.text,
         }}

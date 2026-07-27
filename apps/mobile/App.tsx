@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, Platform, Appearance } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -45,6 +46,8 @@ import ServiceChatScreen from './src/screens/services/ServiceChatScreen';
 import ServiceBookingHistoryScreen from './src/screens/services/ServiceBookingHistoryScreen';
 import ServiceInvoiceScreen from './src/screens/services/ServiceInvoiceScreen';
 import ServiceReviewScreen from './src/screens/services/ServiceReviewScreen';
+import EmergencyRequestScreen from './src/screens/services/EmergencyRequestScreen';
+import EmergencyTrackingScreen from './src/screens/services/EmergencyTrackingScreen';
 import EditProfileScreen from './src/screens/EditProfileScreen';
 import WishlistScreen from './src/screens/WishlistScreen';
 import AddressManagementScreen from './src/screens/AddressManagementScreen';
@@ -206,6 +209,17 @@ function RootNavigator() {
     } else {
       AsyncStorage.removeItem(USER_STORAGE_KEY).catch(e => console.error('Failed to clear session:', e));
     }
+    // packages/shared's axios client (jobService, etc. -- used by the Services/
+    // Emergency screens) reads its bearer token from SecureStore rather than
+    // this app's Redux/AsyncStorage session, same as apps/mechanic, apps/rider,
+    // apps/seller-mobile and apps/admin-mobile already do at login. Without this,
+    // every request made through that shared client goes out with no
+    // Authorization header at all and the backend 401s with "No token provided".
+    if (token) {
+      SecureStore.setItemAsync('token', token).catch(e => console.error('Failed to sync token to SecureStore:', e));
+    } else {
+      SecureStore.deleteItemAsync('token').catch(e => console.error('Failed to clear token from SecureStore:', e));
+    }
   }, [token, user]);
 
   // Sessions are a flat 7-day JWT with no rotation -- silently slide the
@@ -352,6 +366,8 @@ function RootNavigator() {
             <Stack.Screen name="ServiceBookingHistory" component={ServiceBookingHistoryScreen} />
             <Stack.Screen name="ServiceInvoice" component={ServiceInvoiceScreen} />
             <Stack.Screen name="ServiceReview" component={ServiceReviewScreen} />
+            <Stack.Screen name="EmergencyRequest" component={EmergencyRequestScreen} />
+            <Stack.Screen name="EmergencyTracking" component={EmergencyTrackingScreen} />
           </>
         ) : (
           <>

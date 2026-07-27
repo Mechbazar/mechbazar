@@ -1,19 +1,37 @@
 // Dynamic Expo config (was app.json) so the native Google Maps SDK keys and
 // build-profile-dependent settings can be injected from the environment at
 // config-eval time -- app.json couldn't reference an env var.
+//
+// Deliberately EXPO_PUBLIC_GOOGLE_MAPS_API_KEY_NATIVE, NOT the plain
+// EXPO_PUBLIC_GOOGLE_MAPS_API_KEY that the web build (docker-compose.yml) uses
+// -- that one is HTTP-referrer restricted, which an on-device app can never
+// satisfy (it sends no HTTP referrer header), so Google would refuse it here
+// regardless of validity. This needs a key restricted by Android package name
+// + SHA-1 / iOS bundle ID instead. See src/config/maps.ts for the full
+// rationale; that file gates the JS-side map components on the same var.
+//
 // Shape-checked for the same reason as src/config/maps.ts: a credential from
 // another Google product (e.g. an AI Studio "AQ." key) baked into the native
 // Maps SDK config yields a blank grey map on device with no error surfaced.
 // Leaving it undefined instead makes the failure explicit at build time.
-const RAW_GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-const GOOGLE_MAPS_API_KEY = /^AIza[0-9A-Za-z_-]{35}$/.test(RAW_GOOGLE_MAPS_API_KEY)
-  ? RAW_GOOGLE_MAPS_API_KEY
+const RAW_GOOGLE_MAPS_API_KEY_NATIVE = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY_NATIVE || '';
+const GOOGLE_MAPS_API_KEY_NATIVE = /^AIza[0-9A-Za-z_-]{35}$/.test(RAW_GOOGLE_MAPS_API_KEY_NATIVE)
+  ? RAW_GOOGLE_MAPS_API_KEY_NATIVE
   : '';
 
-if (RAW_GOOGLE_MAPS_API_KEY && !GOOGLE_MAPS_API_KEY) {
+if (RAW_GOOGLE_MAPS_API_KEY_NATIVE && !GOOGLE_MAPS_API_KEY_NATIVE) {
   console.warn(
-    '[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY is not a Google Maps Platform key ("AIza..."); ' +
+    '[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY_NATIVE is not a Google Maps Platform key ("AIza..."); ' +
       'native Maps SDK config omitted.'
+  );
+}
+if (!RAW_GOOGLE_MAPS_API_KEY_NATIVE) {
+  console.warn(
+    '[app.config] EXPO_PUBLIC_GOOGLE_MAPS_API_KEY_NATIVE is unset -- this build will render ' +
+      '"Map view coming soon" everywhere a map would go. It is NOT read from apps/mobile/.env for ' +
+      'EAS builds (EAS Build packages the repo respecting .gitignore, and .env is gitignored) -- set it ' +
+      'via `eas env:create --scope project --name EXPO_PUBLIC_GOOGLE_MAPS_API_KEY_NATIVE --value "<key>"` ' +
+      'for each environment (development/preview/production) instead.'
   );
 }
 
@@ -24,6 +42,14 @@ if (RAW_GOOGLE_MAPS_API_KEY && !GOOGLE_MAPS_API_KEY) {
 // can't downgrade API traffic carrying Bearer tokens.
 const BUILD_PROFILE = process.env.EAS_BUILD_PROFILE || 'development';
 const ALLOW_CLEARTEXT = BUILD_PROFILE === 'development';
+
+// Android ABIs to compile native code for. Real devices are arm-only; the two
+// x86 variants are emulator-only. Comma-separated override so an emulator build
+// can ask for x86_64 back without editing this file.
+const BUILD_ARCHS = (process.env.EXPO_ANDROID_BUILD_ARCHS || 'arm64-v8a,armeabi-v7a')
+  .split(',')
+  .map((abi) => abi.trim())
+  .filter(Boolean);
 
 // @react-native-firebase/app needs a GoogleService-Info.plist to initialise on
 // iOS -- without it Firebase never comes up and Phone Auth (the only way to log
@@ -80,7 +106,7 @@ module.exports = {
       // write an incremented value back into a .js config. Do not hard-code
       // `buildNumber` here; it would be ignored and drift from the real value.
       config: {
-        googleMapsApiKey: GOOGLE_MAPS_API_KEY || undefined,
+        googleMapsApiKey: GOOGLE_MAPS_API_KEY_NATIVE || undefined,
       },
       infoPlist: {
         // Export compliance. The app uses only standard HTTPS/TLS, which is
@@ -106,7 +132,10 @@ module.exports = {
 
     android: {
       adaptiveIcon: {
-        backgroundColor: '#E6F4FE',
+        // Brand red (tokens.ts "Brand palette: Primary #E53935"). Each MechBazar
+        // app uses the same hexagon+wrench mark in white over its own brand
+        // colour so the five launcher icons stay distinguishable at a glance.
+        backgroundColor: '#E53935',
         foregroundImage: './assets/android-icon-foreground.png',
         backgroundImage: './assets/android-icon-background.png',
         monochromeImage: './assets/android-icon-monochrome.png',
@@ -117,7 +146,7 @@ module.exports = {
       googleServicesFile: './google-services.json',
       config: {
         googleMaps: {
-          apiKey: GOOGLE_MAPS_API_KEY || undefined,
+          apiKey: GOOGLE_MAPS_API_KEY_NATIVE || undefined,
         },
       },
       // Explicit allowlist. Play's Data Safety declaration must match the
@@ -176,11 +205,16 @@ module.exports = {
         'expo-splash-screen',
         {
           image: './assets/splash-icon.png',
-          imageWidth: 200,
+          // The splash art is now the MechBazar wordmark (~9:1), not the old
+          // square hexagon mark, so this is a width the wordmark reads at
+          // rather than the square's old 200.
+          imageWidth: 240,
           resizeMode: 'contain',
           backgroundColor: '#FFFFFF',
           dark: {
-            image: './assets/splash-icon.png',
+            // Distinct asset: the light wordmark is ink-on-transparent and
+            // would be all but invisible on this background.
+            image: './assets/splash-icon-dark.png',
             backgroundColor: '#111111',
           },
         },
@@ -236,6 +270,19 @@ module.exports = {
             targetSdkVersion: 36,
             // Refuse plaintext HTTP in preview/production builds.
             usesCleartextTraffic: ALLOW_CLEARTEXT,
+            // Every ABI listed here is a full from-source C++ compile of
+            // react-native-reanimated + react-native-worklets. The Expo default
+            // is all four, which quadruples the peak number of concurrent
+            // clang++ processes and is what pushed this build over the machine's
+            // memory limit ("LLVM ERROR: out of memory" out of ninja) -- see
+            // plugins/withAndroidBuildConcurrency.js for the full write-up.
+            //
+            // x86/x86_64 exist only for Android emulators; no physical device
+            // ships them, and Play never serves them to one. Dropping them
+            // halves the native build with zero effect on what users install.
+            // Set EXPO_ANDROID_BUILD_ARCHS to override (e.g. add x86_64 back
+            // when you need an APK that runs in an emulator).
+            buildArchs: BUILD_ARCHS,
           },
           ios: {
             // SDK 57's minimum supported iOS deployment target.
@@ -243,6 +290,11 @@ module.exports = {
           },
         },
       ],
+
+      // Must come after expo-build-properties: both write gradle.properties,
+      // and this one rewrites the org.gradle.parallel value the Expo template
+      // puts there.
+      './plugins/withAndroidBuildConcurrency',
     ],
 
     extra: {

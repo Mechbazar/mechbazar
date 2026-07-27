@@ -71,8 +71,93 @@ export const env = {
   GOOGLE_MAPS_SERVER_API_KEY: process.env.GOOGLE_MAPS_SERVER_API_KEY || '',
   GOOGLE_MAPS_TIMEOUT_MS: Number(process.env.GOOGLE_MAPS_TIMEOUT_MS) || 5000,
   VERSION: process.env.npm_package_version || '1.0.0',
+
+  // ---- Emergency dispatch ----
+  // Comma-separated radii, in km, one per fan-out wave. Wave N offers the job
+  // to every eligible mechanic inside radius N who was not already offered it.
+  DISPATCH_WAVE_RADII_KM: (process.env.DISPATCH_WAVE_RADII_KM || '5,10,20')
+    .split(',')
+    .map((v) => Number(v.trim()))
+    .filter((v) => Number.isFinite(v) && v > 0),
+  // How long a mechanic has to answer one offer before it expires and the next
+  // wave goes out. Short on purpose: this is a breakdown, and an unanswered
+  // phone must cost the customer seconds, not minutes.
+  DISPATCH_OFFER_TTL_SECONDS: Number(process.env.DISPATCH_OFFER_TTL_SECONDS) || 30,
+  // Cap on how many mechanics a single wave may ring at once. Bounds both push
+  // spend and the size of the accept race.
+  DISPATCH_MAX_PER_WAVE: Number(process.env.DISPATCH_MAX_PER_WAVE) || 8,
+  // A mechanic whose last GPS ping is older than this is not dispatchable,
+  // regardless of their isOnline flag -- see ServiceTechnician.lastLocationAt.
+  DISPATCH_STALE_LOCATION_SECONDS: Number(process.env.DISPATCH_STALE_LOCATION_SECONDS) || 300,
+  // Concurrent emergency jobs one mechanic may hold. 1 by default: a breakdown
+  // is not a queueable delivery.
+  DISPATCH_MAX_CONCURRENT_JOBS: Number(process.env.DISPATCH_MAX_CONCURRENT_JOBS) || 1,
+
+  // ---- Job OTP ----
+  JOB_OTP_TTL_SECONDS: Number(process.env.JOB_OTP_TTL_SECONDS) || 900,
+  JOB_OTP_MAX_ATTEMPTS: Number(process.env.JOB_OTP_MAX_ATTEMPTS) || 5,
+  // 32-byte key material for encrypting OTP codes at rest. Optional: when
+  // unset, utils/crypto.ts derives a key from JWT_SECRET via HKDF so the
+  // feature works on an existing deployment without new secrets being
+  // provisioned first. Setting it explicitly is preferred, because then
+  // rotating JWT_SECRET does not invalidate in-flight OTPs.
+  JOB_OTP_SECRET: process.env.JOB_OTP_SECRET || '',
+
+  // ---- Live tracking ----
+  // Target ping cadence pushed down to the mechanic app, which uses it as its
+  // location-watch interval. Server-driven so cadence can be tuned per
+  // environment without shipping a new build.
+  TRACKING_PING_INTERVAL_SECONDS: Number(process.env.TRACKING_PING_INTERVAL_SECONDS) || 4,
+  // Pings closer together than this (after an offline flush, say) are stored
+  // but do not trigger a route/ETA recalculation.
+  TRACKING_ROUTE_REFRESH_SECONDS: Number(process.env.TRACKING_ROUTE_REFRESH_SECONDS) || 25,
+  // Movement below this is GPS jitter, not travel; it is excluded from the
+  // distance-travelled rollup so a parked phone doesn't accrue kilometres.
+  TRACKING_MIN_MOVE_METERS: Number(process.env.TRACKING_MIN_MOVE_METERS) || 15,
+  // Ping breadcrumbs are pruned this long after a job reaches a terminal
+  // state. The derived rollups (distance, duration) are permanent.
+  TRACKING_PING_RETENTION_DAYS: Number(process.env.TRACKING_PING_RETENTION_DAYS) || 30,
+
+  // ---- Masked calling (Exotel) ----
+  // All four must be present for masked calling to be active. When they are
+  // not, call.service.ts reports the feature as unavailable rather than
+  // falling back to exposing real numbers -- see its module comment.
+  EXOTEL_SID: process.env.EXOTEL_SID || '',
+  EXOTEL_API_KEY: process.env.EXOTEL_API_KEY || '',
+  EXOTEL_API_TOKEN: process.env.EXOTEL_API_TOKEN || '',
+  EXOTEL_CALLER_ID: process.env.EXOTEL_CALLER_ID || '',
+  EXOTEL_SUBDOMAIN: process.env.EXOTEL_SUBDOMAIN || 'api.exotel.com',
 };
 
 if (!env.GOOGLE_MAPS_SERVER_API_KEY) {
   console.warn('[WARN] GOOGLE_MAPS_SERVER_API_KEY not set -- /api/geocode/* will return 503 (degraded); rest of the API is unaffected.');
+  console.warn('[WARN] Live-tracking ETA/route will fall back to straight-line distance and an average-speed estimate.');
+}
+
+// A zero-wave configuration would silently disable emergency dispatch: jobs
+// would be created SEARCHING and never offered to anyone. Fail fast instead.
+if (env.DISPATCH_WAVE_RADII_KM.length === 0) {
+  fail('DISPATCH_WAVE_RADII_KM parsed to an empty list. Set a comma-separated list of positive radii in km, e.g. "5,10,20".');
+}
+
+if (!env.JOB_OTP_SECRET && env.NODE_ENV === 'production') {
+  console.error(
+    '[SECURITY] JOB_OTP_SECRET is not set; job OTP codes are being encrypted with a key derived from ' +
+      'JWT_SECRET. This works, but rotating JWT_SECRET will make every in-flight OTP undecryptable. ' +
+      'Set JOB_OTP_SECRET to an independent random value (`openssl rand -base64 32`).'
+  );
+}
+
+export const MASKED_CALLING_ENABLED = !!(
+  env.EXOTEL_SID &&
+  env.EXOTEL_API_KEY &&
+  env.EXOTEL_API_TOKEN &&
+  env.EXOTEL_CALLER_ID
+);
+
+if (!MASKED_CALLING_ENABLED) {
+  console.warn(
+    '[WARN] Exotel credentials incomplete -- masked calling is disabled. ' +
+      'POST /api/jobs/:id/call will return 503. Phone numbers are never exposed as a fallback.'
+  );
 }

@@ -7,6 +7,7 @@ import { auth } from '../config/firebase';
 import {
   LayoutDashboard, Package, ShoppingCart, Warehouse, Wallet, Settings, LogOut, Store, X, Tag, Bell, RotateCcw
 } from 'lucide-react';
+import { Logo } from '@mechbazar/shared/web';
 
 const navItems = [
   { to: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
@@ -37,7 +38,8 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
     >
       <div className="p-5 border-b border-neutral-800">
         <div className="flex items-center justify-between mb-3">
-          <h1 className="text-lg font-black text-white tracking-wide">MECH<span className="text-primary-500">BAZAR</span></h1>
+          {/* Dark tone: the sidebar is bg-neutral-950. */}
+          <Logo tone="dark" width={170} />
           <button
             onClick={onClose}
             className="lg:hidden text-neutral-400 hover:text-white"

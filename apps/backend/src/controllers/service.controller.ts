@@ -626,6 +626,20 @@ export const updateMyBookingStatus = async (req: AuthRequest, res: Response) => 
     const booking = await prisma.serviceBooking.findFirst({ where: { id, technicianId: technician.id } });
     if (!booking) return res.status(404).json({ error: 'Booking not found or not assigned to you' });
 
+    // Emergency jobs share this table and enum with scheduled bookings, but
+    // MUST go through /api/jobs/:id/* exclusively from here on: those routes
+    // are the only place the start-OTP gate (customer verifies before
+    // WORK_STARTED) and the completion-OTP gate (encrypted, attempt-limited
+    // JobOtp, not the legacy plaintext completionOtp field checked below) are
+    // enforced. Without this guard a mechanic could reach WORK_STARTED/
+    // COMPLETED on an emergency job through this endpoint with no customer
+    // verification at all -- this generic flow never asks for a start code.
+    if (booking.isEmergency) {
+      return res.status(400).json({
+        error: 'This is an emergency job -- use the emergency job actions (en-route, arrived, start, complete), not this endpoint.',
+      });
+    }
+
     const allowedNext = TECHNICIAN_STATUS_FLOW[booking.status];
     if (!allowedNext || !allowedNext.includes(status)) {
       return res.status(400).json({ error: `Cannot move from ${booking.status} to ${status}` });
@@ -803,6 +817,12 @@ export const generateBookingCompletionOtp = async (req: AuthRequest, res: Respon
 
     const booking = await prisma.serviceBooking.findFirst({ where: { id, technicianId: technician.id } });
     if (!booking) return res.status(404).json({ error: 'Booking not found or not assigned to you' });
+    // Emergency jobs use the encrypted, attempt-limited JobOtp (see
+    // jobOtp.service.ts) via POST /api/jobs/:id/request-completion -- never
+    // this legacy plaintext completionOtp column.
+    if (booking.isEmergency) {
+      return res.status(400).json({ error: 'This is an emergency job -- use the emergency job completion action, not this endpoint.' });
+    }
     if (booking.status !== 'WORK_STARTED') {
       return res.status(400).json({ error: 'OTP can only be generated once work has started' });
     }
@@ -1330,6 +1350,13 @@ export const assignTechnician = async (req: AuthRequest, res: Response) => {
     if (booking.status === 'COMPLETED' || booking.status === 'CANCELLED') {
       return res.status(400).json({ error: `Cannot assign a technician to a ${booking.status.toLowerCase()} booking` });
     }
+    // Emergency jobs must go through POST /api/jobs/admin/:id/assign instead:
+    // it also closes any still-open dispatch offers on the job (this endpoint
+    // does not), so mechanics who were mid-offer aren't left holding a live
+    // offer card for a job someone else was just handed.
+    if (booking.isEmergency) {
+      return res.status(400).json({ error: 'This is an emergency job -- use POST /api/jobs/admin/:id/assign instead.' });
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
       const b = await tx.serviceBooking.update({
@@ -1384,6 +1411,14 @@ export const updateAdminBookingStatus = async (req: AuthRequest, res: Response) 
     // credited (wallet + totalJobs) a second time for the same job.
     if (existing.status === 'COMPLETED' || existing.status === 'CANCELLED') {
       return res.status(400).json({ error: `Booking is already ${existing.status}; this is a terminal state and cannot be changed.` });
+    }
+    // Emergency jobs must go through POST /api/jobs/admin/:id/force-status:
+    // it requires a stated reason, writes an audit log entry, and never marks
+    // verifiedByCustomer/*OtpVerifiedAt on an override -- this endpoint has
+    // none of those safeguards and would let a COMPLETED job on an emergency
+    // booking look identical to one the customer actually verified.
+    if (existing.isEmergency) {
+      return res.status(400).json({ error: 'This is an emergency job -- use POST /api/jobs/admin/:id/force-status instead.' });
     }
 
     const updated = await prisma.$transaction(async (tx) => {

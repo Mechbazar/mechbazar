@@ -6,6 +6,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import { fetchMyWishlist } from '../../../services/wishlist.service';
 import { useBreakpoint } from '../../../hooks/useBreakpoint';
+import { Logo } from '@mechbazar/shared';
 import { colors, spacing, radius } from '../../../theme/tokens';
 import Container from '../shared/Container';
 import SearchBar from './SearchBar';
@@ -65,7 +66,8 @@ export default function DesktopHeader() {
           accessibilityRole="link"
           accessibilityLabel="MechBazar home"
         >
-          <Text style={styles.logoText}>MechBazar</Text>
+          {/* Dark tone: the header bar is the dark brand surface. */}
+          <Logo tone="dark" width={160} />
         </Pressable>
 
         <MegaMenu />
@@ -146,10 +148,9 @@ const styles = StyleSheet.create({
     height: 64,
     gap: spacing.md,
   },
+  // Logo width is set on <Logo/> itself, sized to stay in proportion with the
+  // shorter 64px row.
   logoWrap: { flexShrink: 0 },
-  // fontSize reduced from 24 to keep proportion with the shorter 64px row
-  // (same weight/color/wordmark -- brand identity unchanged, just smaller).
-  logoText: { color: colors.white, fontSize: 20, fontWeight: '800' },
   servicesLink: { paddingVertical: 6, flexShrink: 0 },
   servicesLinkHovered: { opacity: 0.75 },
   servicesLinkText: { color: colors.white, fontSize: 13, fontWeight: '600' },

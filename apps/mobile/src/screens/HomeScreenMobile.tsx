@@ -31,6 +31,7 @@ import { setVehicleType } from '../store/appSlice';
 import { fetchCategories, getTrendingProducts, fetchBanners, fetchOffers, HomeOffer } from '../services/product.service';
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../services/wishlist.service';
 import { VehicleType, Category, Product } from '../types/product';
+import { Logo } from '@mechbazar/shared';
 import { locationService } from '../services/location.service';
 import { reverseGeocode } from '../services/geocode.service';
 
@@ -386,12 +387,9 @@ export default function HomeScreen({ navigation }: any) {
     <View style={styles.header}>
       {/* Top sticky logo / profiles bar */}
       <View style={styles.headerTop}>
-        <Image 
-          source={require('../../assets/mechbazar_logo.png')} 
-          style={styles.headerLogo} 
-          resizeMode="contain" 
-        />
-        
+        {/* Dark tone: this header sits on colors.secondary (#1C1C1E). */}
+        <Logo tone="dark" width={150} />
+
         {/* Right side icons row */}
         <View style={styles.headerRight}>
           <TouchableOpacity 
@@ -1014,10 +1012,6 @@ const styles = StyleSheet.create({
     alignItems: 'center', 
     marginBottom: 12, 
     height: 38 
-  },
-  headerLogo: { 
-    width: 110, 
-    height: 34 
   },
   headerRight: { 
     flexDirection: 'row', 

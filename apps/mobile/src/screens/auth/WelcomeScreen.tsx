@@ -21,6 +21,7 @@ import { useDispatch } from 'react-redux';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Rect, Defs, LinearGradient, Stop, Circle, Path, G } from 'react-native-svg';
+import { Logo } from '@mechbazar/shared';
 import { loginSuccess } from '../../store/authSlice';
 import { API_BASE_URL } from '../../services/api';
 import { sendPhoneOtp, confirmPhoneOtp } from '../../services/phoneAuth';
@@ -625,13 +626,9 @@ export default function WelcomeScreen() {
         >
           <View style={styles.mainContent}>
             
-            {/* LOGO */}
+            {/* LOGO -- dark tone: this screen's background is #0E1116. */}
             <Animated.View style={[styles.logoSection, { opacity: logoFadeAnim }]}>
-              <Image 
-                source={require('../../../assets/mechbazar_logo.png')} 
-                style={styles.logoImage} 
-                resizeMode="contain" 
-              />
+              <Logo tone="dark" width={250} />
             </Animated.View>
 
             {/* HERO TEXTS */}
@@ -832,10 +829,6 @@ const styles = StyleSheet.create({
   logoSection: {
     alignItems: 'center',
     marginBottom: 10,
-  },
-  logoImage: {
-    width: 170,
-    height: 52,
   },
   heroSection: {
     alignItems: 'center',
