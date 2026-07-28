@@ -24,11 +24,16 @@ import { colors, spacing, radius, shadows } from '../theme/tokens';
 // than assuming a >=1024 viewport, since a user can resize/rotate after
 // landing here. Every destination below is a real existing screen/route --
 // where the requested item has no dedicated screen or backend endpoint
-// (Wallet management, Payment Methods, Notification Settings, Change
-// Password, Login Devices, Privacy Settings), it's shown as a disabled
+// (Wallet management, Payment Methods, Notification Settings, Login Devices,
+// Privacy Settings), it's shown as a disabled
 // "Coming soon" row instead of a fake handler, matching this codebase's
 // existing policy against fabricated UI (see AccountScreen for the pattern
 // this deliberately avoids repeating).
+//
+// Change Password was listed among those dead rows, which was wrong on both
+// counts: PATCH /auth/change-password exists, and the Profile tab
+// (AccountScreen) already has a working modal wired to it. It now routes
+// there, the same way Order Tracking points at My Orders.
 type Row = {
   label: string;
   caption?: string;
@@ -335,7 +340,13 @@ export default function AccountDashboardScreen() {
 
               {/* SECURITY */}
               <SectionCard title="Security" sectionKey="security" sectionRefs={sectionRefs}>
-                <RowItem row={{ label: 'Change Password', caption: 'Coming soon', disabled: true }} />
+                <RowItem
+                  row={{
+                    label: 'Change Password',
+                    caption: 'Opens Profile — change your password there',
+                    onPress: goTo('MainTabs', { screen: 'Account' }),
+                  }}
+                />
                 <RowItem row={{ label: 'Login Devices', caption: 'Coming soon', disabled: true }} />
                 <RowItem row={{ label: 'Privacy Settings', caption: 'Coming soon', disabled: true }} />
               </SectionCard>
