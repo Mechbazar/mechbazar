@@ -12,9 +12,6 @@ build/
 .env.*
 !.env.example
 
-# Vercel local project links (CLI metadata, per-machine)
-.vercel/
-
 # Native build outputs & signing keys
 android/
 ios/

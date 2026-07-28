@@ -232,8 +232,8 @@ looks like an app bug.
 - ☐ **Blaze (pay-as-you-go) billing enabled.** Phone Auth SMS beyond the free
   daily quota requires it; on Spark, `sendOtp` starts failing with
   `auth/quota-exceeded` or `auth/billing-not-enabled` under real traffic
-- ☐ **Authorised domains** include `[WEBSITE_URL]` and any Vercel preview domain
-  used by the web build (web reCAPTCHA flow only)
+- ☐ **Authorised domains** include `mechbazar.com` (and `www.mechbazar.com`),
+  the Hostinger VPS host that serves the web build (web reCAPTCHA flow only)
 - ☐ **SMS region policy** configured to allow **India** and to *deny* regions you
   do not serve — this is the primary defence against SMS-pumping fraud, where
   an attacker drives OTPs to premium international numbers and bills you for it

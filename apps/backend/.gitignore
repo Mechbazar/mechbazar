@@ -7,6 +7,5 @@ node_modules
 # Real service-account credentials must never be committed
 src/config/firebaseServiceAccount.json
 
-.vercel
 .env*
 !.env.example

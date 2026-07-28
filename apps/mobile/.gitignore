@@ -40,7 +40,6 @@ yarn-error.*
 /ios
 /android
 
-.vercel
 .env*
 # ...but the example file carries no secrets and documents the vars this app
 # needs (notably the Maps key format). The root .gitignore already allows it;
