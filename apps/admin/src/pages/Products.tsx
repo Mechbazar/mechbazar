@@ -11,10 +11,11 @@ import {
   Edit,
   Copy,
   Trash2,
-  MoreVertical
+  MoreVertical,
+  ImagePlus
 } from 'lucide-react';
 import { Button, Card, Badge, Dialog, Input } from '@mechbazar/shared/web';
-import { API_URL } from '../config/api';
+import { API_URL, SERVER_ORIGIN } from '../config/api';
 
 export default function Products() {
   const { token } = useSelector((state: RootState) => state.auth);
@@ -72,9 +73,15 @@ export default function Products() {
     b2bPrice: '',
     stock: '',
     lowStockThreshold: '10',
-    status: 'APPROVED'
+    status: 'APPROVED',
+    // The form previously had no image field at all, so every product created
+    // or edited here was saved with an empty images[] -- the backend accepts
+    // `images` on both create and update, and nothing was ever sending it.
+    images: [] as string[],
   };
   const [formData, setFormData] = useState(initialFormState);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState('');
 
   const handleOpenForm = (product: any = null) => {
     if (product) {
@@ -89,7 +96,8 @@ export default function Products() {
         b2bPrice: product.b2bPrice?.toString() || '',
         stock: product.stock?.toString() || '',
         lowStockThreshold: product.lowStockThreshold?.toString() || '10',
-        status: product.status || 'APPROVED'
+        status: product.status || 'APPROVED',
+        images: product.images || [],
       });
     } else {
       setEditMode(null);
@@ -107,6 +115,37 @@ export default function Products() {
       vehicleType,
       category: stillValid ? formData.category : (categoriesForVehicleType(vehicleType)[0]?.name || ''),
     });
+  };
+
+  // Upload returns an absolute URL when Firebase Storage is configured and a
+  // bare "/uploads/<file>" path when it falls back to local disk; only the
+  // latter needs the API origin prepended to be loadable here.
+  const resolveImageSrc = (url: string) => (/^https?:\/\//i.test(url) ? url : `${SERVER_ORIGIN}${url}`);
+
+  // POST /upload stores the file (Firebase Storage when a bucket is
+  // configured, otherwise the backend's own uploads/ dir) and returns the URL
+  // to persist on the product. Absolute URLs come back as-is; the local-disk
+  // fallback returns "/uploads/<file>", which resolves against the API origin.
+  const handleImageUpload = async (file: File) => {
+    setImageError('');
+    setUploadingImage(true);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const res = await axios.post(`${API_URL}/upload`, body, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.data?.url) throw new Error('Upload returned no URL');
+      setFormData((prev) => ({ ...prev, images: [...prev.images, res.data.url] }));
+    } catch (err: any) {
+      setImageError(err?.response?.data?.error || 'Image upload failed. Please try again.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = (url: string) => {
+    setFormData((prev) => ({ ...prev, images: prev.images.filter((i) => i !== url) }));
   };
 
   const handleSave = async () => {
@@ -166,7 +205,10 @@ export default function Products() {
         oem: product.oemNumber || '',
         price: product.price?.toString() || '0',
         b2bPrice: product.b2bPrice?.toString() || '0',
-        stock: product.stock?.toString() || '0'
+        stock: product.stock?.toString() || '0',
+        // Carry the images over too -- a duplicate that silently loses them
+        // would land back in the imageless state this form now exists to fix.
+        images: product.images || [],
       };
       await axios.post(`${API_URL}/products`, dupeData, {
         headers: { Authorization: `Bearer ${token}` }
@@ -481,6 +523,62 @@ export default function Products() {
                     <option value="INACTIVE">Draft (Inactive)</option>
                     <option value="PENDING">Pending Review</option>
                   </select>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-neutral-400 mb-2">Product Images</label>
+
+                  {formData.images.length > 0 && (
+                    <div className="flex flex-wrap gap-3 mb-3">
+                      {formData.images.map((url) => (
+                        <div key={url} className="relative">
+                          <img
+                            src={resolveImageSrc(url)}
+                            alt="Product"
+                            className="h-20 w-20 rounded-xl object-cover border border-neutral-800"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(url)}
+                            aria-label="Remove image"
+                            className="absolute -right-2 -top-2 rounded-full bg-danger-500 p-1 text-white hover:bg-danger-600"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <input
+                    id="product-image-input"
+                    type="file"
+                    accept="image/*"
+                    disabled={uploadingImage}
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageUpload(file);
+                      // Reset so picking the same file twice still fires onChange.
+                      e.target.value = '';
+                    }}
+                  />
+                  <label
+                    htmlFor="product-image-input"
+                    className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border border-neutral-800 px-4 py-2 text-sm font-medium text-neutral-300 hover:border-primary-500 hover:text-primary-500 ${
+                      uploadingImage ? 'pointer-events-none opacity-60' : ''
+                    }`}
+                  >
+                    <ImagePlus className="h-4 w-4" />
+                    {uploadingImage ? 'Uploading…' : formData.images.length ? 'Add another image' : 'Upload image'}
+                  </label>
+
+                  {imageError && <p className="mt-2 text-sm text-danger-400">{imageError}</p>}
+                  {!formData.images.length && !imageError && (
+                    <p className="mt-2 text-sm text-neutral-500">
+                      Products saved without an image show a placeholder in the customer app.
+                    </p>
+                  )}
                 </div>
               </div>
       </Dialog>
