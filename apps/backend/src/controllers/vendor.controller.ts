@@ -8,6 +8,7 @@ import { notifyUser } from '../utils/notify';
 import { sanitizeUser, sanitizeUsers, sanitizeOrders, stripDeliveryOtp, stripDeliveryOtps } from '../utils/sanitizeUser';
 import { recordAuditLog } from '../utils/auditLog';
 import { verifyFirebaseIdTokenAndResolveUser, FirebaseAuthError, FirebaseAuthErrorCode } from '../utils/firebaseAuth';
+import { reconcilePasswordAfterFirebaseReset } from '../utils/firebasePassword';
 import firebaseAdmin from '../config/firebase';
 import prisma from '../config/prisma';
 
@@ -106,13 +107,13 @@ export const loginVendor = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    if (!user.password) {
-      res.status(401).json({ error: 'Invalid credentials' });
-      return;
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
+    // This is the path apps/seller-mobile signs in with. A vendor who resets
+    // their password through the emailed Firebase link updates Firebase only,
+    // so without reconciling here the reset would fix vendor web and leave the
+    // seller app rejecting the new password with no explanation.
+    // See reconcilePasswordAfterFirebaseReset in auth.controller.ts.
+    const isMatch = user.password ? await bcrypt.compare(password, user.password) : false;
+    if (!isMatch && !(await reconcilePasswordAfterFirebaseReset(user, password))) {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }

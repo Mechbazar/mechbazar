@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { sendPasswordResetEmail } from 'firebase/auth';
+import axios from 'axios';
 import { Store } from 'lucide-react';
 import { Button, Card, Alert, Input, Logo } from '@mechbazar/shared/web';
-import { auth } from '../config/firebase';
-import { mapFirebaseAuthError } from '../utils/firebaseErrors';
+import { API_URL } from '../config/api';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -12,22 +11,27 @@ export default function ForgotPassword() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Was a direct client-side sendPasswordResetEmail. Firebase refuses to send
+  // for an address it has never seen, and this page swallowed that as success
+  // -- so a vendor registered through POST /auth/register, which creates no
+  // Firebase account, was shown "a reset link has been sent" for a mail that
+  // was never going to arrive.
+  //
+  // The backend endpoint creates the missing Firebase account before asking
+  // Firebase to send (ensureFirebaseAccount), answers identically for unknown
+  // addresses so enumeration protection is enforced server-side rather than by
+  // each page remembering to catch auth/user-not-found, and is the same call
+  // the seller and admin phone apps make. Firebase still does the delivery.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      await sendPasswordResetEmail(auth, email);
+      await axios.post(`${API_URL}/auth/forgot-password`, { email });
       setSubmitted(true);
     } catch (err: any) {
-      // auth/user-not-found is treated as success below -- surfacing it
-      // would let a caller enumerate which emails have accounts.
-      if (err?.code === 'auth/user-not-found') {
-        setSubmitted(true);
-      } else {
-        setError(mapFirebaseAuthError(err?.code));
-      }
+      setError(err?.response?.data?.error || 'Could not send the reset email. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -64,7 +68,7 @@ export default function ForgotPassword() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="vendor@example.com"
+              autoComplete="email"
               disabled={loading}
             />
 

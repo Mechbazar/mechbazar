@@ -5,6 +5,13 @@ import { generateToken } from '../utils/jwt';
 import { AuthRequest } from '../middlewares/auth';
 import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
 import { verifyFirebaseIdTokenAndResolveUser, FirebaseAuthError, FirebaseAuthErrorCode } from '../utils/firebaseAuth';
+import {
+  sendFirebasePasswordResetEmail,
+  setFirebasePassword,
+  ensureFirebaseAccount,
+  reconcilePasswordAfterFirebaseReset,
+  isFirebasePasswordApiConfigured,
+} from '../utils/firebasePassword';
 import { sanitizeUser } from '../utils/sanitizeUser';
 import prisma from '../config/prisma';
 
@@ -96,12 +103,16 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     // Email/Password Login flow
     if (email && password) {
       const user = await prisma.user.findUnique({ where: { email } });
-      if (!user || !user.password) {
+      // `!user.password` is no longer fatal on its own: an account that has
+      // only ever existed in Firebase (or one created by ensureFirebaseAccount
+      // so a reset mail could reach it) has no local hash yet, and the
+      // reconcile path below is exactly how it gets one.
+      if (!user) {
         res.status(401).json({ error: 'Invalid credentials' });
         return;
       }
-      const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) {
+      const isMatch = user.password ? await bcrypt.compare(password, user.password) : false;
+      if (!isMatch && !(await reconcilePasswordAfterFirebaseReset(user, password))) {
         res.status(401).json({ error: 'Invalid credentials' });
         return;
       }
@@ -219,13 +230,11 @@ export const adminLogin = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    if (!user.password) {
-      res.status(401).json({ error: 'Invalid credentials' });
-      return;
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
+    // Same reconcile as the customer/staff login path: this is what
+    // apps/admin-mobile signs in with, so without it a reset completed through
+    // Firebase would fix the web panel and leave the phone app locked out.
+    const isMatch = user.password ? await bcrypt.compare(password, user.password) : false;
+    if (!isMatch && !(await reconcilePasswordAfterFirebaseReset(user, password))) {
       res.status(401).json({ error: 'Invalid credentials' });
       return;
     }
@@ -344,10 +353,112 @@ export const changePassword = async (req: AuthRequest, res: Response): Promise<v
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await prisma.user.update({ where: { id: user.id }, data: { password: hashedPassword } });
+
+    // Mirror into Firebase for accounts that have both. Vendors and staff sign
+    // in against Firebase on web and against the hash above on mobile; updating
+    // only one left the other on the old password, so "change password" in the
+    // seller app used to silently lock the vendor out of the web panel. Best
+    // effort by design -- see setFirebasePassword.
+    if (user.firebaseUid) {
+      await setFirebasePassword(user.firebaseUid, String(newPassword));
+    }
+
     res.status(200).json({ success: true });
   } catch (error) {
     console.error('Change password error:', error);
     res.status(500).json({ error: 'Failed to change password' });
+  }
+};
+
+/**
+ * Starts a self-service password reset.
+ *
+ * Delivery is Firebase's: it owns a verified mail channel for this project and
+ * the backend has no mailer of any kind (no SMTP, SendGrid, SES or Twilio
+ * dependency exists). That is why this endpoint hands off rather than
+ * generating its own token -- a locally-minted reset code would have no way to
+ * reach the user, which is exactly how apps/admin-mobile ended up shipping a
+ * screen that claimed to have sent a link it never sent.
+ *
+ * Always answers 200 with the same message. Reporting "no account with that
+ * email" would turn this into an account-enumeration oracle, and it is the one
+ * endpoint on the service that anyone can call with an arbitrary address.
+ */
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+  const genericResponse = {
+    message: 'If an account exists for that email, a password reset link has been sent to it.',
+  };
+
+  try {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    if (!email) {
+      res.status(400).json({ error: 'Email is required' });
+      return;
+    }
+
+    // Said plainly, before anything else. If delivery is not configured then no
+    // email can be sent for any address, so admitting it reveals nothing about
+    // who has an account -- and the alternative is answering "a reset link has
+    // been sent" to every caller forever, which is the exact failure this
+    // endpoint replaced.
+    if (!isFirebasePasswordApiConfigured()) {
+      console.error('POST /auth/forgot-password called but FIREBASE_WEB_API_KEY is unset; see utils/firebasePassword.ts');
+      res.status(503).json({
+        error: 'Password reset is not available right now. Please contact support to have your password reset.',
+      });
+      return;
+    }
+
+    // Case-insensitive: emails are stored however the user typed them at
+    // signup (no normalisation anywhere in register/registerPersonal), so an
+    // exact-match lookup would fail to find "Vendor@Shop.com" for someone who
+    // types their own address in lower case -- and the failure would be
+    // invisible, since this endpoint answers the same either way.
+    const user = await prisma.user.findFirst({
+      where: { email: { equals: email, mode: 'insensitive' } },
+    });
+
+    // Unknown address, or an account that was deleted (anonymise-in-place
+    // leaves the row behind -- see the User model's deletedAt notes -- and it
+    // must not be resurrectable through a password reset).
+    if (!user || !user.email || user.deletedAt) {
+      res.status(200).json(genericResponse);
+      return;
+    }
+
+    // Customers sign in by phone OTP and have no password to reset. Sending
+    // them a reset link would invite them to set a credential that no screen in
+    // their app ever asks for.
+    if (user.role === Role.CUSTOMER && !user.password) {
+      res.status(200).json(genericResponse);
+      return;
+    }
+
+    // The stored address, not the lower-cased one the caller typed, so Firebase
+    // holds the same form the rest of the system does.
+    const firebaseUid = await ensureFirebaseAccount(user.id, user.email, user.firebaseUid);
+    if (!firebaseUid) {
+      // Nothing was sent. Say so in the log; the caller still gets the generic
+      // message, because the alternative leaks whether the address exists.
+      console.error(`Password reset requested for ${user.id} but no Firebase account could be established`);
+      res.status(200).json(genericResponse);
+      return;
+    }
+    if (firebaseUid !== user.firebaseUid) {
+      await prisma.user.update({ where: { id: user.id }, data: { firebaseUid } });
+    }
+
+    const sent = await sendFirebasePasswordResetEmail(user.email);
+    if (!sent) {
+      console.error(`Firebase declined to send a password reset email for user ${user.id}`);
+    }
+
+    res.status(200).json(genericResponse);
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    // Still generic: an error here must not be distinguishable from the
+    // "no such account" case either.
+    res.status(200).json(genericResponse);
   }
 };
 

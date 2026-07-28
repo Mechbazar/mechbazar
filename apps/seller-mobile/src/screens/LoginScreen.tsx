@@ -46,10 +46,10 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
       <View style={{ width: '100%' }}>
         <Input
           label="Email Address"
-          placeholder="vendor@example.com"
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
+          autoCorrect={false}
           keyboardType="email-address"
         />
 
@@ -60,6 +60,13 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
           onChangeText={setPassword}
           secureTextEntry
         />
+
+        <Text
+          style={{ color: colors.primary, fontWeight: '700', textAlign: 'right', marginTop: 4 }}
+          onPress={() => navigation.navigate('ForgotPassword')}
+        >
+          Forgot password?
+        </Text>
 
         <Button
           title="Login to Dashboard"

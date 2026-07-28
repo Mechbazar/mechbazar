@@ -29,6 +29,26 @@ export const changePassword = async (currentPassword: string, newPassword: strin
 };
 
 /**
+ * Requests a password reset email for an account.
+ *
+ * Unauthenticated -- this is for people who cannot sign in. The backend hands
+ * delivery to Firebase, which owns the only verified mail channel this project
+ * has, and answers with the same message whether or not the address has an
+ * account, so nothing here can be used to discover who is registered. Callers
+ * must present that outcome as-is and never claim more than "if an account
+ * exists".
+ *
+ * Unlike changePassword above, this IS the right call for every app with a
+ * password login, web panels included: the endpoint drives Firebase, and the
+ * login paths reconcile the local hash afterwards, so one reset now unlocks
+ * both credential stores.
+ */
+export const requestPasswordReset = async (email: string): Promise<{ message: string }> => {
+  const response = await apiClient.post('/auth/forgot-password', { email });
+  return response.data;
+};
+
+/**
  * Turns a stored image path into something <Image> can actually load.
  *
  * The upload endpoint returns an absolute URL when a Firebase Storage bucket

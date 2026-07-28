@@ -87,7 +87,7 @@ export default function Login() {
             type="email"
             required
             icon={<Mail className="h-4 w-4" />}
-            placeholder="vendor@example.com"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={loading}

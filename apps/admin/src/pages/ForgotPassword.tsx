@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { sendPasswordResetEmail } from 'firebase/auth';
+import axios from 'axios';
 import { Button, Card, Alert, Input } from '@mechbazar/shared/web';
-import { auth } from '../config/firebase';
-import { mapFirebaseAuthError } from '../utils/firebaseErrors';
+import { API_URL } from '../config/api';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -11,23 +10,26 @@ export default function ForgotPassword() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Was a direct client-side sendPasswordResetEmail, which Firebase refuses for
+  // an address it has never seen -- and this page swallowed that refusal as
+  // success, so a staff account created straight in the database was shown "a
+  // reset link has been sent" for a mail that could not be sent.
+  //
+  // The backend endpoint creates the missing Firebase account first
+  // (ensureFirebaseAccount), enforces the enumeration-safe response server-side
+  // instead of relying on this page to catch auth/user-not-found, and is the
+  // same call apps/admin-mobile makes -- so one reset now serves both. Firebase
+  // still performs the delivery.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
-      await sendPasswordResetEmail(auth, email);
+      await axios.post(`${API_URL}/auth/forgot-password`, { email });
       setSubmitted(true);
     } catch (err: any) {
-      // auth/user-not-found is deliberately treated as success below (not
-      // caught here) -- surfacing it would let a caller enumerate which
-      // emails have accounts. Only genuine input/rate-limit errors are shown.
-      if (err?.code === 'auth/user-not-found') {
-        setSubmitted(true);
-      } else {
-        setError(mapFirebaseAuthError(err?.code));
-      }
+      setError(err?.response?.data?.error || 'Could not send the reset email. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -59,7 +61,7 @@ export default function ForgotPassword() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              placeholder="admin@mechbazar.com"
+              autoComplete="email"
               disabled={loading}
             />
 

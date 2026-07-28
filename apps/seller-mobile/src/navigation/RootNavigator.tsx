@@ -8,6 +8,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { colors } from '@mechbazar/shared';
 import { RootState, setAuth } from '../store';
 import { LoginScreen } from '../screens/LoginScreen';
+import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { RegisterScreen } from '../screens/registration/RegisterScreen';
 import { MainStack } from './MainStack';
 
@@ -61,6 +62,7 @@ export const RootNavigator = () => {
         ) : (
           <>
             <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
             <Stack.Screen name="Register" component={RegisterScreen} />
           </>
         )}
