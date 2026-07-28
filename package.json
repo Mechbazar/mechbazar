@@ -8,6 +8,7 @@
     "apps/seller-mobile",
     "apps/rider",
     "apps/mechanic",
+    "apps/mobile",
     "apps/vendor",
     "packages/shared"
   ],
@@ -24,7 +25,7 @@
     "dev:mechanic": "npm --prefix apps/mechanic run start",
     "dev:admin-mobile": "npm --prefix apps/admin-mobile run start",
     "dev:seller-mobile": "npm --prefix apps/seller-mobile run start",
-    "install:all": "npm install --legacy-peer-deps && npm --prefix apps/backend install && npm --prefix apps/mobile install --legacy-peer-deps"
+    "install:all": "npm install --legacy-peer-deps && npm --prefix apps/backend install"
   },
   "devDependencies": {
     "@expo/ngrok": "^4.1.3",

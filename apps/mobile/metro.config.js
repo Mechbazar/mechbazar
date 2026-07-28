@@ -1,16 +1,22 @@
 const { getDefaultConfig } = require('expo/metro-config');
 const path = require('path');
 
-// apps/mobile is intentionally NOT part of the npm workspace rooted at the
-// repo root (that workspace only covers apps/admin-mobile, apps/seller-mobile,
-// and packages/shared). The repo root's package-lock.json still makes Expo's
-// automatic monorepo detection treat the repo root as this app's workspace
-// root, which breaks resolution of this app's own node_modules. Pin this app
-// to single-project mode to opt out of that detection.
-const config = getDefaultConfig(__dirname);
+// apps/mobile is now a member of the root npm workspace (see root
+// package.json), matching apps/rider, apps/mechanic, apps/admin-mobile and
+// apps/seller-mobile. This mirrors their metro.config.js exactly: watch only
+// the shared package this app actually uses, and resolve node_modules from
+// both this project and the hoisted workspace root, in that order.
+const projectRoot = __dirname;
+const workspaceRoot = path.resolve(projectRoot, '../..');
+const sharedPackageRoot = path.resolve(workspaceRoot, 'packages/shared');
 
-config.watchFolders = [__dirname];
-config.resolver.nodeModulesPaths = [path.resolve(__dirname, 'node_modules')];
+const config = getDefaultConfig(projectRoot);
+
+config.watchFolders = [sharedPackageRoot];
+config.resolver.nodeModulesPaths = [
+  path.resolve(projectRoot, 'node_modules'),
+  path.resolve(workspaceRoot, 'node_modules'),
+];
 config.resolver.disableHierarchicalLookup = false;
 
 module.exports = config;
