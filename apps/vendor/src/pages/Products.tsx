@@ -4,12 +4,16 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import {
   Package, Search, Plus, Edit, Trash2, CheckCircle,
-  AlertCircle, Upload, Save
+  AlertCircle, Upload, Save, ImagePlus, X
 } from 'lucide-react';
 import { Button, Badge, Dialog, Input, Loader } from '@mechbazar/shared/web';
-import { API_URL } from '../config/api';
+import { API_URL, SERVER_ORIGIN } from '../config/api';
 
-const emptyForm = { name: '', description: '', mrp: '', price: '', b2bPrice: '', stock: '', lowStockThreshold: '10', categoryId: '', brandId: '', oemNumber: '', partNumber: '' };
+// `images` was missing entirely, so every product a vendor listed through this
+// form was saved with an empty images[] and rendered as a placeholder in the
+// customer app -- the backend has accepted `images` on create all along, and
+// the only way a vendor could attach one was the CSV bulk import.
+const emptyForm = { name: '', description: '', mrp: '', price: '', b2bPrice: '', stock: '', lowStockThreshold: '10', categoryId: '', brandId: '', oemNumber: '', partNumber: '', images: [] as string[] };
 
 export default function Products() {
   const { token } = useSelector((state: RootState) => state.auth);
@@ -25,6 +29,8 @@ export default function Products() {
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [csvProducts, setCsvProducts] = useState<any[]>([]);
   const [uploadingBulk, setUploadingBulk] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState('');
 
   const fetchProducts = async () => {
     try {
@@ -49,11 +55,40 @@ export default function Products() {
 
   const selectedCategory = categories.find((c: any) => c.id === formData.categoryId);
 
-  const openAdd = () => { setEditingProduct(null); setFormData({ ...emptyForm }); setShowAddModal(true); };
+  const openAdd = () => { setEditingProduct(null); setFormData({ ...emptyForm }); setImageError(''); setShowAddModal(true); };
   const openEdit = (p: any) => {
     setEditingProduct(p);
-    setFormData({ name: p.name, description: p.description || '', mrp: p.mrp, price: p.price, b2bPrice: p.b2bPrice?.toString() || '', stock: p.stock, lowStockThreshold: p.lowStockThreshold?.toString() || '10', categoryId: p.categoryId || '', brandId: p.brandId || '', oemNumber: p.oemNumber || '', partNumber: p.partNumber || '' });
+    setFormData({ name: p.name, description: p.description || '', mrp: p.mrp, price: p.price, b2bPrice: p.b2bPrice?.toString() || '', stock: p.stock, lowStockThreshold: p.lowStockThreshold?.toString() || '10', categoryId: p.categoryId || '', brandId: p.brandId || '', oemNumber: p.oemNumber || '', partNumber: p.partNumber || '', images: p.images || [] });
+    setImageError('');
     setShowAddModal(true);
+  };
+
+  // Upload returns an absolute URL when Firebase Storage is configured and a
+  // bare "/uploads/<file>" path when it falls back to local disk; only the
+  // latter needs the API origin prepended to be loadable here.
+  const resolveImageSrc = (url: string) => (/^https?:\/\//i.test(url) ? url : `${SERVER_ORIGIN}${url}`);
+
+  // POST /upload stores the file (Firebase Storage when a bucket is configured,
+  // otherwise the backend's own uploads/ dir) and returns the URL to persist on
+  // the product. It authenticates any signed-in role, vendors included.
+  const handleImageUpload = async (file: File) => {
+    setImageError('');
+    setUploadingImage(true);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const res = await axios.post(`${API_URL}/upload`, body, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.data?.url) throw new Error('Upload returned no URL');
+      setFormData(prev => ({ ...prev, images: [...prev.images, res.data.url] }));
+    } catch (err: any) {
+      setImageError(err?.response?.data?.error || 'Image upload failed. Please try again.');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleRemoveImage = (url: string) => {
+    setFormData(prev => ({ ...prev, images: prev.images.filter(i => i !== url) }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -181,14 +216,28 @@ export default function Products() {
               {filtered.map(product => (
                 <tr key={product.id} className="hover:bg-brand-dark/50 transition-colors">
                   <td className="p-4">
-                    <div className="text-sm font-bold text-white">{product.name}</div>
-                    <div className="text-xs text-gray-400 mt-1">
-                      {product.oemNumber && <span className="mr-3">OEM: {product.oemNumber}</span>}
-                      {product.partNumber && <span>Part: {product.partNumber}</span>}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
-                      <span>{product.category?.name}</span>
-                      <span>{product.vehicleType === 'BIKE' ? '🏍️' : '🚗'}</span>
+                    <div className="flex items-start gap-3">
+                      {/* Shows the vendor exactly what the customer app shows.
+                          Listings with no image were previously indistinguishable
+                          here from ones with a good photo. */}
+                      {product.images?.[0] ? (
+                        <img src={resolveImageSrc(product.images[0])} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover border border-brand-muted" />
+                      ) : (
+                        <div className="h-12 w-12 shrink-0 rounded-lg border border-dashed border-brand-muted flex items-center justify-center" title="No image — customers see a placeholder">
+                          <ImagePlus className="w-4 h-4 text-gray-600" />
+                        </div>
+                      )}
+                      <div>
+                        <div className="text-sm font-bold text-white">{product.name}</div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {product.oemNumber && <span className="mr-3">OEM: {product.oemNumber}</span>}
+                          {product.partNumber && <span>Part: {product.partNumber}</span>}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
+                          <span>{product.category?.name}</span>
+                          <span>{product.vehicleType === 'BIKE' ? '🏍️' : '🚗'}</span>
+                        </div>
+                      </div>
                     </div>
                   </td>
                   <td className="p-4">
@@ -265,6 +314,49 @@ export default function Products() {
                   </select>
                 </div>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">Product Images</label>
+
+                {formData.images.length > 0 && (
+                  <div className="flex flex-wrap gap-3 mb-3">
+                    {formData.images.map(url => (
+                      <div key={url} className="relative">
+                        <img src={resolveImageSrc(url)} alt="Product" className="h-20 w-20 rounded-lg object-cover border border-brand-muted" />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(url)}
+                          aria-label="Remove image"
+                          className="absolute -right-2 -top-2 rounded-full bg-red-500 p-1 text-white hover:bg-red-600"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <label className="flex items-center justify-center gap-2 border-2 border-dashed border-brand-muted rounded-lg py-4 text-sm text-gray-400 cursor-pointer hover:border-brand-secondary hover:text-white transition-colors">
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    disabled={uploadingImage}
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      // Reset first: picking the same file twice in a row fires
+                      // no change event otherwise, so a failed upload could not
+                      // be retried with the same image.
+                      e.target.value = '';
+                      if (file) handleImageUpload(file);
+                    }}
+                  />
+                  <ImagePlus className="w-4 h-4" />
+                  {uploadingImage ? 'Uploading...' : 'Add image (PNG, JPG or WebP)'}
+                </label>
+                {imageError && <p className="text-xs text-red-400 mt-1">{imageError}</p>}
+                <p className="text-xs text-gray-500 mt-1">Products with no image show a grey placeholder to customers.</p>
+              </div>
+
               <div className="flex gap-4 pt-4 border-t border-brand-muted">
                 <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 bg-brand-dark text-white border border-brand-muted px-4 py-2.5 rounded-lg font-bold hover:bg-gray-800 transition-colors">Cancel</button>
                 <Button type="submit" isLoading={submitting} className="flex-1">

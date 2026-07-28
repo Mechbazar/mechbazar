@@ -1098,7 +1098,7 @@ export const updateMyProduct = async (req: Request, res: Response): Promise<void
   try {
     const userId = (req as any).user.userId;
     const id = String(req.params.id);
-    const { name, description, mrp, price, b2bPrice, lowStockThreshold, stock, oemNumber, partNumber } = req.body;
+    const { name, description, mrp, price, b2bPrice, lowStockThreshold, stock, categoryId, brandId, oemNumber, partNumber, images } = req.body;
 
     const vendor = await prisma.vendor.findUnique({ where: { userId } });
     if (!vendor) { res.status(404).json({ error: 'Vendor not found' }); return; }
@@ -1106,6 +1106,19 @@ export const updateMyProduct = async (req: Request, res: Response): Promise<void
     // Ensure product belongs to this vendor
     const product = await prisma.product.findFirst({ where: { id, vendorId: vendor.id } });
     if (!product) { res.status(404).json({ error: 'Product not found' }); return; }
+
+    // categoryId, brandId and images used to be destructured away and never
+    // written, so the vendor edit form silently discarded all three: a vendor
+    // could recategorise a product, or attach images to one, watch the request
+    // succeed, and find nothing had changed. vehicleType is re-derived from the
+    // new category for the same reason it is on create -- it is classification
+    // that follows the category, not a client-supplied value.
+    let categoryFields = {};
+    if (categoryId && categoryId !== product.categoryId) {
+      const category = await prisma.category.findUnique({ where: { id: categoryId }, select: { vehicleType: true } });
+      if (!category) { res.status(400).json({ error: 'Category not found' }); return; }
+      categoryFields = { categoryId, vehicleType: category.vehicleType };
+    }
 
     const updated = await prisma.product.update({
       where: { id },
@@ -1117,6 +1130,11 @@ export const updateMyProduct = async (req: Request, res: Response): Promise<void
         stock: stock !== undefined ? Number(stock) : undefined,
         oemNumber,
         partNumber,
+        // Only when the client actually sends the field -- omitting it must
+        // leave the existing images alone, not clear them.
+        images: Array.isArray(images) ? images : undefined,
+        ...categoryFields,
+        ...(brandId && { brandId }),
         status: 'APPROVED', // no approval needed from admin side
         b2bPrice: b2bPrice !== undefined ? (b2bPrice === '' ? null : Number(b2bPrice)) : undefined,
         lowStockThreshold: lowStockThreshold !== undefined && lowStockThreshold !== '' ? Number(lowStockThreshold) : undefined,
