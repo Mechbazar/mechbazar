@@ -22,23 +22,31 @@ if (!hasIosFirebase) {
   );
 }
 
-// EAS sets EAS_BUILD_PROFILE to the profile being built. Cleartext HTTP is
-// needed only for local development against a LAN backend (App.tsx falls back
-// to http://<dev-host>:5000/api); preview and production talk to
-// https://mechbazar.com/api and must refuse plaintext so a hostile network
-// can't downgrade API traffic carrying Bearer tokens. app.json had this pinned
-// to `true` for every profile, including production.
-const BUILD_PROFILE = process.env.EAS_BUILD_PROFILE || 'development';
-const ALLOW_CLEARTEXT = BUILD_PROFILE === 'development';
+// Cleartext HTTP is needed only for local development against a LAN backend
+// (App.tsx falls back to http://<dev-host>:5000/api); preview and production
+// talk to https://mechbazar.com/api and must refuse plaintext so a hostile
+// network can't downgrade API traffic carrying Bearer tokens.
+//
+// This used to be expressed as `android.usesCleartextTraffic`, which is NOT a
+// key the Expo config schema accepts -- `expo-doctor` rejects it and prebuild
+// dropped it on the floor, so the generated release manifest carried no
+// android:usesCleartextTraffic attribute at all. The intended behaviour held
+// anyway, but by accident rather than by this config:
+//
+//   - debug builds get android:usesCleartextTraffic="true" from the debug
+//     variant manifest Expo generates (android/app/src/debug/AndroidManifest.xml)
+//   - release builds get Android's own default, which refuses cleartext for
+//     anything targeting API 28+
+//
+// Stating it here was therefore misleading: it read as an enforced policy while
+// enforcing nothing. If this ever needs to be explicit rather than inherited,
+// add expo-build-properties and set android.usesCleartextTraffic inside that
+// plugin -- which is how apps/mobile does it.
 
 module.exports = ({ config }) => ({
   ...config,
   ios: {
     ...config.ios,
     ...(hasIosFirebase ? { googleServicesFile: './GoogleService-Info.plist' } : {}),
-  },
-  android: {
-    ...config.android,
-    usesCleartextTraffic: ALLOW_CLEARTEXT,
   },
 });

@@ -13,7 +13,6 @@
     },
     "android": {
       "package": "com.mechbazar.rider",
-      "usesCleartextTraffic": true,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#1B9E4B",
