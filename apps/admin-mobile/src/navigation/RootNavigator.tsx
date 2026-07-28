@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import * as SplashScreen from 'expo-splash-screen';
 import { colors } from '@mechbazar/shared';
 import { RootState, setAuth } from '../store';
 import { LoginScreen } from '../screens/LoginScreen';
@@ -67,6 +68,20 @@ export const RootNavigator = () => {
     };
     restoreToken();
   }, [dispatch]);
+
+
+  // Hold the native splash until the token restore above has resolved. Without
+  // this, expo-splash-screen auto-hides the moment the JS bundle mounts, which
+  // is well before `isReady` flips -- so the blank placeholder below was what
+  // the user actually saw for the 2-3 seconds SecureStore took, reading as a
+  // white/default loading screen between the splash and the login screen.
+  React.useEffect(() => {
+    if (isReady) {
+      // Failure here is not worth surfacing: the splash is already gone in the
+      // only case that throws (it was hidden by something else first).
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isReady]);
 
   if (!isReady) {
     return <View style={{ flex: 1, backgroundColor: colors.background }} />;

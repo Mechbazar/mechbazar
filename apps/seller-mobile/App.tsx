@@ -7,6 +7,13 @@ import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { setUnauthorizedHandler } from '@mechbazar/shared';
 
+import * as SplashScreen from 'expo-splash-screen';
+
+// Must run in global scope rather than inside a component or hook: by the time
+// a hook body executes, expo-splash-screen may already have auto-hidden. Not
+// awaited, per Expo's docs -- awaiting it here would reintroduce the race.
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 const queryClient = new QueryClient();
 
 // An expired/invalid token would otherwise leave the seller stuck on a

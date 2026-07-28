@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet, Platform, Appearance } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import * as SplashScreen from 'expo-splash-screen';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -54,6 +55,11 @@ import AddressManagementScreen from './src/screens/AddressManagementScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
 import HelpCenterScreen from './src/screens/HelpCenterScreen';
 import StaticPageScreen from './src/screens/StaticPageScreen';
+
+// Must run in global scope rather than inside a component or hook: by the time
+// a hook body executes, expo-splash-screen may already have auto-hidden. Not
+// awaited, per Expo's docs -- awaiting it here would reintroduce the race.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Same key App.js already used for its session cache -- reusing it means an
 // already-logged-in user isn't logged out by this rewrite. Cart and garage get
@@ -324,6 +330,19 @@ function RootNavigator() {
     });
     return () => sub.remove();
   }, [dispatch]);
+
+  // Hold the native splash until fonts, session, cart and garage have all
+  // resolved. Without this, expo-splash-screen auto-hides as soon as the JS
+  // bundle mounts -- well before `isReady` flips -- so the spinner below was
+  // what the user actually saw for 2-3 seconds, reading as a default loading
+  // screen between the splash and the first real screen.
+  useEffect(() => {
+    if (isReady) {
+      // Failure here is not worth surfacing: the only case that throws is the
+      // splash already having been hidden by something else.
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [isReady]);
 
   if (!isReady) {
     return (

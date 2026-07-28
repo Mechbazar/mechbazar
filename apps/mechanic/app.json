@@ -11,7 +11,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.mechbazar.mechanic",
       "infoPlist": {
-        "UIBackgroundModes": ["location"],
+        "UIBackgroundModes": [
+          "location"
+        ],
         "NSLocationWhenInUseUsageDescription": "MechBazar needs your location to show nearby emergency jobs and guide you to the customer.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "MechBazar shares your live location with the customer only while you have an active job, so they can track your arrival."
       }
@@ -70,13 +72,13 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/splash-icon.png",
+          "image": "./assets/splash-icon-dark.png",
           "imageWidth": 240,
           "resizeMode": "contain",
-          "backgroundColor": "#FFFFFF",
+          "backgroundColor": "#EF6C00",
           "dark": {
             "image": "./assets/splash-icon-dark.png",
-            "backgroundColor": "#111111"
+            "backgroundColor": "#EF6C00"
           }
         }
       ],

@@ -8,6 +8,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { setApiBaseUrl } from '@mechbazar/shared';
 
+import * as SplashScreen from 'expo-splash-screen';
+
+// Must run in global scope rather than inside a component or hook: by the time
+// a hook body executes, expo-splash-screen may already have auto-hidden. Not
+// awaited, per Expo's docs -- awaiting it here would reintroduce the race.
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
 const queryClient = new QueryClient();
 const ORDERS_POLL_INTERVAL_MS = 20000;
 

@@ -106,17 +106,23 @@ module.exports = {
       [
         'expo-splash-screen',
         {
-          image: './assets/splash-icon.png',
+          // splash-icon-dark.png is the LIGHT-ink wordmark ("-dark" means "for
+          // dark backgrounds"). The background below is the brand purple, on
+          // which the ink-coloured variant would be close to invisible.
+          image: './assets/splash-icon-dark.png',
           // The splash art is the MechBazar wordmark (~9:1), not a square mark,
           // so this is a width the wordmark reads at.
           imageWidth: 240,
           resizeMode: 'contain',
-          backgroundColor: '#FFFFFF',
+          // Brand purple, matching this app's launcher icon background, so the
+          // splash continues the icon the user just tapped instead of flashing
+          // a generic white frame.
+          backgroundColor: '#7C3AED',
           dark: {
-            // Distinct asset: the light wordmark is ink-on-transparent and
-            // would be all but invisible on this background.
+            // Same art and colour in dark mode: the splash should read as the
+            // brand, not flip appearance halfway through launch.
             image: './assets/splash-icon-dark.png',
-            backgroundColor: '#111111',
+            backgroundColor: '#7C3AED',
           },
         },
       ],
