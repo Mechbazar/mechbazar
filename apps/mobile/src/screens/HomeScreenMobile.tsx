@@ -1,8 +1,9 @@
 // Web-only, used below the desktop breakpoint (see HomeScreen.web.tsx).
-// Deliberate byte-for-byte duplicate of HomeScreen.tsx's original content --
-// kept as a separate file (rather than extracting shared hooks) so this
-// screen's native behavior can never be affected by desktop web changes.
-// Mirror any native/mobile Home behavior change here too.
+// Deliberate duplicate of HomeScreen.tsx, kept separate (rather than sharing
+// hooks) so this screen can never be affected by desktop web changes.
+// Everything below line 6 is identical in both files -- verify with
+// `diff <(tail -n +7 HomeScreen.tsx) <(tail -n +7 HomeScreenMobile.tsx)`.
+// Mirror every change made in HomeScreen.tsx here.
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
@@ -10,9 +11,10 @@ import {
   TextInput, 
   ScrollView, 
   TouchableOpacity, 
-  StyleSheet, 
-  Image, 
-  Dimensions, 
+  StyleSheet,
+  Image,
+  Dimensions,
+  LayoutChangeEvent,
   Animated, 
   ImageBackground,
   Alert,
@@ -31,9 +33,11 @@ import { setVehicleType } from '../store/appSlice';
 import { fetchCategories, getTrendingProducts, fetchBanners, fetchOffers, HomeOffer } from '../services/product.service';
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../services/wishlist.service';
 import { VehicleType, Category, Product } from '../types/product';
-import { Logo } from '@mechbazar/shared';
+import { ServiceAddress } from '../types/service';
+import { fetchMyAddresses } from '../services/address.service';
 import { locationService } from '../services/location.service';
 import { reverseGeocode } from '../services/geocode.service';
+import { API_BASE_URL } from '../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -239,6 +243,8 @@ export default function HomeScreen({ navigation }: any) {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [locationName, setLocationName] = useState('Fetching location...');
+  const [defaultAddress, setDefaultAddress] = useState<ServiceAddress | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [categories, setCategories] = useState<Category[]>([]);
   const [banners, setBanners] = useState<any[]>([]);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
@@ -250,6 +256,27 @@ export default function HomeScreen({ navigation }: any) {
   // Scroll View Ref for anchor jumps
   const mainScrollRef = useRef<ScrollView>(null);
   const bannerScrollRef = useRef<ScrollView>(null);
+
+  // Measured y of each anchorable section. The quick-action tiles used to jump
+  // to hardcoded offsets (380 / 880 / 1120), which silently drifted off target
+  // whenever any section above them changed height -- including the header and
+  // spacing changes on this screen. Measuring is the only version that stays
+  // correct.
+  const sectionOffsets = useRef<Record<string, number>>({});
+  const registerSection = (key: string) => (e: LayoutChangeEvent) => {
+    sectionOffsets.current[key] = e.nativeEvent.layout.y;
+  };
+  // Takes fallbacks because "Today's Deals" points at the offers section, which
+  // is not rendered at all when there are no live offers.
+  const scrollToSection = (...keys: string[]) => {
+    for (const key of keys) {
+      const y = sectionOffsets.current[key];
+      if (y !== undefined) {
+        mainScrollRef.current?.scrollTo({ y: Math.max(y - 8, 0), animated: true });
+        return;
+      }
+    }
+  };
 
   const suggestions = ['Engine Oils', 'Brake Pads', 'Helmets', 'Car Wash Kit', 'Mechanics'];
 
@@ -284,6 +311,31 @@ export default function HomeScreen({ navigation }: any) {
       setWishlist(Object.fromEntries(items.map(i => [i.id, true])));
     });
   }, [token]);
+
+  // Header state that the user can change from other screens -- the delivery
+  // address (Addresses) and the unread badge (Notifications) -- so it is
+  // refreshed on focus rather than only on mount, which would leave the header
+  // showing the address they just replaced.
+  useEffect(() => {
+    if (!token) {
+      setDefaultAddress(null);
+      setUnreadCount(0);
+      return;
+    }
+    const loadHeaderData = () => {
+      fetchMyAddresses(token).then(list => {
+        setDefaultAddress(list.find(a => a.isDefault) || list[0] || null);
+      });
+      fetch(`${API_BASE_URL}/customers/notifications`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then(res => (res.ok ? res.json() : []))
+        .then((items: any[]) => setUnreadCount(items.filter(n => !n.isRead).length))
+        .catch(() => setUnreadCount(0));
+    };
+    loadHeaderData();
+    return navigation.addListener('focus', loadHeaderData);
+  }, [token, navigation]);
 
   // Request location -- device GPS read via locationService, reverse
   // geocoded through the backend (services/geocode.service.ts) rather than
@@ -383,24 +435,46 @@ export default function HomeScreen({ navigation }: any) {
     dispatch(updateQuantity({ id: prod.id, qty: newQty }));
   };
 
+  // "Deliver to" names the saved default address when there is one -- that is
+  // where orders actually ship -- and falls back to the GPS-derived city while
+  // the customer has no address on file yet.
+  const deliveryLabel = defaultAddress
+    ? [defaultAddress.title, defaultAddress.city].filter(Boolean).join(' · ')
+    : locationName;
+
   const renderHeader = () => (
     <View style={styles.header}>
-      {/* Top sticky logo / profiles bar */}
+      {/* The delivery address leads the header. The wordmark used to occupy
+          this row and pushed the address down onto one of its own -- an extra
+          band of vertical space spent telling customers the name of the app
+          they already opened, above the one line they came to check. */}
       <View style={styles.headerTop}>
-        {/* Dark tone: this header sits on colors.secondary (#1C1C1E). */}
-        <Logo tone="dark" width={150} />
+        <TouchableOpacity
+          style={styles.deliverToBlock}
+          onPress={() => navigation.navigate('AddressManagement')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.deliverToLabelRow}>
+            <Ionicons name="location" size={12} color={colors.primary} />
+            <Text style={styles.deliverToLabel}>Deliver to</Text>
+          </View>
+          <View style={styles.deliverToValueRow}>
+            <Text style={styles.deliverToValue} numberOfLines={1}>{deliveryLabel}</Text>
+            <Ionicons name="chevron-down" size={13} color={colors.white} style={{ marginLeft: 4 }} />
+          </View>
+        </TouchableOpacity>
 
         {/* Right side icons row */}
         <View style={styles.headerRight}>
-          <TouchableOpacity 
-            style={styles.headerIconBtn} 
+          <TouchableOpacity
+            style={styles.headerIconBtn}
             onPress={() => navigation.navigate('Wishlist')}
           >
             <Ionicons name="heart-outline" size={22} color={colors.white} />
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.headerIconBtn} 
+          <TouchableOpacity
+            style={styles.headerIconBtn}
             onPress={() => navigation.navigate('Cart')}
           >
             {cartItemCount > 0 && (
@@ -411,24 +485,21 @@ export default function HomeScreen({ navigation }: any) {
             <Ionicons name="cart-outline" size={22} color={colors.white} />
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.headerIconBtn} 
+          <TouchableOpacity
+            style={styles.headerIconBtn}
             onPress={() => navigation.navigate('Notifications')}
           >
-            <View style={[styles.badgeBubble, { backgroundColor: colors.primary, width: 8, height: 8, borderRadius: 4, top: 4, right: 4 }]} />
+            {/* Was rendered unconditionally, so the bell claimed unread
+                notifications permanently -- including for accounts that had
+                never received one. */}
+            {unreadCount > 0 && <View style={styles.notificationDot} />}
             <Ionicons name="notifications-outline" size={22} color={colors.white} />
           </TouchableOpacity>
 
-          <TouchableOpacity 
-            style={styles.headerIconBtn} 
-            onPress={() => navigation.navigate('Account')}
-          >
-            <Ionicons name="settings-outline" size={22} color={colors.white} />
-          </TouchableOpacity>
-
-          {/* User profile avatar */}
-          <TouchableOpacity 
-            style={styles.avatarBtn} 
+          {/* The settings cog that used to sit here navigated to 'Account',
+              the same place this avatar goes. One destination, one control. */}
+          <TouchableOpacity
+            style={styles.avatarBtn}
             onPress={() => navigation.navigate('Account')}
           >
             <View style={styles.avatarCircle}>
@@ -436,19 +507,6 @@ export default function HomeScreen({ navigation }: any) {
             </View>
           </TouchableOpacity>
         </View>
-      </View>
-
-      {/* Location row */}
-      <View style={styles.locationBar}>
-        <Ionicons name="location" size={16} color={colors.primary} />
-        <Text style={styles.locationLabel}>Deliver to - </Text>
-        <TouchableOpacity 
-          style={styles.locationSelectorRow} 
-          onPress={() => Alert.alert('Change Location', 'GPS geocoding has set your delivery zone.')}
-        >
-          <Text style={styles.locationText} numberOfLines={1}>{locationName}</Text>
-          <Ionicons name="chevron-down" size={12} color={colors.white} style={{ marginLeft: 2 }} />
-        </TouchableOpacity>
       </View>
 
       {/* Search Input bar */}
@@ -555,9 +613,9 @@ export default function HomeScreen({ navigation }: any) {
         {/* QUICK ACTIONS SECTION */}
         <View style={styles.quickActionsContainer}>
           <View style={styles.quickGrid}>
-            <TouchableOpacity 
-              style={styles.quickCard} 
-              onPress={() => mainScrollRef.current?.scrollTo({ y: 380, animated: true })}
+            <TouchableOpacity
+              style={styles.quickCard}
+              onPress={() => scrollToSection('categories')}
             >
               <View style={[styles.quickIconCircle, { backgroundColor: '#FFECEB' }]}>
                 <Ionicons name="car" size={24} color={colors.primary} />
@@ -565,9 +623,9 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={styles.quickLabel}>Spare Parts</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.quickCard} 
-              onPress={() => mainScrollRef.current?.scrollTo({ y: 880, animated: true })}
+            <TouchableOpacity
+              style={styles.quickCard}
+              onPress={() => scrollToSection('services')}
             >
               <View style={[styles.quickIconCircle, { backgroundColor: '#EBFBEE' }]}>
                 <Ionicons name="build" size={24} color="#2B8A3E" />
@@ -599,9 +657,9 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={styles.quickLabel}>Breakdown</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.quickCard} 
-              onPress={() => mainScrollRef.current?.scrollTo({ y: 380, animated: true })}
+            <TouchableOpacity
+              style={styles.quickCard}
+              onPress={() => scrollToSection('categories')}
             >
               <View style={[styles.quickIconCircle, { backgroundColor: '#F8F0FC' }]}>
                 <Ionicons name="construct" size={24} color="#9C36B5" />
@@ -609,9 +667,9 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={styles.quickLabel}>Garage Tools</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.quickCard} 
-              onPress={() => mainScrollRef.current?.scrollTo({ y: 1120, animated: true })}
+            <TouchableOpacity
+              style={styles.quickCard}
+              onPress={() => scrollToSection('offers', 'trending')}
             >
               <View style={[styles.quickIconCircle, { backgroundColor: '#FFF0F6' }]}>
                 <Ionicons name="gift" size={24} color="#D6336C" />
@@ -622,7 +680,7 @@ export default function HomeScreen({ navigation }: any) {
         </View>
 
         {/* SHOP BY CATEGORY SECTION */}
-        <View style={styles.section}>
+        <View style={styles.section} onLayout={registerSection('categories')}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Shop by Category</Text>
           </View>
@@ -658,7 +716,7 @@ export default function HomeScreen({ navigation }: any) {
         </View>
 
         {/* SERVICES SECTION */}
-        <View style={styles.section}>
+        <View style={styles.section} onLayout={registerSection('services')}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Doorstep Services</Text>
             <TouchableOpacity onPress={() => navigation.navigate('Services')}>
@@ -686,7 +744,7 @@ export default function HomeScreen({ navigation }: any) {
         </View>
 
         {/* FEATURED / TRENDING PRODUCTS SECTION */}
-        <View style={styles.section}>
+        <View style={styles.section} onLayout={registerSection('trending')}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Trending {vehicleType === VehicleType.CAR ? 'Car Parts' : 'Bike Parts'}</Text>
           </View>
@@ -825,7 +883,7 @@ export default function HomeScreen({ navigation }: any) {
             of the 4 hardcoded "Flash Sale / Combo Deals / Battery Exchange /
             Free Delivery" cards with invented codes this used to always show. */}
         {(isHomeContentLoading || offers.length > 0) && (
-          <View style={styles.section}>
+          <View style={styles.section} onLayout={registerSection('offers')}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Today's Special Offers</Text>
             </View>
@@ -992,11 +1050,11 @@ const styles = StyleSheet.create({
     flex: 1, 
     backgroundColor: colors.pageBg 
   },
-  header: { 
-    backgroundColor: colors.secondary, 
-    paddingHorizontal: 16, 
-    paddingTop: 16, 
-    paddingBottom: 20, 
+  header: {
+    backgroundColor: colors.secondary,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 14,
     zIndex: 10,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
@@ -1006,16 +1064,15 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 6
   },
-  headerTop: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: 12, 
-    height: 38 
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12
   },
-  headerRight: { 
-    flexDirection: 'row', 
-    alignItems: 'center' 
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center'
   },
   headerIconBtn: {
     padding: 6,
@@ -1058,38 +1115,57 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14
   },
-  locationBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16
+  notificationDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+    zIndex: 4
   },
-  locationLabel: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '500',
-    marginLeft: 4
+  // flexShrink lets a long address ellipsize instead of shoving the icon row
+  // off the right edge; the icons keep their intrinsic width.
+  deliverToBlock: {
+    flexShrink: 1,
+    marginRight: 12
   },
-  locationSelectorRow: {
+  deliverToLabelRow: {
     flexDirection: 'row',
     alignItems: 'center'
   },
-  locationText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: 'bold'
+  deliverToLabel: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4
   },
-  searchBarRow: { 
-    flexDirection: 'row', 
-    backgroundColor: colors.white, 
-    borderRadius: 12, 
-    alignItems: 'center', 
-    height: 46, 
+  deliverToValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 1
+  },
+  deliverToValue: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: '800',
+    flexShrink: 1
+  },
+  searchBarRow: {
+    flexDirection: 'row',
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    alignItems: 'center',
+    height: 44,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    marginBottom: 20
+    marginBottom: 12
   },
   searchInput: { 
     flex: 1, 
@@ -1102,12 +1178,12 @@ const styles = StyleSheet.create({
     padding: 8,
     marginRight: 4
   },
-  toggleContainer: { 
-    flexDirection: 'row', 
-    backgroundColor: 'rgba(255,255,255,0.08)', 
-    borderRadius: 20, 
-    position: 'relative', 
-    height: 40,
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 20,
+    position: 'relative',
+    height: 38,
     padding: 3,
   },
   toggleIndicator: { 
@@ -1133,10 +1209,10 @@ const styles = StyleSheet.create({
     color: '#FFF', 
     fontWeight: '900' 
   },
-  bannerSection: { 
-    zIndex: 1, 
-    paddingBottom: 14, 
-    paddingTop: 14 
+  bannerSection: {
+    zIndex: 1,
+    paddingBottom: 12,
+    paddingTop: 12
   },
   fullBanner: { 
     width: width - 32, 
@@ -1206,7 +1282,7 @@ const styles = StyleSheet.create({
   },
   quickActionsContainer: {
     paddingHorizontal: 16,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   quickGrid: {
     flexDirection: 'row',
@@ -1241,8 +1317,8 @@ const styles = StyleSheet.create({
     color: colors.secondary,
     textAlign: 'center',
   },
-  section: { 
-    marginBottom: 22 
+  section: {
+    marginBottom: 18
   },
   sectionHeader: { 
     flexDirection: 'row', 
