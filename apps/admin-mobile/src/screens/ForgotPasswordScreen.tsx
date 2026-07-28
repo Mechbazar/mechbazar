@@ -1,20 +1,24 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { colors, Button, Typography, Input, Card } from '@mechbazar/shared';
+import { colors, Button, Typography, Card } from '@mechbazar/shared';
 
-// Mirrors apps/admin/src/pages/ForgotPassword.tsx exactly: no real backend
-// call exists on the web side either ("Simulate API call") — this is the
-// same fake-success UX, not a shortcut taken only on mobile.
+// This screen used to claim "a password reset link has been sent" while doing
+// nothing at all -- handleSubmit only flipped a flag. Its comment said it
+// mirrored apps/admin's web version, which was true when both were fake, but
+// the web one now really does call Firebase's sendPasswordResetEmail.
+//
+// This app cannot do the same. It signs in through POST /auth/admin/login's
+// email+password path, which bcrypt-compares User.password, and the backend
+// exposes no reset endpoint for that store -- there is no way from here to
+// send a reset mail for the credential this app actually uses. Firebase would
+// be the wrong door: it holds the *web* panel's password, so resetting it
+// would not change this app's login.
+//
+// So it now says what is true and points at the one place a reset genuinely
+// works, rather than showing a success message for an email nobody sends.
 export const ForgotPasswordScreen = () => {
   const navigation = useNavigation<any>();
-  const [email, setEmail] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-
-  const handleSubmit = () => {
-    if (!email) return;
-    setSubmitted(true);
-  };
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', padding: 24, backgroundColor: colors.background }}>
@@ -23,38 +27,21 @@ export const ForgotPasswordScreen = () => {
           <Text style={{ fontSize: 24, fontWeight: '900', color: colors.text }}>Forgot Password</Text>
         </View>
 
-        {submitted ? (
-          <View>
-            <View style={{ backgroundColor: '#E8F6EE', borderRadius: 8, padding: 16, marginBottom: 16 }}>
-              <Typography variant="body" style={{ color: colors.success }}>
-                If an account exists for {email}, a password reset link has been sent.
-              </Typography>
-            </View>
-            <Button title="Back to Sign In" onPress={() => navigation.navigate('Login')} style={{ width: '100%' }} />
-          </View>
-        ) : (
-          <View>
-            <Typography variant="body" style={{ color: colors.textSecondary, marginBottom: 16 }}>
-              Enter your email address and we'll send you a link to reset your password.
-            </Typography>
-            <Input
-              label="Email Address"
-              placeholder="admin@mechbazar.com"
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              containerStyle={{ marginBottom: 16 }}
-            />
-            <Button title="Send Reset Link" onPress={handleSubmit} style={{ width: '100%' }} />
-            <Text
-              style={{ color: colors.primary, fontWeight: '600', textAlign: 'center', marginTop: 16 }}
-              onPress={() => navigation.navigate('Login')}
-            >
-              Back to Sign In
-            </Text>
-          </View>
-        )}
+        <View>
+          <Typography variant="body" style={{ color: colors.textSecondary, marginBottom: 12 }}>
+            Password resets for the admin app aren't available on your phone yet.
+          </Typography>
+          <Typography variant="body" style={{ color: colors.textSecondary, marginBottom: 12 }}>
+            Sign in at admin.mechbazar.com and use "Forgot password?" there to
+            receive a reset email, or ask another administrator to reset it for
+            you.
+          </Typography>
+          <Typography variant="caption" style={{ marginBottom: 20 }}>
+            Already signed in? You can change your password from Settings.
+          </Typography>
+
+          <Button title="Back to Sign In" onPress={() => navigation.navigate('Login')} style={{ width: '100%' }} />
+        </View>
       </Card>
     </View>
   );

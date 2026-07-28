@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigation } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
 import { colors, Typography, Card, Button, getApiBaseUrl } from '@mechbazar/shared';
 import { RootState, logout } from '../store';
@@ -10,6 +11,7 @@ import { RootState, logout } from '../store';
 // sidebar, plus a read-only view of the logged-in admin's own account info.
 export const SettingsScreen = () => {
   const dispatch = useDispatch();
+  const navigation = useNavigation<any>();
   const user = useSelector((state: RootState) => state.auth.user);
 
   const handleLogout = () => {
@@ -41,7 +43,13 @@ export const SettingsScreen = () => {
         <Typography variant="body" style={{ marginTop: 4 }}>{getApiBaseUrl()}</Typography>
       </Card>
 
-      <Button title="Sign Out" onPress={handleLogout} style={{ backgroundColor: colors.danger, marginTop: 24 }} />
+      <Button
+        title="Change Password"
+        onPress={() => navigation.navigate('ChangePassword')}
+        style={{ marginTop: 24 }}
+      />
+
+      <Button title="Sign Out" onPress={handleLogout} style={{ backgroundColor: colors.danger, marginTop: 12 }} />
     </ScrollView>
   );
 };

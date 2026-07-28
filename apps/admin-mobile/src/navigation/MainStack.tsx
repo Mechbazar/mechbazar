@@ -28,6 +28,7 @@ import { ServiceTimeSlotsScreen } from '../screens/ServiceTimeSlotsScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { InventoryScreen } from '../screens/inventory/InventoryScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -45,6 +46,7 @@ export const MainStack = () => {
     <Stack.Navigator screenOptions={screenOptions}>
       <Stack.Screen name="Tabs" component={TabNavigator} options={{ headerShown: false }} />
       <Stack.Screen name="OrderDetail" component={OrderDetailScreen} options={{ title: 'Order Details' }} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ title: 'Change Password' }} />
       <Stack.Screen name="Categories" component={CategoriesScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Vendors" component={VendorsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="VendorDetail" component={VendorDetailScreen} options={{ title: 'Vendor Details' }} />

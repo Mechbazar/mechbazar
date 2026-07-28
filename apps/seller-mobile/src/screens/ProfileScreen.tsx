@@ -4,6 +4,7 @@ import { colors, Typography, Card, Button, Input, vendorService, geocodeService,
 import type { GeocodeSuccess } from '@mechbazar/shared';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDispatch } from 'react-redux';
+import { useNavigation } from '@react-navigation/native';
 import { logout } from '../store';
 import * as SecureStore from 'expo-secure-store';
 import { MapPin } from 'lucide-react-native';
@@ -21,6 +22,7 @@ const emptyEditForm = {
 export const ProfileScreen = () => {
   const queryClient = useQueryClient();
   const dispatch = useDispatch();
+  const navigation = useNavigation<any>();
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState(emptyEditForm);
   const [locating, setLocating] = useState(false);
@@ -192,6 +194,13 @@ export const ProfileScreen = () => {
             </View>
           )}
         </Card>
+
+        <Button
+          title="Change Password"
+          onPress={() => navigation.navigate('ChangePassword')}
+          variant="outline"
+          style={{marginBottom: 12}}
+        />
 
         <Button title="Sign Out" onPress={handleLogout} style={{backgroundColor: colors.danger}} />
       </View>

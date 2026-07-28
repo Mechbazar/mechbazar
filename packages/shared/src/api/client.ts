@@ -11,6 +11,24 @@ export const setApiBaseUrl = (baseUrl: string) => {
 export const getApiBaseUrl = () => API_URL;
 
 /**
+ * Changes the signed-in user's password.
+ *
+ * Shared because admin-mobile and seller-mobile both authenticate against the
+ * backend's own credential store (bcrypt over User.password) rather than
+ * Firebase, so both need this exact call. Do NOT reuse it for apps/admin or
+ * apps/vendor web: those sign in with Firebase, whose password lives in
+ * Firebase Auth, and this endpoint would report success without touching the
+ * credential they actually log in with.
+ *
+ * `currentPassword` is required whenever the account already has one; the
+ * backend rejects the request otherwise.
+ */
+export const changePassword = async (currentPassword: string, newPassword: string) => {
+  const response = await apiClient.patch('/auth/change-password', { currentPassword, newPassword });
+  return response.data;
+};
+
+/**
  * Turns a stored image path into something <Image> can actually load.
  *
  * The upload endpoint returns an absolute URL when a Firebase Storage bucket

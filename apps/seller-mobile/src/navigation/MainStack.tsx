@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { colors, vendorService, Loader } from '@mechbazar/shared';
 import { logout } from '../store';
 import { OnboardingWizard } from '../screens/registration/OnboardingWizard';
+import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
 import { StatusScreen } from '../screens/registration/StatusScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
 import { AnalyticsScreen } from '../screens/AnalyticsScreen';
@@ -74,6 +75,7 @@ export const MainStack = () => {
   return (
     <Stack.Navigator>
       <Stack.Screen name="Home" component={VendorGate} options={{ headerShown: false }} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} options={{ headerShown: true, title: 'Change Password' }} />
       <Stack.Screen
         name="Notifications"
         component={NotificationsScreen}

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { signOut } from 'firebase/auth';
@@ -5,9 +6,10 @@ import type { RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
 import { auth } from '../config/firebase';
 import {
-  LayoutDashboard, Package, ShoppingCart, Warehouse, Wallet, Settings, LogOut, Store, X, Tag, Bell, RotateCcw
+  LayoutDashboard, Package, ShoppingCart, Warehouse, Wallet, Settings, LogOut, Store, X, Tag, Bell, RotateCcw, KeyRound
 } from 'lucide-react';
 import { Logo } from '@mechbazar/shared/web';
+import ChangePasswordDialog from './ChangePasswordDialog';
 
 const navItems = [
   { to: '/dashboard',     icon: LayoutDashboard, label: 'Dashboard' },
@@ -27,6 +29,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ open = false, onClose }: SidebarProps) {
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const dispatch = useDispatch();
   const { user, vendorProfile } = useSelector((state: RootState) => state.auth);
 
@@ -90,6 +93,12 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
           </div>
         </div>
         <button
+          onClick={() => setShowChangePassword(true)}
+          className="flex items-center gap-3 w-full px-4 py-3 mb-2 rounded-2xl text-sm font-medium text-neutral-300 hover:bg-neutral-800 transition-all"
+        >
+          <KeyRound className="w-4 h-4" /> Change Password
+        </button>
+        <button
           onClick={() => {
             dispatch(logout());
             signOut(auth).catch(() => {});
@@ -99,6 +108,8 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
           <LogOut className="w-4 h-4" /> Sign Out
         </button>
       </div>
+
+      <ChangePasswordDialog isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
     </aside>
   );
 }
