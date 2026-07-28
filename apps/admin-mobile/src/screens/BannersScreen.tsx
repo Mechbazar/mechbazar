@@ -2,10 +2,9 @@ import React, { useState } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Alert, Modal, ScrollView, TouchableOpacity, Image, Switch } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import { colors, Typography, Card, Button, Input, Badge, Loader, adminService, getApiBaseUrl } from '@mechbazar/shared';
+import { colors, Typography, Card, Button, Input, Badge, Loader, adminService, resolveUploadUrl } from '@mechbazar/shared';
 import { Trash2, Edit2, Image as ImageIcon } from 'lucide-react-native';
 
-const getUploadUrl = (path: string) => (path?.startsWith('http') ? path : `${getApiBaseUrl().replace(/\/api\/?$/, '')}${path}`);
 
 const BANNER_TYPES = ['HOMEPAGE', 'CATEGORY', 'PROMO'];
 const emptyForm = { id: '', title: '', image: '', type: 'HOMEPAGE', link: '', isActive: true, startDate: '', endDate: '' };
@@ -115,7 +114,7 @@ export const BannersScreen = () => {
         renderItem={({ item }) => (
           <Card style={styles.card}>
             {item.image ? (
-              <Image source={{ uri: getUploadUrl(item.image) }} style={styles.bannerImg} />
+              <Image source={{ uri: resolveUploadUrl(item.image)! }} style={styles.bannerImg} />
             ) : (
               <View style={[styles.bannerImg, styles.bannerImgFallback]}><ImageIcon color={colors.textSecondary} size={24} /></View>
             )}
@@ -140,7 +139,7 @@ export const BannersScreen = () => {
           <Input label="Title" value={form.title} onChangeText={(t) => setForm({ ...form, title: t })} containerStyle={{ marginBottom: 12 }} />
 
           <Button title={uploading ? 'Uploading...' : 'Pick Image'} variant="outline" onPress={handlePickImage} loading={uploading} style={{ marginBottom: 12 }} />
-          {form.image ? <Image source={{ uri: getUploadUrl(form.image) }} style={{ width: '100%', height: 140, borderRadius: 8, marginBottom: 12 }} /> : null}
+          {form.image ? <Image source={{ uri: resolveUploadUrl(form.image)! }} style={{ width: '100%', height: 140, borderRadius: 8, marginBottom: 12 }} /> : null}
           <Input label="Or paste image URL" value={form.image} onChangeText={(t) => setForm({ ...form, image: t })} autoCapitalize="none" containerStyle={{ marginBottom: 12 }} />
 
           <Typography variant="caption" style={{ marginBottom: 8 }}>Type</Typography>

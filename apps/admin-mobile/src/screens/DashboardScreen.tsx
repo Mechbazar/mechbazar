@@ -2,10 +2,9 @@ import React from 'react';
 import { View, ScrollView, StyleSheet, RefreshControl, Alert, TouchableOpacity, Image } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
-import { colors, Typography, Card, Button, Badge, Loader, adminService, getApiBaseUrl } from '@mechbazar/shared';
+import { colors, Typography, Card, Button, Badge, Loader, adminService, resolveUploadUrl } from '@mechbazar/shared';
 import { IndianRupee, Package, Users, Store, ShoppingBag, AlertTriangle, TrendingUp, ShoppingCart } from 'lucide-react-native';
 
-const getUploadUrl = (path: string) => `${getApiBaseUrl().replace(/\/api\/?$/, '')}${path}`;
 
 const getStatusBadgeVariant = (status: string): 'success' | 'danger' | 'warning' => {
   if (status === 'DELIVERED') return 'success';
@@ -122,7 +121,7 @@ export const DashboardScreen = () => {
           topProducts.map((product: any, idx: number) => (
             <View key={product.id} style={[styles.listRow, idx === topProducts.length - 1 && { borderBottomWidth: 0 }]}>
               {product.images?.[0] ? (
-                <Image source={{ uri: getUploadUrl(product.images[0]) }} style={styles.productImg} />
+                <Image source={{ uri: resolveUploadUrl(product.images[0])! }} style={styles.productImg} />
               ) : (
                 <View style={[styles.productImg, styles.productImgFallback]}>
                   <ShoppingBag color={colors.textSecondary} size={20} />

@@ -29,8 +29,23 @@ function resolveDevHost(): string {
 // EXPO_PUBLIC_API_URL overrides the dev-host guess entirely -- required in
 // production (the Docker web build, or any build not sitting on the same LAN
 // as the backend), where there's no dev server host to derive an address from.
-export const SERVER_ORIGIN = `http://${resolveDevHost()}:${BACKEND_PORT}`;
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || `${SERVER_ORIGIN}/api`;
+const DEV_ORIGIN = `http://${resolveDevHost()}:${BACKEND_PORT}`;
+
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || `${DEV_ORIGIN}/api`;
+
+// The origin behind API_BASE_URL. Used to turn the relative "/uploads/..."
+// paths the upload endpoint returns (upload.controller.ts, when no Firebase
+// Storage bucket is configured) into absolute URLs that <Image> can load --
+// React Native cannot resolve a relative URI, since it has no page origin the
+// way a browser does.
+//
+// Derived from API_BASE_URL rather than from resolveDevHost(), which is the
+// whole point: a standalone production build has no Expo dev server, so
+// hostUri is undefined, resolveDevHost() fell back to "localhost", and every
+// relative product image resolved to http://localhost:5001/uploads/... and
+// failed to load on device. EXPO_PUBLIC_API_URL was already being honoured for
+// API calls, so only the image origin was wrong.
+export const SERVER_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '');
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

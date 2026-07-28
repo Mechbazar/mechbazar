@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Alert, Modal, ScrollView, Image, TouchableOpacity } from 'react-native';
-import { colors, Typography, Card, Button, Input, vendorService, Loader } from '@mechbazar/shared';
+import { colors, Typography, Card, Button, Input, vendorService, Loader, resolveUploadUrl } from '@mechbazar/shared';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Image as ImageIcon, Package, Pencil } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -193,7 +193,7 @@ export const ProductsScreen = () => {
           <Card style={styles.productCard}>
             <View style={{flexDirection:'row', alignItems:'center'}}>
               {item.images?.[0] ? (
-                <Image source={{ uri: item.images[0] }} style={styles.productImg} />
+                <Image source={{ uri: resolveUploadUrl(item.images[0])! }} style={styles.productImg} />
               ) : (
                 <View style={[styles.productImg, {backgroundColor: colors.surfaceHover, justifyContent:'center', alignItems:'center'}]}>
                   <Package color={colors.textSecondary} size={24} />

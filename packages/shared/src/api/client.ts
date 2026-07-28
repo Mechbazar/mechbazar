@@ -10,6 +10,24 @@ export const setApiBaseUrl = (baseUrl: string) => {
 
 export const getApiBaseUrl = () => API_URL;
 
+/**
+ * Turns a stored image path into something <Image> can actually load.
+ *
+ * The upload endpoint returns an absolute URL when a Firebase Storage bucket
+ * is configured, but a bare "/uploads/<file>" path when it is not. A browser
+ * resolves that relative path against the page origin; React Native has no
+ * page origin, so it must be made absolute against the API host or the image
+ * silently fails to load.
+ *
+ * Reads getApiBaseUrl() at call time rather than caching, so it stays correct
+ * after setApiBaseUrl(). Absolute URLs are returned untouched.
+ */
+export const resolveUploadUrl = (path?: string | null): string | null => {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${getApiBaseUrl().replace(/\/api\/?$/, '')}${path.startsWith('/') ? '' : '/'}${path}`;
+};
+
 export const apiClient = axios.create({
   baseURL: API_URL,
   timeout: 10000,

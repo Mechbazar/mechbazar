@@ -1,10 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Alert, Modal, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { colors, Typography, Card, Button, Input, Badge, Loader, adminService, getApiBaseUrl } from '@mechbazar/shared';
+import { colors, Typography, Card, Button, Input, Badge, Loader, adminService, resolveUploadUrl } from '@mechbazar/shared';
 import { Package } from 'lucide-react-native';
 
-const getUploadUrl = (path: string) => `${getApiBaseUrl().replace(/\/api\/?$/, '')}${path}`;
 
 const FILTERS = ['ALL', 'IN_STOCK', 'LOW_STOCK', 'OUT_OF_STOCK'] as const;
 const ACTION_TYPES = ['ADJUSTMENT', 'DAMAGE', 'RETURN'];
@@ -120,7 +119,7 @@ export const InventoryDashboardTab = () => {
             <Card style={styles.card}>
               <View style={{ flexDirection: 'row' }}>
                 {item.product?.images?.[0] ? (
-                  <Image source={{ uri: getUploadUrl(item.product.images[0]) }} style={styles.productImg} />
+                  <Image source={{ uri: resolveUploadUrl(item.product.images[0])! }} style={styles.productImg} />
                 ) : (
                   <View style={[styles.productImg, styles.productImgFallback]}><Package color={colors.textSecondary} size={20} /></View>
                 )}

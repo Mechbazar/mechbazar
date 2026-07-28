@@ -2,10 +2,9 @@ import React, { useState } from 'react';
 import { View, ScrollView, StyleSheet, Alert, Image, TouchableOpacity, Share } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { colors, Typography, Card, Button, Badge, Loader, adminService, getApiBaseUrl } from '@mechbazar/shared';
+import { colors, Typography, Card, Button, Badge, Loader, adminService, resolveUploadUrl } from '@mechbazar/shared';
 import { UserPlus, X } from 'lucide-react-native';
 
-const getUploadUrl = (path: string) => `${getApiBaseUrl().replace(/\/api\/?$/, '')}${path}`;
 
 const getStatusMeta = (status: string): { label: string; variant: 'primary' | 'secondary' | 'warning' | 'success' | 'danger' } => {
   switch (status) {
@@ -144,7 +143,7 @@ export const OrderDetailScreen = () => {
       {order.proofImageUrl && (
         <Card style={{ marginTop: 12 }}>
           <Typography variant="h3">Delivery Proof</Typography>
-          <Image source={{ uri: getUploadUrl(order.proofImageUrl) }} style={styles.proofImage} />
+          <Image source={{ uri: resolveUploadUrl(order.proofImageUrl)! }} style={styles.proofImage} />
         </Card>
       )}
 
