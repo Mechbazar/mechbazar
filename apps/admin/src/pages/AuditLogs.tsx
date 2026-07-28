@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import { ScrollText, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Card, Loader, Badge } from '@mechbazar/shared/web';
+import { Card, Loader, Badge, Dialog } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
 
 interface AuditLogEntry {
@@ -26,6 +27,15 @@ function actionBadge(action: string) {
   return 'warning' as const;
 }
 
+function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-[7rem_1fr] gap-3 py-2 border-b border-neutral-800 last:border-b-0">
+      <dt className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{label}</dt>
+      <dd className="text-sm text-neutral-300 min-w-0">{children}</dd>
+    </div>
+  );
+}
+
 export default function AuditLogs() {
   const { token } = useSelector((state: RootState) => state.auth);
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
@@ -33,6 +43,7 @@ export default function AuditLogs() {
   const [totalPages, setTotalPages] = useState(1);
   const [entity, setEntity] = useState('All');
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<AuditLogEntry | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -91,7 +102,20 @@ export default function AuditLogs() {
               </thead>
               <tbody className="divide-y divide-neutral-800">
                 {logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-neutral-900/50">
+                  <tr
+                    key={log.id}
+                    onClick={() => setSelected(log)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelected(log);
+                      }
+                    }}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`View details for ${log.action}`}
+                    className="hover:bg-neutral-900/50 cursor-pointer focus:outline-none focus:bg-neutral-900/50"
+                  >
                     <td className="p-4"><Badge variant={actionBadge(log.action)} className="!rounded-lg">{log.action}</Badge></td>
                     <td className="p-4 text-sm text-neutral-300">{log.entity}{log.entityId ? ` #${log.entityId.slice(-6)}` : ''}</td>
                     <td className="p-4">
@@ -128,6 +152,44 @@ export default function AuditLogs() {
           </div>
         )}
       </Card>
+
+      {/* The list payload already carries every column in full, so opening a
+          row needs no extra fetch -- it just un-truncates `details` and shows
+          the fields the table has no room for (full entity ID, phone). */}
+      <Dialog isOpen={!!selected} onClose={() => setSelected(null)} title="Audit Log Entry" size="xl">
+        {selected && (
+          <dl>
+            <DetailRow label="Action">
+              <Badge variant={actionBadge(selected.action)} className="!rounded-lg">{selected.action}</Badge>
+            </DetailRow>
+            <DetailRow label="Entity">{selected.entity}</DetailRow>
+            {selected.entityId && (
+              <DetailRow label="Entity ID">
+                <span className="font-mono text-xs break-all">{selected.entityId}</span>
+              </DetailRow>
+            )}
+            <DetailRow label="Performed By">
+              <p className="text-white font-medium">{selected.user?.name || 'Unknown'}</p>
+              <p className="text-neutral-500 text-xs">
+                {selected.user?.role}
+                {selected.user?.phone ? ` · ${selected.user.phone}` : ''}
+              </p>
+            </DetailRow>
+            <DetailRow label="Details">
+              <p className="whitespace-pre-wrap break-words">{selected.details || '—'}</p>
+            </DetailRow>
+            <DetailRow label="IP Address">
+              <span className="font-mono text-xs">{selected.ipAddress || '—'}</span>
+            </DetailRow>
+            <DetailRow label="When">
+              {new Date(selected.createdAt).toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'medium' })}
+            </DetailRow>
+            <DetailRow label="Log ID">
+              <span className="font-mono text-xs break-all">{selected.id}</span>
+            </DetailRow>
+          </dl>
+        )}
+      </Dialog>
     </div>
   );
 }

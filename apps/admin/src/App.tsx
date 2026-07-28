@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Car, ShoppingBag, Users, Layers, Package, LogOut, Store, Navigation, Warehouse, Image, Tag, CreditCard, Bike, Wrench, ClipboardList, Layers3, Menu, X, FileText, ScrollText } from 'lucide-react';
+import { LayoutDashboard, Car, ShoppingBag, Users, Layers, Package, LogOut, Store, Navigation, Warehouse, Image, Tag, CreditCard, Bike, Wrench, ClipboardList, Layers3, Menu, X, FileText, ScrollText, KeyRound } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { Logo } from '@mechbazar/shared/web';
 import { useDispatch } from 'react-redux';
@@ -31,11 +31,13 @@ import AuditLogs from './pages/AuditLogs';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import NotificationBell from './components/NotificationBell';
 import OfflineBanner from './components/OfflineBanner';
+import ChangePasswordDialog from './components/ChangePasswordDialog';
 
 function MainLayout({ children }: { children: React.ReactNode }) {
   const dispatch = useDispatch();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -111,7 +113,17 @@ function MainLayout({ children }: { children: React.ReactNode }) {
             </Link>
           ))}
         </nav>
-        <div className="p-4 border-t border-neutral-200">
+        <div className="p-4 border-t border-neutral-200 space-y-2">
+          <button
+            onClick={() => {
+              setSidebarOpen(false);
+              setShowChangePassword(true);
+            }}
+            className="flex w-full items-center justify-center gap-3 rounded-2xl bg-neutral-100 px-4 py-3 text-neutral-700 hover:text-primary transition-colors"
+          >
+            <KeyRound className="w-5 h-5" />
+            <span className="font-medium">Change Password</span>
+          </button>
           <button
             onClick={handleLogout}
             className="flex w-full items-center justify-center gap-3 rounded-2xl bg-neutral-100 px-4 py-3 text-neutral-700 hover:text-primary transition-colors"
@@ -121,6 +133,8 @@ function MainLayout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       </aside>
+
+      <ChangePasswordDialog isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
 
       <main className="flex-1 min-w-0 overflow-y-auto bg-neutral-50">
         <OfflineBanner />

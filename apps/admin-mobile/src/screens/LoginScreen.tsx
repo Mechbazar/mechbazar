@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, Alert } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
+import { Eye, EyeOff } from 'lucide-react-native';
 import { colors, Button, Typography, Input, Card, Logo, adminService, getApiBaseUrl } from '@mechbazar/shared';
 import { setAuth } from '../store';
 
@@ -12,6 +13,7 @@ export const LoginScreen = () => {
   const navigation = useNavigation<any>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -68,7 +70,6 @@ export const LoginScreen = () => {
 
         <Input
           label="Email Address"
-          placeholder="admin@mechbazar.com"
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -76,14 +77,33 @@ export const LoginScreen = () => {
           containerStyle={{ marginBottom: 16 }}
         />
 
-        <Input
-          label="Password"
-          placeholder="••••••••"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          containerStyle={{ marginBottom: 8 }}
-        />
+        {/* Label sits outside <Input> (rather than via its `label` prop) so the
+            positioning box wraps the field alone -- top/bottom 0 then centres
+            the reveal toggle without hard-coding the label's height. */}
+        <View style={{ marginBottom: 8 }}>
+          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 8 }}>Password</Text>
+          <View>
+            <Input
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={{ paddingRight: 48 }}
+            />
+            <Pressable
+              onPress={() => setShowPassword((v) => !v)}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+              style={{ position: 'absolute', right: 12, top: 0, bottom: 0, justifyContent: 'center' }}
+            >
+              {showPassword
+                ? <EyeOff size={20} color={colors.textSecondary} />
+                : <Eye size={20} color={colors.textSecondary} />}
+            </Pressable>
+          </View>
+        </View>
 
         <View style={{ alignItems: 'flex-end', marginBottom: 16 }}>
           <Text style={{ color: colors.primary, fontWeight: '600' }} onPress={() => navigation.navigate('ForgotPassword')}>

@@ -75,7 +75,6 @@ export default function Login() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            placeholder="admin@mechbazar.com"
             disabled={loading}
           />
 

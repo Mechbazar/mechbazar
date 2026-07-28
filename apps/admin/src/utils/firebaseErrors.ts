@@ -12,6 +12,10 @@ export function mapFirebaseAuthError(code: string | undefined): string {
       return 'Please enter a valid email address.';
     case 'auth/user-disabled':
       return 'This account has been disabled. Contact support.';
+    case 'auth/weak-password':
+      return 'That password is too weak. Use at least 6 characters.';
+    case 'auth/requires-recent-login':
+      return 'For security, please sign out and sign in again before changing your password.';
     case 'auth/too-many-requests':
       return 'Too many attempts. Please wait a moment and try again.';
     case 'auth/network-request-failed':
