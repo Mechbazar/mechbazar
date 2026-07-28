@@ -15,7 +15,7 @@ import {
   ImagePlus
 } from 'lucide-react';
 import { Button, Card, Badge, Dialog, Input } from '@mechbazar/shared/web';
-import { API_URL, SERVER_ORIGIN } from '../config/api';
+import { API_URL, resolveUploadUrl } from '../config/api';
 
 export default function Products() {
   const { token } = useSelector((state: RootState) => state.auth);
@@ -116,11 +116,6 @@ export default function Products() {
       category: stillValid ? formData.category : (categoriesForVehicleType(vehicleType)[0]?.name || ''),
     });
   };
-
-  // Upload returns an absolute URL when Firebase Storage is configured and a
-  // bare "/uploads/<file>" path when it falls back to local disk; only the
-  // latter needs the API origin prepended to be loadable here.
-  const resolveImageSrc = (url: string) => (/^https?:\/\//i.test(url) ? url : `${SERVER_ORIGIN}${url}`);
 
   // POST /upload stores the file (Firebase Storage when a bucket is
   // configured, otherwise the backend's own uploads/ dir) and returns the URL
@@ -533,7 +528,7 @@ export default function Products() {
                       {formData.images.map((url) => (
                         <div key={url} className="relative">
                           <img
-                            src={resolveImageSrc(url)}
+                            src={resolveUploadUrl(url)}
                             alt="Product"
                             className="h-20 w-20 rounded-xl object-cover border border-neutral-800"
                           />

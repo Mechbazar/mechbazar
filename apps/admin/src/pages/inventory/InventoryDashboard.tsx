@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { AlertCircle, ArrowDownCircle, CheckCircle, Package, Search } from 'lucide-react';
 import { Button, Card, Badge, Dialog, Input } from '@mechbazar/shared/web';
-import { API_URL } from '../../config/api';
+import { API_URL, resolveUploadUrl } from '../../config/api';
 
 export default function InventoryDashboard() {
   const { token } = useSelector((state: RootState) => state.auth);
@@ -202,7 +202,7 @@ export default function InventoryDashboard() {
                     <td className="p-4">
                       <div className="flex items-center">
                         {item.product?.images?.[0] ? (
-                          <img src={item.product.images[0]} alt="" className="w-10 h-10 rounded-lg object-cover mr-3 bg-brand-dark" />
+                          <img src={resolveUploadUrl(item.product.images[0])} alt="" className="w-10 h-10 rounded-lg object-cover mr-3 bg-brand-dark" />
                         ) : (
                           <div className="w-10 h-10 rounded-lg bg-brand-dark flex items-center justify-center mr-3">
                             <Package className="w-5 h-5 text-brand-muted" />

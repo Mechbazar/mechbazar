@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../../store';
 import { Package, Search, Edit2, Trash2, Star } from 'lucide-react';
 import { Button, Card, Badge, Dialog, Input } from '@mechbazar/shared/web';
-import { API_URL, SERVER_ORIGIN } from '../../config/api';
+import { API_URL, resolveUploadUrl } from '../../config/api';
 
 const emptyForm = {
   categoryId: '', name: '', description: '', image: '', price: '', discountPrice: '',
@@ -11,7 +11,6 @@ const emptyForm = {
   isPopular: false, isRecommended: false, isEmergency: false,
 };
 
-const resolveImg = (img?: string) => (img && img.startsWith('/') ? `${SERVER_ORIGIN}${img}` : img);
 
 export default function ServicePackages() {
   const { token } = useSelector((state: RootState) => state.auth);
@@ -203,7 +202,7 @@ export default function ServicePackages() {
               <Badge variant={pkg.isActive ? 'success' : 'neutral'} className="!rounded-full">{pkg.isActive ? 'Active' : 'Disabled'}</Badge>
             </div>
             {pkg.image && (
-              <img src={resolveImg(pkg.image)} alt={pkg.name} className="w-full h-32 object-cover rounded-xl mb-3 border border-neutral-800" />
+              <img src={resolveUploadUrl(pkg.image)} alt={pkg.name} className="w-full h-32 object-cover rounded-xl mb-3 border border-neutral-800" />
             )}
             <h3 className="text-lg font-bold text-white mb-1">{pkg.name}</h3>
             <p className="text-neutral-400 text-sm mb-1 line-clamp-2">{pkg.description || 'No description'}</p>
@@ -311,7 +310,7 @@ export default function ServicePackages() {
           <div>
             <label className="block text-sm font-semibold text-neutral-300 mb-2">Service Image</label>
             {formData.image && (
-              <img src={resolveImg(formData.image)} alt="Preview" className="w-full h-40 object-cover rounded-xl mb-2 border border-neutral-800" />
+              <img src={resolveUploadUrl(formData.image)} alt="Preview" className="w-full h-40 object-cover rounded-xl mb-2 border border-neutral-800" />
             )}
             <input
               type="file"

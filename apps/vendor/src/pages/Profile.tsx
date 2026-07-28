@@ -7,7 +7,7 @@ import {
   User, Store, FileText, CreditCard, Save, CheckCircle, Building2, MapPin, Shield, Loader2
 } from 'lucide-react';
 import { Button, Badge, Input } from '@mechbazar/shared/web';
-import { API_URL, SERVER_ORIGIN } from '../config/api';
+import { API_URL, resolveUploadUrl } from '../config/api';
 import { reverseGeocode } from '../services/geocode.service';
 import type { GeocodeSuccess } from '../services/geocode.service';
 import AddressMapPicker from '../components/maps/AddressMapPicker';
@@ -267,7 +267,7 @@ export default function Profile() {
                   {doc.status}
                 </Badge>
                 {doc.url && (
-                  <a href={`${SERVER_ORIGIN}${doc.url}`} target="_blank" rel="noreferrer" className="text-xs text-brand-secondary hover:text-brand-accent underline">View</a>
+                  <a href={resolveUploadUrl(doc.url)} target="_blank" rel="noreferrer" className="text-xs text-brand-secondary hover:text-brand-accent underline">View</a>
                 )}
               </div>
             ))}

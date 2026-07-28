@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import { Store, Phone, Search, Plus, Eye, FileText, Landmark, Building, FileCheck, MapPin } from 'lucide-react';
 import { Button, Badge, Dialog, Input, Loader } from '@mechbazar/shared/web';
-import { API_URL, SERVER_ORIGIN } from '../config/api';
+import { API_URL, resolveUploadUrl } from '../config/api';
 import AddressMapPicker from '../components/maps/AddressMapPicker';
 import PlaceAutocompleteField from '../components/maps/PlaceAutocompleteField';
 import LocationMapView from '../components/maps/LocationMapView';
@@ -317,7 +317,7 @@ export default function Vendors() {
                     {activeVendor.vendorProfile.documents.map((doc: any) => (
                       <a 
                         key={doc.id}
-                        href={`${SERVER_ORIGIN}${doc.url}`}
+                        href={resolveUploadUrl(doc.url)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex flex-col items-center justify-center p-6 bg-brand-dark hover:bg-brand-primary/10 border border-brand-border hover:border-brand-primary rounded-xl transition-all group"

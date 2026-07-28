@@ -30,8 +30,7 @@ import fs from 'fs';
 import path from 'path';
 import { Prisma } from '@prisma/client';
 import prisma from '../src/config/prisma';
-
-const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+import { UPLOADS_DIR, writeCategoryPlaceholder } from './lib/placeholder-images';
 
 async function removeJunkProducts() {
   const junk = await prisma.product.findMany({
@@ -40,6 +39,10 @@ async function removeJunkProducts() {
         { description: { contains: 'Dokan reverse withdrawal' } },
         { name: { startsWith: 'Phase2 Test' } },
         { name: { startsWith: 'Phase2b' } },
+        // "E2E Test Brake Pad" was live and APPROVED in the production
+        // catalogue, matched by neither this list nor cleanup-test-products.ts
+        // (which keys off a "[TEST]" prefix this row does not have).
+        { name: { startsWith: 'E2E Test' } },
       ],
     },
     select: { id: true, name: true },
@@ -105,7 +108,7 @@ async function mergeDuplicateCategories() {
 }
 
 async function removeEmptyJunkCategories() {
-  const junkNames = ['Test', 'Phase2 Test Category', 'Phase2b Cat', 'Uncategorized'];
+  const junkNames = ['Test', 'Phase2 Test Category', 'Phase2b Cat', 'E2E Test Category', 'Uncategorized'];
   for (const name of junkNames) {
     const rows = await prisma.category.findMany({ where: { name } });
     for (const row of rows) {
@@ -127,9 +130,13 @@ async function fixProductImages() {
 
   let fixedBareFilename = 0;
   let replacedExternal = 0;
+  let filledFromCategory = 0;
   for (const p of products) {
-    if (!p.images || p.images.length === 0) continue;
-    const next = p.images.map(img => {
+    // No early `continue` for the empty case: this used to skip products with
+    // no images at all, which meant the category-image fallback below -- the
+    // one thing that exists for products with nothing to show -- was the only
+    // branch it could never reach. Six live products sat blank because of it.
+    const next = (p.images || []).map(img => {
       if (img.startsWith('/') || img.startsWith('data:')) return img; // already fine
       if (img.startsWith('http')) {
         // Unsplash / old WordPress media API -- both are live network
@@ -151,42 +158,21 @@ async function fixProductImages() {
     });
     const cleaned = next.filter((x): x is string => !!x);
     const finalImages = cleaned.length > 0 ? cleaned : (p.category.image ? [p.category.image] : []);
+    if (cleaned.length === 0 && finalImages.length > 0) filledFromCategory++;
 
     if (JSON.stringify(finalImages) !== JSON.stringify(p.images)) {
       await prisma.product.update({ where: { id: p.id }, data: { images: finalImages } });
     }
   }
-  console.log(`[product images] fixed ${fixedBareFilename} bare-filename reference(s), replaced ${replacedExternal} external URL(s).`);
-}
-
-const CATEGORY_ICON_COLORS = ['#DA3830', '#2ECC71', '#1C7ED6', '#F59F00', '#9C36B5', '#0CA678'];
-
-function slugify(name: string) {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-}
-
-// Generates a simple, professional placeholder: category initial in a
-// tinted circle on a light card background. Written to disk (not a data URI
-// inlined into the DB) so it's served the same way as every real category
-// photo (a plain /uploads/ path), and is trivial to swap out later.
-function generateCategorySvg(name: string, colorSeed: number): string {
-  const color = CATEGORY_ICON_COLORS[colorSeed % CATEGORY_ICON_COLORS.length];
-  const initial = name.trim().charAt(0).toUpperCase();
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
-  <rect width="400" height="400" fill="#F8F9FA"/>
-  <circle cx="200" cy="170" r="90" fill="${color}" fill-opacity="0.12"/>
-  <text x="200" y="200" font-family="Arial, sans-serif" font-size="88" font-weight="700" fill="${color}" text-anchor="middle">${initial}</text>
-  <text x="200" y="330" font-family="Arial, sans-serif" font-size="26" font-weight="600" fill="#1B1B1B" text-anchor="middle">${name.length > 22 ? name.slice(0, 20) + '…' : name}</text>
-</svg>`;
+  console.log(`[product images] fixed ${fixedBareFilename} bare-filename reference(s), replaced ${replacedExternal} external URL(s), filled ${filledFromCategory} blank product(s) from their category image.`);
 }
 
 async function backfillCategoryImages() {
   const missing = await prisma.category.findMany({ where: { image: null } });
   let i = 0;
   for (const cat of missing) {
-    const filename = `cat-placeholder-${slugify(cat.name)}-${cat.vehicleType.toLowerCase()}.svg`;
-    fs.writeFileSync(path.join(UPLOADS_DIR, filename), generateCategorySvg(cat.name, i));
-    await prisma.category.update({ where: { id: cat.id }, data: { image: `/uploads/${filename}` } });
+    const url = writeCategoryPlaceholder(cat.name, cat.vehicleType, i);
+    await prisma.category.update({ where: { id: cat.id }, data: { image: url } });
     i++;
   }
   console.log(`[category images] generated ${missing.length} placeholder image(s).`);
@@ -233,8 +219,12 @@ async function main() {
   await removeJunkProducts();
   await mergeDuplicateCategories();
   await removeEmptyJunkCategories();
-  await fixProductImages();
+  // Categories first: fixProductImages() falls back to the category's image for
+  // products left with nothing, and every category was imageless at the time of
+  // writing, so running these the other way round (as this did) guaranteed the
+  // fallback found null and left the product blank.
   await backfillCategoryImages();
+  await fixProductImages();
   await backfillSpecifications();
   console.log('\nDone.');
 }

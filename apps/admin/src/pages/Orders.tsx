@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import type { RootState } from '../store';
 import { Package, Search, Clock, Truck, CheckCircle, MoreVertical, UserPlus, X } from 'lucide-react';
 import { Badge, Card } from '@mechbazar/shared/web';
-import { API_URL, SERVER_ORIGIN } from '../config/api';
+import { API_URL, resolveUploadUrl } from '../config/api';
 import LocationMapView from '../components/maps/LocationMapView';
 
 const ORDERS_POLL_INTERVAL_MS = 20000;
@@ -498,7 +498,7 @@ export default function Orders() {
               {selectedOrder.proofImageUrl && (
                 <div className="mb-6">
                   <p className="font-bold text-white mb-2 border-b border-neutral-800 pb-2">Delivery Proof</p>
-                  <img src={`${SERVER_ORIGIN}${selectedOrder.proofImageUrl}`} alt="Delivery proof" className="rounded-lg max-h-64 object-cover" />
+                  <img src={resolveUploadUrl(selectedOrder.proofImageUrl)} alt="Delivery proof" className="rounded-lg max-h-64 object-cover" />
                 </div>
               )}
 

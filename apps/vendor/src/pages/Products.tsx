@@ -7,7 +7,7 @@ import {
   AlertCircle, Upload, Save, ImagePlus, X
 } from 'lucide-react';
 import { Button, Badge, Dialog, Input, Loader } from '@mechbazar/shared/web';
-import { API_URL, SERVER_ORIGIN } from '../config/api';
+import { API_URL, resolveUploadUrl } from '../config/api';
 
 // `images` was missing entirely, so every product a vendor listed through this
 // form was saved with an empty images[] and rendered as a placeholder in the
@@ -62,11 +62,6 @@ export default function Products() {
     setImageError('');
     setShowAddModal(true);
   };
-
-  // Upload returns an absolute URL when Firebase Storage is configured and a
-  // bare "/uploads/<file>" path when it falls back to local disk; only the
-  // latter needs the API origin prepended to be loadable here.
-  const resolveImageSrc = (url: string) => (/^https?:\/\//i.test(url) ? url : `${SERVER_ORIGIN}${url}`);
 
   // POST /upload stores the file (Firebase Storage when a bucket is configured,
   // otherwise the backend's own uploads/ dir) and returns the URL to persist on
@@ -221,7 +216,7 @@ export default function Products() {
                           Listings with no image were previously indistinguishable
                           here from ones with a good photo. */}
                       {product.images?.[0] ? (
-                        <img src={resolveImageSrc(product.images[0])} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover border border-brand-muted" />
+                        <img src={resolveUploadUrl(product.images[0])} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover border border-brand-muted" />
                       ) : (
                         <div className="h-12 w-12 shrink-0 rounded-lg border border-dashed border-brand-muted flex items-center justify-center" title="No image — customers see a placeholder">
                           <ImagePlus className="w-4 h-4 text-gray-600" />
@@ -321,7 +316,7 @@ export default function Products() {
                   <div className="flex flex-wrap gap-3 mb-3">
                     {formData.images.map(url => (
                       <div key={url} className="relative">
-                        <img src={resolveImageSrc(url)} alt="Product" className="h-20 w-20 rounded-lg object-cover border border-brand-muted" />
+                        <img src={resolveUploadUrl(url)} alt="Product" className="h-20 w-20 rounded-lg object-cover border border-brand-muted" />
                         <button
                           type="button"
                           onClick={() => handleRemoveImage(url)}

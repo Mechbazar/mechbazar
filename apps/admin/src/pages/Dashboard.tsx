@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Users, Package, ShoppingBag, DollarSign, Activity, TrendingUp, AlertCircle, ClipboardList, Wrench, CheckCircle, XCircle, Clock, UserPlus, Navigation as NavigationIcon } from 'lucide-react';
 import axios from 'axios';
 import { Card, Badge } from '@mechbazar/shared/web';
-import { API_URL, SERVER_ORIGIN } from '../config/api';
+import { API_URL, resolveUploadUrl } from '../config/api';
 import RevenueChart from '../components/RevenueChart';
 
 export default function Dashboard() {
@@ -182,7 +182,7 @@ export default function Dashboard() {
                   <div className="flex items-center gap-4 overflow-hidden">
                     <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-neutral-800 border border-neutral-800">
                       {product.images && product.images[0] ? (
-                        <img src={`${SERVER_ORIGIN}${product.images[0]}`} alt={product.name} className="h-full w-full object-cover" />
+                        <img src={resolveUploadUrl(product.images[0])} alt={product.name} className="h-full w-full object-cover" />
                       ) : (
                         <ShoppingBag className="w-6 h-6 text-neutral-400" />
                       )}
