@@ -81,7 +81,13 @@ services:
     restart: unless-stopped
   mobile:
     build:
-      context: ./apps/mobile
+      # Repo root, not ./apps/mobile: this app depends on the local shared
+      # package via "@mechbazar/shared": "file:../../packages/shared", and that
+      # relative path has to exist at install time. An apps/mobile-only context
+      # fails the web bundle with "Unable to resolve module @mechbazar/shared".
+      # Same reason apps/admin and apps/vendor already build from the root.
+      context: .
+      dockerfile: apps/mobile/Dockerfile
       args:
         EXPO_PUBLIC_API_URL: https://mechbazar.com/api
         EXPO_PUBLIC_FIREBASE_VAPID_KEY: BKzZ31SGSXlgFaHsazwM9jXwmNqoUUrNfEAA1WJiQle7kipWHVcWi2fyiEhYfHTCJusQWynxPWJQ1wggAHLNjak

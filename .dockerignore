@@ -19,3 +19,17 @@ node_modules
 **/.cert
 
 .git
+
+# Native build inputs and outputs. apps/mobile now builds from the repo root
+# (it needs packages/shared for the shared <Logo/>), which pulled its android/,
+# .expo/ and any locally built .apk/.aab into the build context -- hundreds of
+# MB shipped to the daemon on every build, none of it used by the web bundle.
+# The web build only ever reads src/, app.config.js and package.json.
+**/.expo
+**/android
+**/ios
+**/*.apk
+**/*.aab
+**/*.keystore
+**/*.jks
+**/*.log
