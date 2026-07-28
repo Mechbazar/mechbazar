@@ -20,6 +20,10 @@ android/
 ios/
 *.keystore
 *.jks
+# Local signing credentials for `eas build --local`: holds the keystore and
+# key passwords in plaintext, so it must never be committed. See
+# docs/LOCAL_BUILDS.md for how to regenerate it from EAS.
+credentials.json
 
 # Runtime data — user uploads & KYC documents must never be committed
 uploads/

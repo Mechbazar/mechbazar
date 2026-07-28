@@ -8,6 +8,7 @@
       "distribution": "internal"
     },
     "preview": {
+      "credentialsSource": "local",
       "distribution": "internal",
       "android": {
         "buildType": "apk"
@@ -17,6 +18,7 @@
       }
     },
     "production": {
+      "credentialsSource": "local",
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_URL": "https://mechbazar.com/api"
