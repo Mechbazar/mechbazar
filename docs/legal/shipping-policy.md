@@ -37,7 +37,7 @@ d. We do not ship outside India, and do not deliver to APO/FPO addresses or to
 | **Express / Quick Delivery** | **Information Required** from order confirmation | Select PIN codes in Information Required, for in-stock items marked *Express* |
 | **Same-Day / Next-Day Delivery** | Same day or next business day | Metro PIN codes, orders placed before the cut-off shown at checkout |
 | **Standard Delivery** | **Information Required** | All serviceable PIN codes |
-| **Bulky / Heavy Goods** | **[3–7] business days** | Subject to carrier and PIN-code restrictions |
+| **Bulky / Heavy Goods** | **5 business days** | Subject to carrier and PIN-code restrictions |
 | **Special Order / Import Parts** | As stated on the product page | Made-to-order and non-stock items |
 
 **All timelines are estimates**, calculated in **business days** from the time the

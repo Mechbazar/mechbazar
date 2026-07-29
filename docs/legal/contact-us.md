@@ -35,12 +35,12 @@ questions.
 | | |
 |---|---|
 | **Registered Office** | Sector 70A Extension Road, Gurugram, Haryana, India |
-| **Operational / Corporate Office** | Information Required |
+| **Operational / Corporate Office** | Not Applicable (same as Registered Office) |
 | **CIN** | U45300HR2026PTC148525 |
 | **GSTIN** | Not Applicable (GST registration pending) |
 | **Website** | https://mechbazar.com |
-| **Play Store** | Information Required (app not yet published on Google Play) |
-| **App Store** | Information Required (app not yet published on the App Store) |
+| **Play Store** | Not Applicable (app not yet published on Google Play) |
+| **App Store** | Not Applicable (app not yet published on the App Store) |
 
 ---
 

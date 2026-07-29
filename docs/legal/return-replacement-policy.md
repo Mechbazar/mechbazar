@@ -167,7 +167,7 @@ processed or reimbursed.
 ## 8. Reverse Pick-Up
 
 a. Once a return is approved, a **reverse pick-up** is scheduled within
-   **[2–4] business days** at serviceable PIN codes.
+   **3 business days** at serviceable PIN codes.
 b. Pack the item in its **original packaging inside an outer box**. Do not affix
    tape or labels directly to the manufacturer's box.
 c. Enclose the **invoice copy** and the return authorisation reference.

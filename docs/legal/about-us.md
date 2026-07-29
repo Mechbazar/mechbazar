@@ -148,11 +148,11 @@ background and the kind of role you are looking for.
 
 **MECH BAZAR PRIVATE LIMITED**
 Registered Office: Sector 70A Extension Road, Gurugram, Haryana, India
-Operational Office: Information Required
+Operational Office: Not Applicable (same as Registered Office)
 CIN: U45300HR2026PTC148525 | GSTIN: Not Applicable (GST registration pending)
 Email: support@mechbazar.com | Phone: +91 9772704981 (Information Required)
 Website: https://mechbazar.com
 
-Download the app: Information Required (app not yet published on Google Play) · Information Required (app not yet published on the App Store)
+Download the app: Not Applicable (app not yet published on Google Play) · Not Applicable (app not yet published on the App Store)
 
 © 2026 MECH BAZAR PRIVATE LIMITED. All rights reserved.
