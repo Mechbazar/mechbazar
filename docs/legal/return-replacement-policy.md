@@ -174,8 +174,8 @@ c. Enclose the **invoice copy** and the return authorisation reference.
 d. Hand over **all** accessories, hardware and free items received with the
    product. Missing components are deducted from the refund.
 e. **Up to [2] pick-up attempts** are made. If both fail because nobody is
-   available, the return request is closed and must be raised afresh, subject to
-   the window still being open.
+   available, a **₹200 no-show fee** applies and the return request is closed
+   and must be raised afresh, subject to the window still being open.
 f. Where reverse pick-up is **not available** at your PIN code, we will authorise
    a **self-ship** return and reimburse reasonable courier charges — up to
    **₹[200]**, against a receipt — where the fault is ours or the Vendor's.
@@ -222,7 +222,7 @@ e. Some manufacturers require the failed part to be surrendered for inspection
    before a claim is settled. Turnaround in such cases follows the
    manufacturer's process and may extend beyond our standard timelines.
 
-**Workmanship warranty** on doorstep services is **[30] days** or **[1,000]
+**Workmanship warranty** on doorstep services is **30 days** or **1,000
 kilometres**, whichever occurs first, unless a longer period is stated on the
 service page. The remedy is re-performance at no cost.
 

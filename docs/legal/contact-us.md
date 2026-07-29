@@ -70,7 +70,7 @@ Protection (E-Commerce) Rules, 2020** and the **Information Technology
 ### Level 1 — Customer Support
 
 Email support@mechbazar.com or call +91 9772704981 during Information Required.
-Most issues are resolved here within **[48] hours**.
+Most issues are resolved here within **48 hours**.
 
 ### Level 2 — Grievance Officer
 

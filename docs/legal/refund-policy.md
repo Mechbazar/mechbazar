@@ -179,7 +179,7 @@ mechanic's observation. The warranty period, terms and remedy (repair,
 replacement or pro-rata credit) are those declared by the manufacturer or
 Vendor on the product page.
 
-Warranty on **workmanship** for doorstep services is **[30] days** or **[1,000]
+Warranty on **workmanship** for doorstep services is **30 days** or **1,000
 kilometres**, whichever occurs first, unless a longer period is stated on the
 service page. The remedy is re-performance of the work at no cost. Warranty
 claims are excluded where the vehicle was subsequently worked on by a third

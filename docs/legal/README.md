@@ -65,7 +65,7 @@ folder.
 | `Information Required` | Quick-commerce delivery promise | 60–120 minutes |
 | `Information Required` | Standard delivery window | 2–5 business days |
 | `Information Required` | Return window | 10 |
-| `5–10 business days` | Refund turnaround (bank/UPI transfer of cash already paid) | 7–10 business days |
+| `5–10 business days` | Refund turnaround (bank/UPI transfer of cash already paid) | |
 | `Information Required` | Order value for free delivery | ₹999 |
 | `Information Required` | Standard delivery fee | ₹49 |
 | `Information Required` | Express/quick-delivery fee | ₹79 |

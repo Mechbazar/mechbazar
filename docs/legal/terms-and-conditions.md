@@ -206,7 +206,7 @@ f. **Exclusions.** Mechanics may decline work that is unsafe, requires a lift,
    control systems, speed limiters, safety systems or vehicle identification
    numbers, or is otherwise unlawful.
 g. **Workmanship warranty.** Unless stated otherwise on the service page,
-   workmanship is warranted for **[30] days** or **[1,000] kilometres**, whichever
+   workmanship is warranted for **30 days** or **1,000 kilometres**, whichever
    occurs first. Parts carry only the warranty offered by their manufacturer or
    Vendor. The warranty is void where the vehicle has been subsequently worked on
    by a third party, misused, raced, overloaded, or operated after a fault was

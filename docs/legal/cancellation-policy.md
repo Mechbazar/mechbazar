@@ -59,15 +59,15 @@ processing begins immediately:
 
 | When you cancel | Charge | Refund of advance |
 |---|---|---|
-| More than **[4] hours** before the slot | None | 100% |
-| Within **[4] hours** of the slot, before the Mechanic departs | **Information Required** | Balance refunded |
+| More than **4 hours** before the slot | None | 100% |
+| Within **4 hours** of the slot, before the Mechanic departs | **Information Required** | Balance refunded |
 | After the Mechanic has departed or arrived, before work begins | Visitation / inspection charge as shown at booking | Balance refunded |
 | After work has begun | Charged for parts fitted and labour performed to that point | Balance, if any, refunded |
 | After the completion OTP is shared | Not cancellable — the service is complete | Nil |
 
 ### Rescheduling
 
-You may **reschedule** a Booking free of charge up to **[4] hours** before the
+You may **reschedule** a Booking free of charge up to **4 hours** before the
 slot, subject to Mechanic availability. Rescheduling is preferable to
 cancellation and avoids any fee. Where the app does not offer a direct reschedule
 for a given booking type, cancel and rebook, or contact support to reschedule for

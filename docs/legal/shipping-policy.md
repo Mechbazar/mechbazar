@@ -140,7 +140,7 @@ e. COD may be withdrawn from accounts with a history of repeatedly refused or
 
 ## 9. Failed Deliveries, Reattempts and RTO
 
-a. Our delivery partners make up to **[3] delivery attempts**. Each attempt is
+a. Our delivery partners make up to **3 delivery attempts**. Each attempt is
    preceded by a call or notification.
 b. If delivery fails on all attempts — nobody available, address incorrect or
    incomplete, entry refused, phone unreachable, or the recipient declines to
