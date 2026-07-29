@@ -1,5 +1,6 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import { initializeAppCheck, ReCaptchaV3Provider, getToken as getAppCheckTokenWeb, AppCheck } from 'firebase/app-check';
 
 // Firebase JS SDK config for the WEB build only.
 //
@@ -31,5 +32,45 @@ const firebaseConfig = {
 
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const auth = getAuth(app);
+
+// App Check (web): reCAPTCHA v3 is the only web provider Firebase offers.
+// Requires a site key created under Firebase Console -> App Check -> Apps ->
+// this web app -> reCAPTCHA v3, which does not exist yet for this project --
+// EXPO_PUBLIC_RECAPTCHA_V3_SITE_KEY is unset until then, and initialization is
+// skipped entirely rather than calling initializeAppCheck with an invalid key
+// (which throws). api.ts's request interceptor already tolerates
+// getWebAppCheckToken() returning null, so this being unset changes nothing
+// about whether the app works today.
+const RECAPTCHA_V3_SITE_KEY = process.env.EXPO_PUBLIC_RECAPTCHA_V3_SITE_KEY || '';
+let appCheckInstance: AppCheck | null = null;
+if (RECAPTCHA_V3_SITE_KEY) {
+  if (__DEV__ && typeof window !== 'undefined') {
+    // Lets a local `expo start --web` dev session pass App Check without a
+    // real reCAPTCHA solve -- register the token Firebase logs to the console
+    // under Firebase Console -> App Check -> Manage debug tokens. Never set in
+    // a production web build (EXPO_PUBLIC_* vars are compiled in, but __DEV__
+    // is stripped false for prod builds, so this branch never ships).
+    (window as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+  try {
+    appCheckInstance = initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(RECAPTCHA_V3_SITE_KEY),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (err) {
+    console.warn('[appCheck] web init failed:', err);
+  }
+}
+
+export const getWebAppCheckToken = async (): Promise<string | null> => {
+  if (!appCheckInstance) return null;
+  try {
+    const { token } = await getAppCheckTokenWeb(appCheckInstance);
+    return token || null;
+  } catch (err) {
+    console.warn('[appCheck] web getToken failed:', err);
+    return null;
+  }
+};
 
 export { app, auth };

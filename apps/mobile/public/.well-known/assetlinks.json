@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.mechbazar.mobile",
+      "sha256_cert_fingerprints": [
+        "08:50:B8:6D:FE:B7:5C:46:71:1B:A8:4F:83:A0:0B:81:1E:B4:E8:9C:0F:85:C3:E5:7B:C7:03:DD:90:6F:DC:03"
+      ]
+    }
+  }
+]

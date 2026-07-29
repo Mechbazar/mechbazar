@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { getAppCheckToken } from './appCheckToken';
 
 const BACKEND_PORT = Number(process.env.EXPO_PUBLIC_BACKEND_PORT || 5001);
 
@@ -53,6 +54,24 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+// Attaches an App Check token when one is available (see services/appCheck.ts
+// / appCheckToken.web.ts). Backend enforcement is off by default
+// (ENFORCE_APP_CHECK, apps/backend/src/middlewares/appCheck.ts) until both the
+// Firebase Console providers are registered and this rolls out in a real
+// build, so a missing/failed token here just means the header is omitted --
+// requests are never blocked client-side by this.
+api.interceptors.request.use(async (config) => {
+  try {
+    const token = await getAppCheckToken();
+    if (token) {
+      config.headers['X-Firebase-AppCheck'] = token;
+    }
+  } catch {
+    // Never let App Check itself break an API call.
+  }
+  return config;
 });
 
 export const setAuthToken = (token: string | null) => {

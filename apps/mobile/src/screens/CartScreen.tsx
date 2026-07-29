@@ -1,17 +1,21 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Loader } from '@mechbazar/shared';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { updateQuantity, clearCart } from '../store/cartSlice';
-import { API_BASE_URL } from '../services/api';
 import { ServiceAddress } from '../types/service';
 import { fetchMyAddresses } from '../services/address.service';
+import { createOrder, validateCoupon as validateCouponApi } from '../services/order.service';
+import { getPaymentConfig, openRazorpayCheckout, verifyRazorpayPayment } from '../services/payment.service';
 import { AddressPickerSheet } from '../components/services/AddressPickerSheet';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
+
+type PaymentMethod = 'COD' | 'RAZORPAY';
 
 export default function CartScreen() {
   const navigation = useNavigation();
@@ -21,6 +25,9 @@ export default function CartScreen() {
   const [selectedAddress, setSelectedAddress] = useState<ServiceAddress | null>(null);
   const [isLoadingAddress, setIsLoadingAddress] = useState(true);
   const [showAddressSheet, setShowAddressSheet] = useState(false);
+  const [razorpayEnabled, setRazorpayEnabled] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
   const cartItems = useSelector((state: RootState) => state.cart.items);
   const deliveryFee = useSelector((state: RootState) => state.cart.deliveryFee);
@@ -50,6 +57,13 @@ export default function CartScreen() {
     });
   }, [token]);
 
+  useEffect(() => {
+    // "Pay Online" only ever appears once the backend reports a configured
+    // gateway -- unset Razorpay keys means this silently stays COD-only, no
+    // build-time flag needed. See services/payment.service.ts on the backend.
+    getPaymentConfig().then(config => setRazorpayEnabled(config.razorpayEnabled));
+  }, []);
+
   const handleChangeAddress = () => {
     setShowAddressSheet(true);
   };
@@ -76,68 +90,93 @@ export default function CartScreen() {
   const totalSavings = (totalOriginalPrice - subtotal) + discount;
 
   const handleApplyCoupon = async () => {
-    if (!couponCode) return;
+    if (!couponCode || !token || isApplyingCoupon) return;
+    setIsApplyingCoupon(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/coupons/validate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token || ''}`
-        },
-        body: JSON.stringify({ code: couponCode, cartTotal: subtotal })
-      });
-      const data = await response.json();
-      if (response.ok) {
-        if (data.discountType === 'percentage') {
-          setDiscount((subtotal * data.discountValue) / 100);
+      const result = await validateCouponApi(token, couponCode, subtotal);
+      if (result.ok) {
+        if (result.discountType === 'percentage') {
+          setDiscount((subtotal * (result.discountValue || 0)) / 100);
         } else {
-          setDiscount(data.discountValue);
+          setDiscount(result.discountValue || 0);
         }
-        alert(data.message || 'Coupon applied successfully');
+        alert(result.message || 'Coupon applied successfully');
       } else {
         setDiscount(0);
-        alert(data.error || 'Invalid coupon');
+        alert(result.error || 'Invalid coupon');
       }
-    } catch (err) {
-      console.error(err);
-      alert('Network error validating coupon');
+    } finally {
+      setIsApplyingCoupon(false);
     }
   };
 
   const handleCheckout = async () => {
-    if (!selectedAddress) {
+    if (!selectedAddress || !token) {
       alert('Please select a delivery address before checking out.');
       return;
     }
     setIsProcessing(true);
     try {
       const isB2B = user?.role === 'B2B' || user?.accountType === 'WHOLESALE' || user?.accountType === 'B2B';
-      const payload = {
+      const result = await createOrder(token, {
         items: cartItems.map(item => ({ id: item.id, qty: item.qty })),
         addressId: selectedAddress.id,
         couponCode,
         isB2B,
-        phone: user?.phone
-      };
-
-      const response = await fetch(`${API_BASE_URL}/orders`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token || ''}`
-        },
-        body: JSON.stringify(payload)
+        phone: user?.phone,
+        payment_method: paymentMethod,
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        dispatch(clearCart());
-        alert('Order placed successfully!');
-        (navigation as any).navigate('MainTabs', { screen: 'Orders' });
-      } else {
-        alert(data.error || 'Failed to place order');
+      if (!result.ok || !result.order) {
+        alert(result.error || 'Failed to place order');
+        return;
       }
+
+      dispatch(clearCart());
+
+      // The backend only hands back a razorpayOrderId when it actually
+      // created one server-side (paymentMethod resolved to RAZORPAY there
+      // too) -- so this branch is unreachable in the current COD-only
+      // deployment, exactly like every other Razorpay code path.
+      if (result.razorpayOrderId && result.razorpayKeyId) {
+        const checkoutResult = await openRazorpayCheckout({
+          razorpayOrderId: result.razorpayOrderId,
+          keyId: result.razorpayKeyId,
+          amount: result.order.finalAmount,
+          orderId: result.order.id,
+          prefillPhone: user?.phone,
+        });
+
+        if (!checkoutResult.success) {
+          if (checkoutResult.cancelled) {
+            (navigation as any).navigate('PaymentCancelled', {
+              orderId: result.order.id,
+              amount: result.order.finalAmount,
+              razorpayOrderId: result.razorpayOrderId,
+              razorpayKeyId: result.razorpayKeyId,
+            });
+          } else {
+            (navigation as any).navigate('PaymentFailure', { orderId: result.order.id, reason: checkoutResult.error });
+          }
+          return;
+        }
+
+        const verification = await verifyRazorpayPayment(token, {
+          razorpay_order_id: checkoutResult.razorpay_order_id!,
+          razorpay_payment_id: checkoutResult.razorpay_payment_id!,
+          razorpay_signature: checkoutResult.razorpay_signature!,
+        });
+
+        if (verification.ok) {
+          (navigation as any).navigate('PaymentSuccess', { orderId: result.order.id, amount: result.order.finalAmount });
+        } else {
+          (navigation as any).navigate('PaymentPending', { orderId: result.order.id });
+        }
+        return;
+      }
+
+      alert('Order placed successfully!');
+      (navigation as any).navigate('MainTabs', { screen: 'Orders' });
     } catch (error) {
       console.error(error);
       alert('Network error. Could not place order.');
@@ -230,8 +269,16 @@ export default function CartScreen() {
         onChangeText={setCouponCode}
         placeholderTextColor={colors.textMuted}
       />
-      <TouchableOpacity style={styles.applyBtn} onPress={handleApplyCoupon}>
-        <Text style={styles.applyBtnText}>Apply</Text>
+      <TouchableOpacity
+        style={[styles.applyBtn, isApplyingCoupon && { opacity: 0.6 }]}
+        onPress={handleApplyCoupon}
+        disabled={isApplyingCoupon}
+      >
+        {isApplyingCoupon ? (
+          <Loader size="small" color={colors.white} />
+        ) : (
+          <Text style={styles.applyBtnText}>Apply</Text>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -281,7 +328,7 @@ export default function CartScreen() {
         </TouchableOpacity>
       </View>
       {isLoadingAddress ? (
-        <ActivityIndicator size="small" color={colors.primary} />
+        <Loader size="small" />
       ) : selectedAddress ? (
         <View style={styles.stackedInput}>
           <Text style={styles.addressType}>{selectedAddress.isDefault ? '⭐ ' : '📍 '}{selectedAddress.title}</Text>
@@ -297,15 +344,26 @@ export default function CartScreen() {
     </View>
   );
 
+  const renderPaymentOption = (method: PaymentMethod, label: string) => {
+    const selected = paymentMethod === method;
+    return (
+      <TouchableOpacity
+        style={[styles.paymentRadioRow, !selected && styles.paymentRadioRowUnselected]}
+        onPress={() => setPaymentMethod(method)}
+      >
+        <View style={[styles.radioSelected, !selected && styles.radioUnselected]}>
+          {selected && <View style={styles.radioDot} />}
+        </View>
+        <Text style={styles.paymentText}>{label}</Text>
+      </TouchableOpacity>
+    );
+  };
+
   const renderPaymentSelection = () => (
     <View style={styles.addressCard}>
       <Text style={styles.addressTitle}>Payment</Text>
-      <View style={styles.paymentRadioRow}>
-        <View style={styles.radioSelected}>
-          <View style={styles.radioDot} />
-        </View>
-        <Text style={styles.paymentText}>Cash on Delivery</Text>
-      </View>
+      {renderPaymentOption('COD', 'Cash on Delivery')}
+      {razorpayEnabled && renderPaymentOption('RAZORPAY', 'Pay Online (Cards, UPI, Netbanking)')}
     </View>
   );
 
@@ -449,7 +507,9 @@ const styles = StyleSheet.create({
   addressText: { fontSize: 13, color: colors.textMuted, lineHeight: 20 },
 
   paymentRadioRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: colors.primary, borderRadius: 10, padding: 12, marginTop: 10 },
+  paymentRadioRowUnselected: { borderColor: colors.borderLight },
   radioSelected: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.primary, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  radioUnselected: { borderColor: colors.borderLight },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
   paymentText: { fontSize: 14, fontWeight: '600', color: colors.textDark },
 

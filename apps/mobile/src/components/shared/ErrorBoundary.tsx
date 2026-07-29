@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { Button, Typography } from '@mechbazar/shared';
 
 // The app previously had no error boundary at all. React's default behaviour on
 // an uncaught render error is to unmount the entire tree, so a single bad field
@@ -52,11 +53,11 @@ export default class ErrorBoundary extends React.Component<Props, State> {
       <View style={styles.container}>
         <ScrollView contentContainerStyle={styles.content}>
           <Text style={styles.emoji}>🔧</Text>
-          <Text style={styles.title}>Something went wrong</Text>
-          <Text style={styles.body}>
+          <Typography variant="h2" style={styles.title}>Something went wrong</Typography>
+          <Typography variant="body" color="#5A6068" style={styles.body}>
             {this.props.message ??
               'MechBazar hit an unexpected problem on this screen. Your account and orders are safe.'}
-          </Text>
+          </Typography>
 
           {__DEV__ && (
             <View style={styles.devBox}>
@@ -64,13 +65,11 @@ export default class ErrorBoundary extends React.Component<Props, State> {
             </View>
           )}
 
-          <TouchableOpacity style={styles.button} onPress={this.handleReset} activeOpacity={0.85}>
-            <Text style={styles.buttonText}>Try Again</Text>
-          </TouchableOpacity>
+          <Button title="Try Again" variant="danger" onPress={this.handleReset} />
 
-          <Text style={styles.help}>
+          <Typography variant="caption" color="#8E8E93" style={styles.help}>
             If this keeps happening, contact us from Account → Help Center.
-          </Text>
+          </Typography>
         </ScrollView>
       </View>
     );
@@ -81,8 +80,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FA' },
   content: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', padding: 28 },
   emoji: { fontSize: 48, marginBottom: 16 },
-  title: { fontSize: 20, fontWeight: '800', color: '#111112', marginBottom: 10, textAlign: 'center' },
-  body: { fontSize: 14, color: '#5A6068', textAlign: 'center', lineHeight: 21, marginBottom: 22 },
+  title: { marginBottom: 10, textAlign: 'center' },
+  body: { textAlign: 'center', marginBottom: 22 },
   devBox: {
     backgroundColor: '#FDECEA',
     borderRadius: 8,
@@ -91,12 +90,5 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   devText: { fontSize: 12, color: '#9B1C1C', fontFamily: 'monospace' },
-  button: {
-    backgroundColor: '#E53935',
-    paddingHorizontal: 32,
-    paddingVertical: 13,
-    borderRadius: 10,
-  },
-  buttonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  help: { fontSize: 12, color: '#8E8E93', textAlign: 'center', marginTop: 18 },
+  help: { textAlign: 'center', marginTop: 18 },
 });

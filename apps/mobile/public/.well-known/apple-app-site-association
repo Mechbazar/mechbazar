@@ -1,0 +1,44 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "REPLACE_WITH_APPLE_TEAM_ID.com.mechbazar.mobile",
+        "paths": [
+          "/",
+          "/product/*",
+          "/category",
+          "/service/*",
+          "/service-booking/*",
+          "/service-tracking/*",
+          "/service-invoice/*",
+          "/service-review/*",
+          "/service-chat/*",
+          "/service-bookings",
+          "/emergency/*",
+          "/emergency-tracking/*",
+          "/garage",
+          "/cart",
+          "/wishlist",
+          "/dashboard",
+          "/edit-profile",
+          "/addresses",
+          "/notifications",
+          "/help",
+          "/wholesale",
+          "/order/*",
+          "/payment/*",
+          "/privacy-policy",
+          "/terms",
+          "/refund-policy",
+          "/shipping-policy",
+          "/cancellation-policy",
+          "/return-policy",
+          "/contact",
+          "/about",
+          "/account-deletion"
+        ]
+      }
+    ]
+  }
+}

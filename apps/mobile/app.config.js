@@ -103,6 +103,12 @@ module.exports = {
       // form factor. iPhone-only is fully permitted by Apple.
       supportsTablet: false,
       bundleIdentifier: 'com.mechbazar.mobile',
+      // Universal Links: lets https://mechbazar.com/... open this app directly
+      // instead of Safari. Requires /.well-known/apple-app-site-association to
+      // be served from the domain (see apps/mobile/public/.well-known/) with the
+      // real Apple Team ID substituted in -- see that file's placeholder and
+      // docs/legal/app-store-submission-checklist.md for the outstanding step.
+      associatedDomains: ['applinks:mechbazar.com', 'applinks:www.mechbazar.com'],
       ...(hasIosFirebase ? { googleServicesFile: './GoogleService-Info.plist' } : {}),
       // Build number is managed remotely by EAS (eas.json ->
       // cli.appVersionSource: "remote" + production.autoIncrement), which is
@@ -155,10 +161,11 @@ module.exports = {
 
     android: {
       adaptiveIcon: {
-        // Brand red (tokens.ts "Brand palette: Primary #E53935"). Each MechBazar
-        // app uses the same hexagon+wrench mark in white over its own brand
-        // colour so the five launcher icons stay distinguishable at a glance.
-        backgroundColor: '#E53935',
+        // Matches the official MB car-logo mark's black backing (2026-07-29
+        // icon redesign). The other four MechBazar apps each get their own
+        // unique icon + brand colour so all five launcher icons stay
+        // distinguishable at a glance.
+        backgroundColor: '#0D0D0D',
         foregroundImage: './assets/android-icon-foreground.png',
         backgroundImage: './assets/android-icon-background.png',
         monochromeImage: './assets/android-icon-monochrome.png',
@@ -199,6 +206,23 @@ module.exports = {
         'android.permission.WRITE_EXTERNAL_STORAGE',
         'android.permission.READ_CONTACTS',
         'android.permission.SYSTEM_ALERT_WINDOW',
+      ],
+      // Android App Links: lets https://mechbazar.com/... open this app
+      // directly instead of Chrome. autoVerify triggers Play's Digital Asset
+      // Links check against /.well-known/assetlinks.json on the domain (see
+      // apps/mobile/public/.well-known/) -- that file already carries the real
+      // SHA-256 fingerprint of release.keystore (the signing key production/
+      // preview builds use per eas.json's credentialsSource: "local").
+      intentFilters: [
+        {
+          action: 'VIEW',
+          autoVerify: true,
+          data: [
+            { scheme: 'https', host: 'mechbazar.com' },
+            { scheme: 'https', host: 'www.mechbazar.com' },
+          ],
+          category: ['BROWSABLE', 'DEFAULT'],
+        },
       ],
     },
 

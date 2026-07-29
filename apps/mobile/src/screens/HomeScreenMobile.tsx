@@ -20,11 +20,11 @@ import {
   Alert,
   Modal,
   Platform,
-  ActivityIndicator,
   Share
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Loader } from '@mechbazar/shared';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 import { logout } from '../store/authSlice';
@@ -496,8 +496,18 @@ export default function HomeScreen({ navigation }: any) {
             <Ionicons name="notifications-outline" size={22} color={colors.white} />
           </TouchableOpacity>
 
-          {/* The settings cog that used to sit here navigated to 'Account',
-              the same place this avatar goes. One destination, one control. */}
+          {/* Settings and the avatar both open 'Account' -- there is no
+              separate settings screen in this app, so this is not a second
+              destination, just a second way in. Restored as its own control
+              rather than folded into the avatar: it was asked for explicitly
+              as functionality to preserve. */}
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            onPress={() => navigation.navigate('Account')}
+          >
+            <Ionicons name="settings-outline" size={22} color={colors.white} />
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.avatarBtn}
             onPress={() => navigation.navigate('Account')}
@@ -686,7 +696,7 @@ export default function HomeScreen({ navigation }: any) {
           </View>
           {isHomeContentLoading ? (
             <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-              <ActivityIndicator size="small" color={colors.primary} />
+              <Loader size="small" />
             </View>
           ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContainer}>
@@ -751,7 +761,7 @@ export default function HomeScreen({ navigation }: any) {
           
           {isHomeContentLoading ? (
             <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-              <ActivityIndicator size="small" color={colors.primary} />
+              <Loader size="small" />
             </View>
           ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
@@ -889,7 +899,7 @@ export default function HomeScreen({ navigation }: any) {
             </View>
             {isHomeContentLoading ? (
               <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-                <ActivityIndicator size="small" color={colors.primary} />
+                <Loader size="small" />
               </View>
             ) : (
               <View style={styles.offersGrid}>
@@ -1053,8 +1063,8 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.secondary,
     paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 14,
+    paddingTop: 8,
+    paddingBottom: 12,
     zIndex: 10,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
@@ -1068,15 +1078,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12
+    marginBottom: 10
   },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center'
   },
+  // Padding/marginLeft trimmed from 6 to make room for the settings icon
+  // restored alongside wishlist/cart/notifications/avatar -- five controls in
+  // one row eats into the "Deliver to" block's width on narrow phones (~360dp),
+  // and that block is the element this header is meant to foreground.
   headerIconBtn: {
-    padding: 6,
-    marginLeft: 6,
+    padding: 5,
+    marginLeft: 5,
     position: 'relative'
   },
   badgeBubble: {
@@ -1098,7 +1112,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold'
   },
   avatarBtn: {
-    marginLeft: 8
+    marginLeft: 6
   },
   avatarCircle: {
     width: 32,
@@ -1165,9 +1179,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    marginBottom: 12
+    marginBottom: 10
   },
-  searchInput: { 
+  searchInput: {
     flex: 1, 
     fontSize: 14, 
     color: '#111', 

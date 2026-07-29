@@ -3,7 +3,7 @@ import { View, ActivityIndicator, StyleSheet, Platform, Appearance } from 'react
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import * as SplashScreen from 'expo-splash-screen';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +20,7 @@ import ErrorBoundary from './src/components/shared/ErrorBoundary';
 import { registerForPushNotificationsAsync } from './src/services/notifications';
 import { registerForWebPushAsync } from './src/services/webPush';
 import { API_BASE_URL } from './src/services/api';
+import { initAppCheck } from './src/services/appCheck';
 import { fetchMyVehicles } from './src/services/garage.service';
 import { OfflineBanner } from './src/components/OfflineBanner';
 import DesktopAppShell from './src/navigation/DesktopAppShell';
@@ -32,6 +33,10 @@ import CategoriesScreen from './src/screens/CategoriesScreen';
 import CartScreen from './src/screens/CartScreen';
 import OrderHistoryScreen from './src/screens/OrderHistoryScreen';
 import OrderInvoiceScreen from './src/screens/OrderInvoiceScreen';
+import PaymentSuccessScreen from './src/screens/PaymentSuccessScreen';
+import PaymentFailureScreen from './src/screens/PaymentFailureScreen';
+import PaymentPendingScreen from './src/screens/PaymentPendingScreen';
+import PaymentCancelledScreen from './src/screens/PaymentCancelledScreen';
 import AccountScreen from './src/screens/AccountScreen';
 import AccountDashboardScreen from './src/screens/AccountDashboardScreen';
 import ProductDetailsScreen from './src/screens/ProductDetailsScreen';
@@ -91,11 +96,65 @@ const STATIC_PAGE_SLUG_TO_KEY: Record<string, string> = {
   'account-deletion': 'account-deletion',
 };
 
-const linking = {
+// Path shapes intentionally mirror the ad hoc "Check out X on MechBazar!"
+// share text in HomeScreen/HomeScreenMobile's Share.share calls -- neither
+// currently appends a URL, so wiring one in (a share-link follow-up) would
+// slot straight into these paths with no renaming needed.
+//
+// Screens left unmapped on purpose:
+// - OrderInvoice: route.params expects a full `order` object, not an id, so
+//   it can't be reached from a bare URL without first adding a fetch-by-id
+//   path to that screen -- out of scope for this pass.
+// - PaymentCancelled: only reached by actively dismissing the in-app Razorpay
+//   sheet (see that screen's own comment); it needs razorpayOrderId/
+//   razorpayKeyId that only exist mid-checkout, not from a bare URL --
+//   PaymentSuccess/Failure/Pending are the real gateway-redirect targets and
+//   only need orderId, so those are mapped.
+// - VehicleSelection, EditProfile: not meaningful entry points from outside
+//   the app (no shareable state).
+// - Any screen requiring auth still requires it after a deep link resolves --
+//   the linking config only affects which route the navigator lands on, not
+//   RootNavigator's own logged-in/logged-out stack split above.
+// The Stack/Tab navigators below are untyped (createNativeStackNavigator()
+// with no ParamList generic, same as the rest of this file's useNavigation<any>()
+// calls) -- LinkingOptions<any> matches that existing convention rather than
+// introducing a first typed param list just for this config.
+const linking: LinkingOptions<any> = {
   prefixes: ['https://mechbazar.com', 'https://www.mechbazar.com', 'mechbazar://'],
   config: {
     screens: {
       Welcome: '',
+      WholesaleRegistration: 'wholesale',
+      MainTabs: {
+        screens: {
+          Home: 'home',
+          Categories: 'categories',
+          Services: 'services',
+          Orders: 'orders',
+          Account: 'account',
+        },
+      },
+      ProductDetails: 'product/:productId',
+      CategoryProducts: 'category',
+      Garage: 'garage',
+      DeliveryTracking: 'order/:orderId/track',
+      PaymentSuccess: 'payment/success/:orderId',
+      PaymentFailure: 'payment/failure/:orderId',
+      PaymentPending: 'payment/pending/:orderId',
+      AccountDashboard: 'dashboard',
+      Wishlist: 'wishlist',
+      AddressManagement: 'addresses',
+      Notifications: 'notifications',
+      HelpCenter: 'help',
+      Cart: 'cart',
+      ServiceCategory: 'service/:categoryId',
+      ServiceBooking: 'service-booking/:packageId',
+      ServiceTracking: 'service-tracking/:bookingId',
+      ServiceBookingHistory: 'service-bookings',
+      ServiceInvoice: 'service-invoice/:bookingId',
+      ServiceReview: 'service-review/:bookingId',
+      EmergencyRequest: 'emergency/:packageId',
+      EmergencyTracking: 'emergency-tracking/:bookingId',
       StaticPage: {
         path: ':page',
         parse: {
@@ -187,6 +246,14 @@ function RootNavigator() {
   useEffect(() => {
     (async () => {
       try {
+        // Fire-and-forget, ahead of the first API call below (session/cart
+        // hydration doesn't call the backend, but garage.service's fetch
+        // further down in this same boot sequence does). Web's App Check
+        // activates as a side effect of importing services/appCheckToken.web.ts
+        // instead -- see api.ts, which imports it unconditionally -- so this
+        // call only does anything on native; it no-ops immediately on web.
+        initAppCheck().catch((err) => console.warn('[appCheck] init failed:', err));
+
         if (Platform.OS !== 'web') {
           // Native: unchanged from today's behavior.
           try {
@@ -401,6 +468,10 @@ function RootNavigator() {
             <Stack.Screen name="VehicleSelection" component={VehicleSelectionScreen} />
             <Stack.Screen name="DeliveryTracking" component={DeliveryTrackingScreen} />
             <Stack.Screen name="OrderInvoice" component={OrderInvoiceScreen} />
+            <Stack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} />
+            <Stack.Screen name="PaymentFailure" component={PaymentFailureScreen} />
+            <Stack.Screen name="PaymentPending" component={PaymentPendingScreen} />
+            <Stack.Screen name="PaymentCancelled" component={PaymentCancelledScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="AccountDashboard" component={AccountDashboardScreen} />
             <Stack.Screen name="Wishlist" component={WishlistScreen} />
