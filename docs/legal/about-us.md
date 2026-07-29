@@ -1,19 +1,19 @@
 # About Us
 
-**[BRAND_NAME]** — Genuine auto parts and trusted mechanic services, delivered to
+**MechBazar** — Genuine auto parts and trusted mechanic services, delivered to
 your doorstep.
 
-**Last Updated:** [LAST_UPDATED]
+**Last Updated:** 29 July 2026
 
 ---
 
 ## Who We Are
 
-**[BRAND_NAME]** is a quick-commerce marketplace for automotive spare parts and
+**MechBazar** is a quick-commerce marketplace for automotive spare parts and
 doorstep mechanic services, built for car and two-wheeler owners across India. It
-is owned and operated by **[COMPANY_LEGAL_NAME]** (CIN: [CIN]), a company
+is owned and operated by **MECH BAZAR PRIVATE LIMITED** (CIN: U45300HR2026PTC148525), a company
 incorporated under the Companies Act, 2013, with its registered office at
-[REGISTERED_ADDRESS].
+Sector 70A Extension Road, Gurugram, Haryana, India.
 
 We exist because buying a car or bike part in India is harder than it should be.
 The right part for your exact variant is often two markets away, the price
@@ -21,7 +21,7 @@ depends on who is asking, and the difference between a genuine component and a
 convincing counterfeit is not visible across a counter. Meanwhile, a routine
 service means surrendering your vehicle for a day.
 
-[BRAND_NAME] replaces that with something simpler: **tell us your vehicle, and we
+MechBazar replaces that with something simpler: **tell us your vehicle, and we
 show you only the parts that fit — then deliver them, or send a verified mechanic
 to your door.**
 
@@ -41,9 +41,9 @@ you know exactly what you are buying before you buy it.
 ### Quick commerce for parts
 
 Vehicles break down at inconvenient times. In our serviced cities, eligible
-in-stock parts are delivered in **[DELIVERY_SLA_EXPRESS]**, with live rider
+in-stock parts are delivered in **Information Required**, with live rider
 tracking. Everywhere else, standard delivery runs at
-**[DELIVERY_SLA_STANDARD]** through our logistics partners.
+**Information Required** through our logistics partners.
 
 ### Doorstep mechanic services
 
@@ -63,7 +63,7 @@ return, replacement or warranty claim from the order itself.
 
 ## How the Marketplace Works
 
-[BRAND_NAME] is a **marketplace**. Parts are listed and fulfilled by independent
+MechBazar is a **marketplace**. Parts are listed and fulfilled by independent
 **Vendors**, and services are performed by independent **Mechanics**. Our role is
 to verify them, standardise the catalogue, hold them to a service standard, and
 stand behind your experience.
@@ -112,7 +112,7 @@ outside a workshop.
 - **Mechanics** who want a steady stream of nearby, pre-qualified jobs and
   reliable payouts.
 
-We currently operate across **[SERVICE_CITIES]**, and deliver to serviceable PIN
+We currently operate across **Information Required**, and deliver to serviceable PIN
 codes nationwide.
 
 ---
@@ -120,13 +120,13 @@ codes nationwide.
 ## Partner With Us
 
 **Become a Vendor** — list your inventory, reach customers beyond your locality,
-and receive scheduled settlements. Write to **[VENDOR_EMAIL]**.
+and receive scheduled settlements. Write to **Information Required**.
 
 **Become a Mechanic** — receive jobs near you, set your availability, and get paid
-for completed work. Write to **[MECHANIC_EMAIL]**.
+for completed work. Write to **Information Required**.
 
 **Careers** — we are building the platform Indian vehicle owners rely on. If you
-want to work on it, write to **[SUPPORT_EMAIL]** with a note about your
+want to work on it, write to **support@mechbazar.com** with a note about your
 background and the kind of role you are looking for.
 
 ---
@@ -146,13 +146,13 @@ background and the kind of role you are looking for.
 
 ## Company Information
 
-**[COMPANY_LEGAL_NAME]**
-Registered Office: [REGISTERED_ADDRESS]
-Operational Office: [OPERATIONAL_ADDRESS]
-CIN: [CIN] | GSTIN: [GSTIN]
-Email: [SUPPORT_EMAIL] | Phone: [SUPPORT_PHONE] ([SUPPORT_HOURS])
-Website: [WEBSITE_URL]
+**MECH BAZAR PRIVATE LIMITED**
+Registered Office: Sector 70A Extension Road, Gurugram, Haryana, India
+Operational Office: Information Required
+CIN: U45300HR2026PTC148525 | GSTIN: Not Applicable (GST registration pending)
+Email: support@mechbazar.com | Phone: +91 9772704981 (Information Required)
+Website: https://mechbazar.com
 
-Download the app: [PLAY_STORE_URL] · [APP_STORE_URL]
+Download the app: Information Required (app not yet published on Google Play) · Information Required (app not yet published on the App Store)
 
-© [YEAR] [COMPANY_LEGAL_NAME]. All rights reserved.
+© 2026 MECH BAZAR PRIVATE LIMITED. All rights reserved.

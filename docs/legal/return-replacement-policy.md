@@ -1,16 +1,16 @@
 # Return & Replacement Policy
 
-**[BRAND_NAME]**, operated by **[COMPANY_LEGAL_NAME]**
+**MechBazar**, operated by **MECH BAZAR PRIVATE LIMITED**
 
-**Effective Date:** [EFFECTIVE_DATE]
-**Last Updated:** [LAST_UPDATED]
+**Effective Date:** 29 July 2026
+**Last Updated:** 29 July 2026
 
 ---
 
 ## 1. Scope
 
 This Policy governs the return and replacement of automotive spare parts,
-accessories and consumables purchased through the [BRAND_NAME] Platform. Refund
+accessories and consumables purchased through the MechBazar Platform. Refund
 amounts and timelines are governed by the [Refund Policy](refund-policy.md);
 cancellations before delivery are governed by the
 [Cancellation Policy](cancellation-policy.md).
@@ -23,7 +23,7 @@ right available to you as a consumer under the **Consumer Protection Act, 2019**
 
 ## 2. Return Window
 
-You may raise a return request **within [RETURN_WINDOW_DAYS] days of delivery**,
+You may raise a return request **within Information Required days of delivery**,
 subject to the eligibility conditions in Section 3.
 
 | Reason for return | Window |
@@ -31,9 +31,9 @@ subject to the eligibility conditions in Section 3.
 | Wrong item, wrong part number, wrong quantity, wrong brand | **[48] hours** from delivery |
 | Damaged in transit | **[48] hours** from delivery |
 | Missing item in a shipment | **[48] hours** from delivery |
-| Item not as described / counterfeit | **[RETURN_WINDOW_DAYS] days** |
-| Defective on arrival (DOA) | **[RETURN_WINDOW_DAYS] days**, or the manufacturer's DOA window if longer |
-| Change of mind / incorrect selection by you | **[RETURN_WINDOW_DAYS] days** |
+| Item not as described / counterfeit | **Information Required days** |
+| Defective on arrival (DOA) | **Information Required days**, or the manufacturer's DOA window if longer |
+| Change of mind / incorrect selection by you | **Information Required days** |
 
 The short window for transit damage, shortages and wrong items exists because
 these claims must be raised with the carrier and the Vendor while evidence is
@@ -155,8 +155,8 @@ f. **One replacement per item** is generally permitted. If the replacement is al
 6. For COD Orders, enter **bank account or UPI details** for the refund
 7. Confirm the pick-up address and slot
 
-Alternatively, contact **[SUPPORT_EMAIL]** or **[SUPPORT_PHONE]**
-([SUPPORT_HOURS]) with your Order ID.
+Alternatively, contact **support@mechbazar.com** or **+91 9772704981**
+(Information Required) with your Order ID.
 
 **Do not ship an item back on your own initiative.** Self-shipped returns without
 an approved return authorisation cannot be tracked to your Order and will not be
@@ -197,7 +197,7 @@ d. **If the item fails** — it is used, fitted, damaged after delivery,
    rejected. We will inform you with photographic evidence, and the item is
    returned to your address at no charge to you. Deliberate substitution of a
    different item is treated as fraud under Section 11.
-e. You may contest a failed inspection by writing to [GRIEVANCE_EMAIL] within
+e. You may contest a failed inspection by writing to Information Required within
    **[7] days** of being notified.
 
 ---
@@ -205,7 +205,7 @@ e. You may contest a failed inspection by writing to [GRIEVANCE_EMAIL] within
 ## 10. Warranty Claims (After the Return Window)
 
 A manufacturer or Vendor warranty operates **separately from and beyond** the
-[RETURN_WINDOW_DAYS]-day return window.
+Information Required-day return window.
 
 a. The warranty period and terms are those declared by the manufacturer or Vendor
    on the product page.
@@ -258,12 +258,12 @@ liability.
 
 ## 13. Contact and Grievance Redressal
 
-**Customer Support:** [SUPPORT_EMAIL] | [SUPPORT_PHONE] | [SUPPORT_HOURS]
+**Customer Support:** support@mechbazar.com | +91 9772704981 | Information Required
 
 **Grievance Officer**
-[GRIEVANCE_OFFICER_NAME]
-[COMPANY_LEGAL_NAME], [REGISTERED_ADDRESS]
-[GRIEVANCE_EMAIL] | [GRIEVANCE_PHONE]
+Information Required
+MECH BAZAR PRIVATE LIMITED, Sector 70A Extension Road, Gurugram, Haryana, India
+Information Required | Information Required
 
 Complaints are acknowledged within **48 hours** and resolved within **30 days**.
 
@@ -276,5 +276,5 @@ Redressal Commission.
 ## 14. Changes to this Policy
 
 We may amend this Policy at any time. The revised version will be published at
-[WEBSITE_URL] and in the app with an updated "Last Updated" date. The Policy in
+https://mechbazar.com and in the app with an updated "Last Updated" date. The Policy in
 force on the date your Order was placed governs that Order.

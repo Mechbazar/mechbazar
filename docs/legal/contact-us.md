@@ -1,9 +1,9 @@
 # Contact Us
 
-**[BRAND_NAME]** — Genuine auto parts and trusted mechanic services, delivered to
+**MechBazar** — Genuine auto parts and trusted mechanic services, delivered to
 your doorstep.
 
-**Last Updated:** [LAST_UPDATED]
+**Last Updated:** 29 July 2026
 
 ---
 
@@ -14,11 +14,11 @@ fitment questions, or your account.
 
 | | |
 |---|---|
-| **Customer Support Email** | [SUPPORT_EMAIL] |
-| **Customer Support Phone** | [SUPPORT_PHONE] |
-| **Support Hours** | [SUPPORT_HOURS] |
+| **Customer Support Email** | support@mechbazar.com |
+| **Customer Support Phone** | +91 9772704981 |
+| **Support Hours** | Information Required |
 | **In-App Support** | Open the app → **Account → Help Centre** |
-| **Website** | [WEBSITE_URL] |
+| **Website** | https://mechbazar.com |
 
 **Fastest route:** raise the issue from the app under **Orders → [your order] →
 Report an Issue**. It arrives with your order details, invoice and vehicle
@@ -29,18 +29,18 @@ questions.
 
 ## Company Details
 
-**[COMPANY_LEGAL_NAME]**
-*(operating the [BRAND_NAME] brand)*
+**MECH BAZAR PRIVATE LIMITED**
+*(operating the MechBazar brand)*
 
 | | |
 |---|---|
-| **Registered Office** | [REGISTERED_ADDRESS] |
-| **Operational / Corporate Office** | [OPERATIONAL_ADDRESS] |
-| **CIN** | [CIN] |
-| **GSTIN** | [GSTIN] |
-| **Website** | [WEBSITE_URL] |
-| **Play Store** | [PLAY_STORE_URL] |
-| **App Store** | [APP_STORE_URL] |
+| **Registered Office** | Sector 70A Extension Road, Gurugram, Haryana, India |
+| **Operational / Corporate Office** | Information Required |
+| **CIN** | U45300HR2026PTC148525 |
+| **GSTIN** | Not Applicable (GST registration pending) |
+| **Website** | https://mechbazar.com |
+| **Play Store** | Information Required (app not yet published on Google Play) |
+| **App Store** | Information Required (app not yet published on the App Store) |
 
 ---
 
@@ -48,16 +48,16 @@ questions.
 
 | I want to… | Write to |
 |---|---|
-| Ask about an order, delivery or refund | [SUPPORT_EMAIL] |
-| Ask about a service booking or a mechanic visit | [SUPPORT_EMAIL] |
-| Sell parts on [BRAND_NAME] (vendor onboarding) | [VENDOR_EMAIL] |
-| Join as a mechanic or technician | [MECHANIC_EMAIL] |
-| Raise a privacy or data-protection request | [DPO_EMAIL] |
-| Delete my account and data | [DPO_EMAIL] — see [Account Deletion Policy](account-deletion-policy.md) |
-| Escalate an unresolved complaint | [GRIEVANCE_EMAIL] |
-| Discuss a partnership, fleet or B2B account | [SUPPORT_EMAIL] |
-| Report a counterfeit part or an IP infringement | [GRIEVANCE_EMAIL] |
-| Media and press enquiries | [SUPPORT_EMAIL] |
+| Ask about an order, delivery or refund | support@mechbazar.com |
+| Ask about a service booking or a mechanic visit | support@mechbazar.com |
+| Sell parts on MechBazar (vendor onboarding) | Information Required |
+| Join as a mechanic or technician | Information Required |
+| Raise a privacy or data-protection request | Information Required |
+| Delete my account and data | Information Required — see [Account Deletion Policy](account-deletion-policy.md) |
+| Escalate an unresolved complaint | Information Required |
+| Discuss a partnership, fleet or B2B account | support@mechbazar.com |
+| Report a counterfeit part or an IP infringement | Information Required |
+| Media and press enquiries | support@mechbazar.com |
 
 ---
 
@@ -69,7 +69,7 @@ Protection (E-Commerce) Rules, 2020** and the **Information Technology
 
 ### Level 1 — Customer Support
 
-Email [SUPPORT_EMAIL] or call [SUPPORT_PHONE] during [SUPPORT_HOURS].
+Email support@mechbazar.com or call +91 9772704981 during Information Required.
 Most issues are resolved here within **[48] hours**.
 
 ### Level 2 — Grievance Officer
@@ -78,12 +78,12 @@ If Level 1 has not resolved your issue within the promised time, or you are
 dissatisfied with the outcome:
 
 **Grievance Officer**
-Name: **[GRIEVANCE_OFFICER_NAME]**
-[COMPANY_LEGAL_NAME]
-[REGISTERED_ADDRESS]
-Email: **[GRIEVANCE_EMAIL]**
-Phone: **[GRIEVANCE_PHONE]**
-Hours: [SUPPORT_HOURS]
+Name: **Information Required**
+MECH BAZAR PRIVATE LIMITED
+Sector 70A Extension Road, Gurugram, Haryana, India
+Email: **Information Required**
+Phone: **Information Required**
+Hours: Information Required
 
 Your complaint will be **acknowledged within 48 hours** of receipt and
 **resolved within 30 days**.
@@ -106,9 +106,9 @@ For coordination with law enforcement agencies, in accordance with the
 Information Technology (Intermediary Guidelines and Digital Media Ethics Code)
 Rules, 2021:
 
-Name: **[NODAL_OFFICER_NAME]**
-Email: **[NODAL_EMAIL]**
-Address: [REGISTERED_ADDRESS]
+Name: **Information Required**
+Email: **Information Required**
+Address: Sector 70A Extension Road, Gurugram, Haryana, India
 
 ---
 
@@ -117,8 +117,8 @@ Address: [REGISTERED_ADDRESS]
 For access, correction, erasure, consent-withdrawal and nomination requests under
 the **Digital Personal Data Protection Act, 2023**:
 
-Name: **[DPO_NAME]**
-Email: **[DPO_EMAIL]**
+Name: **Information Required**
+Email: **Information Required**
 
 See the [Privacy Policy](privacy-policy.md) for the full description of your
 rights.
@@ -143,25 +143,25 @@ To help us resolve your issue in a single exchange, please include:
 | Channel | First response |
 |---|---|
 | In-app **Report an Issue** | Within **[4] business hours** |
-| Email to [SUPPORT_EMAIL] | Within **[24] hours** |
-| Phone [SUPPORT_PHONE] | Immediate, during [SUPPORT_HOURS] |
+| Email to support@mechbazar.com | Within **[24] hours** |
+| Phone +91 9772704981 | Immediate, during Information Required |
 | Grievance Officer | **Acknowledged within 48 hours**, resolved within **30 days** |
 
 ---
 
 ## A Security Note
 
-**[BRAND_NAME] will never ask you for your login OTP, card CVV, UPI PIN, net
+**MechBazar will never ask you for your login OTP, card CVV, UPI PIN, net
 banking password, or ask you to install a screen-sharing or remote-access
 application.** Any such request is fraudulent, regardless of the number it comes
-from. Report it immediately to [SUPPORT_EMAIL] and to the National Cyber Crime
+from. Report it immediately to support@mechbazar.com and to the National Cyber Crime
 Reporting Portal (cybercrime.gov.in / helpline **1930**).
 
 We contact you only from our official numbers and from email addresses ending in
-the [WEBSITE_URL] domain.
+the https://mechbazar.com domain.
 
 ---
 
 ## Follow Us
 
-Facebook · Instagram · X (Twitter) · YouTube — linked from [WEBSITE_URL].
+Facebook · Instagram · X (Twitter) · YouTube — linked from https://mechbazar.com.

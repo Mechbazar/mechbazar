@@ -1,24 +1,24 @@
 # Account Deletion & Data Deletion Policy
 
-**[BRAND_NAME]**, operated by **[COMPANY_LEGAL_NAME]**
+**MechBazar**, operated by **MECH BAZAR PRIVATE LIMITED**
 
-**Effective Date:** [EFFECTIVE_DATE]
-**Last Updated:** [LAST_UPDATED]
+**Effective Date:** 29 July 2026
+**Last Updated:** 29 July 2026
 
 ---
 
 > **For Google Play reviewers and users without the app installed:**
-> You can request deletion of your [BRAND_NAME] account and associated data
+> You can request deletion of your MechBazar account and associated data
 > **without installing the app**, at
-> **[WEBSITE_URL]/account-deletion** or by emailing **[DPO_EMAIL]** from your
-> registered email address, or by calling **[SUPPORT_PHONE]**. No app
+> **https://mechbazar.com/account-deletion** or by emailing **Information Required** from your
+> registered email address, or by calling **+91 9772704981**. No app
 > installation or purchase is required.
 
 ---
 
 ## 1. Your Right to Delete
 
-You may request deletion of your [BRAND_NAME] account and the personal data
+You may request deletion of your MechBazar account and the personal data
 associated with it at any time. This right is provided under the **Digital
 Personal Data Protection Act, 2023**, the **Information Technology (Reasonable
 Security Practices and Procedures and Sensitive Personal Data or Information)
@@ -33,7 +33,7 @@ Deletion is **free of charge** and does not require you to give a reason.
 
 ### Option A — In the app (fastest)
 
-1. Open the **[BRAND_NAME]** app
+1. Open the **MechBazar** app
 2. Go to **Account**
 3. Open **Security & Privacy → Delete Account**
 4. Read the summary of what will be deleted and what must be retained
@@ -45,12 +45,12 @@ further step.
 
 ### Option B — On the web
 
-Visit **[WEBSITE_URL]/account-deletion**, enter your registered mobile number,
+Visit **https://mechbazar.com/account-deletion**, enter your registered mobile number,
 verify with the OTP, and submit the request. **No app installation is required.**
 
 ### Option C — By email
 
-Write to **[DPO_EMAIL]** from your registered email address, or from any address
+Write to **Information Required** from your registered email address, or from any address
 if you include your registered mobile number, with the subject line
 **"Account Deletion Request"**. Include:
 
@@ -62,7 +62,7 @@ We will verify your identity by OTP before acting on the request.
 
 ### Option D — By phone
 
-Call **[SUPPORT_PHONE]** during [SUPPORT_HOURS] and ask for account deletion. Our
+Call **+91 9772704981** during Information Required and ask for account deletion. Our
 team will verify your identity and record the request.
 
 ---
@@ -81,12 +81,12 @@ is blocking the request and hold it until it clears.
   deletion.
 - **Outstanding Cash-on-Delivery dues** or any amount payable to a Vendor or
   Mechanic.
-- **[BRAND_NAME] credit balance, coupons and loyalty points** — these are
+- **MechBazar credit balance, coupons and loyalty points** — these are
   **forfeited on deletion** and are not convertible to cash. Use them first if
   you wish.
 - **Vendor / Mechanic / Delivery Partner accounts** — additional settlement,
   payout reconciliation and statutory KYC retention obligations apply. Contact
-  [VENDOR_EMAIL] or [MECHANIC_EMAIL] to begin offboarding.
+  Information Required or Information Required to begin offboarding.
 
 ---
 
@@ -174,10 +174,10 @@ in the app:
 | Profile details, photo, email | **Account → Edit Profile** |
 | Cart and wishlist | **Cart** / **Wishlist →** remove items |
 | Marketing notifications | **Account → Notifications →** turn off promotional messages |
-| Location permission | Device **Settings → Apps → [BRAND_NAME] → Permissions** |
+| Location permission | Device **Settings → Apps → MechBazar → Permissions** |
 | Advertising identifier | Android: **Settings → Privacy → Ads**; iOS: **Settings → Privacy & Security → Tracking** |
 
-For any other targeted deletion or correction request, write to **[DPO_EMAIL]**.
+For any other targeted deletion or correction request, write to **Information Required**.
 
 ---
 
@@ -207,7 +207,7 @@ Grievance Officer.
   receive no further notifications.
 - **Permanent:** order history, bookings, invoices in the app, saved vehicles,
   addresses and preferences are not recoverable.
-- **Forfeited:** any [BRAND_NAME] credit balance, promotional credits, coupons and loyalty points
+- **Forfeited:** any MechBazar credit balance, promotional credits, coupons and loyalty points
   are cancelled without compensation.
 - **Closed:** open returns, replacements and warranty claims are closed and
   cannot be revived.
@@ -220,15 +220,15 @@ Grievance Officer.
 ## 10. Contact
 
 **Data Protection Contact**
-[DPO_NAME] — **[DPO_EMAIL]**
+Information Required — **Information Required**
 
 **Customer Support**
-[SUPPORT_EMAIL] | [SUPPORT_PHONE] | [SUPPORT_HOURS]
+support@mechbazar.com | +91 9772704981 | Information Required
 
 **Grievance Officer**
-[GRIEVANCE_OFFICER_NAME]
-[COMPANY_LEGAL_NAME], [REGISTERED_ADDRESS]
-[GRIEVANCE_EMAIL] | [GRIEVANCE_PHONE]
+Information Required
+MECH BAZAR PRIVATE LIMITED, Sector 70A Extension Road, Gurugram, Haryana, India
+Information Required | Information Required
 
 Complaints are acknowledged within **48 hours** and resolved within **30 days**.
 If unresolved, you may approach the Data Protection Board of India (once
@@ -239,15 +239,15 @@ constituted under the DPDP Act, 2023) or the appropriate consumer forum.
 ## 11. Changes to this Policy
 
 We may amend this Policy at any time. The revised version will be published at
-[WEBSITE_URL] and in the app with an updated "Last Updated" date.
+https://mechbazar.com and in the app with an updated "Last Updated" date.
 
 ---
 
 ### Summary for store listings
 
-> **[BRAND_NAME] account deletion.** Delete your account in-app via
+> **MechBazar account deletion.** Delete your account in-app via
 > **Account → Settings → Delete Account**, or without installing the app at
-> **[WEBSITE_URL]/account-deletion**. Profile, addresses, saved vehicles, cart,
+> **https://mechbazar.com/account-deletion**. Profile, addresses, saved vehicles, cart,
 > browsing history and device identifiers are deleted within **30 days**.
 > Invoices and transaction records are retained for **8 years** as required by
 > Indian tax and company law. Any credit balance is forfeited. Deletion

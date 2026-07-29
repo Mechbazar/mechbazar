@@ -35,44 +35,44 @@ folder.
 
 | Token | Meaning | Example |
 |-------|---------|---------|
-| `[COMPANY_LEGAL_NAME]` | Registered entity name | ABC Auto Commerce Private Limited |
-| `[BRAND_NAME]` | Consumer-facing brand | MechBazar |
-| `[CIN]` | Corporate Identity Number (MCA) | U52100XX2024PTC000000 |
-| `[GSTIN]` | GST registration number | 07AAAAA0000A1Z5 |
-| `[REGISTERED_ADDRESS]` | Registered office, full postal address with PIN | |
-| `[OPERATIONAL_ADDRESS]` | Corporate/operations office, if different | |
-| `[WEBSITE_URL]` | Primary website | https://www.mechbazar.com |
-| `[SUPPORT_EMAIL]` | Customer support inbox | support@mechbazar.com |
-| `[SUPPORT_PHONE]` | Support helpline, with STD/country code | +91-XXXXXXXXXX |
-| `[SUPPORT_HOURS]` | Support window, IST | Mon–Sat, 9:00 AM – 8:00 PM IST |
-| `[GRIEVANCE_OFFICER_NAME]` | Grievance Officer (IT Rules, 2021) | |
-| `[GRIEVANCE_EMAIL]` | Grievance Officer email | grievance@mechbazar.com |
-| `[GRIEVANCE_PHONE]` | Grievance Officer phone | |
-| `[NODAL_OFFICER_NAME]` | Nodal Contact Person (E-Commerce Rules, 2020) | |
-| `[NODAL_EMAIL]` | Nodal officer email | nodal@mechbazar.com |
-| `[DPO_NAME]` | Data Protection Officer / contact under DPDP Act | |
-| `[DPO_EMAIL]` | Data protection contact | privacy@mechbazar.com |
-| `[VENDOR_EMAIL]` | Seller/vendor onboarding inbox | sellers@mechbazar.com |
-| `[MECHANIC_EMAIL]` | Mechanic onboarding inbox | partners@mechbazar.com |
-| `[JURISDICTION_CITY]` | Courts of exclusive jurisdiction | New Delhi |
-| `[JURISDICTION_STATE]` | State | Delhi |
-| `[ARBITRATION_SEAT]` | Seat of arbitration | New Delhi |
-| `[EFFECTIVE_DATE]` | Date the policy takes effect | 1 August 2026 |
-| `[LAST_UPDATED]` | Last revision date | 26 July 2026 |
-| `[PLAY_STORE_URL]` | Play Store listing | |
-| `[APP_STORE_URL]` | App Store listing | |
-| `[SERVICE_CITIES]` | Cities currently served | Delhi NCR, Bengaluru, Pune |
-| `[DELIVERY_SLA_EXPRESS]` | Quick-commerce delivery promise | 60–120 minutes |
-| `[DELIVERY_SLA_STANDARD]` | Standard delivery window | 2–5 business days |
-| `[RETURN_WINDOW_DAYS]` | Return window | 10 |
-| `[REFUND_TAT_COD]` | Refund turnaround (bank/UPI transfer of cash already paid) | 7–10 business days |
-| `[FREE_DELIVERY_THRESHOLD]` | Order value for free delivery | ₹999 |
-| `[DELIVERY_FEE]` | Standard delivery fee | ₹49 |
-| `[EXPRESS_FEE]` | Express/quick-delivery fee | ₹79 |
-| `[COD_FEE]` | COD handling fee, if any | ₹25 |
-| `[CANCELLATION_FEE_SERVICE]` | Late service-cancellation fee | ₹99 |
-| `[LOGISTICS_PARTNERS]` | 3PL partners | Delhivery, Shadowfax |
-| `[ANALYTICS_PROVIDERS]` | Analytics SDKs in the build | Firebase Analytics |
+| `MECH BAZAR PRIVATE LIMITED` | Registered entity name | ABC Auto Commerce Private Limited |
+| `MechBazar` | Consumer-facing brand | MechBazar |
+| `U45300HR2026PTC148525` | Corporate Identity Number (MCA) | U52100XX2024PTC000000 |
+| `Not Applicable (GST registration pending)` | GST registration number | 07AAAAA0000A1Z5 |
+| `Sector 70A Extension Road, Gurugram, Haryana, India` | Registered office, full postal address with PIN | |
+| `Information Required` | Corporate/operations office, if different | |
+| `https://mechbazar.com` | Primary website | https://www.mechbazar.com |
+| `support@mechbazar.com` | Customer support inbox | support@mechbazar.com |
+| `+91 9772704981` | Support helpline, with STD/country code | +91-XXXXXXXXXX |
+| `Information Required` | Support window, IST | Mon–Sat, 9:00 AM – 8:00 PM IST |
+| `Information Required` | Grievance Officer (IT Rules, 2021) | |
+| `Information Required` | Grievance Officer email | grievance@mechbazar.com |
+| `Information Required` | Grievance Officer phone | |
+| `Information Required` | Nodal Contact Person (E-Commerce Rules, 2020) | |
+| `Information Required` | Nodal officer email | nodal@mechbazar.com |
+| `Information Required` | Data Protection Officer / contact under DPDP Act | |
+| `Information Required` | Data protection contact | privacy@mechbazar.com |
+| `Information Required` | Seller/vendor onboarding inbox | sellers@mechbazar.com |
+| `Information Required` | Mechanic onboarding inbox | partners@mechbazar.com |
+| `Information Required` | Courts of exclusive jurisdiction | New Delhi |
+| `Information Required` | State | Delhi |
+| `Information Required` | Seat of arbitration | New Delhi |
+| `29 July 2026` | Date the policy takes effect | 1 August 2026 |
+| `29 July 2026` | Last revision date | 26 July 2026 |
+| `Information Required (app not yet published on Google Play)` | Play Store listing | |
+| `Information Required (app not yet published on the App Store)` | App Store listing | |
+| `Information Required` | Cities currently served | Delhi NCR, Bengaluru, Pune |
+| `Information Required` | Quick-commerce delivery promise | 60–120 minutes |
+| `Information Required` | Standard delivery window | 2–5 business days |
+| `Information Required` | Return window | 10 |
+| `5–10 business days` | Refund turnaround (bank/UPI transfer of cash already paid) | 7–10 business days |
+| `Information Required` | Order value for free delivery | ₹999 |
+| `Information Required` | Standard delivery fee | ₹49 |
+| `Information Required` | Express/quick-delivery fee | ₹79 |
+| `Information Required` | COD handling fee, if any | ₹25 |
+| `Information Required` | Late service-cancellation fee | ₹99 |
+| `Information Required` | 3PL partners | Delhivery, Shadowfax |
+| `Information Required` | Analytics SDKs in the build | Firebase Analytics |
 
 ---
 
@@ -92,7 +92,7 @@ contradict the in-app experience:
 
 ### 💵 Payments: Cash on Delivery only
 
-**Every document in this pack states that [BRAND_NAME] accepts Cash on Delivery
+**Every document in this pack states that MechBazar accepts Cash on Delivery
 and nothing else.** There is no payment gateway in the product — no Razorpay,
 Stripe, PhonePe, Paytm, UPI, card, net-banking or wallet integration — and the
 backend hard-locks the payment method server-side
@@ -117,9 +117,9 @@ live** — not after. See the note at the bottom of `payment.service.ts` for wha
 
 ### ⚠️ One thing to reconcile before you publish
 
-**Quick-commerce SLA.** `[DELIVERY_SLA_EXPRESS]` is stated as a promise. Only
+**Quick-commerce SLA.** `Information Required` is stated as a promise. Only
 publish a minutes-level SLA for pincodes where you can actually meet it; keep
-`[DELIVERY_SLA_STANDARD]` as the fallback everywhere else.
+`Information Required` as the fallback everywhere else.
 
 ---
 
@@ -129,7 +129,7 @@ The mobile app already renders static pages from
 [`apps/mobile/src/data/staticPages.ts`](../../apps/mobile/src/data/staticPages.ts)
 via the `StaticPage` screen, keyed by `StaticPageKey`. To ship the full versions:
 
-- Keep the in-app copy as the **summary**, and link out to `[WEBSITE_URL]/legal/...`
+- Keep the in-app copy as the **summary**, and link out to `https://mechbazar.com/legal/...`
   for the full text, **or**
 - Expand `STATIC_PAGES` with the new keys (`refund`, `cancellation`,
   `account-deletion`, `contact`) and paste the section headings/bodies from these

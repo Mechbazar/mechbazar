@@ -1,18 +1,18 @@
 # Privacy Policy
 
-**[BRAND_NAME]**, operated by **[COMPANY_LEGAL_NAME]**
+**MechBazar**, operated by **MECH BAZAR PRIVATE LIMITED**
 
-**Effective Date:** [EFFECTIVE_DATE]
-**Last Updated:** [LAST_UPDATED]
+**Effective Date:** 29 July 2026
+**Last Updated:** 29 July 2026
 
 ---
 
 ## 1. Introduction
 
-[COMPANY_LEGAL_NAME] (CIN: [CIN]), a company incorporated under the Companies
-Act, 2013 and having its registered office at [REGISTERED_ADDRESS] (referred to
-as **"[BRAND_NAME]"**, **"we"**, **"us"** or **"our"**), operates the
-[BRAND_NAME] mobile application and the website at [WEBSITE_URL] (together, the
+MECH BAZAR PRIVATE LIMITED (CIN: U45300HR2026PTC148525), a company incorporated under the Companies
+Act, 2013 and having its registered office at Sector 70A Extension Road, Gurugram, Haryana, India (referred to
+as **"MechBazar"**, **"we"**, **"us"** or **"our"**), operates the
+MechBazar mobile application and the website at https://mechbazar.com (together, the
 **"Platform"**) — an online marketplace and quick-commerce service for genuine
 automotive spare parts, accessories and consumables for cars and two-wheelers,
 and for doorstep mechanic services.
@@ -90,7 +90,7 @@ policies, and we encourage you to read them.
 
 - **Delivery Partners** — confirmation of cash collected at the door and
   delivery proof. *There is no payment aggregator or gateway in the loop,
-  because [BRAND_NAME] accepts Cash on Delivery only.*
+  because MechBazar accepts Cash on Delivery only.*
 - **Logistics partners** — shipment scan events, delivery status, delivery
   proof, address corrections.
 - **Vendors and mechanics** — order fulfilment status, job completion reports,
@@ -199,10 +199,10 @@ reusing it for their own marketing.
 |---|---|---|
 | Cloud hosting and databases | Hosting the Platform and storing data | Cloud infrastructure providers, managed database services |
 | Authentication and messaging | OTP delivery, push notifications, media storage | Google Firebase (Phone Authentication, Cloud Messaging, Cloud Storage) |
-| Refund disbursal | Paying approved cash refunds to the bank account or UPI ID you supply | Our bank's business-payments facility. *No payment aggregator or gateway is used, and none is integrated — [BRAND_NAME] is Cash on Delivery only.* |
-| Logistics and delivery | Shipping and last-mile delivery | [LOGISTICS_PARTNERS] |
+| Refund disbursal | Paying approved cash refunds to the bank account or UPI ID you supply | Our bank's business-payments facility. *No payment aggregator or gateway is used, and none is integrated — MechBazar is Cash on Delivery only.* |
+| Logistics and delivery | Shipping and last-mile delivery | Information Required |
 | Communications | SMS, email and WhatsApp notifications | DLT-registered SMS providers, transactional email providers |
-| Analytics and crash reporting | Diagnostics and product improvement | [ANALYTICS_PROVIDERS] |
+| Analytics and crash reporting | Diagnostics and product improvement | Information Required |
 | Maps and geocoding | Address capture, serviceability, routing, live tracking | Google Maps Platform |
 | Customer support tooling | Ticketing and support conversations | Helpdesk / CRM providers |
 
@@ -215,7 +215,7 @@ We may disclose personal data where required to do so by law, or where we
 believe in good faith that disclosure is reasonably necessary to comply with a
 statutory obligation, a court order, or a lawful request by a government or law
 enforcement agency; to enforce our Terms and Conditions; or to protect the
-rights, property or safety of [BRAND_NAME], our users or the public.
+rights, property or safety of MechBazar, our users or the public.
 
 ### 6.4 Corporate transactions
 
@@ -290,9 +290,9 @@ Rules and commensurate with the sensitivity of the data, including:
 No method of transmission or storage is completely secure. While we work to
 protect your data, we cannot guarantee absolute security. **You are responsible
 for keeping your registered mobile number secure and for not sharing your login
-OTP with anyone.** [BRAND_NAME] will never ask you for your OTP, UPI PIN, card
+OTP with anyone.** MechBazar will never ask you for your OTP, UPI PIN, card
 CVV or bank password. If you become aware of any unauthorised use of your
-account, notify us immediately at [SUPPORT_EMAIL].
+account, notify us immediately at support@mechbazar.com.
 
 In the event of a personal data breach, we will notify the Indian Computer
 Emergency Response Team (CERT-In) and, where applicable, the Data Protection
@@ -323,7 +323,7 @@ Subject to applicable law, you have the right to:
 7. **Nominate** — nominate another individual to exercise your rights in the
    event of your death or incapacity, as provided under the DPDP Act.
 
-To exercise any of these rights, write to **[DPO_EMAIL]** from your registered
+To exercise any of these rights, write to **Information Required** from your registered
 email address or contact number. We may ask you to verify your identity before
 acting on a request, and will respond within **[30] days**.
 
@@ -339,7 +339,7 @@ orders and entering into contracts requires legal capacity under the Indian
 Contract Act, 1872. We do not knowingly collect personal data from children.
 Where we become aware that a child's data has been collected without verifiable
 parental consent, we will delete it promptly. Parents or guardians who believe a
-child has provided us data may write to [DPO_EMAIL].
+child has provided us data may write to Information Required.
 
 We do not undertake tracking, behavioural monitoring or targeted advertising
 directed at children.
@@ -377,20 +377,20 @@ and the Consumer Protection (E-Commerce) Rules, 2020, the details of our
 Grievance Officer and Nodal Officer are:
 
 **Grievance Officer**
-Name: [GRIEVANCE_OFFICER_NAME]
-[COMPANY_LEGAL_NAME]
-Address: [REGISTERED_ADDRESS]
-Email: [GRIEVANCE_EMAIL]
-Phone: [GRIEVANCE_PHONE]
-Working hours: [SUPPORT_HOURS]
+Name: Information Required
+MECH BAZAR PRIVATE LIMITED
+Address: Sector 70A Extension Road, Gurugram, Haryana, India
+Email: Information Required
+Phone: Information Required
+Working hours: Information Required
 
 **Nodal Contact Person** (for coordination with law enforcement agencies)
-Name: [NODAL_OFFICER_NAME]
-Email: [NODAL_EMAIL]
+Name: Information Required
+Email: Information Required
 
 **Data Protection Contact**
-Name: [DPO_NAME]
-Email: [DPO_EMAIL]
+Name: Information Required
+Email: Information Required
 
 **Timelines:** a complaint will be **acknowledged within 48 hours** of receipt and
 **resolved within 30 days**, or such shorter period as may be prescribed by law
@@ -407,7 +407,7 @@ the e-Daakhil portal.
 
 We may update this Policy from time to time to reflect changes in our practices,
 technology, or legal requirements. The revised Policy will be posted at
-[WEBSITE_URL] and in the app with a new "Last Updated" date. Where the changes
+https://mechbazar.com and in the app with a new "Last Updated" date. Where the changes
 are material, we will give you prior notice by push notification, email or SMS,
 and — where required by law — seek your fresh consent. Continued use of the
 Platform after the effective date of a revision constitutes acceptance of the
@@ -417,10 +417,10 @@ revised Policy.
 
 ## 16. Contact Us
 
-**[COMPANY_LEGAL_NAME]**
-Registered Office: [REGISTERED_ADDRESS]
-Operational Office: [OPERATIONAL_ADDRESS]
-CIN: [CIN] | GSTIN: [GSTIN]
-Email: [SUPPORT_EMAIL] | Privacy: [DPO_EMAIL]
-Phone: [SUPPORT_PHONE] ([SUPPORT_HOURS])
-Website: [WEBSITE_URL]
+**MECH BAZAR PRIVATE LIMITED**
+Registered Office: Sector 70A Extension Road, Gurugram, Haryana, India
+Operational Office: Information Required
+CIN: U45300HR2026PTC148525 | GSTIN: Not Applicable (GST registration pending)
+Email: support@mechbazar.com | Privacy: Information Required
+Phone: +91 9772704981 (Information Required)
+Website: https://mechbazar.com

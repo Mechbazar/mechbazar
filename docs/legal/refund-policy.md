@@ -1,15 +1,15 @@
 # Refund Policy
 
-**[BRAND_NAME]**, operated by **[COMPANY_LEGAL_NAME]**
+**MechBazar**, operated by **MECH BAZAR PRIVATE LIMITED**
 
-**Effective Date:** [EFFECTIVE_DATE]
-**Last Updated:** [LAST_UPDATED]
+**Effective Date:** 29 July 2026
+**Last Updated:** 29 July 2026
 
 ---
 
 > ### Cash on Delivery only
 >
-> **[BRAND_NAME] accepts payment by Cash on Delivery only.** We do not operate a
+> **MechBazar accepts payment by Cash on Delivery only.** We do not operate a
 > payment gateway. We do not accept UPI, debit or credit cards, net banking,
 > wallets, pay-later instruments, or any other form of online or advance
 > payment. **You never pay anything before your parts are delivered or your
@@ -27,7 +27,7 @@
 This Refund Policy explains when money you have already paid in cash is
 returned to you, how the amount is calculated, how it is paid back, and the
 timelines involved. It applies to automotive spare parts, accessories and
-consumables purchased through the [BRAND_NAME] Platform, and to doorstep
+consumables purchased through the MechBazar Platform, and to doorstep
 mechanic services booked through it.
 
 Read this Policy together with the
@@ -45,7 +45,7 @@ to refund and nothing for you to do:
 
 - You cancel an Order before it is dispatched.
 - You refuse a delivery at your door.
-- An Order is cancelled by a Vendor or by [BRAND_NAME] before delivery.
+- An Order is cancelled by a Vendor or by MechBazar before delivery.
 - A delivery fails and the shipment is returned to the Vendor.
 - You cancel a Service Booking before the Mechanic begins work.
 - A Mechanic does not arrive, or a Booking is cancelled by us.
@@ -65,7 +65,7 @@ A refund arises only where cash has already changed hands.
 
 | Situation | Refund |
 |---|---|
-| Approved return within the **[RETURN_WINDOW_DAYS]-day** window (change of mind or incorrect selection by you) | Product value refunded; the delivery charge you paid and any reverse-pickup charge are **not** refunded |
+| Approved return within the **Information Required-day** window (change of mind or incorrect selection by you) | Product value refunded; the delivery charge you paid and any reverse-pickup charge are **not** refunded |
 | **Wrong item** delivered and paid for (different part, wrong part number, wrong quantity, wrong brand) | 100% of everything you paid, including delivery charges — or a free replacement at your option |
 | **Damaged or defective** item you paid for on delivery | 100% of everything you paid, including delivery charges — or a free replacement at your option |
 | **Missing item** discovered after you paid for a multi-item shipment | Full value of the missing item, or dispatch of the missing item |
@@ -101,7 +101,7 @@ d. **Batteries** where the warranty sticker or terminals show installation, or
 e. **Made-to-order, custom-cut, special-ordered or imported-on-request** parts.
 f. Items returned **without original packaging, manufacturer seal, tags,
    warranty card, invoice or accessories**.
-g. Items returned **after the [RETURN_WINDOW_DAYS]-day window**.
+g. Items returned **after the Information Required-day window**.
 h. Products listed as **"Non-returnable"**, **"Final sale"** or **"Clearance"**
    on the product page.
 i. **Delivery charges** on change-of-mind returns.
@@ -118,7 +118,7 @@ b. Where a **coupon or promotional discount** was applied across a multi-item
    the returned item is refunded. The coupon itself has no cash value and is
    not refunded.
 c. Where a return causes the Order to fall below the free-delivery threshold of
-   **[FREE_DELIVERY_THRESHOLD]**, the delivery charge that was waived may be
+   **Information Required**, the delivery charge that was waived may be
    deducted from the refund.
 d. **GST** is refunded proportionately with the item value, and a credit note
    is issued by the Vendor in accordance with GST law.
@@ -140,7 +140,7 @@ reverse.** Refunds are therefore paid directly to a bank account or UPI ID that
 | Stage | Timeline |
 |---|---|
 | Refund approved (after the returned item passes quality inspection, or the claim is accepted) | Within **[2] business days** |
-| Refund credited to your bank account or UPI ID | **[REFUND_TAT_COD]** from approval |
+| Refund credited to your bank account or UPI ID | **5–10 business days** from approval |
 
 **What you need to provide.** Either:
 
@@ -161,7 +161,7 @@ reverse.** Refunds are therefore paid directly to a bank account or UPI ID that
   the amount is not visible after the stated timeline, quote the UTR to your
   bank first, then contact us.
 - Where you prefer it, and only if you expressly choose it, an approved refund
-  may instead be issued as **[BRAND_NAME] credit** against a future order,
+  may instead be issued as **MechBazar credit** against a future order,
   credited within 24 hours. This is optional — you are always entitled to the
   money instead.
 
@@ -191,7 +191,7 @@ party, misused, or driven after the fault became evident.
 
 ### Protect yourself
 
-**[BRAND_NAME] will never:**
+**MechBazar will never:**
 
 - ask you to pay in advance, online, or by UPI, card, net banking or wallet;
 - ask for your card number, CVV, UPI PIN, net-banking password or login OTP;
@@ -201,7 +201,7 @@ party, misused, or driven after the fault became evident.
 - ask you to transfer money to "verify" your account before a refund.
 
 Every genuine refund is initiated by us and lands in the account **you** supplied
-through the app. If you are contacted otherwise, report it to [SUPPORT_EMAIL]
+through the app. If you are contacted otherwise, report it to support@mechbazar.com
 and to the National Cyber Crime Reporting Portal (cybercrime.gov.in, helpline
 **1930**).
 
@@ -232,8 +232,8 @@ Grievance Officer.
 5. Enter your **bank account or UPI details** for the refund.
 6. Track progress under **Refund Status**.
 
-Alternatively, write to **[SUPPORT_EMAIL]** or call **[SUPPORT_PHONE]**
-([SUPPORT_HOURS]) with your Order ID.
+Alternatively, write to **support@mechbazar.com** or call **+91 9772704981**
+(Information Required) with your Order ID.
 
 ---
 
@@ -243,12 +243,12 @@ If a refund is delayed beyond the stated timeline or you are dissatisfied with
 a decision:
 
 **Level 1 — Customer Support**
-[SUPPORT_EMAIL] | [SUPPORT_PHONE] | [SUPPORT_HOURS]
+support@mechbazar.com | +91 9772704981 | Information Required
 
 **Level 2 — Grievance Officer**
-[GRIEVANCE_OFFICER_NAME]
-[COMPANY_LEGAL_NAME], [REGISTERED_ADDRESS]
-[GRIEVANCE_EMAIL] | [GRIEVANCE_PHONE]
+Information Required
+MECH BAZAR PRIVATE LIMITED, Sector 70A Extension Road, Gurugram, Haryana, India
+Information Required | Information Required
 
 Complaints are acknowledged within **48 hours** and resolved within **30 days**,
 in accordance with the Consumer Protection (E-Commerce) Rules, 2020.
@@ -262,5 +262,5 @@ Redressal Commission.
 ## 11. Changes to this Policy
 
 We may amend this Policy at any time. The revised version will be published at
-[WEBSITE_URL] and in the app with an updated "Last Updated" date. The Policy in
+https://mechbazar.com and in the app with an updated "Last Updated" date. The Policy in
 force on the date your Order or Booking was placed governs that transaction.

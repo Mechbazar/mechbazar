@@ -2,7 +2,7 @@
 
 Internal document. **Not for publication.**
 
-**Last Updated:** [LAST_UPDATED]
+**Last Updated:** 29 July 2026
 
 ---
 
@@ -118,7 +118,7 @@ Select **"All or some functionality is restricted"** and add:
 >   services**. Payment is **Cash on Delivery only** — no digital goods are sold
 >   and no in-app purchase applies.
 > - Account deletion is at **Account → Security & Privacy → Delete Account**,
->   and also at [WEBSITE_URL]/account-deletion without installing the app.
+>   and also at https://mechbazar.com/account-deletion without installing the app.
 > - Browsing the catalogue does **not** require an account; login is needed only
 >   to place an order or booking.
 
@@ -159,7 +159,7 @@ Select **"All or some functionality is restricted"** and add:
 >
 > **Guideline 5.1.1(v) — account deletion:** in-app at **Account → Security &
 > Privacy → Delete Account** (two confirmations, then immediate deletion), and
-> on the web at [WEBSITE_URL]/account-deletion.
+> on the web at https://mechbazar.com/account-deletion.
 >
 > **Suggested walkthrough:** sign in → Account → My Garage (see saved vehicles)
 > → Home (catalogue filtered to the selected vehicle) → open a product → add to

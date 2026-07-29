@@ -1,15 +1,15 @@
 # Shipping & Delivery Policy
 
-**[BRAND_NAME]**, operated by **[COMPANY_LEGAL_NAME]**
+**MechBazar**, operated by **MECH BAZAR PRIVATE LIMITED**
 
-**Effective Date:** [EFFECTIVE_DATE]
-**Last Updated:** [LAST_UPDATED]
+**Effective Date:** 29 July 2026
+**Last Updated:** 29 July 2026
 
 ---
 
 ## 1. Scope
 
-This Policy sets out how orders placed on the [BRAND_NAME] Platform are packed,
+This Policy sets out how orders placed on the MechBazar Platform are packed,
 dispatched and delivered — including our quick-commerce express delivery, our
 standard delivery, applicable charges, tracking, and what happens when a delivery
 cannot be completed. It applies to deliveries within India only.
@@ -18,7 +18,7 @@ cannot be completed. It applies to deliveries within India only.
 
 ## 2. Service Areas
 
-a. We currently deliver in **[SERVICE_CITIES]** and to serviceable PIN codes
+a. We currently deliver in **Information Required** and to serviceable PIN codes
    across India through our logistics partners.
 b. Enter your **PIN code** on the product page or at checkout to see whether the
    item is deliverable to your location and which delivery speed is available.
@@ -34,9 +34,9 @@ d. We do not ship outside India, and do not deliver to APO/FPO addresses or to
 
 | Option | Typical timeline | Availability |
 |---|---|---|
-| **Express / Quick Delivery** | **[DELIVERY_SLA_EXPRESS]** from order confirmation | Select PIN codes in [SERVICE_CITIES], for in-stock items marked *Express* |
+| **Express / Quick Delivery** | **Information Required** from order confirmation | Select PIN codes in Information Required, for in-stock items marked *Express* |
 | **Same-Day / Next-Day Delivery** | Same day or next business day | Metro PIN codes, orders placed before the cut-off shown at checkout |
-| **Standard Delivery** | **[DELIVERY_SLA_STANDARD]** | All serviceable PIN codes |
+| **Standard Delivery** | **Information Required** | All serviceable PIN codes |
 | **Bulky / Heavy Goods** | **[3–7] business days** | Subject to carrier and PIN-code restrictions |
 | **Special Order / Import Parts** | As stated on the product page | Made-to-order and non-stock items |
 
@@ -78,10 +78,10 @@ d. Every shipment carries a **tax invoice** issued by the seller of record,
 
 | Order value / type | Charge |
 |---|---|
-| Orders of **[FREE_DELIVERY_THRESHOLD]** and above (standard delivery) | **Free** |
-| Orders below **[FREE_DELIVERY_THRESHOLD]** | **[DELIVERY_FEE]** |
-| Express / Quick Delivery | **[EXPRESS_FEE]** (in addition to any standard charge) |
-| Cash on Delivery handling fee | **[COD_FEE]** |
+| Orders of **Information Required** and above (standard delivery) | **Free** |
+| Orders below **Information Required** | **Information Required** |
+| Express / Quick Delivery | **Information Required** (in addition to any standard charge) |
+| Cash on Delivery handling fee | **Information Required** |
 | Bulky / heavy / hazardous goods | Surcharge as displayed at checkout |
 | Remote or difficult-access PIN codes | Surcharge as displayed at checkout |
 
@@ -128,10 +128,10 @@ f. Report any shortage, damage or wrong item **within [48] hours** of delivery
 
 a. COD is available on eligible Orders at eligible PIN codes, up to an order
    value cap displayed at checkout.
-b. A COD handling fee of **[COD_FEE]** may apply.
+b. A COD handling fee of **Information Required** may apply.
 c. Pay the **exact invoice amount in cash**. Riders may not carry change for
    large denominations. There is no card machine, UPI-on-delivery or any other
-   electronic payment option — [BRAND_NAME] accepts cash only.
+   electronic payment option — MechBazar accepts cash only.
 d. Always collect a **payment receipt or delivery acknowledgement**.
 e. COD may be withdrawn from accounts with a history of repeatedly refused or
    undelivered COD Orders.
@@ -207,12 +207,12 @@ cancel for a full refund.
 
 ## 13. Contact and Grievance Redressal
 
-**Customer Support:** [SUPPORT_EMAIL] | [SUPPORT_PHONE] | [SUPPORT_HOURS]
+**Customer Support:** support@mechbazar.com | +91 9772704981 | Information Required
 
 **Grievance Officer**
-[GRIEVANCE_OFFICER_NAME]
-[COMPANY_LEGAL_NAME], [REGISTERED_ADDRESS]
-[GRIEVANCE_EMAIL] | [GRIEVANCE_PHONE]
+Information Required
+MECH BAZAR PRIVATE LIMITED, Sector 70A Extension Road, Gurugram, Haryana, India
+Information Required | Information Required
 
 Complaints are acknowledged within **48 hours** and resolved within **30 days**.
 
@@ -221,5 +221,5 @@ Complaints are acknowledged within **48 hours** and resolved within **30 days**.
 ## 14. Changes to this Policy
 
 We may amend this Policy at any time. The revised version will be published at
-[WEBSITE_URL] and in the app with an updated "Last Updated" date. The Policy in
+https://mechbazar.com and in the app with an updated "Last Updated" date. The Policy in
 force on the date your Order was placed governs that Order.

@@ -1,8 +1,8 @@
-# App Store Submission Checklist — [BRAND_NAME]
+# App Store Submission Checklist — MechBazar
 
 Internal document. **Not for publication.**
 
-**Last Updated:** [LAST_UPDATED]
+**Last Updated:** 29 July 2026
 **Target stores:** Google Play (Android) · Apple App Store (iOS)
 **Region:** India
 
@@ -36,23 +36,23 @@ login wall, or a "coming soon" page is a rejection.
 
 | Page | Required URL | Status |
 |---|---|---|
-| Privacy Policy | `[WEBSITE_URL]/privacy-policy` | ☐ |
-| Terms and Conditions | `[WEBSITE_URL]/terms` | ☐ |
-| Refund Policy | `[WEBSITE_URL]/refund-policy` | ☐ |
-| Shipping Policy | `[WEBSITE_URL]/shipping-policy` | ☐ |
-| Cancellation Policy | `[WEBSITE_URL]/cancellation-policy` | ☐ |
-| Return & Replacement Policy | `[WEBSITE_URL]/return-policy` | ☐ |
-| Contact Us | `[WEBSITE_URL]/contact` | ☐ |
-| About Us | `[WEBSITE_URL]/about` | ☐ |
-| **Account Deletion** | `[WEBSITE_URL]/account-deletion` | ☐ |
+| Privacy Policy | `https://mechbazar.com/privacy-policy` | ☐ |
+| Terms and Conditions | `https://mechbazar.com/terms` | ☐ |
+| Refund Policy | `https://mechbazar.com/refund-policy` | ☐ |
+| Shipping Policy | `https://mechbazar.com/shipping-policy` | ☐ |
+| Cancellation Policy | `https://mechbazar.com/cancellation-policy` | ☐ |
+| Return & Replacement Policy | `https://mechbazar.com/return-policy` | ☐ |
+| Contact Us | `https://mechbazar.com/contact` | ☐ |
+| About Us | `https://mechbazar.com/about` | ☐ |
+| **Account Deletion** | `https://mechbazar.com/account-deletion` | ☐ |
 
 Checks for each page:
 
 - ☐ Publicly reachable over **HTTPS**, no login, no redirect loop
 - ☐ Valid TLS certificate, no mixed-content warnings
 - ☐ Mobile-responsive and readable
-- ☐ All `[PLACEHOLDER]` tokens replaced — a live page containing
-  `[COMPANY_LEGAL_NAME]` is a rejection
+- ☐ All bracketed placeholder tokens (e.g. `[COMPANY_LEGAL_NAME]`) replaced — a
+  live page still containing a literal `[...]` token is a rejection
 - ☐ Company legal name, registered address, email and phone visible
 - ☐ Grievance Officer name, email and phone published (mandatory in India)
 - ☐ "Last Updated" date present and recent
@@ -107,7 +107,7 @@ Checks for each page:
 - ☐ **Financial features** — declare if you offer EMI, pay-later or insurance;
   India requires additional documentation for lending features
 - ☐ **Health** — No
-- ☐ **Account deletion** — URL `[WEBSITE_URL]/account-deletion` **plus** the
+- ☐ **Account deletion** — URL `https://mechbazar.com/account-deletion` **plus** the
   in-app path. **Mandatory** for any app that allows account creation
 - ☐ **Advertising ID** — declare if any SDK collects it
 - ☐ **Photo & video permissions** declaration, if `READ_MEDIA_IMAGES` is in the
@@ -214,7 +214,7 @@ be implemented.
   [Terms and Conditions](terms-and-conditions.md) as a custom licence agreement
 - ☐ Age rating: **17+** or **18+** (commerce app, adult contracting capacity)
 - ☐ Category: Shopping (secondary: Utilities)
-- ☐ Copyright: `© [YEAR] [COMPANY_LEGAL_NAME]`
+- ☐ Copyright: `© 2026 MECH BAZAR PRIVATE LIMITED`
 - ☐ **App Review notes** with:
   - a **demo mobile number and static OTP** that works from outside India
   - a demo account with existing orders, bookings and a saved vehicle, so
@@ -323,7 +323,7 @@ Run on a **real device**, on the **release build**, on both platforms:
 
 ## Part 7 — Submission order
 
-1. Publish all nine legal pages at `[WEBSITE_URL]` — **do this first**
+1. Publish all nine legal pages at `https://mechbazar.com` — **do this first**
 2. Fix Part 0 blockers, rebuild
 3. Run Part 6 smoke test on release builds
 4. Google Play: internal testing track → closed testing → production

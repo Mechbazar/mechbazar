@@ -1,18 +1,18 @@
 # Terms and Conditions
 
-**[BRAND_NAME]**, operated by **[COMPANY_LEGAL_NAME]**
+**MechBazar**, operated by **MECH BAZAR PRIVATE LIMITED**
 
-**Effective Date:** [EFFECTIVE_DATE]
-**Last Updated:** [LAST_UPDATED]
+**Effective Date:** 29 July 2026
+**Last Updated:** 29 July 2026
 
 ---
 
 ## 1. Acceptance of Terms
 
 These Terms and Conditions (**"Terms"**) constitute a legally binding agreement
-between you (**"User"**, **"you"**) and **[COMPANY_LEGAL_NAME]** (CIN: [CIN]),
-having its registered office at [REGISTERED_ADDRESS], which owns and operates the
-**[BRAND_NAME]** mobile application and the website at [WEBSITE_URL]
+between you (**"User"**, **"you"**) and **MECH BAZAR PRIVATE LIMITED** (CIN: U45300HR2026PTC148525),
+having its registered office at Sector 70A Extension Road, Gurugram, Haryana, India, which owns and operates the
+**MechBazar** mobile application and the website at https://mechbazar.com
 (the **"Platform"**).
 
 This document is an electronic record under the Information Technology Act, 2000
@@ -29,7 +29,7 @@ discontinue use of the Platform.
 
 ## 2. Definitions
 
-- **"Platform"** — the [BRAND_NAME] app (Android and iOS) and website.
+- **"Platform"** — the MechBazar app (Android and iOS) and website.
 - **"Customer"** — a User who purchases Products or books Services.
 - **"Vendor"** / **"Seller"** — an independent third party who lists, sells and
   fulfils Products through the Platform.
@@ -65,25 +65,25 @@ and that any GSTIN provided is valid and belongs to it.
 
 ## 4. Nature of the Platform — Marketplace and Intermediary
 
-**[BRAND_NAME] operates a marketplace.** We provide a technology platform that
+**MechBazar operates a marketplace.** We provide a technology platform that
 connects Customers with independent Vendors who sell Products and independent
 Mechanics who perform Services. Accordingly:
 
-a. [BRAND_NAME] is an **"intermediary"** under Section 2(1)(w) of the
+a. MechBazar is an **"intermediary"** under Section 2(1)(w) of the
    Information Technology Act, 2000 and a **"marketplace e-commerce entity"**
    under the Consumer Protection (E-Commerce) Rules, 2020.
 b. The **contract of sale of a Product is directly between the Customer and the
    Vendor.** The contract for performance of a Service is directly between the
-   Customer and the Mechanic. [BRAND_NAME] is not a party to that contract and
+   Customer and the Mechanic. MechBazar is not a party to that contract and
    does not take title to the Products.
 c. Vendors and Mechanics are solely responsible for the description, quality,
    genuineness, fitment, safety, warranty, packaging, statutory labelling,
    pricing, availability and timely fulfilment of what they supply.
-d. [BRAND_NAME] does not manufacture, refurbish or remanufacture any Product
-   unless expressly stated as a [BRAND_NAME]-owned or private-label listing, in
+d. MechBazar does not manufacture, refurbish or remanufacture any Product
+   unless expressly stated as a MechBazar-owned or private-label listing, in
    which case the applicable seller entity is disclosed on the product page.
 
-Where [BRAND_NAME] operates on an inventory or first-party basis for particular
+Where MechBazar operates on an inventory or first-party basis for particular
 categories, the seller of record is disclosed on the product page and on the tax
 invoice, and the corresponding statutory obligations of a seller apply to that
 entity.
@@ -96,7 +96,7 @@ a. Registration requires a valid **Indian mobile number**, verified by a
    One-Time Password (OTP). You must provide accurate, current and complete
    information.
 b. You are responsible for all activity that occurs under your account. **Do not
-   share your OTP with anyone.** [BRAND_NAME] will never ask for your OTP, card
+   share your OTP with anyone.** MechBazar will never ask for your OTP, card
    CVV, UPI PIN or bank password.
 c. You must keep your registered mobile number current, since order updates,
    delivery coordination, refunds and login all depend on it.
@@ -158,7 +158,7 @@ a. Prices are set by Vendors and are inclusive of GST unless stated otherwise.
    are shown separately at checkout before you confirm.
 b. Prices, discounts and availability may change without notice at any time
    before an Order is confirmed.
-c. In the event of an obvious pricing, stock or description error, [BRAND_NAME]
+c. In the event of an obvious pricing, stock or description error, MechBazar
    or the Vendor may cancel the affected Order and refund any amount paid in
    full. No further liability arises from such cancellation.
 
@@ -170,7 +170,7 @@ a. Placing an Order constitutes an **offer** to purchase. The contract is formed
    when the Vendor accepts and confirms the Order. Every Order is subject to
    stock availability at the time of fulfilment.
 b. Delivery timelines — including any express or quick-commerce timeline of
-   [DELIVERY_SLA_EXPRESS] — are **estimates applicable only to serviceable
+   Information Required — are **estimates applicable only to serviceable
    PIN codes for eligible in-stock items**, and are subject to traffic, weather,
    local restrictions, force majeure and rider availability. Failure to meet an
    estimated timeline does not, by itself, entitle you to compensation beyond the
@@ -187,7 +187,7 @@ e. Full details are set out in the [Shipping Policy](shipping-policy.md).
 ## 8. Doorstep Mechanic Services
 
 a. Services are performed by **independent verified Mechanics**, not by employees
-   of [BRAND_NAME].
+   of MechBazar.
 b. Booking slots and arrival times are **best-effort estimates** and may shift
    with traffic, job overruns and mechanic availability.
 c. Service completion may be confirmed by an **OTP shared by you** to the
@@ -211,17 +211,17 @@ g. **Workmanship warranty.** Unless stated otherwise on the service page,
    Vendor. The warranty is void where the vehicle has been subsequently worked on
    by a third party, misused, raced, overloaded, or operated after a fault was
    evident.
-h. [BRAND_NAME] is not liable for pre-existing defects, consequential
+h. MechBazar is not liable for pre-existing defects, consequential
    deterioration, or damage caused by parts supplied by you.
 
 ---
 
 ## 9. Payment — Cash on Delivery Only
 
-a. **Cash on Delivery is the only payment method [BRAND_NAME] supports.**
+a. **Cash on Delivery is the only payment method MechBazar supports.**
    Payment is made in Indian Rupees, in cash, to the Delivery Partner at the
    time of handover, or to the Mechanic once the Service is complete.
-b. **[BRAND_NAME] does not operate or integrate any payment gateway.** We do
+b. **MechBazar does not operate or integrate any payment gateway.** We do
    not accept UPI, debit or credit cards, net banking, wallets, pay-later
    instruments, or any other form of online or advance payment, and we do not
    collect, process or store any payment-instrument data.
@@ -231,17 +231,17 @@ c. **No amount is payable before fulfilment.** Placing an Order or a Booking
 d. You are responsible for paying the exact amount shown on the tax invoice at
    handover. Delivery Partners and Mechanics may not carry change for large
    denominations. Always collect a receipt or delivery acknowledgement.
-e. A **COD handling fee of [COD_FEE]** may apply and, where it does, is
+e. A **COD handling fee of Information Required** may apply and, where it does, is
    disclosed in the order summary before you confirm. COD may be unavailable
    for certain PIN codes, for high-value Orders, or for accounts with a history
    of refused deliveries.
 f. Refunds of cash already paid are governed by the
    [Refund Policy](refund-policy.md) and are paid to a bank account or UPI ID
    you supply, since there is no original transaction to reverse.
-g. **Security.** [BRAND_NAME] will never ask you to pay online or in advance,
+g. **Security.** MechBazar will never ask you to pay online or in advance,
    never asks for a card number, CVV, UPI PIN, net-banking password or login
    OTP, and never asks you to scan a QR code to *receive* money. Any such
-   request is fraudulent. Report it to [SUPPORT_EMAIL] and to the National
+   request is fraudulent. Report it to support@mechbazar.com and to the National
    Cyber Crime Reporting Portal (helpline **1930**).
 h. Refusing to pay for goods you have accepted, or repeatedly refusing COD
    deliveries, constitutes a breach of these Terms and may result in account
@@ -259,7 +259,7 @@ These are governed by the following documents, which form part of these Terms:
 - [Shipping Policy](shipping-policy.md)
 
 In summary: unused Products in original, unbroken packaging may generally be
-returned within **[RETURN_WINDOW_DAYS] days** of delivery. Installed, used,
+returned within **Information Required days** of delivery. Installed, used,
 fitted, damaged, electrically tested or made-to-order parts, and completed
 Services, are not returnable. Full conditions and exclusions are in the linked
 policies.
@@ -286,7 +286,7 @@ d. Abuse of promotions — including bulk ordering for resale, use of multiple
 
 a. You may post reviews, ratings, photographs and other content
    (**"User Content"**) relating to Products, Vendors and Mechanics.
-b. You grant [BRAND_NAME] a worldwide, royalty-free, non-exclusive,
+b. You grant MechBazar a worldwide, royalty-free, non-exclusive,
    sub-licensable, perpetual licence to host, store, reproduce, adapt, publish
    and display User Content in connection with the Platform and its promotion.
 c. You represent that your User Content is your own, is accurate, is based on
@@ -331,9 +331,9 @@ We may report violations to law enforcement and cooperate with investigations.
 
 ## 14. Intellectual Property
 
-The Platform, the [BRAND_NAME] name and logo, its design, layout, graphics,
+The Platform, the MechBazar name and logo, its design, layout, graphics,
 databases, source code, catalogue structure and compilation are the property of
-[COMPANY_LEGAL_NAME] or its licensors and are protected under Indian and
+MECH BAZAR PRIVATE LIMITED or its licensors and are protected under Indian and
 international intellectual property law. Vendor, manufacturer and vehicle
 brand names, part numbers and logos remain the property of their respective
 owners, and are used solely to identify compatibility and provenance. Nothing on
@@ -380,12 +380,12 @@ d. **Do not attempt safety-critical repairs — including brakes, steering,
 
 To the maximum extent permitted by applicable law:
 
-a. [BRAND_NAME] shall not be liable for any indirect, incidental, special,
+a. MechBazar shall not be liable for any indirect, incidental, special,
    consequential, punitive or exemplary loss, including loss of profit, loss of
    business, loss of use of the vehicle, towing charges, alternative transport
    costs, or loss of data, arising out of or in connection with the use of the
    Platform.
-b. The aggregate liability of [BRAND_NAME] in respect of any claim relating to an
+b. The aggregate liability of MechBazar in respect of any claim relating to an
    Order or Booking shall not exceed **the total amount paid by you for that
    particular Order or Booking**.
 c. Nothing in these Terms excludes or limits liability that cannot be excluded or
@@ -397,7 +397,7 @@ c. Nothing in these Terms excludes or limits liability that cannot be excluded o
 
 ## 18. Indemnity
 
-You agree to indemnify, defend and hold harmless [COMPANY_LEGAL_NAME], its
+You agree to indemnify, defend and hold harmless MECH BAZAR PRIVATE LIMITED, its
 directors, officers, employees and agents from and against any claim, demand,
 loss, liability, cost or expense (including reasonable legal fees) arising out
 of: (a) your breach of these Terms or any applicable law; (b) your infringement
@@ -440,11 +440,11 @@ b. **Grievance first.** Before initiating any formal proceedings, you agree to
    for resolution.
 c. **Arbitration.** Any dispute not resolved through the grievance process shall
    be referred to arbitration by a sole arbitrator appointed by
-   [COMPANY_LEGAL_NAME], under the **Arbitration and Conciliation Act, 1996**.
-   The seat and venue of arbitration shall be **[ARBITRATION_SEAT]** and the
+   MECH BAZAR PRIVATE LIMITED, under the **Arbitration and Conciliation Act, 1996**.
+   The seat and venue of arbitration shall be **Information Required** and the
    language shall be English. The award shall be final and binding.
-d. **Jurisdiction.** Subject to the above, the courts at **[JURISDICTION_CITY],
-   [JURISDICTION_STATE]** shall have exclusive jurisdiction.
+d. **Jurisdiction.** Subject to the above, the courts at **Information Required,
+   Information Required** shall have exclusive jurisdiction.
 e. **Consumer rights preserved.** Nothing in this Section restricts your right as
    a consumer to approach the appropriate consumer commission under the Consumer
    Protection Act, 2019, including through the National Consumer Helpline (1915)
@@ -462,7 +462,7 @@ c. **Assignment** — you may not assign these Terms; we may assign them to an
 d. **Entire agreement** — these Terms, together with the policies referenced,
    constitute the entire agreement between you and us regarding the Platform.
 e. **Amendments** — we may revise these Terms at any time. The revised version
-   takes effect when posted at [WEBSITE_URL] and in the app, and continued use
+   takes effect when posted at https://mechbazar.com and in the app, and continued use
    thereafter constitutes acceptance. Material changes will be notified in
    advance.
 f. **Language** — these Terms are executed in English, which prevails over any
@@ -472,17 +472,17 @@ f. **Language** — these Terms are executed in English, which prevails over any
 
 ## 23. Contact and Grievance Redressal
 
-**[COMPANY_LEGAL_NAME]**
-Registered Office: [REGISTERED_ADDRESS]
-CIN: [CIN] | GSTIN: [GSTIN]
-Customer Support: [SUPPORT_EMAIL] | [SUPPORT_PHONE] ([SUPPORT_HOURS])
-Website: [WEBSITE_URL]
+**MECH BAZAR PRIVATE LIMITED**
+Registered Office: Sector 70A Extension Road, Gurugram, Haryana, India
+CIN: U45300HR2026PTC148525 | GSTIN: Not Applicable (GST registration pending)
+Customer Support: support@mechbazar.com | +91 9772704981 (Information Required)
+Website: https://mechbazar.com
 
 **Grievance Officer** (under the IT Act, 2000 and the Consumer Protection
 (E-Commerce) Rules, 2020)
-Name: [GRIEVANCE_OFFICER_NAME]
-Email: [GRIEVANCE_EMAIL] | Phone: [GRIEVANCE_PHONE]
-Address: [REGISTERED_ADDRESS]
+Name: Information Required
+Email: Information Required | Phone: Information Required
+Address: Sector 70A Extension Road, Gurugram, Haryana, India
 
 Complaints are acknowledged within **48 hours** and resolved within **30 days**.
 
@@ -491,11 +491,11 @@ Complaints are acknowledged within **48 hours** and resolved within **30 days**.
 ### Apple App Store Users
 
 If you download the app from the Apple App Store, the following additional terms
-apply. This agreement is between you and [COMPANY_LEGAL_NAME] only, and not with
+apply. This agreement is between you and MECH BAZAR PRIVATE LIMITED only, and not with
 Apple Inc. Apple has no obligation to furnish maintenance or support for the app.
 In the event the app fails to conform to any applicable warranty, you may notify
 Apple, which will refund the purchase price (if any); to the maximum extent
-permitted by law, Apple has no other warranty obligation. [COMPANY_LEGAL_NAME] is
+permitted by law, Apple has no other warranty obligation. MECH BAZAR PRIVATE LIMITED is
 responsible for addressing any claims relating to the app, including product
 liability, regulatory non-compliance and consumer protection claims. Apple and
 its subsidiaries are third-party beneficiaries of these Terms and may enforce
