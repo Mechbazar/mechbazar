@@ -142,8 +142,8 @@ To help us resolve your issue in a single exchange, please include:
 
 | Channel | First response |
 |---|---|
-| In-app **Report an Issue** | Within **[4] business hours** |
-| Email to support@mechbazar.com | Within **[24] hours** |
+| In-app **Report an Issue** | Within **4 business hours** |
+| Email to support@mechbazar.com | Within **24 hours** |
 | Phone +91 9772704981 | Immediate, during Information Required |
 | Grievance Officer | **Acknowledged within 48 hours**, resolved within **30 days** |
 

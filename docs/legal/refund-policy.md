@@ -139,7 +139,7 @@ reverse.** Refunds are therefore paid directly to a bank account or UPI ID that
 
 | Stage | Timeline |
 |---|---|
-| Refund approved (after the returned item passes quality inspection, or the claim is accepted) | Within **[2] business days** |
+| Refund approved (after the returned item passes quality inspection, or the claim is accepted) | Within **2 business days** |
 | Refund credited to your bank account or UPI ID | **5–10 business days** from approval |
 
 **What you need to provide.** Either:

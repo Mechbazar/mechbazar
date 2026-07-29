@@ -254,7 +254,7 @@ collected, or for as long as required by law — whichever is longer.
 
 | Data | Retention period |
 |---|---|
-| Account profile, addresses, Garage vehicles | While the account is active; deleted or anonymised within **[30] days** of a verified deletion request |
+| Account profile, addresses, Garage vehicles | While the account is active; deleted or anonymised within **30 days** of a verified deletion request |
 | Order, booking, invoice and tax records | **8 years** from the end of the relevant financial year (Companies Act, 2013 and GST law) |
 | Payment and refund records | **8 years**, as required for financial audit |
 | Partner KYC records | **5 years** after the partnership ends, or longer if required by law |
@@ -325,7 +325,7 @@ Subject to applicable law, you have the right to:
 
 To exercise any of these rights, write to **Information Required** from your registered
 email address or contact number. We may ask you to verify your identity before
-acting on a request, and will respond within **[30] days**.
+acting on a request, and will respond within **30 days**.
 
 You also have a corresponding duty under the DPDP Act not to furnish false
 particulars, impersonate another person, or file frivolous or false grievances.

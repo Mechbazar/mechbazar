@@ -119,7 +119,7 @@ d. **Open-box / open-delivery** is available on selected high-value items, where
 e. **Record an unboxing video** for high-value, fragile or electrical parts. For
    claims of missing items, wrong items or transit damage, an unbroken unboxing
    video is the most reliable evidence and materially speeds up resolution.
-f. Report any shortage, damage or wrong item **within [48] hours** of delivery
+f. Report any shortage, damage or wrong item **within 48 hours** of delivery
    through **Orders → Report an Issue**, with photographs.
 
 ---

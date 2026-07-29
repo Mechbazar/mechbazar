@@ -130,7 +130,7 @@ account.
 | Refund, settlement and payout records | Financial audit and reconciliation | **8 years** |
 | Partner KYC documents (Vendors, Mechanics, Riders) | Statutory onboarding and tax obligations | **5 years** after the relationship ends |
 | Records subject to an ongoing dispute, investigation, claim or legal proceeding | Legal defence and enforcement | Until final resolution, plus the applicable limitation period |
-| Fraud, abuse and security records | Prevention of repeat fraud and platform integrity | **[3] years**, in minimised form |
+| Fraud, abuse and security records | Prevention of repeat fraud and platform integrity | **3 years**, in minimised form |
 | Server and access logs | IT Act, 2000 and CERT-In directions | **180 days**, unless required for an active investigation |
 | Grievance and complaint records | Consumer Protection (E-Commerce) Rules, 2020 | **3 years** from resolution |
 | Record of your deletion request itself | Proof of compliance | **3 years** |
@@ -147,9 +147,9 @@ indefinitely.
 |---|---|
 | **In-app deletion** — personal data erased, login disabled, push tokens revoked, Firebase sign-in credential removed | **Immediately**, at the moment you confirm |
 | Deletion requested by email, phone or web instead of in-app: acknowledgement | **Within 48 hours** |
-| Deletion requested by email, phone or web instead of in-app: completion | **Within [30] days** |
-| Erasure propagated to encrypted backups | **Within [90] days**, as backups cycle |
-| Erasure requests forwarded to processors and marketplace partners | **Within [30] days** |
+| Deletion requested by email, phone or web instead of in-app: completion | **Within 30 days** |
+| Erasure propagated to encrypted backups | **Within 90 days**, as backups cycle |
+| Erasure requests forwarded to processors and marketplace partners | **Within 30 days** |
 | Written confirmation of completion | On completion |
 
 **There is no cooling-off period and no way to undo an in-app deletion.** Once

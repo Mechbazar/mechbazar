@@ -76,7 +76,7 @@ you.
 ### No-show
 
 If nobody is available at the service address, the vehicle is not accessible, or
-the Mechanic cannot reach you within **[15] minutes** of arrival, the Booking is
+the Mechanic cannot reach you within **15 minutes** of arrival, the Booking is
 marked a **customer no-show**. A visitation charge applies and the balance of any
 advance is refunded. Repeated no-shows may result in advance payment being
 required for future Bookings.

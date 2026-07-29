@@ -28,9 +28,9 @@ subject to the eligibility conditions in Section 3.
 
 | Reason for return | Window |
 |---|---|
-| Wrong item, wrong part number, wrong quantity, wrong brand | **[48] hours** from delivery |
-| Damaged in transit | **[48] hours** from delivery |
-| Missing item in a shipment | **[48] hours** from delivery |
+| Wrong item, wrong part number, wrong quantity, wrong brand | **48 hours** from delivery |
+| Damaged in transit | **48 hours** from delivery |
+| Missing item in a shipment | **48 hours** from delivery |
 | Item not as described / counterfeit | **Information Required days** |
 | Defective on arrival (DOA) | **Information Required days**, or the manufacturer's DOA window if longer |
 | Change of mind / incorrect selection by you | **Information Required days** |
@@ -129,7 +129,7 @@ b. **Free replacement** is provided where the fault lies with us, the Vendor or
 c. Replacement is **like-for-like** — the same part number, brand and
    specification. Where the exact item is unavailable, we will offer an
    equivalent or better substitute for your approval, or a full refund.
-d. Replacements are dispatched **within [2] business days** of the returned item
+d. Replacements are dispatched **within 2 business days** of the returned item
    passing quality inspection, or immediately on approval where we waive
    inspection.
 e. A replacement carries the **remainder of the original warranty**, not a fresh
@@ -173,12 +173,12 @@ b. Pack the item in its **original packaging inside an outer box**. Do not affix
 c. Enclose the **invoice copy** and the return authorisation reference.
 d. Hand over **all** accessories, hardware and free items received with the
    product. Missing components are deducted from the refund.
-e. **Up to [2] pick-up attempts** are made. If both fail because nobody is
+e. **Up to 2 pick-up attempts** are made. If both fail because nobody is
    available, a **₹200 no-show fee** applies and the return request is closed
    and must be raised afresh, subject to the window still being open.
 f. Where reverse pick-up is **not available** at your PIN code, we will authorise
    a **self-ship** return and reimburse reasonable courier charges — up to
-   **₹[200]**, against a receipt — where the fault is ours or the Vendor's.
+   **₹200**, against a receipt — where the fault is ours or the Vendor's.
 g. **Reverse-logistics charges** may be deducted for change-of-mind and
    incorrect-selection returns. The amount is disclosed before you confirm the
    return. No such charge is levied where the fault is ours or the Vendor's.
