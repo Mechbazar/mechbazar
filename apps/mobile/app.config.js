@@ -97,7 +97,11 @@ module.exports = {
     assetBundlePatterns: ['**/*'],
 
     ios: {
-      supportsTablet: true,
+      // No iPad-specific layout has ever been tested in this app. Shipping
+      // supportsTablet: true without that obliges 13" iPad screenshots and a
+      // passing iPad review with zero evidence it's ever been checked on that
+      // form factor. iPhone-only is fully permitted by Apple.
+      supportsTablet: false,
       bundleIdentifier: 'com.mechbazar.mobile',
       ...(hasIosFirebase ? { googleServicesFile: './GoogleService-Info.plist' } : {}),
       // Build number is managed remotely by EAS (eas.json ->
