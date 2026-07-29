@@ -252,23 +252,28 @@ module.exports = {
         'expo-splash-screen',
         {
           // splash-icon-dark.png is the LIGHT-ink wordmark ("-dark" means "for
-          // dark backgrounds"). The background below is the brand red, on which
-          // the ink-coloured variant would be close to invisible.
+          // dark backgrounds"): "MECH" renders in white, "BAZAR" in brand red,
+          // both on a transparent PNG. It needs an actually dark background to
+          // read correctly -- the previous brand-red backgroundColor put the
+          // red half of the wordmark ("BAZAR") directly on top of a
+          // near-identical red, making it disappear (the bug this fixes).
           image: './assets/splash-icon-dark.png',
           // The splash art is the MechBazar wordmark (~9:1), not the old square
           // hexagon mark, so this is a width the wordmark reads at rather than
           // the square's old 200.
           imageWidth: 240,
           resizeMode: 'contain',
-          // Brand red, matching this app's launcher icon background, so the
-          // splash continues the icon the user just tapped instead of flashing
-          // a generic white frame.
-          backgroundColor: '#E53935',
+          // Matches android.adaptiveIcon.backgroundColor below (the actual
+          // launcher icon background as of the 2026-07-29 icon redesign) so the
+          // splash continues the icon the user just tapped, and gives both
+          // wordmark colours full contrast: white "MECH" and red "BAZAR" each
+          // read cleanly against near-black.
+          backgroundColor: '#0D0D0D',
           dark: {
             // Same art and colour in dark mode: the splash should read as the
             // brand, not flip appearance halfway through launch.
             image: './assets/splash-icon-dark.png',
-            backgroundColor: '#E53935',
+            backgroundColor: '#0D0D0D',
           },
         },
       ],

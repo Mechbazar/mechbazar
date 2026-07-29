@@ -29,18 +29,36 @@ import { notify } from '../../utils/notify';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import Container from '../../components/desktop/shared/Container';
-import { spacing as deskSpacing, radius as deskRadius } from '../../theme/tokens';
+import { spacing, typography, radius, shadows, darkColors, colors as brandColors } from '../../theme/tokens';
 
 const { width } = Dimensions.get('window');
 
+// Deliberately a fixed dark theme regardless of the device's light/dark
+// preference -- this is the pre-login brand moment, not the app's normal
+// (light) content theme, so it does not read from useThemeColors(). Values
+// are sourced from theme/tokens.ts's `darkColors` (the design system's own
+// dark palette -- surfaces invert, brand hues are lifted for AA contrast
+// against dark backgrounds) rather than invented locally, so this screen
+// and the desktop layout below share one definition of "the app's dark
+// surface colours" instead of two.
 const colors = {
-  primary: '#DA3830',     
+  bg: darkColors.pageBg, // '#121212'
+  surface: darkColors.white, // '#1E1E1E' -- card/elevated-surface colour in dark mode
+  surfaceRaised: '#242C35', // one step brighter than `surface`, for the OTP card once it's the focused step
+  border: darkColors.borderLight, // '#2E2E2E'
+  borderFocus: darkColors.primary,
+  // Button fills use the canonical brand red (same hex as the rest of the
+  // app, e.g. GarageScreen/EditProfileScreen) since a solid-fill CTA needs
+  // white-on-red contrast, not dark-surface text contrast.
+  primary: brandColors.primary, // '#DA3830'
   primaryLight: '#FF573C',
-  secondary: '#1B1B1B',   
-  steel: '#242C35',       
+  // Text/link colour on the dark surfaces below uses the dark-mode-tuned red
+  // (lifted for AA contrast against near-black, per tokens.ts's own rationale).
+  primaryOnDark: darkColors.primary, // '#FF5A4E'
   white: '#FFFFFF',
-  textMuted: '#9AA5B1',
-  border: '#2C3540'
+  textPrimary: darkColors.textDark, // '#F1F2F4'
+  textMuted: darkColors.textMuted, // '#A6ACB5'
+  danger: darkColors.danger, // '#FF6B6B'
 };
 
 const SvgBackground = ({ gearRotation, floatAnim }: any) => (
@@ -48,13 +66,13 @@ const SvgBackground = ({ gearRotation, floatAnim }: any) => (
     <Svg height="100%" width="100%">
       <Defs>
         <LinearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <Stop offset="0%" stopColor="#1C232B" />
-          <Stop offset="100%" stopColor="#0B0D11" />
+          <Stop offset="0%" stopColor="#1A1D22" />
+          <Stop offset="100%" stopColor={colors.bg} />
         </LinearGradient>
       </Defs>
       <Rect width="100%" height="100%" fill="url(#bgGrad)" />
     </Svg>
-    
+
     {/* Subtle animated floating gear background overlay */}
     <Animated.View style={[
       styles.animatedGear,
@@ -133,7 +151,7 @@ const GradientButton = ({ onPress, children, disabled, isLoading }: any) => {
                 <Stop offset="100%" stopColor={colors.primary} />
               </LinearGradient>
             </Defs>
-            <Rect width="100%" height="100%" fill={disabled ? "#4A5562" : "url(#btnGrad)"} rx="12" ry="12" />
+            <Rect width="100%" height="100%" fill={disabled ? "#4A5562" : "url(#btnGrad)"} rx={radius.md} ry={radius.md} />
           </Svg>
         </View>
         <View style={styles.btnContent}>
@@ -181,7 +199,7 @@ const ApiSettingsModal = ({
           value={tempBaseUrl}
           onChangeText={setTempBaseUrl}
           placeholder="http://<IP>:<PORT>/api"
-          placeholderTextColor="#6B7480"
+          placeholderTextColor={colors.textMuted}
           autoCapitalize="none"
           autoCorrect={false}
         />
@@ -235,6 +253,9 @@ function DesktopWelcomeLayout({
         <View style={desktopStyles.splitRow}>
           {/* LEFT: hero copy + banner + benefits */}
           <View style={desktopStyles.leftCol}>
+            <View style={desktopStyles.leftLogoRow}>
+              <Logo tone="dark" width={168} />
+            </View>
             <Text style={desktopStyles.heroTitle}>India's Smart Vehicle Marketplace</Text>
             <Text style={desktopStyles.heroSubtitle}>Car Parts • Bike Parts • Home Mechanic Services</Text>
 
@@ -246,15 +267,15 @@ function DesktopWelcomeLayout({
 
             <View style={desktopStyles.benefitsRow}>
               <View style={desktopStyles.benefitItem}>
-                <Ionicons name="shield-checkmark-outline" size={18} color={colors.primary} />
+                <Ionicons name="shield-checkmark-outline" size={18} color={colors.primaryOnDark} />
                 <Text style={desktopStyles.benefitText}>Genuine Parts</Text>
               </View>
               <View style={desktopStyles.benefitItem}>
-                <Ionicons name="home-outline" size={18} color={colors.primary} />
+                <Ionicons name="home-outline" size={18} color={colors.primaryOnDark} />
                 <Text style={desktopStyles.benefitText}>Doorstep Service</Text>
               </View>
               <View style={desktopStyles.benefitItem}>
-                <Ionicons name="flash-outline" size={18} color={colors.primary} />
+                <Ionicons name="flash-outline" size={18} color={colors.primaryOnDark} />
                 <Text style={desktopStyles.benefitText}>Fast Delivery</Text>
               </View>
             </View>
@@ -264,7 +285,7 @@ function DesktopWelcomeLayout({
           <View style={desktopStyles.rightCol}>
             <View style={desktopStyles.card}>
               <Text style={desktopStyles.welcomeBack}>Welcome Back</Text>
-              <Text style={desktopStyles.continueWith}>Continue with Mobile Number</Text>
+              <Text style={desktopStyles.continueWith}>Continue with your mobile number</Text>
 
               <Text style={desktopStyles.inputLabel}>Mobile Number</Text>
               <View style={[desktopStyles.inputRow, phoneError ? desktopStyles.inputRowError : null]}>
@@ -276,7 +297,7 @@ function DesktopWelcomeLayout({
                 <TextInput
                   style={desktopStyles.mobileInput}
                   placeholder="Enter 10-digit number"
-                  placeholderTextColor="#6B7480"
+                  placeholderTextColor={colors.textMuted}
                   keyboardType="numeric"
                   maxLength={10}
                   value={mobile}
@@ -286,20 +307,23 @@ function DesktopWelcomeLayout({
               </View>
               {!!phoneError && (
                 <View style={desktopStyles.errorRow}>
-                  <Ionicons name="alert-circle" size={13} color={colors.primary} />
+                  <Ionicons name="alert-circle" size={13} color={colors.danger} />
                   <Text style={desktopStyles.errorText}>{phoneError}</Text>
                 </View>
               )}
 
               {isOtpSent && (
                 <View style={desktopStyles.otpSection}>
-                  <Text style={desktopStyles.inputLabel}>Enter OTP</Text>
+                  <View style={desktopStyles.otpSectionHeader}>
+                    <Text style={desktopStyles.inputLabel}>Enter OTP</Text>
+                    <Text style={desktopStyles.sentToText}>Sent to +91 {mobile}</Text>
+                  </View>
                   <View style={desktopStyles.inputRow}>
                     <Ionicons name="lock-closed-outline" size={17} color={colors.textMuted} style={{ marginRight: 10 }} />
                     <TextInput
                       style={desktopStyles.mobileInput}
                       placeholder="Enter 6-digit OTP"
-                      placeholderTextColor="#6B7480"
+                      placeholderTextColor={colors.textMuted}
                       keyboardType="numeric"
                       maxLength={6}
                       value={otp}
@@ -502,7 +526,7 @@ export default function WelcomeScreen() {
       notify('Validation Error', 'Please enter a valid 6-digit OTP.');
       return;
     }
-    
+
     setIsLoading(true);
     try {
       // `otp` (the code the user typed) confirms the pending Firebase
@@ -596,7 +620,7 @@ export default function WelcomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <SvgBackground gearRotation={gearRotation} floatAnim={floatAnim} />
-      
+
       {/* Top Header Settings Bar */}
       <View style={styles.topHeader}>
         {/* Development builds only -- see the note on DEV_TOOLS_ENABLED. */}
@@ -609,34 +633,34 @@ export default function WelcomeScreen() {
             }}
             activeOpacity={0.7}
           >
-            <Ionicons name="settings-outline" size={22} color={colors.white} />
+            <Ionicons name="settings-outline" size={20} color={colors.white} />
           </TouchableOpacity>
         )}
       </View>
 
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardContainer}
       >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContent} 
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           bounces={false}
           scrollEnabled={false}
         >
           <View style={styles.mainContent}>
-            
-            {/* LOGO -- dark tone: this screen's background is #0E1116. */}
+
+            {/* LOGO -- dark tone: this screen's background is near-black. */}
             <Animated.View style={[styles.logoSection, { opacity: logoFadeAnim }]}>
-              <Logo tone="dark" width={250} />
+              <Logo tone="dark" width={220} />
             </Animated.View>
 
             {/* HERO TEXTS */}
             <Animated.View style={[
-              styles.heroSection, 
-              { 
+              styles.heroSection,
+              {
                 opacity: logoFadeAnim,
-                transform: [{ translateY: heroSlideAnim }] 
+                transform: [{ translateY: heroSlideAnim }]
               }
             ]}>
               <Text style={styles.heroTitle}>India's Smart Vehicle Marketplace</Text>
@@ -667,8 +691,10 @@ export default function WelcomeScreen() {
               <View style={styles.trustItem}><Text style={styles.trustItemText}>✓ Secure OTP Login</Text></View>
             </View>
 
-            {/* LOGIN INPUT CARD */}
+            {/* PREMIUM LOGIN CARD */}
             <Animated.View style={[styles.authContainer, { opacity: inputFadeAnim }]}>
+              <Text style={styles.cardEyebrow}>{isOtpSent ? 'VERIFY YOUR NUMBER' : 'LOG IN OR SIGN UP'}</Text>
+
               <Text style={styles.inputLabel}>Mobile Number</Text>
               <View style={[styles.inputRow, phoneError ? styles.inputRowError : null]}>
                 <View style={styles.flagBox}>
@@ -679,7 +705,7 @@ export default function WelcomeScreen() {
                 <TextInput
                   style={styles.mobileInput}
                   placeholder="Enter 10-digit number"
-                  placeholderTextColor="#6B7480"
+                  placeholderTextColor={colors.textMuted}
                   keyboardType="numeric"
                   maxLength={10}
                   value={mobile}
@@ -688,22 +714,31 @@ export default function WelcomeScreen() {
                   autoFocus={true}
                 />
               </View>
-              {phoneError ? <Text style={styles.errorText}>{phoneError}</Text> : null}
+              {!!phoneError && (
+                <View style={styles.errorRow}>
+                  <Ionicons name="alert-circle" size={13} color={colors.danger} />
+                  <Text style={styles.errorText}>{phoneError}</Text>
+                </View>
+              )}
 
               {isOtpSent && (
                 <View style={styles.otpSection}>
-                  <Text style={styles.inputLabel}>Enter OTP</Text>
+                  <View style={styles.otpSectionHeader}>
+                    <Text style={styles.inputLabel}>Enter OTP</Text>
+                    <Text style={styles.sentToText}>Sent to +91 {mobile}</Text>
+                  </View>
                   <View style={styles.otpInputRow}>
                     <Ionicons name="lock-closed-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
                     <TextInput
                       style={styles.otpInput}
                       placeholder="Enter 6-digit OTP"
-                      placeholderTextColor="#6B7480"
+                      placeholderTextColor={colors.textMuted}
                       keyboardType="numeric"
                       maxLength={6}
                       value={otp}
                       onChangeText={setOtp}
                       editable={!isLoading}
+                      autoFocus={true}
                     />
                   </View>
                   <TouchableOpacity
@@ -727,6 +762,11 @@ export default function WelcomeScreen() {
                   {isOtpSent ? 'Verify & Login' : 'Send OTP'}
                 </Text>
               </GradientButton>
+
+              <View style={styles.securityNote}>
+                <Ionicons name="shield-checkmark-outline" size={13} color={colors.textMuted} />
+                <Text style={styles.securityNoteText}>Your number is used only for secure OTP login</Text>
+              </View>
             </Animated.View>
 
           </View>
@@ -754,13 +794,13 @@ export default function WelcomeScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>API Server Configuration</Text>
             <Text style={styles.modalDesc}>Change backend API base URL for testing environment updates.</Text>
-            
+
             <TextInput
               style={styles.modalInput}
               value={tempBaseUrl}
               onChangeText={setTempBaseUrl}
               placeholder="http://<IP>:<PORT>/api"
-              placeholderTextColor="#6B7480"
+              placeholderTextColor={colors.textMuted}
               autoCapitalize="none"
               autoCorrect={false}
             />
@@ -784,24 +824,29 @@ export default function WelcomeScreen() {
   );
 }
 
+// Caps how wide the stacked mobile column is allowed to grow (tablet
+// portrait, foldables) -- below this the layout is just full-width with
+// spacing.lg gutters, same as before.
+const CONTENT_MAX_WIDTH = 460;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0E1116',
+    backgroundColor: colors.bg,
   },
   topHeader: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
     zIndex: 10,
   },
   settingsIconBtn: {
-    padding: 8,
-    backgroundColor: '#FFFFFF10',
-    borderRadius: 20,
+    padding: spacing.sm,
+    backgroundColor: '#FFFFFF12',
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: '#FFFFFF15',
+    borderColor: '#FFFFFF1F',
   },
   animatedGear: {
     position: 'absolute',
@@ -819,117 +864,128 @@ const styles = StyleSheet.create({
   scrollContent: {
     flex: 1,
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingBottom: 16,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
   },
   mainContent: {
     flex: 1,
     justifyContent: 'center',
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
   },
   logoSection: {
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: spacing.sm,
   },
   heroSection: {
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: spacing.md,
   },
   heroTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: colors.white,
+    fontSize: 21,
+    fontWeight: '800',
+    color: colors.textPrimary,
     textAlign: 'center',
+    letterSpacing: 0.2,
   },
   heroSubtitle: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginTop: 4,
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.primaryOnDark,
+    marginTop: spacing.xs,
     textAlign: 'center',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   heroDescription: {
-    fontSize: 12,
+    ...typography.caption,
     color: colors.textMuted,
     textAlign: 'center',
-    paddingHorizontal: 10,
+    paddingHorizontal: spacing.sm,
     lineHeight: 18,
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
   badgeRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 14,
+    marginBottom: spacing.md,
   },
   featureBadge: {
-    backgroundColor: '#242C3570',
+    backgroundColor: '#FFFFFF0D',
     borderWidth: 1,
-    borderColor: '#343E4A50',
-    borderRadius: 14,
-    paddingHorizontal: 8,
+    borderColor: '#FFFFFF14',
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.sm,
     paddingVertical: 5,
     marginHorizontal: 3,
   },
   badgeText: {
-    color: colors.white,
+    color: colors.textPrimary,
     fontSize: 10,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   trustGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: spacing.lg,
     marginHorizontal: -4,
   },
   trustItem: {
     width: '46%',
     margin: 3,
-    backgroundColor: '#1E252D50',
-    borderRadius: 6,
+    backgroundColor: '#FFFFFF08',
+    borderRadius: radius.sm,
     paddingVertical: 4,
-    paddingHorizontal: 6,
+    paddingHorizontal: spacing.xs,
     alignItems: 'center',
     borderWidth: 0.5,
-    borderColor: '#FFFFFF05',
+    borderColor: '#FFFFFF0D',
   },
   trustItemText: {
-    color: '#8FA0B3',
+    color: colors.textMuted,
     fontSize: 10,
     fontWeight: '600',
   },
+  // "Premium OTP card" -- larger radius + real elevation shadow (tokens'
+  // shadows.lg) instead of the previous flat, barely-elevated panel, and a
+  // small eyebrow label so the card reads as its own distinct step rather
+  // than a continuation of the hero copy above it.
   authContainer: {
-    backgroundColor: colors.steel,
-    borderRadius: 16,
-    padding: 16,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
+    ...shadows.lg,
+  },
+  cardEyebrow: {
+    ...typography.caption,
+    fontWeight: '700',
+    color: colors.textMuted,
+    letterSpacing: 1,
+    marginBottom: spacing.md,
   },
   inputLabel: {
-    fontSize: 13,
+    ...typography.bodySmall,
     fontWeight: '600',
-    color: colors.white,
-    marginBottom: 8,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1B2026',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#343E4A',
-    paddingHorizontal: 12,
-    height: 50,
-    marginBottom: 4,
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.sm + 4,
+    height: 56,
+    marginBottom: spacing.xs,
   },
   inputRowError: {
-    borderColor: colors.primary,
+    borderColor: colors.danger,
   },
   flagBox: {
     flexDirection: 'row',
@@ -940,39 +996,55 @@ const styles = StyleSheet.create({
   },
   countryCode: {
     fontSize: 15,
-    fontWeight: '600',
-    color: colors.white,
-    marginLeft: 6,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginLeft: spacing.xs + 2,
   },
   verticalDivider: {
     width: 1,
-    height: 20,
-    backgroundColor: '#343E4A',
-    marginHorizontal: 12,
+    height: 22,
+    backgroundColor: colors.border,
+    marginHorizontal: spacing.sm,
   },
   mobileInput: {
     flex: 1,
     fontSize: 16,
-    color: colors.white,
+    color: colors.textPrimary,
+    height: '100%',
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
   },
   errorText: {
-    color: colors.primary,
-    fontSize: 12,
-    marginTop: 4,
-    marginBottom: 8,
+    ...typography.caption,
+    color: colors.danger,
   },
   otpSection: {
-    marginTop: 14,
+    marginTop: spacing.md,
+  },
+  otpSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  sentToText: {
+    ...typography.caption,
+    color: colors.textMuted,
   },
   resendBtn: {
     alignSelf: 'flex-end',
-    marginTop: 8,
+    marginTop: spacing.sm,
     paddingVertical: 4,
   },
   resendText: {
-    color: colors.primary,
+    color: colors.primaryOnDark,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   resendTextDisabled: {
     color: colors.textMuted,
@@ -980,27 +1052,29 @@ const styles = StyleSheet.create({
   otpInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1B2026',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#343E4A',
-    paddingHorizontal: 12,
-    height: 50,
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.sm + 4,
+    height: 56,
   },
   inputIcon: {
-    marginRight: 10,
+    marginRight: spacing.sm,
   },
   otpInput: {
     flex: 1,
     fontSize: 16,
-    color: colors.white,
+    letterSpacing: 2,
+    color: colors.textPrimary,
+    height: '100%',
   },
   gradientBtnContainer: {
-    height: 50,
+    height: 56,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 18,
-    borderRadius: 12,
+    marginTop: spacing.lg,
+    borderRadius: radius.md,
   },
   btnContent: {
     width: '100%',
@@ -1009,15 +1083,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   primaryBtnText: {
+    ...typography.button,
     color: colors.white,
-    fontSize: 16,
-    fontWeight: 'bold',
     textTransform: 'uppercase',
     letterSpacing: 0.75,
   },
+  securityNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: spacing.md,
+  },
+  securityNoteText: {
+    fontSize: 11,
+    color: colors.textMuted,
+  },
   footerContainer: {
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: spacing.sm + 2,
   },
   footerTextRow: {
     flexDirection: 'row',
@@ -1028,56 +1112,56 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   linkText: {
-    color: colors.primary,
+    color: colors.primaryOnDark,
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: '#00000080',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: spacing.lg,
   },
   modalCard: {
     width: '100%',
-    backgroundColor: colors.steel,
-    borderRadius: 16,
-    padding: 20,
+    maxWidth: 420,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.lg,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.white,
-    marginBottom: 8,
+    ...typography.h4,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
   },
   modalDesc: {
-    fontSize: 13,
+    ...typography.bodySmall,
     color: colors.textMuted,
-    lineHeight: 18,
-    marginBottom: 20,
+    marginBottom: spacing.lg,
   },
   modalInput: {
-    backgroundColor: '#1B2026',
-    borderRadius: 12,
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#343E4A',
-    color: colors.white,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderColor: colors.border,
+    color: colors.textPrimary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 4,
     fontSize: 15,
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   modalBtnRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
   modalSecondaryBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginRight: 10,
+    paddingHorizontal: spacing.sm + 6,
+    paddingVertical: spacing.sm + 2,
+    marginRight: spacing.sm,
   },
   modalSecondaryBtnText: {
     color: colors.textMuted,
@@ -1086,14 +1170,14 @@ const styles = StyleSheet.create({
   },
   modalPrimaryBtn: {
     backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
   },
   modalPrimaryBtnText: {
     color: colors.white,
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '700',
   }
 });
 
@@ -1101,117 +1185,119 @@ const styles = StyleSheet.create({
 // palette (`colors` above) as the native screen -- this is a layout change,
 // not a re-theme.
 const desktopStyles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: '#0E1116' },
+  page: { flex: 1, backgroundColor: colors.bg },
   settingsIconBtn: {
     position: 'absolute' as any,
-    top: deskSpacing.md,
-    right: deskSpacing.md,
+    top: spacing.md,
+    right: spacing.md,
     zIndex: 10,
-    padding: 8,
+    padding: spacing.sm,
     backgroundColor: '#FFFFFF0D',
-    borderRadius: deskRadius.pill,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: '#FFFFFF15',
   },
-  center: { flex: 1, justifyContent: 'center', paddingVertical: deskSpacing.xl },
+  center: { flex: 1, justifyContent: 'center', paddingVertical: spacing.xl },
   splitRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: deskSpacing.xxl,
+    gap: spacing.xxl,
   },
   leftCol: { flex: 1.15 },
+  leftLogoRow: { marginBottom: spacing.lg },
   heroTitle: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: colors.white,
+    ...typography.h2,
+    color: colors.textPrimary,
   },
   heroSubtitle: {
-    fontSize: 13,
+    ...typography.bodySmall,
     fontWeight: '700',
-    color: colors.primary,
-    marginTop: 6,
-    marginBottom: deskSpacing.md,
+    color: colors.primaryOnDark,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
   bannerImage: {
     width: '100%',
     height: 320,
-    borderRadius: deskRadius.lg,
+    borderRadius: radius.lg,
   },
   benefitsRow: {
     flexDirection: 'row',
-    gap: deskSpacing.lg,
-    marginTop: deskSpacing.md,
+    gap: spacing.lg,
+    marginTop: spacing.md,
   },
   benefitItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  benefitText: { color: colors.white, fontSize: 13, fontWeight: '600' },
+  benefitText: { color: colors.textPrimary, fontSize: 13, fontWeight: '600' },
   rightCol: { width: 480, maxWidth: 480, flexShrink: 0, alignItems: 'stretch' },
   card: {
-    backgroundColor: colors.steel,
-    borderRadius: deskRadius.lg,
-    padding: deskSpacing.lg,
+    backgroundColor: colors.surfaceRaised,
+    borderRadius: radius.lg,
+    padding: spacing.xl,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 24,
-    elevation: 8,
+    ...shadows.lg,
   },
-  welcomeBack: { fontSize: 22, fontWeight: '800', color: colors.white },
-  continueWith: { fontSize: 13, color: colors.textMuted, marginTop: 4, marginBottom: deskSpacing.lg },
-  inputLabel: { fontSize: 13, fontWeight: '600', color: colors.white, marginBottom: 8 },
+  welcomeBack: { ...typography.h3, color: colors.textPrimary },
+  continueWith: { ...typography.bodySmall, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.lg },
+  inputLabel: { ...typography.bodySmall, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.sm },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1B2026',
-    borderRadius: deskRadius.md,
-    borderWidth: 1,
-    borderColor: '#343E4A',
-    paddingHorizontal: 12,
-    height: 50,
+    backgroundColor: colors.bg,
+    borderRadius: radius.md,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    paddingHorizontal: spacing.sm + 4,
+    height: 56,
   },
-  inputRowError: { borderColor: colors.primary },
+  inputRowError: { borderColor: colors.danger },
   flagBox: { flexDirection: 'row', alignItems: 'center' },
   flagText: { fontSize: 17 },
-  countryCode: { fontSize: 15, fontWeight: '600', color: colors.white, marginLeft: 6 },
-  verticalDivider: { width: 1, height: 20, backgroundColor: '#343E4A', marginHorizontal: 12 },
-  mobileInput: { flex: 1, fontSize: 15, color: colors.white, outlineStyle: 'none' as any },
-  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
-  errorText: { color: colors.primary, fontSize: 12 },
-  otpSection: { marginTop: deskSpacing.md },
-  resendBtn: { alignSelf: 'flex-end', marginTop: 8, paddingVertical: 4 },
-  resendText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  countryCode: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginLeft: spacing.xs + 2 },
+  verticalDivider: { width: 1, height: 22, backgroundColor: colors.border, marginHorizontal: spacing.sm },
+  mobileInput: { flex: 1, fontSize: 15, color: colors.textPrimary, outlineStyle: 'none' as any },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.xs },
+  errorText: { ...typography.caption, color: colors.danger },
+  otpSection: { marginTop: spacing.md },
+  otpSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.sm,
+  },
+  sentToText: { ...typography.caption, color: colors.textMuted },
+  resendBtn: { alignSelf: 'flex-end', marginTop: spacing.sm, paddingVertical: 4 },
+  resendText: { color: colors.primaryOnDark, fontSize: 13, fontWeight: '700' },
   resendTextDisabled: { color: colors.textMuted },
   primaryBtnText: {
+    ...typography.button,
     color: colors.white,
-    fontSize: 15,
-    fontWeight: 'bold',
     textTransform: 'uppercase',
     letterSpacing: 0.75,
   },
   wholesaleBtn: {
-    marginTop: deskSpacing.md,
-    height: 44,
-    borderRadius: deskRadius.md,
+    marginTop: spacing.md,
+    height: 48,
+    borderRadius: radius.md,
     borderWidth: 1.5,
-    borderColor: '#343E4A',
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  wholesaleBtnHovered: { borderColor: colors.primary },
-  wholesaleBtnText: { color: colors.white, fontSize: 13, fontWeight: '700' },
-  footer: { borderTopWidth: 1, borderTopColor: '#1E252D' },
+  wholesaleBtnHovered: { borderColor: colors.primaryOnDark },
+  wholesaleBtnText: { color: colors.textPrimary, fontSize: 13, fontWeight: '700' },
+  footer: { borderTopWidth: 1, borderTopColor: colors.border },
   footerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: deskSpacing.sm,
+    paddingVertical: spacing.sm,
   },
   footerCopy: { color: colors.textMuted, fontSize: 12 },
   footerLinks: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   footerStatic: { color: colors.textMuted, fontSize: 12 },
-  footerLink: { color: colors.primary, fontSize: 12, fontWeight: '700' },
+  footerLink: { color: colors.primaryOnDark, fontSize: 12, fontWeight: '700' },
   footerDot: { color: '#3A4552', fontSize: 12 },
 });

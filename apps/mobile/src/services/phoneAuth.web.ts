@@ -6,6 +6,7 @@ import {
   ConfirmationResult,
 } from 'firebase/auth';
 import { auth } from './firebase';
+import { friendlyAuthErrorMessage } from '../utils/authErrors';
 
 // Web build only (Metro picks this file over phoneAuth.ts for the `web`
 // platform) -- the native @react-native-firebase/auth module has no web
@@ -171,11 +172,12 @@ export const sendPhoneOtp = async (phone10Digit: string): Promise<void> => {
     // auth/invalid-app-credential, auth/too-many-requests, etc.).
     log(`signInWithPhoneNumber FAILED code=${err?.code ?? 'unknown'}`, err?.message ?? err);
     resetRecaptcha();
-    // Re-throw with the code attached so the UI can show it.
-    if (err?.code) {
-      throw new Error(`${err.message} (${err.code})`);
-    }
-    throw err;
+    // Friendly text first (what the user reads), original code kept in
+    // parentheses so a Console-side blocker (auth/unauthorized-domain,
+    // auth/billing-not-enabled, auth/invalid-app-credential, etc.) is still
+    // identifiable without opening devtools.
+    const friendly = friendlyAuthErrorMessage(err?.code, err?.message || 'Failed to send OTP.');
+    throw new Error(err?.code ? `${friendly} (${err.code})` : friendly);
   }
 };
 
@@ -219,7 +221,7 @@ export const confirmPhoneOtp = async (code: string): Promise<string> => {
       clearPending();
       resetRecaptcha();
     }
-    throw err;
+    throw new Error(friendlyAuthErrorMessage(err?.code, err?.message || 'Failed to verify OTP.'));
   }
 
   const idToken = await credentialResult.user.getIdToken();

@@ -8,6 +8,7 @@ import type { ConfirmationResult } from '@react-native-firebase/auth';
 // 20d60f3. Nothing on the OTP critical path should depend on a native module
 // that a already-installed build might not contain.
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { friendlyAuthErrorMessage } from '../utils/authErrors';
 
 // Android/iOS build only (Metro picks this file over phoneAuth.web.ts for
 // native platforms) -- uses @react-native-firebase/auth's native SDK, which
@@ -189,7 +190,7 @@ export const sendPhoneOtp = async (phone10Digit: string): Promise<void> => {
     }
   } catch (err: any) {
     log(`signInWithPhoneNumber FAILED code=${err?.code ?? 'unknown'}`, err?.message ?? err);
-    throw err;
+    throw new Error(friendlyAuthErrorMessage(err?.code, err?.message || 'Failed to send OTP.'));
   }
 };
 
@@ -231,7 +232,7 @@ export const confirmPhoneOtp = async (code: string): Promise<string> => {
       confirmationResult = null;
       await clearPending();
     }
-    throw err;
+    throw new Error(friendlyAuthErrorMessage(err?.code, err?.message || 'Failed to verify OTP.'));
   }
 
   if (!userCredential) {
