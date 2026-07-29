@@ -72,6 +72,40 @@ const CART_STORAGE_KEY = 'mb-cart-v2';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
+// Public policy URLs required by Google Play / Apple App Store review --
+// reviewers open these logged out, from a desktop browser, so a login wall or
+// 404 here is a rejection. Slugs match docs/legal/app-store-submission-checklist.md's
+// Part 1 table exactly. StaticPageScreen already falls back to the "about" page
+// for any unrecognised key, so an unmapped path degrades safely rather than
+// crashing -- same defensive behaviour already relied on for the native
+// mechbazar:// deep-link scheme.
+const STATIC_PAGE_SLUG_TO_KEY: Record<string, string> = {
+  'privacy-policy': 'privacy',
+  terms: 'terms',
+  'refund-policy': 'refund',
+  'shipping-policy': 'shipping',
+  'cancellation-policy': 'cancellation',
+  'return-policy': 'returns',
+  contact: 'contact',
+  about: 'about',
+  'account-deletion': 'account-deletion',
+};
+
+const linking = {
+  prefixes: ['https://mechbazar.com', 'https://www.mechbazar.com', 'mechbazar://'],
+  config: {
+    screens: {
+      Welcome: '',
+      StaticPage: {
+        path: ':page',
+        parse: {
+          page: (page: string) => STATIC_PAGE_SLUG_TO_KEY[page] ?? 'about',
+        },
+      },
+    },
+  },
+};
+
 const TAB_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   Home: 'home-outline',
   Categories: 'grid-outline',
@@ -355,7 +389,7 @@ function RootNavigator() {
   return (
     <>
       <OfflineBanner />
-      <NavigationContainer>
+      <NavigationContainer linking={linking}>
       <DesktopAppShell>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {token ? (
@@ -392,6 +426,11 @@ function RootNavigator() {
           <>
             <Stack.Screen name="Welcome" component={WelcomeScreen} />
             <Stack.Screen name="WholesaleRegistration" component={WholesaleRegistrationScreen} />
+            {/* Legal pages must be reachable logged out, from a desktop browser --
+                a login wall here is an App Store / Play Store review rejection.
+                StaticPageScreen has no auth-dependent state, so it's safe to
+                register in this pre-login stack too. */}
+            <Stack.Screen name="StaticPage" component={StaticPageScreen} />
           </>
         )}
       </Stack.Navigator>
