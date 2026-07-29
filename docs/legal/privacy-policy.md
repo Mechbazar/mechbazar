@@ -377,11 +377,11 @@ and the Consumer Protection (E-Commerce) Rules, 2020, the details of our
 Grievance Officer and Nodal Officer are:
 
 **Grievance Officer**
-Name: Information Required
+Name: Raish Khan
 MECH BAZAR PRIVATE LIMITED
 Address: Sector 70A Extension Road, Gurugram, Haryana, India
-Email: Information Required
-Phone: Information Required
+Email: support@mechbazar.com
+Phone: +91 9772704981
 Working hours: Information Required
 
 **Nodal Contact Person** (for coordination with law enforcement agencies)

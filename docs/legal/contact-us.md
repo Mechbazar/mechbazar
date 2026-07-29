@@ -78,11 +78,11 @@ If Level 1 has not resolved your issue within the promised time, or you are
 dissatisfied with the outcome:
 
 **Grievance Officer**
-Name: **Information Required**
+Name: **Raish Khan**
 MECH BAZAR PRIVATE LIMITED
 Sector 70A Extension Road, Gurugram, Haryana, India
-Email: **Information Required**
-Phone: **Information Required**
+Email: **support@mechbazar.com**
+Phone: **+91 9772704981**
 Hours: Information Required
 
 Your complaint will be **acknowledged within 48 hours** of receipt and

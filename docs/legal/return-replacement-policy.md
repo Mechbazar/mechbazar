@@ -188,7 +188,7 @@ g. **Reverse-logistics charges** may be deducted for change-of-mind and
 ## 9. Quality Inspection
 
 a. Returned items undergo a **quality check** at the Vendor's or our facility
-   within **[2] business days** of receipt.
+   within **2 business days** of receipt.
 b. The check verifies condition, completeness, part number, serial/batch code and
    seal integrity against what was dispatched.
 c. **If the item passes**, the refund or replacement is processed immediately.
@@ -197,8 +197,8 @@ d. **If the item fails** — it is used, fitted, damaged after delivery,
    rejected. We will inform you with photographic evidence, and the item is
    returned to your address at no charge to you. Deliberate substitution of a
    different item is treated as fraud under Section 11.
-e. You may contest a failed inspection by writing to Information Required within
-   **[7] days** of being notified.
+e. You may contest a failed inspection by writing to support@mechbazar.com within
+   **7 calendar days** of being notified.
 
 ---
 
@@ -261,9 +261,9 @@ liability.
 **Customer Support:** support@mechbazar.com | +91 9772704981 | Information Required
 
 **Grievance Officer**
-Information Required
+Raish Khan
 MECH BAZAR PRIVATE LIMITED, Sector 70A Extension Road, Gurugram, Haryana, India
-Information Required | Information Required
+support@mechbazar.com | +91 9772704981
 
 Complaints are acknowledged within **48 hours** and resolved within **30 days**.
 

@@ -480,8 +480,8 @@ Website: https://mechbazar.com
 
 **Grievance Officer** (under the IT Act, 2000 and the Consumer Protection
 (E-Commerce) Rules, 2020)
-Name: Information Required
-Email: Information Required | Phone: Information Required
+Name: Raish Khan
+Email: support@mechbazar.com | Phone: +91 9772704981
 Address: Sector 70A Extension Road, Gurugram, Haryana, India
 
 Complaints are acknowledged within **48 hours** and resolved within **30 days**.

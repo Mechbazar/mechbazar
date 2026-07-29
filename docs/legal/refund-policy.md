@@ -246,9 +246,9 @@ a decision:
 support@mechbazar.com | +91 9772704981 | Information Required
 
 **Level 2 — Grievance Officer**
-Information Required
+Raish Khan
 MECH BAZAR PRIVATE LIMITED, Sector 70A Extension Road, Gurugram, Haryana, India
-Information Required | Information Required
+support@mechbazar.com | +91 9772704981
 
 Complaints are acknowledged within **48 hours** and resolved within **30 days**,
 in accordance with the Consumer Protection (E-Commerce) Rules, 2020.
