@@ -128,6 +128,25 @@ module.exports = {
           NSAllowsArbitraryLoads: ALLOW_CLEARTEXT,
         },
       },
+      // Apple requires a privacy manifest declaring "required reason" API usage
+      // since May 2024 (App Store Connect otherwise rejects the binary on
+      // upload). This declares only this app's OWN direct usage --
+      // @react-native-async-storage/async-storage reads/writes UserDefaults on
+      // iOS, which is a required-reason category. Third-party SDKs that ship
+      // their own PrivacyInfo.xcprivacy (Firebase, etc.) are merged in
+      // automatically by Xcode at archive time and do not need to be repeated
+      // here. Verify completeness via Xcode's own privacy report (Product ->
+      // Archive) before the first App Store submission -- that is the
+      // authoritative source for every required-reason API actually linked
+      // into the binary, including ones pulled in transitively.
+      privacyManifests: {
+        NSPrivacyAccessedAPITypes: [
+          {
+            NSPrivacyAccessedAPIType: 'NSPrivacyAccessedAPICategoryUserDefaults',
+            NSPrivacyAccessedAPITypeReasons: ['CA92.1'],
+          },
+        ],
+      },
     },
 
     android: {
