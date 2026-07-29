@@ -58,7 +58,7 @@ const FAQS: FAQItem[] = [
     id: 4,
     category: 'services',
     question: 'Can I reschedule my service appointment?',
-    answer: 'Yes, you can reschedule your doorstep service free of charge up to 2 hours before the scheduled time by visiting the Service Bookings section on your profile.'
+    answer: 'Yes, you can reschedule your doorstep service free of charge up to 4 hours before the scheduled time by visiting the Service Bookings section on your profile.'
   },
   {
     id: 5,

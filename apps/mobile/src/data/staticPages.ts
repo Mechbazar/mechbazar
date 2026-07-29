@@ -165,7 +165,7 @@ export const STATIC_PAGES: Record<StaticPageKey, StaticPageContent> = {
       },
       {
         heading: 'Warranty',
-        body: 'Manufacturer or vendor warranty runs separately from the 10-day return window, on the terms stated on the product page. Workmanship on doorstep services is warranted for 30 days.',
+        body: 'Manufacturer or vendor warranty runs separately from the 10-day return window, on the terms stated on the product page. Workmanship on doorstep services is warranted for 30 days or 1,000 kilometres, whichever comes first.',
       },
     ],
   },
@@ -187,7 +187,7 @@ export const STATIC_PAGES: Record<StaticPageKey, StaticPageContent> = {
       },
       {
         heading: 'Timelines',
-        body: 'Refunds are approved within 2 business days of the returned item passing inspection, and credited within 7–10 business days after that, depending on your bank. You can track progress under Orders > Refund Status.',
+        body: 'Refunds are approved within 2 business days of the returned item passing inspection, and credited within 5–10 business days after that, depending on your bank. You can track progress under Orders > Refund Status.',
       },
       {
         heading: 'What is not refunded',
@@ -231,7 +231,7 @@ export const STATIC_PAGES: Record<StaticPageKey, StaticPageContent> = {
       },
       {
         heading: 'Cancelling a service booking',
-        body: 'You can cancel or reschedule a booking free of charge up to 2 hours before the scheduled slot. Cancelling later, or after the mechanic has already travelled to your address, may attract a visitation charge shown at booking. Once work has begun you are liable for the parts fitted and labour performed to that point.',
+        body: 'You can cancel or reschedule a booking free of charge up to 4 hours before the scheduled slot. Cancelling later, or after the mechanic has already travelled to your address, may attract a visitation charge shown at booking. Once work has begun you are liable for the parts fitted and labour performed to that point.',
       },
       {
         heading: 'No cancellation charges before dispatch',
