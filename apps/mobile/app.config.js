@@ -258,10 +258,35 @@ module.exports = {
           // red half of the wordmark ("BAZAR") directly on top of a
           // near-identical red, making it disappear (the bug this fixes).
           image: './assets/splash-icon-dark.png',
-          // The splash art is the MechBazar wordmark (~9:1), not the old square
-          // hexagon mark, so this is a width the wordmark reads at rather than
-          // the square's old 200.
-          imageWidth: 240,
+          // MUST stay <= 191. This is not a taste setting -- it is a hard
+          // geometric limit imposed by Android 12+.
+          //
+          // expo-splash-screen composites this image, at exactly `imageWidth`
+          // dp, centred on a 288dp square canvas, and wires the result up as
+          // `windowSplashScreenAnimatedIcon` (see
+          // node_modules/expo-splash-screen/plugin/build/withAndroidSplashImages.js:
+          // `canvasSize = 288 * multiplier`). The Android 12+ SplashScreen API
+          // then MASKS that icon to a circle 192dp in diameter -- an icon
+          // supplied without an icon background gets a 288dp canvas of which
+          // only the inner 192dp circle is ever drawn. Everything outside is
+          // clipped away by the system; no resizeMode or asset change can opt
+          // out of it.
+          //
+          // At the previous value of 240 the wordmark was 240dp wide inside a
+          // 192dp circle, so the system shaved 24dp off each end -- almost
+          // exactly one glyph. The "M" was cut down to its right-hand stem
+          // (reading as "I") and the trailing "R" disappeared completely, so
+          // the splash showed "IECHBAZA". That was the bug, and it was in the
+          // generated drawable itself, not in the source asset: the shipped
+          // splashscreen_logo.png measures 288x288 with 240x24 of content.
+          //
+          // The wordmark is 922x94 (aspect 9.81:1), so the widest it can be and
+          // still fit inside a 192dp circle is
+          //     w * sqrt(1 + (1/9.81)^2) / 2 <= 96  ->  w <= 191.
+          // 176 keeps ~7.5dp of clearance on each side for OEM launchers that
+          // mask slightly more aggressively than stock. Raising this back above
+          // ~190 re-introduces the truncation.
+          imageWidth: 176,
           resizeMode: 'contain',
           // Matches android.adaptiveIcon.backgroundColor below (the actual
           // launcher icon background as of the 2026-07-29 icon redesign) so the
@@ -353,6 +378,14 @@ module.exports = {
       // and this one rewrites the org.gradle.parallel value the Expo template
       // puts there.
       './plugins/withAndroidBuildConcurrency',
+
+      // Points the `release` build type at release.keystore instead of the
+      // debug keystore the RN template wires up. Required for a direct local
+      // `./gradlew assembleRelease` to produce an APK Firebase will attest --
+      // a debug-signed build fails phone-OTP login with
+      // auth/missing-client-identifier. No-ops under EAS, which injects its own
+      // credentials. See the plugin header for the full rationale.
+      './plugins/withAndroidReleaseSigning',
     ],
 
     extra: {

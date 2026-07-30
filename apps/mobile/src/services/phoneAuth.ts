@@ -39,12 +39,72 @@ type RnfbAuth = {
   signInWithCredential: (auth: unknown, credential: PhoneCredential) => Promise<any>;
 };
 
+// WARNING: these are console.log, and babel.config.js applies
+// `transform-remove-console` with `exclude: ['error','warn']` for production
+// builds -- so every line below is COMPILED OUT of a release APK. That is
+// deliberate (they print the phone number and a verificationId prefix), but it
+// also means a release build used to leave no trace of an OTP failure in
+// logcat whatsoever, which is exactly why "check logcat for the real Firebase
+// exception" was not actionable on a production build. Anything that must
+// survive a release build has to go through console.error/console.warn --
+// see logAuthErrorDetail and breadcrumb below.
 const log = (msg: string, extra?: unknown) => {
   const line = `[otp:native] ${new Date().toISOString()} ${msg}`;
   if (extra !== undefined) {
     console.log(line, extra);
   } else {
     console.log(line);
+  }
+};
+
+// Release-visible, PII-free progress marker. Without it a release-build failure
+// report cannot distinguish "the native module never loaded" from "Firebase was
+// called and rejected us" -- the two have completely different fixes. Carries
+// no phone number, no verificationId: only which step was reached.
+const breadcrumb = (stage: string) => {
+  console.warn(`[otp:native] stage=${stage}`);
+};
+
+// The friendly text from authErrors.ts is what the user sees, which means the
+// only place the ACTUAL cause can still be recovered from is logcat. A bare
+// `err.code` is not enough to act on: every device-attestation failure arrives
+// as the single code `auth/missing-client-identifier`, and what distinguishes
+// "Play Integrity said this APK wasn't installed by Play" from "the reCAPTCHA
+// tab was dismissed" from "SHA-1 not registered" lives only in the native
+// exception that @react-native-firebase wraps -- `nativeErrorCode` /
+// `nativeErrorMessage`, plus whatever `userInfo` carries up from the Android
+// SDK. Emitted via console.error so it lands at logcat priority E and can be
+// pulled without wading through the whole JS log:
+//
+//   adb logcat -s ReactNativeJS:E | grep otp:native
+//
+// Guard rails: this runs inside a catch on the login critical path, so it must
+// not be able to throw itself (hence the try/catch and the JSON.stringify
+// replacer for circular native error objects).
+const logAuthErrorDetail = (stage: string, err: any) => {
+  try {
+    const detail: Record<string, unknown> = {
+      stage,
+      code: err?.code ?? null,
+      message: err?.message ?? null,
+      nativeErrorCode: err?.nativeErrorCode ?? null,
+      nativeErrorMessage: err?.nativeErrorMessage ?? null,
+      userInfo: err?.userInfo ?? null,
+    };
+    const seen = new WeakSet();
+    console.error(
+      `[otp:native] FIREBASE ERROR DETAIL ${new Date().toISOString()}`,
+      JSON.stringify(detail, (_k, v) => {
+        if (typeof v === 'object' && v !== null) {
+          if (seen.has(v)) return '[circular]';
+          seen.add(v);
+        }
+        return v;
+      })
+    );
+    if (err?.stack) console.error(`[otp:native] stack: ${String(err.stack).slice(0, 2000)}`);
+  } catch (loggingErr) {
+    console.error('[otp:native] failed to serialise Firebase error', String(loggingErr));
   }
 };
 
@@ -162,10 +222,12 @@ export const sendPhoneOtp = async (phone10Digit: string): Promise<void> => {
   void clearPending();
 
   try {
+    breadcrumb('send:begin');
     const rnfb = loadRnfbAuth();
     log('RNFB auth module loaded');
     const authInstance = rnfb.getAuthInstance();
     log('auth instance resolved');
+    breadcrumb('send:firebase-ready');
 
     // Every await below is bracketed by a log so a hang is attributable to one
     // specific call rather than to "somewhere in sendPhoneOtp".
@@ -178,6 +240,7 @@ export const sendPhoneOtp = async (phone10Digit: string): Promise<void> => {
       // into logcat, but the prefix is enough to correlate send with confirm.
       verificationId: result?.verificationId ? `${String(result.verificationId).slice(0, 10)}...` : null,
     });
+    breadcrumb('send:sms-dispatched');
 
     if (result?.verificationId) {
       await savePending({
@@ -190,6 +253,7 @@ export const sendPhoneOtp = async (phone10Digit: string): Promise<void> => {
     }
   } catch (err: any) {
     log(`signInWithPhoneNumber FAILED code=${err?.code ?? 'unknown'}`, err?.message ?? err);
+    logAuthErrorDetail('sendPhoneOtp/signInWithPhoneNumber', err);
     throw new Error(friendlyAuthErrorMessage(err?.code, err?.message || 'Failed to send OTP.'));
   }
 };
@@ -226,6 +290,7 @@ export const confirmPhoneOtp = async (code: string): Promise<string> => {
     }
   } catch (err: any) {
     log(`confirm FAILED code=${err?.code ?? 'unknown'}`, err?.message ?? err);
+    logAuthErrorDetail('confirmPhoneOtp/confirm', err);
     // A wrong code is retryable and must NOT drop the pending verification; an
     // expired/consumed session is not, so clear it and make the user resend.
     if (err?.code === 'auth/session-expired' || err?.code === 'auth/code-expired') {
