@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
@@ -7,6 +7,7 @@ import { RootState } from '../../../store';
 import { addToCart, updateQuantity } from '../../../store/cartSlice';
 import { Product } from '../../../types/product';
 import { colors, spacing, radius, shadows } from '../../../theme/tokens';
+import { NO_IMAGE_PLACEHOLDER } from '../../../services/product.service';
 
 interface ProductRailProps {
   title: string;
@@ -25,6 +26,7 @@ export default function ProductRail({ title, products, wishlist, onWishlistToggl
   const navigation = useNavigation<NavigationProp<any>>();
   const dispatch = useDispatch();
   const cartItems = useSelector((state: RootState) => state.cart.items);
+  const [failedImageIds, setFailedImageIds] = useState<Record<string, boolean>>({});
 
   if (products.length === 0) return null;
 
@@ -51,7 +53,12 @@ export default function ProductRail({ title, products, wishlist, onWishlistToggl
               onPress={() => navigation.navigate('ProductDetails', { productId: prod.id })}
             >
               <View style={styles.imageWrap}>
-                <Image source={{ uri: prod.image }} style={styles.image} resizeMode="cover" />
+                <Image
+                  source={{ uri: failedImageIds[prod.id] ? NO_IMAGE_PLACEHOLDER : prod.image }}
+                  style={styles.image}
+                  resizeMode="cover"
+                  onError={() => setFailedImageIds(prev => ({ ...prev, [prod.id]: true }))}
+                />
                 {(prod.discountPercentage ?? 0) > 0 && (
                   <View style={styles.discountBadge}>
                     <Text style={styles.discountText}>{prod.discountPercentage}% OFF</Text>

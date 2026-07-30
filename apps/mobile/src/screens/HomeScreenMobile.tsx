@@ -30,7 +30,7 @@ import { RootState } from '../store';
 import { logout } from '../store/authSlice';
 import { addToCart, updateQuantity } from '../store/cartSlice';
 import { setVehicleType } from '../store/appSlice';
-import { fetchCategories, getTrendingProducts, fetchBanners, fetchOffers, HomeOffer } from '../services/product.service';
+import { fetchCategories, getTrendingProducts, fetchBanners, fetchOffers, HomeOffer, NO_IMAGE_PLACEHOLDER } from '../services/product.service';
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../services/wishlist.service';
 import { VehicleType, Category, Product } from '../types/product';
 import { ServiceAddress } from '../types/service';
@@ -249,6 +249,7 @@ export default function HomeScreen({ navigation }: any) {
   const [banners, setBanners] = useState<any[]>([]);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [trendingProducts, setTrendingProducts] = useState<Product[]>([]);
+  const [failedImageIds, setFailedImageIds] = useState<Record<string, boolean>>({});
   const [offers, setOffers] = useState<HomeOffer[]>([]);
   const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
   const [isHomeContentLoading, setIsHomeContentLoading] = useState(true);
@@ -787,7 +788,11 @@ export default function HomeScreen({ navigation }: any) {
                     onPress={() => navigation.navigate('ProductDetails', { productId: prod.id })}
                     style={styles.imageContainer}
                   >
-                    <Image source={{ uri: prod.image }} style={styles.productImage} />
+                    <Image
+                      source={{ uri: failedImageIds[prod.id] ? NO_IMAGE_PLACEHOLDER : prod.image }}
+                      style={styles.productImage}
+                      onError={() => setFailedImageIds(prev => ({ ...prev, [prod.id]: true }))}
+                    />
                     <View style={styles.timerBadge}>
                       <Text style={styles.timerText}>⏱ {prod.time}</Text>
                     </View>
