@@ -63,3 +63,26 @@ export const verifyFirebaseIdTokenAndResolveUser = async (
 
   return user;
 };
+
+/**
+ * Verifies a Firebase ID token without requiring the email to already be
+ * verified, and without resolving to a linked Prisma row. Used only by
+ * resend-verification-email, where an unverified email is the expected,
+ * normal case rather than a rejection condition -- the whole point of the
+ * call is to prove "this token really does belong to this address" so
+ * another verification mail can be sent to it.
+ */
+export const verifyFirebaseIdTokenAllowUnverified = async (
+  idToken: string
+): Promise<{ uid: string; email: string | null }> => {
+  if (!idToken || typeof idToken !== 'string') {
+    throw new FirebaseAuthError('INVALID_TOKEN', 'Missing verification token');
+  }
+  try {
+    const decoded = await admin.auth().verifyIdToken(idToken);
+    return { uid: decoded.uid, email: decoded.email ?? null };
+  } catch (err) {
+    console.error('Firebase ID token verification failed:', err);
+    throw new FirebaseAuthError('INVALID_TOKEN', 'Invalid or expired session. Please sign in again.');
+  }
+};

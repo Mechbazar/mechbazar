@@ -2,12 +2,10 @@ import { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import axios from 'axios';
-import { sendEmailVerification } from 'firebase/auth';
 import { loginSuccess } from '../store';
 import { Button, Card, Alert } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
 import { auth } from '../config/firebase';
-import { mapFirebaseAuthError } from '../utils/firebaseErrors';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -48,21 +46,23 @@ export default function VerifyEmail() {
     setInfo('');
     setResending(true);
     try {
-      // `url` becomes `continueUrl` on the emailed link -- where the
-      // project's shared AuthAction page (apps/vendor/src/pages/AuthAction.tsx;
-      // the project has one Auth action URL for every app, not one per app)
-      // sends the user back to once they've confirmed. Without this, the
-      // link would carry no continueUrl and Firebase's own hosted action
-      // page would auto-apply the code on load -- exactly the bug fixed for
-      // the vendor app, unfixed here until now.
-      await sendEmailVerification(auth.currentUser!, {
-        url: `${window.location.origin}/verify-email`,
-        handleCodeInApp: true,
+      // The backend generates the oobCode itself and emails it through its
+      // own mailer rather than Firebase's automatic send, so the link can
+      // point at the project's shared AuthAction page
+      // (apps/vendor/src/pages/AuthAction.tsx -- one Auth action URL for
+      // every app, not one per app) instead of Firebase's auto-consuming
+      // hosted one -- see apps/backend/src/utils/firebasePassword.ts's
+      // sendFirebaseVerificationEmail for why Firebase's own send can't be
+      // redirected there anymore.
+      const idToken = await auth.currentUser!.getIdToken();
+      await axios.post(`${API_URL}/auth/resend-verification-email`, {
+        idToken,
+        continueUrl: `${window.location.origin}/verify-email`,
       });
       setInfo(`Verification email sent to ${email}.`);
       setCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err: any) {
-      setError(mapFirebaseAuthError(err?.code));
+      setError(err?.response?.data?.error || 'Failed to resend verification email. Please try again.');
     } finally {
       setResending(false);
     }

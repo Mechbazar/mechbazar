@@ -2,12 +2,10 @@ import { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import axios from 'axios';
-import { sendEmailVerification } from 'firebase/auth';
 import { loginSuccess } from '../store/slices/authSlice';
 import { Button, Card, Alert } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
 import { auth } from '../config/firebase';
-import { mapFirebaseAuthError } from '../utils/firebaseErrors';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -45,17 +43,22 @@ export default function VerifyEmail() {
     setInfo('');
     setResending(true);
     try {
-      // `url` becomes `continueUrl` on the emailed link -- where the project's
-      // shared AuthAction page (apps/vendor/src/pages/AuthAction.tsx, see its
-      // header comment) sends the user back to once they've confirmed.
-      await sendEmailVerification(auth.currentUser!, {
-        url: `${window.location.origin}/verify-email`,
-        handleCodeInApp: true,
+      // The backend generates the oobCode itself and emails it through its
+      // own mailer rather than Firebase's automatic send, so the link can
+      // point at our own AuthAction page (apps/vendor/src/pages/AuthAction.tsx)
+      // instead of Firebase's auto-consuming hosted one -- see
+      // apps/backend/src/utils/firebasePassword.ts's
+      // sendFirebaseVerificationEmail for why Firebase's own send can't be
+      // redirected there anymore.
+      const idToken = await auth.currentUser!.getIdToken();
+      await axios.post(`${API_URL}/auth/resend-verification-email`, {
+        idToken,
+        continueUrl: `${window.location.origin}/verify-email`,
       });
       setInfo(`Verification email sent to ${email}.`);
       setCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err: any) {
-      setError(mapFirebaseAuthError(err?.code));
+      setError(err?.response?.data?.error || 'Failed to resend verification email. Please try again.');
     } finally {
       setResending(false);
     }

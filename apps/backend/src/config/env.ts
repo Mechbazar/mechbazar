@@ -127,7 +127,31 @@ export const env = {
   EXOTEL_API_TOKEN: process.env.EXOTEL_API_TOKEN || '',
   EXOTEL_CALLER_ID: process.env.EXOTEL_CALLER_ID || '',
   EXOTEL_SUBDOMAIN: process.env.EXOTEL_SUBDOMAIN || 'api.exotel.com',
+
+  // ---- Transactional email (Resend) ----
+  // Only RESEND_API_KEY gates sending -- see services/email.service.ts. When
+  // unset, every send resolves to an EmailLog row with status SKIPPED instead
+  // of throwing; the order/verify-email/reset-password flow that triggered it
+  // still completes normally (verify-email/reset-password fall back to
+  // Firebase's own send -- see utils/firebasePassword.ts).
+  RESEND_API_KEY: process.env.RESEND_API_KEY || '',
+  // "Name <address>" or a bare address. Must be a verified sender/domain in
+  // the Resend dashboard, or every send is rejected regardless of the API key.
+  EMAIL_FROM: process.env.EMAIL_FROM || 'MechBazar <orders@mechbazar.com>',
+  // Optional -- signing secret for Resend's delivery-tracking webhook
+  // (routes/email.routes.ts). Resend Dashboard -> Webhooks -> create one
+  // pointed at POST /api/email/webhook, subscribed to email.delivered and
+  // email.bounced. Without it the webhook route responds 200 but does not
+  // process the payload (an unverified webhook cannot be trusted to update
+  // EmailLog rows).
+  RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET || '',
 };
+
+export const isEmailConfigured = (): boolean => Boolean(env.RESEND_API_KEY);
+
+if (!isEmailConfigured()) {
+  console.warn('[WARN] RESEND_API_KEY not set -- transactional email (order confirmations, verify-email, password reset) will fall back to degraded/Firebase-only delivery. See services/email.service.ts and utils/firebasePassword.ts.');
+}
 
 if (!env.GOOGLE_MAPS_SERVER_API_KEY) {
   console.warn('[WARN] GOOGLE_MAPS_SERVER_API_KEY not set -- /api/geocode/* will return 503 (degraded); rest of the API is unaffected.');

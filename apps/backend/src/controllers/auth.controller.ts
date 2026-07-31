@@ -4,15 +4,22 @@ import bcrypt from 'bcryptjs';
 import { generateToken } from '../utils/jwt';
 import { AuthRequest } from '../middlewares/auth';
 import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
-import { verifyFirebaseIdTokenAndResolveUser, FirebaseAuthError, FirebaseAuthErrorCode } from '../utils/firebaseAuth';
+import {
+  verifyFirebaseIdTokenAndResolveUser,
+  verifyFirebaseIdTokenAllowUnverified,
+  FirebaseAuthError,
+  FirebaseAuthErrorCode,
+} from '../utils/firebaseAuth';
 import {
   sendFirebasePasswordResetEmail,
+  sendFirebaseVerificationEmail,
   setFirebasePassword,
   ensureFirebaseAccount,
   reconcilePasswordAfterFirebaseReset,
   isFirebasePasswordApiConfigured,
 } from '../utils/firebasePassword';
 import { sanitizeUser } from '../utils/sanitizeUser';
+import { isEmailConfigured } from '../config/env';
 import prisma from '../config/prisma';
 
 // Where a password-reset email is allowed to send the user back to after
@@ -441,13 +448,15 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // Said plainly, before anything else. If delivery is not configured then no
-    // email can be sent for any address, so admitting it reveals nothing about
-    // who has an account -- and the alternative is answering "a reset link has
-    // been sent" to every caller forever, which is the exact failure this
-    // endpoint replaced.
-    if (!isFirebasePasswordApiConfigured()) {
-      console.error('POST /auth/forgot-password called but FIREBASE_WEB_API_KEY is unset; see utils/firebasePassword.ts');
+    // Said plainly, before anything else. If neither delivery path is
+    // configured then no email can be sent for any address, so admitting it
+    // reveals nothing about who has an account -- and the alternative is
+    // answering "a reset link has been sent" to every caller forever, which
+    // is the exact failure this endpoint replaced. sendFirebasePasswordResetEmail
+    // prefers Resend (isEmailConfigured) and falls back to the Firebase REST
+    // path (isFirebasePasswordApiConfigured) -- either being ready is enough.
+    if (!isEmailConfigured() && !isFirebasePasswordApiConfigured()) {
+      console.error('POST /auth/forgot-password called but neither RESEND_API_KEY nor FIREBASE_WEB_API_KEY is set; see utils/firebasePassword.ts');
       res.status(503).json({
         error: 'Password reset is not available right now. Please contact support to have your password reset.',
       });
@@ -504,6 +513,50 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
     console.error('Forgot password error:', error);
     // Still generic: an error here must not be distinguishable from the
     // "no such account" case either.
+    res.status(200).json(genericResponse);
+  }
+};
+
+/**
+ * Resends a verify-email link for the caller's own Firebase account.
+ *
+ * Unlike forgotPassword, this doesn't take an email in the body -- it takes
+ * the caller's own Firebase idToken and reads the address off the verified
+ * token, so it can only ever be used to re-send to the account that's
+ * asking, not an arbitrary address. Deliberately allows an *unverified*
+ * token through (verifyFirebaseIdTokenAllowUnverified, not
+ * verifyFirebaseIdTokenAndResolveUser) -- an unverified email is the normal,
+ * expected case here, not a rejection condition.
+ */
+export const resendVerificationEmail = async (req: Request, res: Response): Promise<void> => {
+  const genericResponse = { message: 'Verification email sent.' };
+
+  try {
+    const idToken = typeof req.body?.idToken === 'string' ? req.body.idToken : '';
+    if (!idToken) {
+      res.status(400).json({ error: 'idToken is required' });
+      return;
+    }
+
+    const { email } = await verifyFirebaseIdTokenAllowUnverified(idToken);
+    if (!email) {
+      res.status(400).json({ error: 'This account has no email address.' });
+      return;
+    }
+
+    const continueUrl = sanitizeContinueUrl(req.body?.continueUrl);
+    const sent = await sendFirebaseVerificationEmail(email, idToken, continueUrl);
+    if (!sent) {
+      console.error(`Failed to send verification email for ${email}`);
+    }
+
+    res.status(200).json(genericResponse);
+  } catch (error) {
+    if (error instanceof FirebaseAuthError) {
+      res.status(401).json({ error: error.message });
+      return;
+    }
+    console.error('Resend verification email error:', error);
     res.status(200).json(genericResponse);
   }
 };
