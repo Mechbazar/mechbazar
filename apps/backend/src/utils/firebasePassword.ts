@@ -99,10 +99,15 @@ async function identityToolkit(
  * and a "reset link sent" message with nothing behind it is worse than saying
  * resets are unavailable.
  *
+ * `continueUrl`, if given, is where the project's shared AuthAction page
+ * (apps/vendor/src/pages/AuthAction.tsx) sends the user back to after they
+ * set a new password -- the caller (forgotPassword below) is expected to
+ * validate it against a known-app allowlist before it ever reaches here.
+ *
  * Returns false on any failure so the caller can decide what to tell the user
  * without leaking whether the address has an account.
  */
-export const sendFirebasePasswordResetEmail = async (email: string): Promise<boolean> => {
+export const sendFirebasePasswordResetEmail = async (email: string, continueUrl?: string): Promise<boolean> => {
   if (!isFirebasePasswordApiConfigured()) {
     console.error('Password reset requested but FIREBASE_WEB_API_KEY is not set -- no email can be sent.');
     return false;
@@ -111,6 +116,7 @@ export const sendFirebasePasswordResetEmail = async (email: string): Promise<boo
     const { ok, data } = await identityToolkit('sendOobCode', {
       requestType: 'PASSWORD_RESET',
       email,
+      ...(continueUrl ? { continueUrl } : {}),
     });
     if (!ok) {
       console.error('Firebase sendOobCode failed:', data?.error?.message || data);

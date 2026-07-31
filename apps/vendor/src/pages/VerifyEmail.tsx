@@ -45,11 +45,11 @@ export default function VerifyEmail() {
     setInfo('');
     setResending(true);
     try {
-      // Point the emailed link at our own confirm page (handleCodeInApp: true)
-      // instead of Firebase's default hosted action page, which applies the
-      // code as soon as it loads -- see VerifyEmailConfirm.tsx for why.
+      // `url` becomes `continueUrl` on the emailed link -- where the project's
+      // shared AuthAction page (apps/vendor/src/pages/AuthAction.tsx, see its
+      // header comment) sends the user back to once they've confirmed.
       await sendEmailVerification(auth.currentUser!, {
-        url: `${window.location.origin}/verify-email-confirm`,
+        url: `${window.location.origin}/verify-email`,
         handleCodeInApp: true,
       });
       setInfo(`Verification email sent to ${email}.`);

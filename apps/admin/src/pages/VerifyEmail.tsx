@@ -48,7 +48,17 @@ export default function VerifyEmail() {
     setInfo('');
     setResending(true);
     try {
-      await sendEmailVerification(auth.currentUser!);
+      // `url` becomes `continueUrl` on the emailed link -- where the
+      // project's shared AuthAction page (apps/vendor/src/pages/AuthAction.tsx;
+      // the project has one Auth action URL for every app, not one per app)
+      // sends the user back to once they've confirmed. Without this, the
+      // link would carry no continueUrl and Firebase's own hosted action
+      // page would auto-apply the code on load -- exactly the bug fixed for
+      // the vendor app, unfixed here until now.
+      await sendEmailVerification(auth.currentUser!, {
+        url: `${window.location.origin}/verify-email`,
+        handleCodeInApp: true,
+      });
       setInfo(`Verification email sent to ${email}.`);
       setCooldown(RESEND_COOLDOWN_SECONDS);
     } catch (err: any) {

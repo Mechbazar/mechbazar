@@ -11,7 +11,7 @@ import { auth } from './config/firebase';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import VerifyEmail from './pages/VerifyEmail';
-import VerifyEmailConfirm from './pages/VerifyEmailConfirm';
+import AuthAction from './pages/AuthAction';
 import Register from './pages/Register';
 import PendingApproval from './pages/PendingApproval';
 import Dashboard from './pages/Dashboard';
@@ -69,7 +69,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
-          <Route path="/verify-email-confirm" element={<VerifyEmailConfirm />} />
+          <Route path="/auth-action" element={<AuthAction />} />
           <Route path="/register" element={<Register />} />
           <Route path="/pending-approval" element={<PendingApproval />} />
           <Route path="/dashboard" element={Wrapped(Dashboard)} />

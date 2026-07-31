@@ -15,6 +15,32 @@ import {
 import { sanitizeUser } from '../utils/sanitizeUser';
 import prisma from '../config/prisma';
 
+// Where a password-reset email is allowed to send the user back to after
+// they set a new password. Firebase forwards whatever `continueUrl` the
+// caller supplies straight into the mail it sends to the target address --
+// unvalidated, that would let anyone holding a known account email trigger a
+// real password-reset mail whose "Continue" link points at a phishing
+// domain. Mirrors the project's own Firebase `authorizedDomains` list rather
+// than introducing a second source of truth.
+const ALLOWED_CONTINUE_URL_HOSTS = new Set([
+  'mechbazar.com',
+  'www.mechbazar.com',
+  'admin.mechbazar.com',
+  'vendor.mechbazar.com',
+  'localhost',
+]);
+
+const sanitizeContinueUrl = (value: unknown): string | undefined => {
+  if (typeof value !== 'string' || !value) return undefined;
+  try {
+    const url = new URL(value);
+    if (!ALLOWED_CONTINUE_URL_HOSTS.has(url.hostname)) return undefined;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+};
+
 // Maps a FirebaseAuthError to the HTTP response for the admin/vendor login
 // endpoints. EMAIL_NOT_VERIFIED is surfaced as a machine-readable code so the
 // frontend can route to the verify-email gate; NO_LINKED_ACCOUNT/FORBIDDEN
@@ -467,7 +493,8 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
       await prisma.user.update({ where: { id: user.id }, data: { firebaseUid } });
     }
 
-    const sent = await sendFirebasePasswordResetEmail(user.email);
+    const continueUrl = sanitizeContinueUrl(req.body?.continueUrl);
+    const sent = await sendFirebasePasswordResetEmail(user.email, continueUrl);
     if (!sent) {
       console.error(`Firebase declined to send a password reset email for user ${user.id}`);
     }
