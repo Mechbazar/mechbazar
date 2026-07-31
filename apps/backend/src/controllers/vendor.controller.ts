@@ -379,7 +379,7 @@ export const addMyProduct = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const { name, description, mrp, price, b2bPrice, lowStockThreshold, stock, categoryId, brandId, oemNumber, partNumber, images } = req.body;
+    const { name, description, mrp, price, b2bPrice, lowStockThreshold, stock, categoryId, brandId, oemNumber, partNumber, images, specifications } = req.body;
 
     if (!categoryId || !brandId) {
       res.status(400).json({ error: 'Category and Brand are required fields' });
@@ -414,6 +414,11 @@ export const addMyProduct = async (req: Request, res: Response): Promise<void> =
         status: 'APPROVED', // No admin approval required
         b2bPrice: b2bPrice !== undefined && b2bPrice !== '' ? Number(b2bPrice) : null,
         ...(lowStockThreshold !== undefined && lowStockThreshold !== '' && { lowStockThreshold: Number(lowStockThreshold) }),
+        // Optional free-form spec sheet (schema comment: shown on
+        // ProductDetailsScreen's Specifications tab) -- was accepted by the
+        // schema but silently dropped here, so no vendor-created product
+        // could ever populate that tab.
+        ...(specifications !== undefined && specifications !== null && { specifications }),
       }
     });
 
@@ -1099,7 +1104,7 @@ export const updateMyProduct = async (req: Request, res: Response): Promise<void
   try {
     const userId = (req as any).user.userId;
     const id = String(req.params.id);
-    const { name, description, mrp, price, b2bPrice, lowStockThreshold, stock, categoryId, brandId, oemNumber, partNumber, images } = req.body;
+    const { name, description, mrp, price, b2bPrice, lowStockThreshold, stock, categoryId, brandId, oemNumber, partNumber, images, specifications } = req.body;
 
     const vendor = await prisma.vendor.findUnique({ where: { userId } });
     if (!vendor) { res.status(404).json({ error: 'Vendor not found' }); return; }
@@ -1139,6 +1144,7 @@ export const updateMyProduct = async (req: Request, res: Response): Promise<void
         status: 'APPROVED', // no approval needed from admin side
         b2bPrice: b2bPrice !== undefined ? (b2bPrice === '' ? null : Number(b2bPrice)) : undefined,
         lowStockThreshold: lowStockThreshold !== undefined && lowStockThreshold !== '' ? Number(lowStockThreshold) : undefined,
+        ...(specifications !== undefined && { specifications: specifications === null ? null : specifications }),
       }
     });
 
