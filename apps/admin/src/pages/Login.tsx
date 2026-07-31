@@ -59,8 +59,13 @@ export default function Login() {
     <div className="flex min-h-screen w-full items-center justify-center bg-neutral-950 px-4">
       <Card variant="dark" className="w-full max-w-md !p-8 shadow-2xl">
         <div className="text-center mb-8">
-          {/* Dark tone: the login card sits on bg-neutral-950. */}
-          <Logo tone="dark" width={320} className="mx-auto mb-3" />
+          {/* Light tone: index.css's `.admin-light` layer repaints bg-neutral-950
+              and Card variant="dark" to #ffffff, so this card renders white
+              despite the dark class names. The logo's colour is an inline SVG
+              `fill` attribute, which no CSS override can reach -- tone="dark"
+              painted "MECH" white-on-white and only "BAZAR" stayed visible.
+              Matches App.tsx's untoned <Logo /> in the header. */}
+          <Logo tone="light" width={320} className="mx-auto mb-3" />
           <p className="text-neutral-400">Sign in to manage your empire</p>
         </div>
 
