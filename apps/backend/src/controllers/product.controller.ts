@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
 import { AuthRequest } from '../middlewares/auth';
-import { Role, VendorStatus, Prisma } from '@prisma/client';
+import { Role, VendorStatus, ProductApprovalStatus, Prisma } from '@prisma/client';
 import { normalizeVehicleType, parseVehicleTypeFilter } from '../utils/vehicleType';
 
 // The admin product form has no vendor picker -- products added directly by
@@ -344,6 +344,11 @@ export const updateProductStatus = async (req: Request, res: Response): Promise<
     const id = String(req.params.id);
     const { status } = req.body;
 
+    if (!Object.values(ProductApprovalStatus).includes(status)) {
+      res.status(400).json({ error: `Invalid status "${status}". Must be one of ${Object.values(ProductApprovalStatus).join(', ')}.` });
+      return;
+    }
+
     const updatedProduct = await prisma.product.update({
       where: { id },
       data: { status }
@@ -408,7 +413,7 @@ export const bulkCreateProducts = async (req: AuthRequest, res: Response): Promi
       mrp: Number(p.basePrice) || Number(p.price) || 0,
       stock: Number(p.stock) || 0,
       oemNumber: p.oem || null,
-      status: 'APPROVED'
+      status: 'APPROVED' as const
     }));
 
     // Since we need to trigger inventory creation (which might be complex via triggers or middleware),
