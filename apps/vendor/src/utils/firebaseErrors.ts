@@ -20,6 +20,9 @@ export function mapFirebaseAuthError(code: string | undefined): string {
       return 'Too many attempts. Please wait a moment and try again.';
     case 'auth/network-request-failed':
       return 'Network error. Check your connection and try again.';
+    case 'auth/invalid-action-code':
+    case 'auth/expired-action-code':
+      return 'This link has expired or already been used. Request a new verification email and use the latest one.';
     default:
       return 'Something went wrong. Please try again.';
   }
