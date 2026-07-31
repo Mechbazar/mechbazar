@@ -14,8 +14,16 @@ export interface AuthRequest extends Request {
 // otherwise keep working for up to a week. Re-resolving the user against the
 // database on each request is what actually revokes it -- one indexed
 // primary-key lookup, and the request cannot do anything useful without the
-// database anyway. `role` is taken from the row rather than the token so a
-// demoted admin loses privileges immediately instead of at token expiry.
+// database anyway.
+//
+// `role` in the decoded token is the SESSION's role -- which app/identity this
+// particular login is acting as (e.g. a customer's phone that also has a
+// rider account gets a CUSTOMER-scoped token from apps/mobile and a
+// DELIVERY_PARTNER-scoped token from apps/rider, from the same User row). It
+// is trusted only after confirming the account still actually holds that
+// role in `roles` -- so a role removed from the account (or the whole account
+// disabled) still revokes immediately, same guarantee as before, just checked
+// against the multi-role set instead of a single column.
 export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -35,7 +43,7 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
   try {
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: { id: true, role: true, deletedAt: true },
+      select: { id: true, role: true, roles: true, deletedAt: true },
     });
 
     if (!user || user.deletedAt) {
@@ -43,7 +51,12 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
       return res.status(401).json({ error: 'Unauthorized: Account no longer active' });
     }
 
-    req.user = { userId: user.id, role: user.role };
+    if (!user.roles.includes(decoded.role as any)) {
+      console.warn(`[auth] 401 session role no longer held ${decoded.userId} role=${decoded.role}: ${req.method} ${req.originalUrl}`);
+      return res.status(401).json({ error: 'Unauthorized: This session\'s role is no longer active on this account' });
+    }
+
+    req.user = { userId: user.id, role: decoded.role };
     next();
   } catch (error) {
     console.error('[auth] session lookup failed:', error);
@@ -65,10 +78,10 @@ export const optionalAuthenticate = async (req: AuthRequest, res: Response, next
       // stale token would still unlock the elevated view on public routes.
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
-        select: { id: true, role: true, deletedAt: true },
+        select: { id: true, roles: true, deletedAt: true },
       });
-      if (user && !user.deletedAt) {
-        req.user = { userId: user.id, role: user.role };
+      if (user && !user.deletedAt && user.roles.includes(decoded.role as any)) {
+        req.user = { userId: user.id, role: decoded.role };
       }
     } catch {
       // Invalid/expired token, or a transient lookup failure, on an otherwise

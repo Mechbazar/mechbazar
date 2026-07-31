@@ -4,11 +4,14 @@ export const technicianService = {
   // Auth is Firebase-only. The app runs Firebase Phone Auth client-side
   // (apps/mechanic/src/services/phoneAuth.ts), which sends the SMS and returns
   // an ID token; that token is passed here as `otp`. There is no backend
-  // send-otp step. Technicians have no password (admin-created), so login goes
-  // through the same phone-auth path as everyone else.
+  // send-otp step. This hits the technician-specific login endpoint (not the
+  // generic /auth/login) so the session is always SERVICE_TECHNICIAN-scoped
+  // regardless of what other roles this phone's shared identity also holds,
+  // and so a customer-only phone gets a clear "no technician account" error
+  // instead of a silently-wrong session that 403s on every subsequent call.
   login: async (credentials: { phone: string; otp: string }) => {
-    const response = await apiClient.post('/auth/login', credentials);
-    return response.data; // { user, token }
+    const response = await apiClient.post('/technicians/login', credentials);
+    return response.data; // { user, technicianProfile, token }
   },
 
   // Self-registration. `otp` is a Firebase ID token. Returns a token so the

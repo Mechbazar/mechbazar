@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { Role, RiderStatus } from '@prisma/client';
+import { transitionSettlement, SettlementAlreadyFinalisedError, SettlementChangedConcurrentlyError } from '../services/settlement.service';
+import { reviewDocument, InvalidDocumentStatusError, DocumentNotFoundError } from '../services/documentVerification.service';
 import { AuthRequest } from '../middlewares/auth';
 import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
 import { generateToken } from '../utils/jwt';
@@ -24,7 +26,7 @@ export const getRiders = async (req: Request, res: Response): Promise<void> => {
   try {
     const riders = await prisma.user.findMany({
       where: {
-        role: Role.DELIVERY_PARTNER
+        roles: { has: Role.DELIVERY_PARTNER }
       },
       include: {
         deliveryProfile: {
@@ -49,7 +51,7 @@ export const getRiderById = async (req: Request, res: Response): Promise<void> =
   try {
     const id = String(req.params.id); // User id
     const rider = await prisma.user.findFirst({
-      where: { id, role: Role.DELIVERY_PARTNER },
+      where: { id, roles: { has: Role.DELIVERY_PARTNER } },
       include: {
         deliveryProfile: {
           include: {
@@ -76,8 +78,39 @@ export const createRider = async (req: Request, res: Response): Promise<void> =>
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({ where: { phone } });
+
     if (existingUser) {
-      res.status(400).json({ error: 'User with this phone number already exists' });
+      const existingDeliveryProfile = await prisma.deliveryPartner.findUnique({ where: { userId: existingUser.id } });
+      if (existingDeliveryProfile) {
+        res.status(400).json({ error: 'This phone number already has a rider account' });
+        return;
+      }
+
+      // Attach a rider profile to the existing shared identity (it may
+      // already be a Customer/Vendor/Mechanic) instead of refusing outright.
+      const rider = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name: existingUser.name ?? name,
+          email: existingUser.email ?? (email || null),
+          city: city ?? existingUser.city,
+          state: state ?? existingUser.state,
+          roles: Array.from(new Set([...existingUser.roles, Role.DELIVERY_PARTNER])),
+          deliveryProfile: {
+            create: {
+              vehicleType,
+              licenseNumber,
+              isActive: true,
+              isOnline: false,
+              status: RiderStatus.APPROVED,
+              reviewedAt: new Date(),
+            },
+          },
+        },
+        include: { deliveryProfile: true },
+      });
+
+      res.status(201).json(rider);
       return;
     }
 
@@ -93,6 +126,7 @@ export const createRider = async (req: Request, res: Response): Promise<void> =>
         city,
         state,
         role: Role.DELIVERY_PARTNER,
+        roles: [Role.CUSTOMER, Role.DELIVERY_PARTNER],
         deliveryProfile: {
           create: {
             vehicleType,
@@ -245,45 +279,32 @@ export const updateRiderDocumentStatus = async (req: AuthRequest, res: Response)
     const documentId = String(req.params.documentId);
     const { status, remarks } = req.body;
 
-    if (!['PENDING', 'VERIFIED', 'REJECTED'].includes(status)) {
-      res.status(400).json({ error: 'Invalid document status' });
-      return;
-    }
-
-    const document = await prisma.riderDocument.findUnique({ where: { id: documentId } });
-    if (!document || document.deliveryPartnerId !== id) {
-      res.status(404).json({ error: 'Document not found' });
-      return;
-    }
-
-    const updated = await prisma.riderDocument.update({
-      where: { id: documentId },
-      data: { status, remarks: remarks || null },
-    });
-
-    const partner = await prisma.deliveryPartner.findUnique({ where: { id } });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.userId,
-        action: 'RIDER_DOCUMENT_STATUS_CHANGE',
-        entity: 'RiderDocument',
-        entityId: documentId,
-        details: `${document.type}: ${document.status} -> ${status}${remarks ? ` (${remarks})` : ''}`,
+    const updated = await reviewDocument({
+      reviewerUserId: req.user!.userId,
+      status,
+      remarks,
+      loadDocument: async () => {
+        const document = await prisma.riderDocument.findUnique({ where: { id: documentId } });
+        return document && document.deliveryPartnerId === id ? document : null;
       },
+      updateDocument: (status, remarks) =>
+        prisma.riderDocument.update({ where: { id: documentId }, data: { status, remarks } }),
+      loadOwnerUserId: async () => (await prisma.deliveryPartner.findUnique({ where: { id } }))?.userId ?? null,
+      auditAction: 'RIDER_DOCUMENT_STATUS_CHANGE',
+      auditEntity: 'RiderDocument',
+      notifyType: 'RIDER_DOCUMENT_STATUS',
     });
-
-    if (partner) {
-      notifyUser(
-        partner.userId,
-        'Document review update',
-        `Your ${document.type.replace(/_/g, ' ')} document was marked ${status}${remarks ? `: ${remarks}` : '.'}`,
-        { type: 'RIDER_DOCUMENT_STATUS', documentId, status }
-      );
-    }
 
     res.status(200).json(updated);
   } catch (error) {
+    if (error instanceof InvalidDocumentStatusError) {
+      res.status(400).json({ error: 'Invalid document status' });
+      return;
+    }
+    if (error instanceof DocumentNotFoundError) {
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
     console.error('Error updating rider document status:', error);
     res.status(500).json({ error: 'Failed to update document status' });
   }
@@ -316,8 +337,36 @@ export const registerRider = async (req: Request, res: Response): Promise<void> 
     }
 
     const existingUser = await prisma.user.findFirst({ where: { OR: [{ phone: verifiedPhone }, { phone }] } });
+
     if (existingUser) {
-      res.status(400).json({ error: 'Phone number already registered' });
+      const existingDeliveryProfile = await prisma.deliveryPartner.findUnique({ where: { userId: existingUser.id } });
+      if (existingDeliveryProfile) {
+        res.status(409).json({ error: 'You already have a rider account for this number. Please log in instead.' });
+        return;
+      }
+
+      // Attach the rider role to the existing shared identity (it may already
+      // be a Customer/Vendor/Mechanic) instead of creating a second User row
+      // for the same phone. Name/email are only filled in if currently blank.
+      const rider = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name: existingUser.name ?? name,
+          email: existingUser.email ?? (email || null),
+          roles: Array.from(new Set([...existingUser.roles, Role.DELIVERY_PARTNER])),
+          deliveryProfile: {
+            create: {
+              vehicleType: 'UNSPECIFIED',
+              licenseNumber: 'PENDING',
+              status: RiderStatus.PENDING,
+            },
+          },
+        },
+        include: { deliveryProfile: true },
+      });
+
+      const token = generateToken(rider.id, Role.DELIVERY_PARTNER);
+      res.status(201).json({ user: sanitizeUser(rider), deliveryProfile: rider.deliveryProfile, token });
       return;
     }
 
@@ -327,6 +376,7 @@ export const registerRider = async (req: Request, res: Response): Promise<void> 
         phone: verifiedPhone,
         email: email || null,
         role: Role.DELIVERY_PARTNER,
+        roles: [Role.CUSTOMER, Role.DELIVERY_PARTNER],
         deliveryProfile: {
           create: {
             // Placeholders -- filled in via PATCH /riders/me/registration during
@@ -341,11 +391,57 @@ export const registerRider = async (req: Request, res: Response): Promise<void> 
       include: { deliveryProfile: true }
     });
 
-    const token = generateToken(rider.id, rider.role);
+    const token = generateToken(rider.id, Role.DELIVERY_PARTNER);
     res.status(201).json({ user: sanitizeUser(rider), deliveryProfile: rider.deliveryProfile, token });
   } catch (error) {
     console.error('Error registering rider:', error);
     res.status(500).json({ error: 'Failed to register' });
+  }
+};
+
+// ============ Rider login (phone + OTP, own shared identity) ============
+// Previously the rider app logged in through the generic /auth/login, which
+// mints whatever role the account's legacy `role` column happens to hold --
+// wrong once a phone can carry more than one role, and it gave no clear
+// error at all when a customer-only phone tried to log into this app (it
+// silently succeeded with a CUSTOMER-scoped token, then every /riders/me/*
+// call 403'd with a bare "Forbidden"). This resolves by phone, requires a
+// rider profile to actually exist, and always mints a DELIVERY_PARTNER-scoped
+// session regardless of what other roles this identity also holds.
+export const loginRider = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) {
+      res.status(400).json({ error: 'phone and otp are required' });
+      return;
+    }
+
+    let verifiedPhone: string;
+    try {
+      verifiedPhone = await verifyOtpAndResolvePhone(phone, otp);
+    } catch (err) {
+      res.status(401).json({ error: err instanceof OtpVerificationError ? err.message : 'Invalid or expired OTP token' });
+      return;
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { OR: [{ phone: verifiedPhone }, { phone }] },
+      include: { deliveryProfile: true },
+    });
+    if (!user) {
+      res.status(401).json({ error: 'No account found for this number. Please register.' });
+      return;
+    }
+    if (!user.deliveryProfile) {
+      res.status(403).json({ error: 'This number has no rider account yet. Register in the app first.' });
+      return;
+    }
+
+    const token = generateToken(user.id, Role.DELIVERY_PARTNER);
+    res.status(200).json({ user: sanitizeUser(user), deliveryProfile: user.deliveryProfile, token });
+  } catch (error) {
+    console.error('Error logging in rider:', error);
+    res.status(500).json({ error: 'Failed to login' });
   }
 };
 
@@ -847,35 +943,31 @@ export const updateRiderSettlementStatus = async (req: Request, res: Response): 
       return;
     }
 
-    if (settlement.status === 'COMPLETED' || settlement.status === 'FAILED') {
-      res.status(400).json({ error: 'Settlement is already finalised' });
-      return;
-    }
-
-    // Atomically claim the transition: only matches if the settlement's
-    // status is still what we just read, re-checked under Postgres's row
-    // lock at UPDATE time. Without this, two concurrent/duplicated requests
-    // marking the same settlement FAILED could both pass the "already
-    // finalised" check and both credit the rider's wallet with the amount.
-    const updatedSettlement = await prisma.$transaction(async (tx) => {
-      const claim = await tx.riderSettlement.updateMany({
-        where: { id, status: settlement.status },
-        data: { status, transactionId },
-      });
-      if (claim.count === 0) {
-        throw new Error('SETTLEMENT_CHANGED_CONCURRENTLY');
-      }
-      if (status === 'FAILED') {
-        await tx.deliveryPartner.update({
-          where: { id: settlement.deliveryPartnerId },
-          data: { walletBalance: { increment: settlement.amount } },
-        });
-      }
-      return tx.riderSettlement.findUniqueOrThrow({ where: { id } });
-    });
+    const updatedSettlement = await transitionSettlement(
+      settlement,
+      status,
+      transactionId,
+      (tx) => tx.riderSettlement,
+      (tx) => tx.deliveryPartner.update({
+        where: { id: settlement.deliveryPartnerId },
+        data: { walletBalance: { increment: settlement.amount } },
+      }).then(() => {})
+    );
 
     res.status(200).json(updatedSettlement);
   } catch (error: any) {
+    if (error instanceof RangeError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    if (error instanceof SettlementAlreadyFinalisedError) {
+      res.status(400).json({ error: 'Settlement is already finalised' });
+      return;
+    }
+    if (error instanceof SettlementChangedConcurrentlyError) {
+      res.status(409).json({ error: 'Settlement was already updated by another request. Please refresh and retry.' });
+      return;
+    }
     if (error.message === 'SETTLEMENT_CHANGED_CONCURRENTLY') {
       res.status(409).json({ error: 'Settlement was already updated by another request. Please refresh and retry.' });
       return;

@@ -42,7 +42,11 @@ module.exports = {
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
-    userInterfaceStyle: 'dark',
+    // Every screen in this app is built light (colors.background/colors.card
+    // in packages/shared, all the auth screens' hardcoded #ffffff) -- 'dark'
+    // here was a copy/paste leftover that only affects OS chrome (keyboard,
+    // Alert.alert, system pickers), forcing dark dialogs over a light app.
+    userInterfaceStyle: 'light',
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.mechbazar.seller',
@@ -58,10 +62,12 @@ module.exports = {
     },
     android: {
       package: 'com.mechbazar.seller',
+      googleServicesFile: './google-services.json',
       adaptiveIcon: {
-        // Seller purple -- see the note in apps/mobile/app.config.js: one shared
-        // mark, one colour per app.
-        backgroundColor: '#7C3AED',
+        // Vendor orange, matching the box+gear icon (2026-07-29 icon redesign).
+        // See the note in apps/mobile/app.config.js: one shared family, one
+        // unique mark + colour per app.
+        backgroundColor: '#2C1404',
         foregroundImage: './assets/android-icon-foreground.png',
         backgroundImage: './assets/android-icon-background.png',
         monochromeImage: './assets/android-icon-monochrome.png',
@@ -85,6 +91,16 @@ module.exports = {
           locationWhenInUsePermission: 'MechBazar Seller uses your location to set your store location accurately.',
         },
       ],
+      // Without this, iOS has no NSCameraUsageDescription/
+      // NSPhotoLibraryUsageDescription and terminates the app on first camera/
+      // gallery use in Products or the onboarding wizard's document upload.
+      [
+        'expo-image-picker',
+        {
+          photosPermission: 'MechBazar Seller accesses your photo library so you can attach product photos and business documents.',
+          cameraPermission: 'MechBazar Seller uses your camera so you can photograph product images and business documents.',
+        },
+      ],
       // Android renders the notification small-icon as a silhouette: any
       // non-transparent pixel becomes solid white. The monochrome adaptive
       // asset is the only one of the three icon layers already drawn as a
@@ -94,7 +110,7 @@ module.exports = {
         'expo-notifications',
         {
           icon: './assets/android-icon-monochrome.png',
-          color: '#7C3AED',
+          color: '#FF7A1A',
           defaultChannel: 'default',
           enableBackgroundRemoteNotifications: false,
         },
@@ -107,25 +123,31 @@ module.exports = {
         'expo-splash-screen',
         {
           // splash-icon-dark.png is the LIGHT-ink wordmark ("-dark" means "for
-          // dark backgrounds"). The background below is the brand purple, on
+          // dark backgrounds"). The background below is the brand orange/near-black, on
           // which the ink-coloured variant would be close to invisible.
           image: './assets/splash-icon-dark.png',
           // The splash art is the MechBazar wordmark (~9:1), not a square mark,
-          // so this is a width the wordmark reads at.
-          imageWidth: 240,
+          // so this is a width the wordmark reads at. 176, not the naive-looking
+          // 240: Android 12+ clips windowSplashScreenAnimatedIcon to a 192dp
+          // circle with no opt-out, and at 240 the wordmark overflowed it by
+          // 24dp/side (see apps/mobile/app.config.js and the 2026-07-30 fix).
+          imageWidth: 176,
           resizeMode: 'contain',
-          // Brand purple, matching this app's launcher icon background, so the
+          // Brand icon background, matching this app's launcher icon, so the
           // splash continues the icon the user just tapped instead of flashing
           // a generic white frame.
-          backgroundColor: '#7C3AED',
+          backgroundColor: '#2C1404',
           dark: {
             // Same art and colour in dark mode: the splash should read as the
             // brand, not flip appearance halfway through launch.
             image: './assets/splash-icon-dark.png',
-            backgroundColor: '#7C3AED',
+            backgroundColor: '#2C1404',
           },
         },
       ],
+      '@react-native-firebase/app',
+      '@react-native-firebase/auth',
+      './plugins/withAndroidReleaseSigning',
     ],
     extra: {
       eas: {

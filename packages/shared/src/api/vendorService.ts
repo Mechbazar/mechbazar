@@ -1,7 +1,11 @@
 import { apiClient } from './client';
 
 export const vendorService = {
-  // Auth
+  // Auth. `credentials` is one of:
+  //  - { idToken } -- Firebase email/password ID token (apps/vendor web)
+  //  - { email, password } -- legacy path, kept for already-registered vendors
+  //  - { phone, otp } -- Firebase phone-auth ID token (apps/seller-mobile),
+  //    same shared phone identity every other role resolves through.
   login: async (credentials: any) => {
     const response = await apiClient.post('/vendors/login', credentials);
     return response.data;
@@ -9,8 +13,12 @@ export const vendorService = {
 
   // Self-registration wizard — mirrors apps/vendor web's 4-step flow
   // (personal -> business -> bank -> documents -> submit). Each step after
-  // the first requires the token returned here.
-  register: async (data: { name: string; phone: string; email?: string; password: string }) => {
+  // the first requires the token returned here. `otp` is a Firebase phone ID
+  // token (apps/seller-mobile/src/services/phoneAuth.ts) -- required, so a
+  // vendor's phone is proven the same way Customer/Rider/Mechanic prove
+  // theirs, and resolves to the same shared identity if this phone already
+  // has an account under another role.
+  register: async (data: { name: string; phone: string; otp: string; email?: string; password: string }) => {
     const response = await apiClient.post('/vendors/register', data);
     return response.data; // { token, user, vendor }
   },

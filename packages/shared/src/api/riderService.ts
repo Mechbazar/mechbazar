@@ -4,11 +4,14 @@ export const riderService = {
   // Auth is Firebase-only. The app runs Firebase Phone Auth client-side
   // (apps/rider/src/services/phoneAuth.ts), which sends the SMS and returns an
   // ID token; that token is passed here as `otp`. There is no backend send-otp
-  // step. Riders have no password (admin-created), so login goes through the
-  // same phone-auth path as everyone else.
+  // step. This hits the rider-specific login endpoint (not the generic
+  // /auth/login) so the session is always DELIVERY_PARTNER-scoped regardless
+  // of what other roles this phone's shared identity also holds, and so a
+  // customer-only phone gets a clear "no rider account" error instead of a
+  // silently-wrong session that 403s on every subsequent call.
   login: async (credentials: { phone: string; otp: string }) => {
-    const response = await apiClient.post('/auth/login', credentials);
-    return response.data; // { user, token }
+    const response = await apiClient.post('/riders/login', credentials);
+    return response.data; // { user, deliveryProfile, token }
   },
 
   // Self-registration — riders can only be created through the app from here

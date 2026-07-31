@@ -43,7 +43,7 @@ Copy each `.env.example` to `.env` (or `.env.local` for the Vite apps) and fill 
 
 **The backend port is `5001` everywhere by default.** If you change `PORT` in `apps/backend/.env`, update `EXPO_PUBLIC_BACKEND_PORT` / `VITE_BACKEND_PORT` in the frontend `.env` files to match, or the frontends will fail to reach the backend even though it's running.
 
-You also need a reachable Postgres database at `DATABASE_URL` in `apps/backend/.env` (a local install, or point it at the Hostinger database) and, optionally, Redis at `REDIS_URL` (the backend runs fine without it -- it's cache-only).
+You also need a reachable Postgres database at `DATABASE_URL` in `apps/backend/.env`. **There is exactly one MechBazar database -- the Postgres instance on the Hostinger VPS -- used for dev, staging, and production alike; never a separate local install or a different hosted provider.** From a machine other than the VPS, reach it via an SSH tunnel: `ssh -N -L 15432:127.0.0.1:5432 mechbazar-vps`, then point `DATABASE_URL` at `127.0.0.1:15432` with the real Hostinger credentials (see `apps/backend/.env.example`). Optionally, Redis at `REDIS_URL` (the backend runs fine without it -- it's cache-only).
 
 ## 3. Run everything
 
@@ -133,11 +133,11 @@ Another process (often a previous backend instance that didn't shut down cleanly
 **Database connection errors on startup**
 The server retries the DB connection every 3 seconds and logs each attempt instead of crashing — check the logged error for the actual cause (wrong credentials, Postgres container not started, network issue) rather than assuming the backend itself is broken.
 
-**Local dev** needs a reachable Postgres instance at `DATABASE_URL` (local install or remote) and, optionally, Redis at `REDIS_URL`.
+**Local dev** needs a reachable Postgres instance at `DATABASE_URL` -- the Hostinger instance, reached directly on the VPS or via an SSH tunnel from elsewhere (see "Configure environment variables" above), never a separate local database -- and, optionally, Redis at `REDIS_URL`.
 
 ---
 
-## Seed accounts (local dev database)
+## Seed accounts (shared Hostinger database)
 
 - Admin: `admin@mechbazar.com` / `password` (seed via `npx tsx prisma/seed-admin.ts` in `apps/backend`)
 - Retail: `retail@mechbazar.com` / `retail123`

@@ -7,6 +7,7 @@ import {
   updateTechnicianVerificationStatus,
   updateTechnicianDocumentStatus,
   registerTechnician,
+  loginTechnician,
   updateMyRegistration,
   uploadMyDocument,
   submitMyApplication,
@@ -41,6 +42,7 @@ const technicianOnly = [Role.SERVICE_TECHNICIAN];
 
 // Public self-registration — no auth yet, this *creates* the account.
 router.post('/register', registerTechnician);
+router.post('/login', loginTechnician);
 
 // Technician self-service — must be declared before "/:id" so "me" doesn't
 // get captured as an :id param.

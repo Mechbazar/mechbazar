@@ -54,6 +54,23 @@ enum OrderStatus {
   RETURNED
 }
 
+enum PaymentMethod {
+  COD
+  RAZORPAY
+  // Legacy value only: rows written before the COD-only lock (see
+  // services/payment.service.ts) could carry this. Never written by current
+  // code -- kept solely so existing production rows survive the column's
+  // conversion from free text to this enum.
+  ONLINE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
 enum TechnicianStatus {
   PENDING
   UNDER_VERIFICATION
@@ -120,6 +137,81 @@ enum VehicleType {
   BIKE
 }
 
+// Shared by VendorDocument, RiderDocument, and TechnicianDocument -- all three
+// KYC-upload verification workflows go through the same admin review states.
+enum DocumentVerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+// Shared by VendorSettlement, RiderSettlement, and TechnicianSettlement -- the
+// three payout ledgers all move through the same admin-driven states.
+enum SettlementStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// Shared by Coupon and Offer.
+enum DiscountType {
+  PERCENTAGE
+  FLAT
+}
+
+enum ProductApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BannerType {
+  HOMEPAGE
+  CATEGORY
+  PROMO
+}
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum SupportTicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum StockMovementAction {
+  PURCHASE
+  SALE
+  RETURN
+  DAMAGE
+  ADJUSTMENT
+  TRANSFER
+}
+
+enum StockTransferStatus {
+  PENDING
+  APPROVED
+  SHIPPED
+  COMPLETED
+  CANCELLED
+}
+
+enum PurchaseOrderStatus {
+  DRAFT
+  APPROVED
+  ORDERED
+  RECEIVED
+  COMPLETED
+  CANCELLED
+}
+
 model User {
   id          String  @id @default(uuid())
   phone       String  @unique
@@ -127,7 +219,21 @@ model User {
   name        String?
   password    String?
   firebaseUid String? @unique
+  // Legacy single-role column -- kept for existing admin listings/back-compat.
+  // Reflects the FIRST role ever assigned to this identity, never updated
+  // again once a second role is attached. `roles` below is the authoritative
+  // set of roles this phone/identity actually holds; every authorization
+  // check that needs to know "can this identity act as X" reads `roles`, not
+  // this column. See the platform's single-identity design: one User row per
+  // phone, one Firebase user per phone, any number of role profiles
+  // (vendorProfile/deliveryProfile/technicianProfile) attached to it.
   role        Role    @default(CUSTOMER)
+  // Every role this identity currently holds. CUSTOMER is implicit for every
+  // account (shopping/booking is never gated by role), so it's the default
+  // for brand-new rows. Registering as Vendor/Rider/Mechanic on a phone that
+  // already has a User row appends to this array instead of creating a
+  // second identity -- see controllers/{vendor,rider,technician}.controller.ts.
+  roles       Role[]  @default([CUSTOMER])
 
   // B2B & Mode Fields
   accountType        AccountType @default(RETAIL)
@@ -211,13 +317,13 @@ model Vendor {
 }
 
 model VendorDocument {
-  id         String   @id @default(uuid())
+  id         String                     @id @default(uuid())
   vendorId   String
-  vendor     Vendor   @relation(fields: [vendorId], references: [id])
+  vendor     Vendor                     @relation(fields: [vendorId], references: [id])
   type       String // GST, PAN, AADHAAR, SHOP_PHOTO, OWNER_PHOTO, BUSINESS_LICENSE, CANCELLED_CHEQUE
   url        String
-  status     String   @default("PENDING") // PENDING, VERIFIED, REJECTED
-  uploadedAt DateTime @default(now())
+  status     DocumentVerificationStatus @default(PENDING)
+  uploadedAt DateTime                   @default(now())
 }
 
 model VendorBankAccount {
@@ -234,13 +340,13 @@ model VendorBankAccount {
 }
 
 model VendorSettlement {
-  id            String   @id @default(uuid())
+  id            String           @id @default(uuid())
   vendorId      String
-  vendor        Vendor   @relation(fields: [vendorId], references: [id])
+  vendor        Vendor           @relation(fields: [vendorId], references: [id])
   amount        Float
-  status        String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  status        SettlementStatus @default(PENDING)
   transactionId String?
-  date          DateTime @default(now())
+  date          DateTime         @default(now())
 }
 
 model DeliveryPartner {
@@ -293,16 +399,16 @@ model DeliveryPartner {
 }
 
 model RiderDocument {
-  id                String          @id @default(uuid())
+  id                String                     @id @default(uuid())
   deliveryPartnerId String
-  deliveryPartner   DeliveryPartner @relation(fields: [deliveryPartnerId], references: [id])
+  deliveryPartner   DeliveryPartner            @relation(fields: [deliveryPartnerId], references: [id])
   type              String // AADHAAR, DL_FRONT, DL_BACK, RC, INSURANCE, PUC, SELFIE, PROFILE_PHOTO
   filePath          String // legacy disk path for pre-serverless rows; new rows store the original filename here for display only
   fileData          Bytes? // file bytes, stored in Postgres instead of disk -- this is private KYC content that must not sit in public object storage
   mimeType          String?
-  status            String          @default("PENDING") // PENDING, VERIFIED, REJECTED
+  status            DocumentVerificationStatus @default(PENDING)
   remarks           String?
-  uploadedAt        DateTime        @default(now())
+  uploadedAt        DateTime                   @default(now())
 }
 
 model RiderBankAccount {
@@ -319,13 +425,13 @@ model RiderBankAccount {
 }
 
 model RiderSettlement {
-  id                String          @id @default(uuid())
+  id                String           @id @default(uuid())
   deliveryPartnerId String
-  deliveryPartner   DeliveryPartner @relation(fields: [deliveryPartnerId], references: [id])
+  deliveryPartner   DeliveryPartner  @relation(fields: [deliveryPartnerId], references: [id])
   amount            Float
-  status            String          @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  status            SettlementStatus @default(PENDING)
   transactionId     String?
-  date              DateTime        @default(now())
+  date              DateTime         @default(now())
 }
 
 model Address {
@@ -476,18 +582,18 @@ model Product {
   description       String
   mrp               Float
   price             Float
-  stock             Int         @default(0)
+  stock             Int                   @default(0)
   images            String[]
   oemNumber         String?
   partNumber        String?
-  status            String      @default("APPROVED") // PENDING, APPROVED, REJECTED
-  vehicleType       VehicleType @default(CAR)
+  status            ProductApprovalStatus @default(APPROVED)
+  vehicleType       VehicleType           @default(CAR)
   discountPrice     Float?
   b2bPrice          Float?
-  lowStockThreshold Int         @default(10)
-  isFeatured        Boolean     @default(false)
-  isDeal            Boolean     @default(false)
-  salesCount        Int         @default(0)
+  lowStockThreshold Int                   @default(10)
+  isFeatured        Boolean               @default(false)
+  isDeal            Boolean               @default(false)
+  salesCount        Int                   @default(0)
   compatibleModels  String?
   // Free-form key/value spec sheet (e.g. {"Viscosity":"10W-40","Volume":"3.5L"}),
   // shown on ProductDetailsScreen's Specifications tab. Nullable/optional --
@@ -498,8 +604,8 @@ model Product {
   // create/update/delete. Lets GET /products sort/filter by rating directly
   // in SQL instead of pulling every product's full review list into Node to
   // average client-side on every request.
-  avgRating         Float       @default(0)
-  reviewCount       Int         @default(0)
+  avgRating         Float                 @default(0)
+  reviewCount       Int                   @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -584,25 +690,36 @@ model OrderItem {
 }
 
 model Payment {
-  id               String          @id @default(uuid())
+  id                String          @id @default(uuid())
   // Exactly one of orderId/serviceBookingId is set per row -- enforced in
   // application code (order.controller.ts / service.controller.ts each create
   // Payment as a nested create under their own entity), not at the DB level.
-  orderId          String?         @unique
-  order            Order?          @relation(fields: [orderId], references: [id])
-  serviceBookingId String?         @unique
-  serviceBooking   ServiceBooking? @relation(fields: [serviceBookingId], references: [id])
-  method           String // e.g., UPI, CARD, COD
-  status           String // PENDING, SUCCESS, FAILED, REFUNDED
-  transactionId    String?
-  amount           Float
-  createdAt        DateTime        @default(now())
+  orderId           String?         @unique
+  order             Order?          @relation(fields: [orderId], references: [id])
+  serviceBookingId  String?         @unique
+  serviceBooking    ServiceBooking? @relation(fields: [serviceBookingId], references: [id])
+  method            PaymentMethod
+  status            PaymentStatus
+  transactionId     String?
+  amount            Float
+  // Razorpay gateway linkage -- unset for COD rows and for every payment made
+  // before the gateway was integrated. See services/payment.service.ts.
+  gatewayOrderId    String?
+  gatewayPaymentId  String?
+  razorpaySignature String?
+  failureReason     String?
+  createdAt         DateTime        @default(now())
+
+  // Every webhook delivery and the client-side verify call look this row up
+  // by gatewayOrderId (see controllers/payment.controller.ts) -- without an
+  // index that's a full table scan on every payment event at any real volume.
+  @@index([gatewayOrderId])
 }
 
 model Coupon {
   id            String       @id @default(uuid())
   code          String       @unique
-  discountType  String // PERCENTAGE, FLAT
+  discountType  DiscountType
   discountValue Float
   minOrderValue Float        @default(0)
   vehicleType   VehicleType? // null = applies to both CAR and BIKE orders
@@ -659,6 +776,37 @@ model Notification {
   @@index([userId, type, createdAt])
 }
 
+enum EmailStatus {
+  SKIPPED // RESEND_API_KEY not configured, or the recipient has no email on file
+  SENT // Accepted by Resend; provider-side delivery outcome not yet known
+  FAILED // Resend rejected the send (bad address, API error, etc.)
+  DELIVERED // Confirmed by Resend's delivery webhook
+  BOUNCED // Confirmed by Resend's bounce webhook
+}
+
+// One row per transactional email attempt -- the delivery-tracking/logging
+// half of the email service (services/email.service.ts). `status` starts as
+// SENT/FAILED/SKIPPED at send time and is updated to DELIVERED/BOUNCED later
+// by the Resend webhook (routes/email.routes.ts), matched on
+// providerMessageId. Deliberately not FK'd to Order/User -- template payloads
+// vary (order confirmation today, others later) and this is an audit trail,
+// not a relation other tables need to join through.
+model EmailLog {
+  id                String      @id @default(uuid())
+  to                String
+  subject           String
+  template          String
+  status            EmailStatus
+  providerMessageId String?     @unique
+  error             String?
+  meta              Json?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@index([to, createdAt])
+  @@index([status])
+}
+
 // Homepage newsletter signup -- no user account required (name matches
 // common e-commerce UX: any visitor can subscribe with just an email).
 model NewsletterSubscriber {
@@ -691,7 +839,7 @@ model Banner {
   id           String      @id @default(uuid())
   title        String
   image        String
-  type         String      @default("HOMEPAGE") // HOMEPAGE, CATEGORY, PROMO
+  type         BannerType  @default(HOMEPAGE)
   link         String?
   vehicleType  VehicleType @default(CAR)
   buttonText   String?
@@ -704,15 +852,15 @@ model Banner {
 }
 
 model SupportTicket {
-  id          String   @id @default(uuid())
+  id          String                @id @default(uuid())
   userId      String
-  user        User     @relation(fields: [userId], references: [id])
+  user        User                  @relation(fields: [userId], references: [id])
   subject     String
-  description String   @db.Text
-  status      String   @default("OPEN") // OPEN, IN_PROGRESS, RESOLVED, CLOSED
-  priority    String   @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  description String                @db.Text
+  status      SupportTicketStatus   @default(OPEN)
+  priority    SupportTicketPriority @default(MEDIUM)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
 }
 
 // =======================
@@ -807,7 +955,7 @@ model StockMovement {
   userId      String
   user        User      @relation(fields: [userId], references: [id])
 
-  action       String // PURCHASE, SALE, RETURN, DAMAGE, ADJUSTMENT, TRANSFER
+  action       StockMovementAction
   prevQuantity Int
   newQuantity  Int
   quantityDiff Int // Can be negative or positive
@@ -826,7 +974,7 @@ model StockTransfer {
   toWarehouse     Warehouse @relation("TransferTo", fields: [toWarehouseId], references: [id])
 
   quantity     Int
-  status       String    @default("PENDING") // PENDING, APPROVED, SHIPPED, COMPLETED, CANCELLED
+  status       StockTransferStatus @default(PENDING)
   transferDate DateTime?
   receivedDate DateTime?
 
@@ -835,10 +983,10 @@ model StockTransfer {
 }
 
 model PurchaseOrder {
-  id         String   @id @default(uuid())
+  id         String              @id @default(uuid())
   supplierId String
-  supplier   Supplier @relation(fields: [supplierId], references: [id])
-  status     String   @default("DRAFT") // DRAFT, APPROVED, ORDERED, RECEIVED, COMPLETED, CANCELLED
+  supplier   Supplier            @relation(fields: [supplierId], references: [id])
+  status     PurchaseOrderStatus @default(DRAFT)
 
   totalCost    Float     @default(0)
   taxAmount    Float     @default(0)
@@ -864,20 +1012,20 @@ model PurchaseOrderItem {
 }
 
 model Offer {
-  id            String      @id @default(uuid())
+  id            String       @id @default(uuid())
   title         String
   description   String?
   image         String?
-  discountType  String      @default("PERCENTAGE") // PERCENTAGE, FLAT
+  discountType  DiscountType @default(PERCENTAGE)
   discountValue Float
-  minOrderValue Float       @default(0)
-  code          String?     @unique
-  vehicleType   VehicleType @default(CAR)
-  isActive      Boolean     @default(true)
+  minOrderValue Float        @default(0)
+  code          String?      @unique
+  vehicleType   VehicleType  @default(CAR)
+  isActive      Boolean      @default(true)
   startDate     DateTime?
   endDate       DateTime?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 }
 
 // =======================
@@ -941,16 +1089,16 @@ model ServiceTechnician {
 }
 
 model TechnicianDocument {
-  id           String            @id @default(uuid())
+  id           String                     @id @default(uuid())
   technicianId String
-  technician   ServiceTechnician @relation(fields: [technicianId], references: [id])
+  technician   ServiceTechnician          @relation(fields: [technicianId], references: [id])
   type         String // AADHAAR, CERTIFICATION, SELFIE, PROFILE_PHOTO
   filePath     String // original filename, display only -- bytes are the source of truth
   fileData     Bytes? // stored in Postgres, not disk -- see RiderDocument for rationale (private KYC content)
   mimeType     String?
-  status       String            @default("PENDING") // PENDING, VERIFIED, REJECTED
+  status       DocumentVerificationStatus @default(PENDING)
   remarks      String?
-  uploadedAt   DateTime          @default(now())
+  uploadedAt   DateTime                   @default(now())
 }
 
 model TechnicianBankAccount {
@@ -971,7 +1119,7 @@ model TechnicianSettlement {
   technicianId  String
   technician    ServiceTechnician @relation(fields: [technicianId], references: [id])
   amount        Float
-  status        String            @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  status        SettlementStatus  @default(PENDING)
   transactionId String?
   date          DateTime          @default(now())
 }
@@ -1081,11 +1229,11 @@ model ServiceBooking {
   // edited or deleted afterwards, and a roadside breakdown is frequently not
   // at any saved address at all. Falls back to the address centroid when the
   // customer did not drop a precise pin.
-  jobLat           Float?
-  jobLng           Float?
-  jobAddressText   String?
-  landmark         String?
-  customerNotes    String?
+  jobLat         Float?
+  jobLng         Float?
+  jobAddressText String?
+  landmark       String?
+  customerNotes  String?
 
   issueDescription String?
   status           BookingStatus @default(PENDING)
@@ -1239,8 +1387,8 @@ model JobOtp {
   // into a response addressed to the job's own customer.
   codeEnc String
 
-  attempts    Int      @default(0)
-  maxAttempts Int      @default(5)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(5)
   expiresAt   DateTime
   // Single-use: set on the first successful verification. A consumed row is
   // never matched again, so a replayed request cannot re-run the transition.
@@ -1300,10 +1448,10 @@ model CallSession {
   // The number the caller's handset actually dials. Never a participant's real
   // number when a masking provider is configured.
   virtualNumber     String?
-  status            String   @default("INITIATED") // INITIATED | RINGING | ANSWERED | COMPLETED | FAILED
+  status            String    @default("INITIATED") // INITIATED | RINGING | ANSWERED | COMPLETED | FAILED
   failureReason     String?
   durationSec       Int?
-  createdAt         DateTime @default(now())
+  createdAt         DateTime  @default(now())
   endedAt           DateTime?
 
   @@index([bookingId, createdAt])

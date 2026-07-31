@@ -54,7 +54,10 @@ export const verifyFirebaseIdTokenAndResolveUser = async (
     throw new FirebaseAuthError('NO_LINKED_ACCOUNT', 'Invalid credentials or unauthorized');
   }
 
-  if (!allowedRoles.includes(user.role)) {
+  // Checked against the full multi-role set, not the single legacy `role`
+  // column -- a vendor who is also a customer (or vice versa) must still be
+  // able to sign in through this path as long as VENDOR is one of their roles.
+  if (!allowedRoles.some((r) => user.roles.includes(r))) {
     throw new FirebaseAuthError('FORBIDDEN', 'Invalid credentials or unauthorized');
   }
 

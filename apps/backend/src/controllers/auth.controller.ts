@@ -41,6 +41,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const { phone, otp, name, accountType, companyName, contactPerson, gstNumber, businessType, city, state, email, password } = req.body;
 
     let verifiedPhone = phone;
+    let phoneWasOtpVerified = false;
 
     // If no OTP but we have a password, we assume it's a direct email/password registration
     if (!otp && password && email) {
@@ -48,15 +49,33 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     } else {
       try {
         verifiedPhone = await verifyOtpAndResolvePhone(phone, otp);
+        phoneWasOtpVerified = true;
       } catch (err) {
         res.status(401).json({ error: err instanceof OtpVerificationError ? err.message : 'Invalid or expired OTP token' });
         return;
       }
     }
 
-    const existingUserByPhone = await prisma.user.findUnique({ where: { phone: verifiedPhone } });
+    // Phone numbers aren't stored consistently across creation paths (E.164
+    // vs raw 10-digit) -- see login()'s identical OR lookup below.
+    const existingUserByPhone = await prisma.user.findFirst({ where: { OR: [{ phone: verifiedPhone }, { phone }] } });
     if (existingUserByPhone) {
-      res.status(400).json({ error: 'Phone number already registered' });
+      if (!phoneWasOtpVerified) {
+        // The email/password branch never proved ownership of this phone
+        // number (no Firebase token was checked), so it must not be allowed
+        // to log in as -- or silently attach to -- an identity someone else
+        // already verified. Same rejection as before for this branch only.
+        res.status(400).json({ error: 'Phone number already registered' });
+        return;
+      }
+      // Every identity implicitly has customer capability -- Address/Order/
+      // Wishlist/etc. all hang directly off User, so there is no separate
+      // "customer profile" to create. A phone that already exists (it may
+      // have registered as a Vendor/Rider/Mechanic first) just needs to be
+      // logged in here rather than rejected, per the single-identity design:
+      // one phone, one User row, any number of role profiles attached to it.
+      const token = generateToken(existingUserByPhone.id, Role.CUSTOMER, { accountType: existingUserByPhone.accountType });
+      res.status(200).json({ user: sanitizeUser(existingUserByPhone), token });
       return;
     }
 

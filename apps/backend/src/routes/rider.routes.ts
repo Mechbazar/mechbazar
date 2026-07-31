@@ -7,6 +7,7 @@ import {
   updateRiderVerificationStatus,
   updateRiderDocumentStatus,
   registerRider,
+  loginRider,
   updateMyRegistration,
   uploadMyDocument,
   submitMyApplication,
@@ -35,6 +36,7 @@ const riderOnly = [Role.DELIVERY_PARTNER];
 
 // Public self-registration — no auth yet, this *creates* the account.
 router.post('/register', registerRider);
+router.post('/login', loginRider);
 
 // Rider self-service — must be declared before "/:id" so "me" doesn't get
 // captured as an :id param.

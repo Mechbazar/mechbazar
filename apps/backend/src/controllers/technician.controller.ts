@@ -1,5 +1,7 @@
 import { Request, Response } from 'express';
 import { Role, TechnicianStatus } from '@prisma/client';
+import { transitionSettlement, SettlementAlreadyFinalisedError, SettlementChangedConcurrentlyError } from '../services/settlement.service';
+import { reviewDocument, InvalidDocumentStatusError, DocumentNotFoundError } from '../services/documentVerification.service';
 import { AuthRequest } from '../middlewares/auth';
 import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
 import { generateToken } from '../utils/jwt';
@@ -22,7 +24,7 @@ const DOCUMENT_LIST_SELECT = { id: true, technicianId: true, type: true, status:
 export const getTechnicians = async (req: Request, res: Response): Promise<void> => {
   try {
     const technicians = await prisma.user.findMany({
-      where: { role: Role.SERVICE_TECHNICIAN },
+      where: { roles: { has: Role.SERVICE_TECHNICIAN } },
       include: {
         technicianProfile: {
           include: { documents: { select: DOCUMENT_LIST_SELECT }, bankAccounts: true },
@@ -57,7 +59,7 @@ export const getTechnicianById = async (req: Request, res: Response): Promise<vo
   try {
     const id = String(req.params.id); // User id
     const technician = await prisma.user.findFirst({
-      where: { id, role: Role.SERVICE_TECHNICIAN },
+      where: { id, roles: { has: Role.SERVICE_TECHNICIAN } },
       include: {
         technicianProfile: {
           include: { documents: { select: DOCUMENT_LIST_SELECT }, bankAccounts: true },
@@ -80,8 +82,40 @@ export const createTechnician = async (req: Request, res: Response): Promise<voi
     const { name, phone, email, city, state, specializations, skills, experienceYears } = req.body;
 
     const existingUser = await prisma.user.findUnique({ where: { phone } });
+
     if (existingUser) {
-      res.status(400).json({ error: 'User with this phone number already exists' });
+      const existingTechnicianProfile = await prisma.serviceTechnician.findUnique({ where: { userId: existingUser.id } });
+      if (existingTechnicianProfile) {
+        res.status(400).json({ error: 'This phone number already has a technician account' });
+        return;
+      }
+
+      // Attach a technician profile to the existing shared identity (it may
+      // already be a Customer/Vendor/Rider) instead of refusing outright.
+      const technician = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name: existingUser.name ?? name,
+          email: existingUser.email ?? (email || null),
+          city: city ?? existingUser.city,
+          state: state ?? existingUser.state,
+          roles: Array.from(new Set([...existingUser.roles, Role.SERVICE_TECHNICIAN])),
+          technicianProfile: {
+            create: {
+              specializations: Array.isArray(specializations) ? specializations : ['CAR', 'BIKE'],
+              skills: Array.isArray(skills) ? skills : [],
+              experienceYears: experienceYears ?? null,
+              isActive: true,
+              isOnline: false,
+              status: TechnicianStatus.APPROVED,
+              reviewedAt: new Date(),
+            },
+          },
+        },
+        include: { technicianProfile: true },
+      });
+
+      res.status(201).json(technician);
       return;
     }
 
@@ -96,6 +130,7 @@ export const createTechnician = async (req: Request, res: Response): Promise<voi
         city,
         state,
         role: Role.SERVICE_TECHNICIAN,
+        roles: [Role.CUSTOMER, Role.SERVICE_TECHNICIAN],
         technicianProfile: {
           create: {
             specializations: Array.isArray(specializations) ? specializations : ['CAR', 'BIKE'],
@@ -250,45 +285,32 @@ export const updateTechnicianDocumentStatus = async (req: AuthRequest, res: Resp
     const documentId = String(req.params.documentId);
     const { status, remarks } = req.body;
 
-    if (!['PENDING', 'VERIFIED', 'REJECTED'].includes(status)) {
-      res.status(400).json({ error: 'Invalid document status' });
-      return;
-    }
-
-    const document = await prisma.technicianDocument.findUnique({ where: { id: documentId } });
-    if (!document || document.technicianId !== id) {
-      res.status(404).json({ error: 'Document not found' });
-      return;
-    }
-
-    const updated = await prisma.technicianDocument.update({
-      where: { id: documentId },
-      data: { status, remarks: remarks || null },
-    });
-
-    const technician = await prisma.serviceTechnician.findUnique({ where: { id } });
-
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user!.userId,
-        action: 'TECHNICIAN_DOCUMENT_STATUS_CHANGE',
-        entity: 'TechnicianDocument',
-        entityId: documentId,
-        details: `${document.type}: ${document.status} -> ${status}${remarks ? ` (${remarks})` : ''}`,
+    const updated = await reviewDocument({
+      reviewerUserId: req.user!.userId,
+      status,
+      remarks,
+      loadDocument: async () => {
+        const document = await prisma.technicianDocument.findUnique({ where: { id: documentId } });
+        return document && document.technicianId === id ? document : null;
       },
+      updateDocument: (status, remarks) =>
+        prisma.technicianDocument.update({ where: { id: documentId }, data: { status, remarks } }),
+      loadOwnerUserId: async () => (await prisma.serviceTechnician.findUnique({ where: { id } }))?.userId ?? null,
+      auditAction: 'TECHNICIAN_DOCUMENT_STATUS_CHANGE',
+      auditEntity: 'TechnicianDocument',
+      notifyType: 'TECHNICIAN_DOCUMENT_STATUS',
     });
-
-    if (technician) {
-      notifyUser(
-        technician.userId,
-        'Document review update',
-        `Your ${document.type.replace(/_/g, ' ')} document was marked ${status}${remarks ? `: ${remarks}` : '.'}`,
-        { type: 'TECHNICIAN_DOCUMENT_STATUS', documentId, status }
-      );
-    }
 
     res.status(200).json(updated);
   } catch (error) {
+    if (error instanceof InvalidDocumentStatusError) {
+      res.status(400).json({ error: 'Invalid document status' });
+      return;
+    }
+    if (error instanceof DocumentNotFoundError) {
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
     console.error('Error updating technician document status:', error);
     res.status(500).json({ error: 'Failed to update document status' });
   }
@@ -320,8 +342,35 @@ export const registerTechnician = async (req: Request, res: Response): Promise<v
     }
 
     const existingUser = await prisma.user.findFirst({ where: { OR: [{ phone: verifiedPhone }, { phone }] } });
+
     if (existingUser) {
-      res.status(400).json({ error: 'Phone number already registered' });
+      const existingTechnicianProfile = await prisma.serviceTechnician.findUnique({ where: { userId: existingUser.id } });
+      if (existingTechnicianProfile) {
+        res.status(409).json({ error: 'You already have a technician account for this number. Please log in instead.' });
+        return;
+      }
+
+      // Attach the technician role to the existing shared identity (it may
+      // already be a Customer/Vendor/Rider) instead of creating a second User
+      // row for the same phone. Name/email are only filled in if blank.
+      const technician = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name: existingUser.name ?? name,
+          email: existingUser.email ?? (email || null),
+          roles: Array.from(new Set([...existingUser.roles, Role.SERVICE_TECHNICIAN])),
+          technicianProfile: {
+            create: {
+              specializations: [],
+              status: TechnicianStatus.PENDING,
+            },
+          },
+        },
+        include: { technicianProfile: true },
+      });
+
+      const token = generateToken(technician.id, Role.SERVICE_TECHNICIAN);
+      res.status(201).json({ user: sanitizeUser(technician), technicianProfile: technician.technicianProfile, token });
       return;
     }
 
@@ -331,6 +380,7 @@ export const registerTechnician = async (req: Request, res: Response): Promise<v
         phone: verifiedPhone,
         email: email || null,
         role: Role.SERVICE_TECHNICIAN,
+        roles: [Role.CUSTOMER, Role.SERVICE_TECHNICIAN],
         technicianProfile: {
           create: {
             specializations: [],
@@ -341,11 +391,54 @@ export const registerTechnician = async (req: Request, res: Response): Promise<v
       include: { technicianProfile: true },
     });
 
-    const token = generateToken(technician.id, technician.role);
+    const token = generateToken(technician.id, Role.SERVICE_TECHNICIAN);
     res.status(201).json({ user: sanitizeUser(technician), technicianProfile: technician.technicianProfile, token });
   } catch (error) {
     console.error('Error registering technician:', error);
     res.status(500).json({ error: 'Failed to register' });
+  }
+};
+
+// ============ Technician login (phone + OTP, own shared identity) ============
+// Mirrors rider.controller.ts's loginRider -- previously the mechanic app
+// logged in through the generic /auth/login, which mints whatever role the
+// account's legacy `role` column happens to hold. This always mints a
+// SERVICE_TECHNICIAN-scoped session, regardless of what other roles the
+// underlying identity also holds.
+export const loginTechnician = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) {
+      res.status(400).json({ error: 'phone and otp are required' });
+      return;
+    }
+
+    let verifiedPhone: string;
+    try {
+      verifiedPhone = await verifyOtpAndResolvePhone(phone, otp);
+    } catch (err) {
+      res.status(401).json({ error: err instanceof OtpVerificationError ? err.message : 'Invalid or expired OTP token' });
+      return;
+    }
+
+    const user = await prisma.user.findFirst({
+      where: { OR: [{ phone: verifiedPhone }, { phone }] },
+      include: { technicianProfile: true },
+    });
+    if (!user) {
+      res.status(401).json({ error: 'No account found for this number. Please register.' });
+      return;
+    }
+    if (!user.technicianProfile) {
+      res.status(403).json({ error: 'This number has no technician account yet. Register in the app first.' });
+      return;
+    }
+
+    const token = generateToken(user.id, Role.SERVICE_TECHNICIAN);
+    res.status(200).json({ user: sanitizeUser(user), technicianProfile: user.technicianProfile, token });
+  } catch (error) {
+    console.error('Error logging in technician:', error);
+    res.status(500).json({ error: 'Failed to login' });
   }
 };
 
@@ -639,7 +732,15 @@ export const getMyBookings = async (req: AuthRequest, res: Response): Promise<vo
       },
       orderBy: { createdAt: 'desc' },
     });
-    const sanitized = bookings.map((b) => ({ ...b, user: b.user ? sanitizeUser(b.user) : b.user }));
+    // The completion OTP is read aloud by the customer to the technician -- it
+    // must never be readable from the technician's own API response (mirrors
+    // the single-booking redaction in service.controller.ts's getBooking).
+    const sanitized = bookings.map((b) => ({
+      ...b,
+      user: b.user ? sanitizeUser(b.user) : b.user,
+      completionOtp: undefined,
+      completionOtpGeneratedAt: undefined,
+    }));
     res.status(200).json(sanitized);
   } catch (error) {
     console.error('Error fetching own bookings:', error);
@@ -964,36 +1065,28 @@ export const updateTechnicianSettlementStatus = async (req: Request, res: Respon
       return;
     }
 
-    if (settlement.status === 'COMPLETED' || settlement.status === 'FAILED') {
-      res.status(400).json({ error: 'Settlement is already finalised' });
-      return;
-    }
-
-    // Atomically claim the transition: only matches if the settlement's
-    // status is still what we just read, re-checked under Postgres's row
-    // lock at UPDATE time. Without this, two concurrent/duplicated requests
-    // marking the same settlement FAILED could both pass the "already
-    // finalised" check and both credit the technician's wallet with the amount.
-    const updatedSettlement = await prisma.$transaction(async (tx) => {
-      const claim = await tx.technicianSettlement.updateMany({
-        where: { id, status: settlement.status },
-        data: { status, transactionId },
-      });
-      if (claim.count === 0) {
-        throw new Error('SETTLEMENT_CHANGED_CONCURRENTLY');
-      }
-      if (status === 'FAILED') {
-        await tx.serviceTechnician.update({
-          where: { id: settlement.technicianId },
-          data: { walletBalance: { increment: settlement.amount } },
-        });
-      }
-      return tx.technicianSettlement.findUniqueOrThrow({ where: { id } });
-    });
+    const updatedSettlement = await transitionSettlement(
+      settlement,
+      status,
+      transactionId,
+      (tx) => tx.technicianSettlement,
+      (tx) => tx.serviceTechnician.update({
+        where: { id: settlement.technicianId },
+        data: { walletBalance: { increment: settlement.amount } },
+      }).then(() => {})
+    );
 
     res.status(200).json(updatedSettlement);
   } catch (error: any) {
-    if (error.message === 'SETTLEMENT_CHANGED_CONCURRENTLY') {
+    if (error instanceof RangeError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    if (error instanceof SettlementAlreadyFinalisedError) {
+      res.status(400).json({ error: 'Settlement is already finalised' });
+      return;
+    }
+    if (error instanceof SettlementChangedConcurrentlyError) {
       res.status(409).json({ error: 'Settlement was already updated by another request. Please refresh and retry.' });
       return;
     }

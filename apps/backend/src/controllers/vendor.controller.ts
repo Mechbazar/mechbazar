@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Role, VendorStatus, OrderStatus } from '@prisma/client';
+import { transitionSettlement, SettlementAlreadyFinalisedError, SettlementChangedConcurrentlyError } from '../services/settlement.service';
 import bcrypt from 'bcrypt';
 import { generateToken } from '../utils/jwt';
 import { AuthRequest } from '../middlewares/auth';
@@ -9,6 +10,7 @@ import { sanitizeUser, sanitizeUsers, sanitizeOrders, stripDeliveryOtp, stripDel
 import { recordAuditLog } from '../utils/auditLog';
 import { verifyFirebaseIdTokenAndResolveUser, FirebaseAuthError, FirebaseAuthErrorCode } from '../utils/firebaseAuth';
 import { reconcilePasswordAfterFirebaseReset } from '../utils/firebasePassword';
+import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
 import firebaseAdmin from '../config/firebase';
 import prisma from '../config/prisma';
 
@@ -73,7 +75,7 @@ export const getTopVendors = async (req: Request, res: Response): Promise<void> 
 
 export const loginVendor = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { idToken, email, password } = req.body;
+    const { idToken, email, password, phone, otp } = req.body;
 
     // Firebase path: client already authenticated with
     // signInWithEmailAndPassword and is forwarding the resulting ID token.
@@ -81,7 +83,7 @@ export const loginVendor = async (req: Request, res: Response): Promise<void> =>
       try {
         const user = await verifyFirebaseIdTokenAndResolveUser(idToken, [Role.VENDOR]);
         const vendor = await prisma.vendor.findUnique({ where: { userId: user.id } });
-        const token = generateToken(user.id, user.role);
+        const token = generateToken(user.id, Role.VENDOR);
         res.status(200).json({ token, user: sanitizeUser(user), vendor });
       } catch (err) {
         if (err instanceof FirebaseAuthError) {
@@ -90,6 +92,36 @@ export const loginVendor = async (req: Request, res: Response): Promise<void> =>
         }
         throw err;
       }
+      return;
+    }
+
+    // Phone+OTP path -- same Firebase-phone-auth identity resolution as
+    // rider/technician login, and the same shared User row a Customer/Rider/
+    // Mechanic registration on this number would have created or attached to.
+    if (phone && otp) {
+      let verifiedPhone: string;
+      try {
+        verifiedPhone = await verifyOtpAndResolvePhone(phone, otp);
+      } catch (err) {
+        res.status(401).json({ error: err instanceof OtpVerificationError ? err.message : 'Invalid or expired OTP token' });
+        return;
+      }
+
+      const user = await prisma.user.findFirst({
+        where: { OR: [{ phone: verifiedPhone }, { phone }] },
+        include: { vendorProfile: true },
+      });
+      if (!user) {
+        res.status(401).json({ error: 'No account found for this number. Please register.' });
+        return;
+      }
+      if (!user.vendorProfile) {
+        res.status(403).json({ error: 'This number has no vendor account yet. Register in the app first.' });
+        return;
+      }
+
+      const token = generateToken(user.id, Role.VENDOR);
+      res.status(200).json({ token, user: sanitizeUser(user), vendor: user.vendorProfile });
       return;
     }
 
@@ -102,7 +134,7 @@ export const loginVendor = async (req: Request, res: Response): Promise<void> =>
       include: { vendorProfile: true }
     });
 
-    if (!user || user.role !== Role.VENDOR) {
+    if (!user || !user.roles.includes(Role.VENDOR)) {
       res.status(401).json({ error: 'Invalid credentials or not a vendor' });
       return;
     }
@@ -118,7 +150,7 @@ export const loginVendor = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    const token = generateToken(user.id, user.role);
+    const token = generateToken(user.id, Role.VENDOR);
 
     res.status(200).json({ token, user: sanitizeUser(user), vendor: user.vendorProfile });
   } catch (error) {
@@ -129,11 +161,76 @@ export const loginVendor = async (req: Request, res: Response): Promise<void> =>
 
 export const registerPersonal = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, phone, email, password } = req.body;
+    const { name, phone, otp, email, password } = req.body;
 
-    const existingUser = await prisma.user.findUnique({ where: { phone } });
+    if (!phone || !otp || !password) {
+      res.status(400).json({ error: 'phone, otp and password are required' });
+      return;
+    }
+
+    // Phone must be proven via Firebase phone auth, exactly like Customer/
+    // Rider/Mechanic registration -- previously this endpoint took `phone` as
+    // a raw, unverified field, letting anyone type in someone else's number
+    // as a vendor. This also makes vendor identity resolve through the same
+    // shared phone-keyed User row every other role uses.
+    let verifiedPhone: string;
+    try {
+      verifiedPhone = await verifyOtpAndResolvePhone(phone, otp);
+    } catch (err) {
+      res.status(401).json({ error: err instanceof OtpVerificationError ? err.message : 'Invalid or expired OTP token' });
+      return;
+    }
+
+    // Phone numbers aren't stored consistently across creation paths -- see
+    // rider/technician register's identical OR lookup.
+    const existingUser = await prisma.user.findFirst({ where: { OR: [{ phone: verifiedPhone }, { phone }] } });
+
     if (existingUser) {
-      res.status(400).json({ error: 'User with this phone number already exists' });
+      const existingVendorProfile = await prisma.vendor.findUnique({ where: { userId: existingUser.id } });
+      if (existingVendorProfile) {
+        res.status(409).json({ error: 'You already have a vendor account for this number. Please log in instead.' });
+        return;
+      }
+
+      if (email) {
+        const existingEmail = await prisma.user.findFirst({ where: { email, NOT: { id: existingUser.id } } });
+        if (existingEmail) {
+          res.status(400).json({ error: 'An account with this email already exists' });
+          return;
+        }
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Attach the vendor role to the existing shared identity instead of
+      // creating a second User row for the same phone. Name/email are only
+      // filled in if currently blank -- never overwrite what another role's
+      // registration already set.
+      let user = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name: existingUser.name ?? name,
+          email: existingUser.email ?? (email || null),
+          password: hashedPassword,
+          roles: Array.from(new Set([...existingUser.roles, Role.VENDOR])),
+        },
+      });
+
+      if (email && !user.firebaseUid) {
+        try {
+          const firebaseUser = await firebaseAdmin.auth().createUser({ uid: user.id, email, password, emailVerified: false });
+          user = await prisma.user.update({ where: { id: user.id }, data: { firebaseUid: firebaseUser.uid } });
+        } catch (err) {
+          console.error('Failed to create Firebase account for attached vendor:', err);
+        }
+      }
+
+      const vendor = await prisma.vendor.create({
+        data: { userId: user.id, storeName: 'My Store', status: VendorStatus.PENDING },
+      });
+
+      const token = generateToken(user.id, Role.VENDOR);
+      res.status(201).json({ token, user: sanitizeUser(user), vendor });
       return;
     }
 
@@ -154,10 +251,11 @@ export const registerPersonal = async (req: Request, res: Response): Promise<voi
     let user = await prisma.user.create({
       data: {
         name,
-        phone,
+        phone: verifiedPhone,
         email: email || null,
         password: hashedPassword,
         role: Role.VENDOR,
+        roles: [Role.CUSTOMER, Role.VENDOR],
       }
     });
 
@@ -194,7 +292,7 @@ export const registerPersonal = async (req: Request, res: Response): Promise<voi
       }
     });
 
-    const token = generateToken(user.id, user.role);
+    const token = generateToken(user.id, Role.VENDOR);
 
     res.status(201).json({ token, user: sanitizeUser(user), vendor });
   } catch (error) {
@@ -738,7 +836,7 @@ export const getVendors = async (req: Request, res: Response): Promise<void> => 
   try {
     const vendors = await prisma.user.findMany({
       where: {
-        role: Role.VENDOR
+        roles: { has: Role.VENDOR }
       },
       include: {
         vendorProfile: {
@@ -789,44 +887,35 @@ export const updateSettlementStatus = async (req: Request, res: Response): Promi
   try {
     const id = String(req.params.id);
     const { status, transactionId } = req.body;
-    
+
     const settlement = await prisma.vendorSettlement.findUnique({ where: { id } });
     if (!settlement) {
       res.status(404).json({ error: 'Settlement not found' });
       return;
     }
 
-    if (settlement.status === 'COMPLETED' || settlement.status === 'FAILED') {
-      res.status(400).json({ error: 'Settlement is already finalised' });
-      return;
-    }
-
-    // Atomically claim the transition: only matches if the settlement's
-    // status is still what we just read, re-checked under Postgres's row
-    // lock at UPDATE time -- not against the stale `settlement.status` read
-    // above. Without this, two concurrent/duplicated requests marking the
-    // same settlement FAILED could both pass the "already finalised" check
-    // and both credit the vendor's wallet with settlement.amount.
-    const updatedSettlement = await prisma.$transaction(async (tx) => {
-      const claim = await tx.vendorSettlement.updateMany({
-        where: { id, status: settlement.status },
-        data: { status, transactionId },
-      });
-      if (claim.count === 0) {
-        throw new Error('SETTLEMENT_CHANGED_CONCURRENTLY');
-      }
-      if (status === 'FAILED') {
-        await tx.vendor.update({
-          where: { id: settlement.vendorId },
-          data: { walletBalance: { increment: settlement.amount } },
-        });
-      }
-      return tx.vendorSettlement.findUniqueOrThrow({ where: { id } });
-    });
+    const updatedSettlement = await transitionSettlement(
+      settlement,
+      status,
+      transactionId,
+      (tx) => tx.vendorSettlement,
+      (tx) => tx.vendor.update({
+        where: { id: settlement.vendorId },
+        data: { walletBalance: { increment: settlement.amount } },
+      }).then(() => {})
+    );
 
     res.status(200).json(updatedSettlement);
   } catch (error: any) {
-    if (error.message === 'SETTLEMENT_CHANGED_CONCURRENTLY') {
+    if (error instanceof RangeError) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    if (error instanceof SettlementAlreadyFinalisedError) {
+      res.status(400).json({ error: 'Settlement is already finalised' });
+      return;
+    }
+    if (error instanceof SettlementChangedConcurrentlyError) {
       res.status(409).json({ error: 'Settlement was already updated by another request. Please refresh and retry.' });
       return;
     }
@@ -886,8 +975,38 @@ export const createVendor = async (req: Request, res: Response): Promise<void> =
     } = req.body;
 
     const existingUser = await prisma.user.findUnique({ where: { phone } });
+
     if (existingUser) {
-      res.status(400).json({ error: 'User with this phone number already exists' });
+      const existingVendorProfile = await prisma.vendor.findUnique({ where: { userId: existingUser.id } });
+      if (existingVendorProfile) {
+        res.status(400).json({ error: 'This phone number already has a vendor account' });
+        return;
+      }
+
+      // Attach a vendor profile to the existing shared identity (it may
+      // already be a Customer/Rider/Mechanic) instead of refusing outright --
+      // mirrors the self-registration attach path in registerPersonal above.
+      const vendor = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          name: existingUser.name ?? name,
+          email: existingUser.email ?? (email || null),
+          city: city ?? existingUser.city,
+          state: state ?? existingUser.state,
+          roles: Array.from(new Set([...existingUser.roles, Role.VENDOR])),
+          vendorProfile: {
+            create: {
+              storeName, gstNumber, city, state, addressLine1, addressLine2,
+              pincode, country, lat, lng, placeId, formattedAddress,
+              status: VendorStatus.APPROVED,
+              isActive: true,
+            },
+          },
+        },
+        include: { vendorProfile: true },
+      });
+
+      res.status(201).json(sanitizeUser(vendor));
       return;
     }
 
@@ -899,6 +1018,7 @@ export const createVendor = async (req: Request, res: Response): Promise<void> =
         city,
         state,
         role: Role.VENDOR,
+        roles: [Role.CUSTOMER, Role.VENDOR],
         vendorProfile: {
           create: {
             storeName,
