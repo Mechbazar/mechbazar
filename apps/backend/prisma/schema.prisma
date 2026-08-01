@@ -777,20 +777,20 @@ model Notification {
 }
 
 enum EmailStatus {
-  SKIPPED // RESEND_API_KEY not configured, or the recipient has no email on file
-  SENT // Accepted by Resend; provider-side delivery outcome not yet known
-  FAILED // Resend rejected the send (bad address, API error, etc.)
-  DELIVERED // Confirmed by Resend's delivery webhook
-  BOUNCED // Confirmed by Resend's bounce webhook
+  SKIPPED // SMTP not configured, or the recipient has no email on file
+  SENT // Accepted by the SMTP server (Hostinger); nothing more is tracked past this
+  FAILED // SMTP rejected the send (bad address, auth error, etc.)
+  DELIVERED // Unused -- was set by the retired Resend delivery webhook
+  BOUNCED // Unused -- was set by the retired Resend bounce webhook
 }
 
 // One row per transactional email attempt -- the delivery-tracking/logging
-// half of the email service (services/email.service.ts). `status` starts as
-// SENT/FAILED/SKIPPED at send time and is updated to DELIVERED/BOUNCED later
-// by the Resend webhook (routes/email.routes.ts), matched on
-// providerMessageId. Deliberately not FK'd to Order/User -- template payloads
-// vary (order confirmation today, others later) and this is an audit trail,
-// not a relation other tables need to join through.
+// half of the email service (services/email.service.ts). `status` is set once,
+// at send time, to SENT/FAILED/SKIPPED and never updated after -- there is no
+// delivery/bounce webhook for plain SMTP the way there was for Resend.
+// Deliberately not FK'd to Order/User -- template payloads vary (order
+// confirmation today, others later) and this is an audit trail, not a
+// relation other tables need to join through.
 model EmailLog {
   id                String      @id @default(uuid())
   to                String

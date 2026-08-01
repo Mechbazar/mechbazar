@@ -116,8 +116,8 @@ function extractOobCode(firebaseGeneratedLink: string): string | null {
 }
 
 /**
- * Sends a password-reset email. Prefers generating the oobCode via the Admin
- * SDK and delivering it through this backend's own mailer (Resend, see
+ * Sends a password-reset email. Generates the oobCode via the Admin SDK and
+ * delivers it through this backend's own mailer (Hostinger SMTP, see
  * services/email.service.ts) to our own AuthAction page -- Firebase's
  * *automatic* send always links to its own hosted action page
  * ({project}.firebaseapp.com/__/auth/action), and the one project setting
@@ -127,9 +127,9 @@ function extractOobCode(firebaseGeneratedLink: string): string | null {
  * being retired) -- so taking over delivery ourselves is the only way left
  * to control the destination.
  *
- * Falls back to Firebase's own REST-triggered send (the pre-2026-08-01
- * behavior, gated on FIREBASE_WEB_API_KEY) when RESEND_API_KEY isn't set yet,
- * so this doesn't disable password reset while Resend is still being set up.
+ * There is no fallback to Firebase's own REST-triggered send: this is the
+ * only delivery path, gated purely on isEmailConfigured() (SMTP_* env vars).
+ * If SMTP isn't configured, no email goes out and the caller is told so.
  *
  * `continueUrl`, if given, is where the AuthAction page sends the user back
  * to afterward -- the caller (forgotPassword below) is expected to validate
@@ -139,88 +139,46 @@ function extractOobCode(firebaseGeneratedLink: string): string | null {
  * without leaking whether the address has an account.
  */
 export const sendFirebasePasswordResetEmail = async (email: string, continueUrl?: string): Promise<boolean> => {
-  if (isEmailConfigured()) {
-    try {
-      const firebaseLink = await admin.auth().generatePasswordResetLink(email);
-      const oobCode = extractOobCode(firebaseLink);
-      if (!oobCode) {
-        console.error('generatePasswordResetLink returned a link with no oobCode:', firebaseLink);
-        return false;
-      }
-      return await sendPasswordResetEmail(email, buildAuthActionLink('resetPassword', oobCode, continueUrl));
-    } catch (err) {
-      console.error('Failed to generate/send password reset email via Resend:', err);
-      return false;
-    }
-  }
-
-  if (!isFirebasePasswordApiConfigured()) {
-    console.error('Password reset requested but neither RESEND_API_KEY nor FIREBASE_WEB_API_KEY is set -- no email can be sent.');
+  if (!isEmailConfigured()) {
+    console.error('Password reset requested but SMTP is not configured -- no email can be sent.');
     return false;
   }
   try {
-    const { ok, data } = await identityToolkit('sendOobCode', {
-      requestType: 'PASSWORD_RESET',
-      email,
-      ...(continueUrl ? { continueUrl } : {}),
-    });
-    if (!ok) {
-      console.error('Firebase sendOobCode failed:', data?.error?.message || data);
+    const firebaseLink = await admin.auth().generatePasswordResetLink(email);
+    const oobCode = extractOobCode(firebaseLink);
+    if (!oobCode) {
+      console.error('generatePasswordResetLink returned a link with no oobCode:', firebaseLink);
       return false;
     }
-    return true;
+    return await sendPasswordResetEmail(email, buildAuthActionLink('resetPassword', oobCode, continueUrl));
   } catch (err) {
-    console.error('Firebase sendOobCode threw:', err);
+    console.error('Failed to generate/send password reset email:', err);
     return false;
   }
 };
 
 /**
- * Sends a verify-email email. Same Resend-first, Firebase-REST-fallback
- * design as sendFirebasePasswordResetEmail above -- see its doc comment for
- * why. The REST fallback needs `idToken` because VERIFY_EMAIL (unlike
- * PASSWORD_RESET) operates on "the currently authenticated user," not an
- * arbitrary address; the caller (resendVerificationEmail below) already has
- * one, since proving control of the account is exactly what that endpoint
- * requires before sending anything.
+ * Sends a verify-email email. Same design as sendFirebasePasswordResetEmail
+ * above -- see its doc comment for why delivery is taken over from Firebase.
  */
 export const sendFirebaseVerificationEmail = async (
   email: string,
-  idToken: string,
   continueUrl?: string
 ): Promise<boolean> => {
-  if (isEmailConfigured()) {
-    try {
-      const firebaseLink = await admin.auth().generateEmailVerificationLink(email);
-      const oobCode = extractOobCode(firebaseLink);
-      if (!oobCode) {
-        console.error('generateEmailVerificationLink returned a link with no oobCode:', firebaseLink);
-        return false;
-      }
-      return await sendVerificationEmail(email, buildAuthActionLink('verifyEmail', oobCode, continueUrl));
-    } catch (err) {
-      console.error('Failed to generate/send verification email via Resend:', err);
-      return false;
-    }
-  }
-
-  if (!isFirebasePasswordApiConfigured()) {
-    console.error('Verification email requested but neither RESEND_API_KEY nor FIREBASE_WEB_API_KEY is set -- no email can be sent.');
+  if (!isEmailConfigured()) {
+    console.error('Verification email requested but SMTP is not configured -- no email can be sent.');
     return false;
   }
   try {
-    const { ok, data } = await identityToolkit('sendOobCode', {
-      requestType: 'VERIFY_EMAIL',
-      idToken,
-      ...(continueUrl ? { continueUrl } : {}),
-    });
-    if (!ok) {
-      console.error('Firebase sendOobCode failed:', data?.error?.message || data);
+    const firebaseLink = await admin.auth().generateEmailVerificationLink(email);
+    const oobCode = extractOobCode(firebaseLink);
+    if (!oobCode) {
+      console.error('generateEmailVerificationLink returned a link with no oobCode:', firebaseLink);
       return false;
     }
-    return true;
+    return await sendVerificationEmail(email, buildAuthActionLink('verifyEmail', oobCode, continueUrl));
   } catch (err) {
-    console.error('Firebase sendOobCode threw:', err);
+    console.error('Failed to generate/send verification email:', err);
     return false;
   }
 };

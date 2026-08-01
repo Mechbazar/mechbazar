@@ -128,29 +128,28 @@ export const env = {
   EXOTEL_CALLER_ID: process.env.EXOTEL_CALLER_ID || '',
   EXOTEL_SUBDOMAIN: process.env.EXOTEL_SUBDOMAIN || 'api.exotel.com',
 
-  // ---- Transactional email (Resend) ----
-  // Only RESEND_API_KEY gates sending -- see services/email.service.ts. When
-  // unset, every send resolves to an EmailLog row with status SKIPPED instead
-  // of throwing; the order/verify-email/reset-password flow that triggered it
-  // still completes normally (verify-email/reset-password fall back to
-  // Firebase's own send -- see utils/firebasePassword.ts).
-  RESEND_API_KEY: process.env.RESEND_API_KEY || '',
-  // "Name <address>" or a bare address. Must be a verified sender/domain in
-  // the Resend dashboard, or every send is rejected regardless of the API key.
-  EMAIL_FROM: process.env.EMAIL_FROM || 'MechBazar <orders@mechbazar.com>',
-  // Optional -- signing secret for Resend's delivery-tracking webhook
-  // (routes/email.routes.ts). Resend Dashboard -> Webhooks -> create one
-  // pointed at POST /api/email/webhook, subscribed to email.delivered and
-  // email.bounced. Without it the webhook route responds 200 but does not
-  // process the payload (an unverified webhook cannot be trusted to update
-  // EmailLog rows).
-  RESEND_WEBHOOK_SECRET: process.env.RESEND_WEBHOOK_SECRET || '',
+  // ---- Transactional email (Hostinger SMTP via Nodemailer) ----
+  // All four SMTP_* vars gate sending -- see services/email.service.ts. When
+  // any is unset, every send resolves to an EmailLog row with status SKIPPED
+  // instead of throwing; the order/verify-email/reset-password flow that
+  // triggered it still completes normally, just without mail going out.
+  SMTP_HOST: process.env.SMTP_HOST || 'smtp.hostinger.com',
+  SMTP_PORT: Number(process.env.SMTP_PORT) || 465,
+  // The full mailbox address (e.g. no-reply@mechbazar.com), used both to
+  // authenticate and, unless EMAIL_FROM overrides it, as the From address.
+  SMTP_USER: process.env.SMTP_USER || '',
+  SMTP_PASS: process.env.SMTP_PASS || '',
+  // "Name <address>" or a bare address. The address portion should normally
+  // match SMTP_USER -- Hostinger's mail servers reject or rewrite a From that
+  // doesn't belong to the authenticated mailbox.
+  EMAIL_FROM: process.env.EMAIL_FROM || 'MechBazar <no-reply@mechbazar.com>',
 };
 
-export const isEmailConfigured = (): boolean => Boolean(env.RESEND_API_KEY);
+export const isEmailConfigured = (): boolean =>
+  Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
 
 if (!isEmailConfigured()) {
-  console.warn('[WARN] RESEND_API_KEY not set -- transactional email (order confirmations, verify-email, password reset) will fall back to degraded/Firebase-only delivery. See services/email.service.ts and utils/firebasePassword.ts.');
+  console.warn('[WARN] SMTP_HOST/SMTP_USER/SMTP_PASS not fully set -- transactional email (order confirmations, verify-email, password reset) is disabled; those flows still complete normally, just without sending mail.');
 }
 
 if (!env.GOOGLE_MAPS_SERVER_API_KEY) {

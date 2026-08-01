@@ -16,7 +16,6 @@ import {
   setFirebasePassword,
   ensureFirebaseAccount,
   reconcilePasswordAfterFirebaseReset,
-  isFirebasePasswordApiConfigured,
 } from '../utils/firebasePassword';
 import { sanitizeUser } from '../utils/sanitizeUser';
 import { isEmailConfigured } from '../config/env';
@@ -425,12 +424,10 @@ export const changePassword = async (req: AuthRequest, res: Response): Promise<v
 /**
  * Starts a self-service password reset.
  *
- * Delivery is Firebase's: it owns a verified mail channel for this project and
- * the backend has no mailer of any kind (no SMTP, SendGrid, SES or Twilio
- * dependency exists). That is why this endpoint hands off rather than
- * generating its own token -- a locally-minted reset code would have no way to
- * reach the user, which is exactly how apps/admin-mobile ended up shipping a
- * screen that claimed to have sent a link it never sent.
+ * Generates the reset link via the Firebase Admin SDK and delivers it
+ * ourselves through Hostinger SMTP (see utils/firebasePassword.ts and
+ * services/email.service.ts) to our own AuthAction page, rather than letting
+ * Firebase's automatic send reach its own hosted action page.
  *
  * Always answers 200 with the same message. Reporting "no account with that
  * email" would turn this into an account-enumeration oracle, and it is the one
@@ -448,15 +445,13 @@ export const forgotPassword = async (req: Request, res: Response): Promise<void>
       return;
     }
 
-    // Said plainly, before anything else. If neither delivery path is
-    // configured then no email can be sent for any address, so admitting it
-    // reveals nothing about who has an account -- and the alternative is
-    // answering "a reset link has been sent" to every caller forever, which
-    // is the exact failure this endpoint replaced. sendFirebasePasswordResetEmail
-    // prefers Resend (isEmailConfigured) and falls back to the Firebase REST
-    // path (isFirebasePasswordApiConfigured) -- either being ready is enough.
-    if (!isEmailConfigured() && !isFirebasePasswordApiConfigured()) {
-      console.error('POST /auth/forgot-password called but neither RESEND_API_KEY nor FIREBASE_WEB_API_KEY is set; see utils/firebasePassword.ts');
+    // Said plainly, before anything else. If SMTP isn't configured then no
+    // email can be sent for any address, so admitting it reveals nothing
+    // about who has an account -- and the alternative is answering "a reset
+    // link has been sent" to every caller forever, which is the exact
+    // failure this endpoint replaced.
+    if (!isEmailConfigured()) {
+      console.error('POST /auth/forgot-password called but SMTP is not configured; see config/env.ts');
       res.status(503).json({
         error: 'Password reset is not available right now. Please contact support to have your password reset.',
       });
@@ -545,7 +540,7 @@ export const resendVerificationEmail = async (req: Request, res: Response): Prom
     }
 
     const continueUrl = sanitizeContinueUrl(req.body?.continueUrl);
-    const sent = await sendFirebaseVerificationEmail(email, idToken, continueUrl);
+    const sent = await sendFirebaseVerificationEmail(email, continueUrl);
     if (!sent) {
       console.error(`Failed to send verification email for ${email}`);
     }
