@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useDispatch, useSelector } from 'react-redux';
+import { RecaptchaVerifier, signInWithPhoneNumber, type ConfirmationResult } from 'firebase/auth';
 import { loginSuccess, updateVendorProfile } from '../store/slices/authSlice';
 import type { RootState } from '../store';
 import { Store, User, Building, Landmark, FileText, ArrowRight, CheckCircle, MapPin, Loader2 } from 'lucide-react';
 import { Button, Alert, Input, Logo } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
+import { auth as firebaseAuth } from '../config/firebase';
+import { mapFirebaseAuthError } from '../utils/firebaseErrors';
 import { reverseGeocode } from '../services/geocode.service';
 import type { GeocodeSuccess } from '../services/geocode.service';
 import AddressMapPicker from '../components/maps/AddressMapPicker';
@@ -25,6 +28,18 @@ export default function Register() {
 
   // Form States
   const [personal, setPersonal] = useState({ name: '', phone: '', email: '', password: '' });
+
+  // Phone must be proven via Firebase phone auth before /vendors/register will
+  // accept it (see vendor.controller.ts's registerPersonal) -- otherwise
+  // anyone could type in someone else's number as a vendor. `otpSent` toggles
+  // the submit button between "Send OTP" and the real "Continue" action;
+  // `confirmationResultRef` holds the pending Firebase phone-auth challenge
+  // between the send and confirm steps.
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null);
+  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
   const [business, setBusiness] = useState({
     storeName: '', gstNumber: '', panNumber: '', businessType: 'RETAIL',
     addressLine1: '', addressLine2: '', city: '', state: '', pincode: '',
@@ -93,13 +108,35 @@ export default function Register() {
     setStep(initialStep);
   }, [initialStep]);
 
+  // Counts down the resend cooldown once a second while it's positive.
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setTimeout(() => setResendCooldown((s) => s - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCooldown]);
+
+  // Firebase reuses this widget across sends; only tear it down when the page
+  // itself goes away, not between renders.
+  useEffect(() => {
+    return () => {
+      recaptchaVerifierRef.current?.clear();
+      recaptchaVerifierRef.current = null;
+    };
+  }, []);
+
   const updateStep = (newStep: string) => {
     setSearchParams({ step: newStep });
     setStep(newStep);
   };
 
-  const handlePersonalSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const getRecaptchaVerifier = (): RecaptchaVerifier => {
+    if (!recaptchaVerifierRef.current) {
+      recaptchaVerifierRef.current = new RecaptchaVerifier(firebaseAuth, 'vendor-register-recaptcha', { size: 'invisible' });
+    }
+    return recaptchaVerifierRef.current;
+  };
+
+  const handleSendOtp = async () => {
     const phoneOnly = personal.phone.replace(/\D/g, '');
     if (phoneOnly.length < 10) {
       setError('Please enter a valid 10-digit phone number.');
@@ -109,18 +146,66 @@ export default function Register() {
     setLoading(true);
     setError('');
     try {
+      const verifier = getRecaptchaVerifier();
+      const result = await signInWithPhoneNumber(firebaseAuth, `+91${phoneOnly.slice(-10)}`, verifier);
+      confirmationResultRef.current = result;
+      setOtpSent(true);
+      setResendCooldown(60);
+    } catch (err: any) {
+      // A failed challenge can't be reused for the next attempt -- rebuild it
+      // from scratch on the next "Send OTP" click.
+      recaptchaVerifierRef.current?.clear();
+      recaptchaVerifierRef.current = null;
+      setError(err?.code?.startsWith?.('auth/') ? mapFirebaseAuthError(err.code) : 'Failed to send OTP. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangeNumber = () => {
+    setOtpSent(false);
+    setOtpCode('');
+    setResendCooldown(0);
+    confirmationResultRef.current = null;
+  };
+
+  const handlePersonalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!otpSent) {
+      await handleSendOtp();
+      return;
+    }
+
+    if (!otpCode || otpCode.length < 6) {
+      setError('Please enter the 6-digit OTP sent to your phone.');
+      return;
+    }
+
+    const phoneOnly = personal.phone.replace(/\D/g, '');
+    setLoading(true);
+    setError('');
+    try {
+      const credential = await confirmationResultRef.current!.confirm(otpCode);
+      const idToken = await credential.user.getIdToken();
+
       const response = await axios.post(`${API_URL}/vendors/register`, {
         ...personal,
         phone: phoneOnly,
+        otp: idToken,
       });
       dispatch(loginSuccess(response.data));
       updateStep('business');
     } catch (err: any) {
-      setError(
-        err.response?.data?.error ||
-        err.message ||
-        'Failed to register. Please check your details and try again.'
-      );
+      if (err?.code?.startsWith?.('auth/')) {
+        setError(mapFirebaseAuthError(err.code));
+      } else {
+        setError(
+          err.response?.data?.error ||
+          err.message ||
+          'Failed to register. Please check your details and try again.'
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -252,12 +337,46 @@ export default function Register() {
             <form onSubmit={handlePersonalSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input label="Full Name" type="text" required value={personal.name} onChange={e => setPersonal({...personal, name: e.target.value})} />
-                <Input label="Phone Number" type="tel" required value={personal.phone} onChange={e => setPersonal({...personal, phone: e.target.value})} />
+                <Input label="Phone Number" type="tel" required disabled={otpSent} value={personal.phone} onChange={e => setPersonal({...personal, phone: e.target.value})} />
                 <Input label="Email Address" type="email" required value={personal.email} onChange={e => setPersonal({...personal, email: e.target.value})} />
                 <Input label="Password" type="password" required value={personal.password} onChange={e => setPersonal({...personal, password: e.target.value})} />
               </div>
+
+              {otpSent && (
+                <div>
+                  <Input
+                    label="Enter OTP"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    required
+                    value={otpCode}
+                    onChange={e => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                    helperText={`OTP sent to ${personal.phone}`}
+                  />
+                  <div className="flex items-center justify-between mt-2 text-sm">
+                    <button type="button" onClick={handleChangeNumber} className="text-gray-400 hover:text-white">
+                      Change number
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSendOtp}
+                      disabled={resendCooldown > 0 || loading}
+                      className="text-brand-secondary disabled:text-gray-500 disabled:cursor-not-allowed"
+                    >
+                      {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Invisible reCAPTCHA challenge Firebase Phone Auth attaches
+                  itself to -- renders nothing, but must exist in the DOM
+                  before signInWithPhoneNumber is called. */}
+              <div id="vendor-register-recaptcha" />
+
               <Button type="submit" isLoading={loading} className="w-full">
-                Continue to Business Details <ArrowRight className="ml-2 w-5 h-5" />
+                {otpSent ? <>Continue to Business Details <ArrowRight className="ml-2 w-5 h-5" /></> : 'Send OTP'}
               </Button>
               <p className="text-center text-sm text-gray-400 mt-4">Already have an account? <Link to="/login" className="text-brand-secondary">Login</Link></p>
             </form>

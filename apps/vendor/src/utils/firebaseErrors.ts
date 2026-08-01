@@ -23,6 +23,15 @@ export function mapFirebaseAuthError(code: string | undefined): string {
     case 'auth/invalid-action-code':
     case 'auth/expired-action-code':
       return 'This link has expired or already been used. Request a new verification email and use the latest one.';
+    case 'auth/invalid-phone-number':
+    case 'auth/missing-phone-number':
+      return 'Please enter a valid 10-digit phone number.';
+    case 'auth/invalid-verification-code':
+      return 'Incorrect OTP. Please check the code and try again.';
+    case 'auth/code-expired':
+      return 'This OTP has expired. Please request a new one.';
+    case 'auth/quota-exceeded':
+      return 'SMS limit reached for now. Please try again later.';
     default:
       return 'Something went wrong. Please try again.';
   }
