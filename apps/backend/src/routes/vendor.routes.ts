@@ -10,6 +10,7 @@ import {
   updateBusinessDetails,
   updateBankDetails,
   addDocument,
+  getVendorDocumentFile,
   submitForApproval,
   getMyProfile,
   getMyProducts,
@@ -29,6 +30,7 @@ import {
   updateMyProfile,
 } from '../controllers/vendor.controller';
 import { authenticate, authorize } from '../middlewares/auth';
+import { vendorUpload } from '../middlewares/vendorUpload';
 import { Role } from '@prisma/client';
 
 const router = Router();
@@ -43,7 +45,12 @@ router.post('/login', loginVendor);
 router.post('/register', registerPersonal);
 router.post('/business', authenticate, authorize([Role.VENDOR]), updateBusinessDetails);
 router.post('/bank', authenticate, authorize([Role.VENDOR]), updateBankDetails);
-router.post('/documents', authenticate, authorize([Role.VENDOR]), addDocument);
+router.post('/documents', authenticate, authorize([Role.VENDOR]), vendorUpload.single('file'), addDocument);
+// No authorize() here -- matches riders.routes.ts's equivalent file route.
+// The owner-or-admin check happens inside getVendorDocumentFile itself,
+// since a broader set of admin-side roles (support/ops, not just the
+// vendor-management admins list below) legitimately need to view KYC docs.
+router.get('/:vendorId/documents/:documentId/file', authenticate, getVendorDocumentFile);
 router.post('/submit', authenticate, authorize([Role.VENDOR]), submitForApproval);
 
 // Profile

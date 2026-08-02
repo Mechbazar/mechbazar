@@ -7,7 +7,7 @@ import {
   User, Store, FileText, CreditCard, Save, CheckCircle, Building2, MapPin, Shield, Loader2
 } from 'lucide-react';
 import { Button, Badge, Input } from '@mechbazar/shared/web';
-import { API_URL, resolveUploadUrl } from '../config/api';
+import { API_URL } from '../config/api';
 import { reverseGeocode } from '../services/geocode.service';
 import type { GeocodeSuccess } from '../services/geocode.service';
 import AddressMapPicker from '../components/maps/AddressMapPicker';
@@ -29,6 +29,19 @@ export default function Profile() {
   const [locating, setLocating] = useState(false);
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
+
+  // Document files are behind an authenticated route (never a public URL,
+  // unlike product images) -- a plain <a href> can't carry the Authorization
+  // header, so fetch as a blob with the token and open that instead. Mirrors
+  // apps/admin/src/pages/Riders.tsx's identical viewDocument.
+  const viewDocument = async (documentId: string) => {
+    const res = await axios.get(`${API_URL}/vendors/${vendorProfile?.id}/documents/${documentId}/file`, {
+      headers: { Authorization: `Bearer ${token}` },
+      responseType: 'blob',
+    });
+    const url = URL.createObjectURL(res.data);
+    window.open(url, '_blank');
+  };
 
   useEffect(() => {
     setForm({
@@ -266,9 +279,7 @@ export default function Profile() {
                 <Badge variant={doc.status === 'APPROVED' ? 'success' : doc.status === 'REJECTED' ? 'danger' : 'warning'} className="!rounded-lg">
                   {doc.status}
                 </Badge>
-                {doc.url && (
-                  <a href={resolveUploadUrl(doc.url)} target="_blank" rel="noreferrer" className="text-xs text-brand-secondary hover:text-brand-accent underline">View</a>
-                )}
+                <button type="button" onClick={() => viewDocument(doc.id)} className="text-xs text-brand-secondary hover:text-brand-accent underline">View</button>
               </div>
             ))}
           </div>

@@ -34,15 +34,17 @@ export const vendorService = {
     const response = await apiClient.post('/vendors/bank', data);
     return response.data;
   },
-  addDocument: async (type: string, url: string) => {
-    const response = await apiClient.post('/vendors/documents', { type, url });
-    return response.data;
-  },
-  // Uploads the file then attaches it as a KYC document in one call, same
-  // two-step sequence the web Register page does by hand (POST /upload -> POST /vendors/documents).
+  // Multipart upload straight to /vendors/documents -- the backend stores
+  // the bytes in Postgres (VendorDocument.fileData), never a public URL.
+  // Mirrors riderService/technicianService's identical KYC-document upload.
   uploadDocument: async (type: string, fileUri: string, fileType: string, fileName: string) => {
-    const upload = await vendorService.uploadImage(fileUri, fileType, fileName);
-    return vendorService.addDocument(type, upload.url);
+    const formData = new FormData();
+    formData.append('type', type);
+    formData.append('file', { uri: fileUri, type: fileType, name: fileName } as any);
+    const response = await apiClient.post('/vendors/documents', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
   },
   submitForApproval: async () => {
     const response = await apiClient.post('/vendors/submit');

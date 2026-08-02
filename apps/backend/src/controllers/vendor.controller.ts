@@ -4,12 +4,12 @@ import { transitionSettlement, SettlementAlreadyFinalisedError, SettlementChange
 import bcrypt from 'bcrypt';
 import { generateToken } from '../utils/jwt';
 import { AuthRequest } from '../middlewares/auth';
-import { restoreOrderStock, creditOrderDelivery } from './order.controller';
+import { restoreOrderStock, creditOrderDelivery, notifyWalletCredits } from './order.controller';
 import { notifyUser } from '../utils/notify';
 import { sanitizeUser, sanitizeUsers, sanitizeOrders, stripDeliveryOtp, stripDeliveryOtps } from '../utils/sanitizeUser';
 import { recordAuditLog } from '../utils/auditLog';
 import { verifyFirebaseIdTokenAndResolveUser, FirebaseAuthError, FirebaseAuthErrorCode } from '../utils/firebaseAuth';
-import { reconcilePasswordAfterFirebaseReset } from '../utils/firebasePassword';
+import { reconcilePasswordAfterFirebaseReset, sendFirebaseVerificationEmail } from '../utils/firebasePassword';
 import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
 import firebaseAdmin from '../config/firebase';
 import prisma from '../config/prisma';
@@ -33,6 +33,18 @@ const respondToFirebaseAuthError = (res: Response, err: FirebaseAuthError): void
   };
   res.status(statusByCode[err.code]).json(bodyByCode[err.code]);
 };
+
+// Document files are private KYC content (see VendorDocument.fileData in
+// schema.prisma) -- fileData is excluded from every list/profile response
+// below and can only be fetched back out through getVendorDocumentFile.
+// Mirrors rider.controller.ts's DOCUMENT_LIST_SELECT.
+const VENDOR_DOCUMENT_LIST_SELECT = { id: true, vendorId: true, type: true, status: true, uploadedAt: true, mimeType: true };
+
+// Mirrors rider.controller.ts's ADMIN_RIDER_ROLES.
+const ADMIN_VENDOR_ROLES = new Set<Role>([
+  Role.ADMIN, Role.SUPER_ADMIN, Role.OPERATIONS_MANAGER,
+  Role.VENDOR_MANAGER, Role.CUSTOMER_SUPPORT,
+]);
 
 // ----------------------------------------------------
 // VENDOR PORTAL APIs (Used by Vendor Frontend)
@@ -220,6 +232,11 @@ export const registerPersonal = async (req: Request, res: Response): Promise<voi
         try {
           const firebaseUser = await firebaseAdmin.auth().createUser({ uid: user.id, email, password, emailVerified: false });
           user = await prisma.user.update({ where: { id: user.id }, data: { firebaseUid: firebaseUser.uid } });
+          // Fire-and-forget, same as order confirmation elsewhere -- previously
+          // this only ever went out from an explicit "resend" action on a
+          // vendor-web page the vendor might not land on right away, so a new
+          // vendor could sit unverified with no prompting at all.
+          sendFirebaseVerificationEmail(email);
         } catch (err) {
           console.error('Failed to create Firebase account for attached vendor:', err);
         }
@@ -279,6 +296,11 @@ export const registerPersonal = async (req: Request, res: Response): Promise<voi
           where: { id: user.id },
           data: { firebaseUid: firebaseUser.uid },
         });
+        // Fire-and-forget, same as order confirmation elsewhere -- previously
+        // this only ever went out from an explicit "resend" action on a
+        // vendor-web page the vendor might not land on right away, so a new
+        // vendor could sit unverified with no prompting at all.
+        sendFirebaseVerificationEmail(email);
       } catch (err) {
         console.error('Failed to create Firebase account for new vendor:', err);
       }
@@ -377,11 +399,19 @@ export const updateBankDetails = async (req: Request, res: Response): Promise<vo
   }
 };
 
-export const addDocument = async (req: Request, res: Response): Promise<void> => {
+export const addDocument = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).user.userId;
-    const { type, url } = req.body;
+    const { type } = req.body;
+    if (!type) {
+      res.status(400).json({ error: 'Document type is required' });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: 'No file uploaded' });
+      return;
+    }
 
+    const userId = req.user!.userId;
     const vendor = await prisma.vendor.findUnique({ where: { userId } });
     if (!vendor) {
       res.status(404).json({ error: 'Vendor not found' });
@@ -392,14 +422,57 @@ export const addDocument = async (req: Request, res: Response): Promise<void> =>
       data: {
         vendorId: vendor.id,
         type,
-        url
+        filePath: req.file.originalname,
+        fileData: req.file.buffer,
+        mimeType: req.file.mimetype,
       }
     });
 
-    res.status(200).json(document);
+    res.status(200).json({ ...document, filePath: undefined, fileData: undefined });
   } catch (error) {
     console.error('Error adding document:', error);
     res.status(500).json({ error: 'Failed to add document' });
+  }
+};
+
+// Authenticated access only -- the owning vendor or an admin. Mirrors
+// rider.controller.ts's getRiderDocumentFile: this is the *only* way to fetch
+// a vendor KYC document's bytes back out, since fileData is stored in
+// Postgres, never on disk or in public object storage.
+export const getVendorDocumentFile = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const vendorId = String(req.params.vendorId);
+    const documentId = String(req.params.documentId);
+    const document = await prisma.vendorDocument.findUnique({ where: { id: documentId } });
+    if (!document || document.vendorId !== vendorId) {
+      res.status(404).json({ error: 'Document not found' });
+      return;
+    }
+
+    const { userId, role } = req.user!;
+    const isAdmin = ADMIN_VENDOR_ROLES.has(role as Role);
+    const isOwner = !isAdmin && (await prisma.vendor.findUnique({ where: { userId } }))?.id === vendorId;
+    if (!isAdmin && !isOwner) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
+    if (document.fileData) {
+      res.setHeader('Content-Type', document.mimeType || 'application/octet-stream');
+      res.send(document.fileData);
+      return;
+    }
+    // Pre-migration row that hasn't been backfilled yet (see
+    // prisma/backfill-vendor-documents.ts) -- fall back to its old public
+    // URL rather than 404ing on every document uploaded before this change.
+    if (document.url) {
+      res.redirect(document.url);
+      return;
+    }
+    res.status(404).json({ error: 'File not found' });
+  } catch (error) {
+    console.error('Error fetching vendor document:', error);
+    res.status(500).json({ error: 'Failed to fetch document' });
   }
 };
 
@@ -429,7 +502,7 @@ export const getMyProfile = async (req: Request, res: Response): Promise<void> =
       where: { userId },
       include: {
         user: true,
-        documents: true,
+        documents: { select: VENDOR_DOCUMENT_LIST_SELECT },
         bankAccounts: true,
       }
     });
@@ -667,7 +740,7 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
     const isBeingClosed = status === OrderStatus.CANCELLED || status === OrderStatus.RETURNED;
     const isBeingDelivered = status === OrderStatus.DELIVERED && order.status !== OrderStatus.DELIVERED;
 
-    const updatedOrder = await prisma.$transaction(async (tx) => {
+    const { updatedOrder, credits } = await prisma.$transaction(async (tx) => {
       // Atomically claim the transition -- only matches if the order's status
       // is still what we just read, re-checked under Postgres's row lock at
       // UPDATE time. Closes the race where a concurrent admin/vendor status
@@ -693,11 +766,9 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       // just never happen for these orders. order.items is already scoped to
       // this vendor's own products, so this only ever credits this vendor's
       // own share (plus the assigned rider, if any).
-      if (isBeingDelivered) {
-        await creditOrderDelivery(tx, order);
-      }
+      const credits = isBeingDelivered ? await creditOrderDelivery(tx, order) : [];
 
-      return tx.order.findUniqueOrThrow({ where: { id } });
+      return { updatedOrder: await tx.order.findUniqueOrThrow({ where: { id } }), credits };
     });
 
     notifyUser(
@@ -706,6 +777,7 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       `Your order #${id.slice(0, 8)} is now ${updatedOrder.status}.`,
       { orderId: id, status: updatedOrder.status }
     );
+    notifyWalletCredits(credits);
 
     res.status(200).json(stripDeliveryOtp(updatedOrder));
   } catch (error: any) {
@@ -841,7 +913,7 @@ export const getVendors = async (req: Request, res: Response): Promise<void> => 
       include: {
         vendorProfile: {
           include: {
-            documents: true,
+            documents: { select: VENDOR_DOCUMENT_LIST_SELECT },
             bankAccounts: true
           }
         },
@@ -902,7 +974,8 @@ export const updateSettlementStatus = async (req: Request, res: Response): Promi
       (tx) => tx.vendor.update({
         where: { id: settlement.vendorId },
         data: { walletBalance: { increment: settlement.amount } },
-      }).then(() => {})
+      }).then(() => {}),
+      async () => (await prisma.vendor.findUnique({ where: { id: settlement.vendorId }, select: { userId: true } }))?.userId ?? null
     );
 
     res.status(200).json(updatedSettlement);

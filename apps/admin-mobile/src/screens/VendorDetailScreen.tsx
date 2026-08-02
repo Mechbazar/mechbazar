@@ -1,8 +1,17 @@
-import React, { useState } from 'react';
-import { View, ScrollView, StyleSheet, Alert, Linking, Modal, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, ScrollView, StyleSheet, Alert, Modal, TouchableOpacity, Image } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { colors, Typography, Card, Button, Input, Badge, Loader, adminService, resolveUploadUrl } from '@mechbazar/shared';
+import * as SecureStore from 'expo-secure-store';
+import { colors, Typography, Card, Button, Input, Badge, Loader, adminService, getApiBaseUrl } from '@mechbazar/shared';
+
+// Vendor KYC documents are behind an authenticated route (never a public
+// URL, same as rider/technician docs) -- Image supports a `headers` option
+// on its uri source, so the token can be attached directly instead of
+// needing a blob/download step. Mirrors RiderDetailScreen.tsx's identical
+// getDocumentUrl/preview-modal pattern.
+const getDocumentUrl = (vendorId: string, documentId: string) =>
+  `${getApiBaseUrl().replace(/\/api\/?$/, '')}/api/vendors/${vendorId}/documents/${documentId}/file`;
 
 
 const getStatusMeta = (status: string): { label: string; variant: 'success' | 'warning' | 'danger' | 'secondary' } => {
@@ -27,6 +36,12 @@ export const VendorDetailScreen = () => {
   const { vendorId } = route.params;
   const [editVisible, setEditVisible] = useState(false);
   const [editForm, setEditForm] = useState<any>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<any | null>(null);
+
+  useEffect(() => {
+    SecureStore.getItemAsync('token').then(setToken);
+  }, []);
 
   const { data: vendors, isLoading } = useQuery({
     queryKey: ['admin-vendors'],
@@ -119,7 +134,7 @@ export const VendorDetailScreen = () => {
           <Typography variant="body" style={{ color: colors.textSecondary }}>No documents uploaded.</Typography>
         ) : (
           profile.documents.map((doc: any) => (
-            <TouchableOpacity key={doc.id} onPress={() => Linking.openURL(resolveUploadUrl(doc.url)!)} style={styles.row}>
+            <TouchableOpacity key={doc.id} onPress={() => setPreviewDoc(doc)} style={styles.row}>
               <Typography variant="body" style={{ color: colors.navy, fontWeight: '600' }}>{doc.type}</Typography>
               <Typography variant="caption">{doc.status}</Typography>
             </TouchableOpacity>
@@ -152,6 +167,18 @@ export const VendorDetailScreen = () => {
           )}
         </ScrollView>
       </Modal>
+
+      <Modal visible={!!previewDoc} animationType="fade" transparent onRequestClose={() => setPreviewDoc(null)}>
+        <TouchableOpacity style={styles.previewBackdrop} activeOpacity={1} onPress={() => setPreviewDoc(null)}>
+          {previewDoc && token && (
+            <Image
+              source={{ uri: getDocumentUrl(profile.id, previewDoc.id), headers: { Authorization: `Bearer ${token}` } }}
+              style={styles.previewImage}
+              resizeMode="contain"
+            />
+          )}
+        </TouchableOpacity>
+      </Modal>
     </ScrollView>
   );
 };
@@ -159,4 +186,6 @@ export const VendorDetailScreen = () => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
+  previewBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' },
+  previewImage: { width: '90%', height: '70%' },
 });

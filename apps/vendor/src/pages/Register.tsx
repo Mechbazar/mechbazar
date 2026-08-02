@@ -244,22 +244,19 @@ export default function Register() {
     }
   };
 
+  // Single multipart POST straight to /vendors/documents -- the backend
+  // stores the bytes in Postgres (VendorDocument.fileData), never a public
+  // URL, so there's no separate /upload step to attach a url from afterward.
   const uploadFile = async (file: File, type: string) => {
     const formData = new FormData();
+    formData.append('type', type);
     formData.append('file', file);
-    
-    const uploadRes = await axios.post(`${API_URL}/upload`, formData, {
-      headers: { 
+
+    await axios.post(`${API_URL}/vendors/documents`, formData, {
+      headers: {
         'Content-Type': 'multipart/form-data',
         Authorization: `Bearer ${auth.token}`
       }
-    });
-
-    await axios.post(`${API_URL}/vendors/documents`, {
-      type,
-      url: uploadRes.data.url
-    }, {
-      headers: { Authorization: `Bearer ${auth.token}` }
     });
   };
 

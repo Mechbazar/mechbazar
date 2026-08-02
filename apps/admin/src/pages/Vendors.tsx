@@ -4,7 +4,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import { Store, Phone, Search, Plus, Eye, FileText, Landmark, Building, FileCheck, MapPin } from 'lucide-react';
 import { Button, Badge, Dialog, Input, Loader } from '@mechbazar/shared/web';
-import { API_URL, resolveUploadUrl } from '../config/api';
+import { API_URL } from '../config/api';
 import AddressMapPicker from '../components/maps/AddressMapPicker';
 import PlaceAutocompleteField from '../components/maps/PlaceAutocompleteField';
 import LocationMapView from '../components/maps/LocationMapView';
@@ -97,6 +97,19 @@ export default function Vendors() {
       placeId: result.placeId,
       formattedAddress: result.formattedAddress,
     }));
+  };
+
+  // Document files are behind an authenticated route (never a public URL) --
+  // a plain <a href> can't carry the Authorization header, so fetch as a
+  // blob with the token and open that instead. Mirrors this same file's
+  // Riders.tsx / MechanicsPage.tsx equivalents.
+  const viewDocument = async (vendorId: string, documentId: string) => {
+    const res = await axios.get(`${API_URL}/vendors/${vendorId}/documents/${documentId}/file`, {
+      headers: { Authorization: `Bearer ${token}` },
+      responseType: 'blob',
+    });
+    const url = URL.createObjectURL(res.data);
+    window.open(url, '_blank');
   };
 
   const handleOpenReviewModal = (vendor: any) => {
@@ -315,17 +328,16 @@ export default function Vendors() {
                 {activeVendor.vendorProfile.documents && activeVendor.vendorProfile.documents.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {activeVendor.vendorProfile.documents.map((doc: any) => (
-                      <a 
+                      <button
+                        type="button"
                         key={doc.id}
-                        href={resolveUploadUrl(doc.url)}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        onClick={() => viewDocument(activeVendor.vendorProfile.id, doc.id)}
                         className="flex flex-col items-center justify-center p-6 bg-brand-dark hover:bg-brand-primary/10 border border-brand-border hover:border-brand-primary rounded-xl transition-all group"
                       >
                         <FileText className="w-10 h-10 text-brand-muted group-hover:text-brand-primary mb-2 transition-colors" />
                         <span className="text-sm font-bold text-brand-light group-hover:text-brand-primary transition-colors">{doc.type}</span>
                         <span className="text-xs text-brand-muted mt-1 flex items-center"><Eye className="w-3 h-3 mr-1"/> View Document</span>
-                      </a>
+                      </button>
                     ))}
                   </div>
                 ) : (
