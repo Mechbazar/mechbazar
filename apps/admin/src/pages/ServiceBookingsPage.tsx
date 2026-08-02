@@ -156,7 +156,14 @@ export default function ServiceBookingsPage() {
   const handleAssign = async (technicianId: string) => {
     if (!assigningBooking) return;
     try {
-      await axios.post(`${API_URL}/services/bookings/${assigningBooking.id}/assign`, { technicianId }, { headers: { Authorization: `Bearer ${token}` } });
+      // Emergency jobs must go through the dispatch-aware endpoint (it also
+      // closes any still-open offer) -- the plain scheduled-booking endpoint
+      // rejects them outright. See jobAdmin.controller.ts's adminAssign vs.
+      // service.controller.ts's assignTechnician.
+      const endpoint = assigningBooking.isEmergency
+        ? `${API_URL}/jobs/admin/${assigningBooking.id}/assign`
+        : `${API_URL}/services/bookings/${assigningBooking.id}/assign`;
+      await axios.post(endpoint, { technicianId }, { headers: { Authorization: `Bearer ${token}` } });
       setAssigningBooking(null);
       fetchBookings();
     } catch (error: any) {
