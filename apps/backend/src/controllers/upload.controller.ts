@@ -31,7 +31,26 @@ export const uploadFile = async (req: Request, res: Response): Promise<void> => 
       return;
     }
 
-    const filename = uniqueFilename(req.file.mimetype);
+    // multer's fileFilter (upload.ts) only checks the client-supplied
+    // Content-Type header on the multipart part, which is trivially spoofed
+    // -- it can't do better, since the buffer isn't fully populated yet at
+    // that point in multer's stream. Now that the whole file is in memory,
+    // sniff its real signature and trust that over whatever the client
+    // claimed, both for the accept/reject decision and for the
+    // extension/content-type this file gets saved and served back under.
+    // file-type is a pure-ESM package; this project's output is CommonJS, so
+    // it must be brought in with a dynamic import rather than a static one
+    // (a static `import` here would try to `require()` it, which Node
+    // rejects for ESM-only packages).
+    const { fileTypeFromBuffer } = await import('file-type');
+    const detected = await fileTypeFromBuffer(req.file.buffer);
+    if (!detected || !(detected.mime in EXTENSION_BY_MIMETYPE)) {
+      res.status(400).json({ error: 'File content does not match an allowed type (JPEG, PNG, WEBP, PDF).' });
+      return;
+    }
+    const mimetype = detected.mime;
+
+    const filename = uniqueFilename(mimetype);
 
     // Checked first so that setting FIREBASE_STORAGE_BUCKET is enough to
     // switch uploads over to Firebase Storage without touching the local
@@ -41,7 +60,7 @@ export const uploadFile = async (req: Request, res: Response): Promise<void> => 
       const bucket = admin.storage().bucket(process.env.FIREBASE_STORAGE_BUCKET);
       const file = bucket.file(filename);
       await file.save(req.file.buffer, {
-        contentType: req.file.mimetype,
+        contentType: mimetype,
         // Matches storage.rules (`allow read: if true`) -- consumers of the
         // returned `url` (product images, avatars, etc.) already assume a
         // directly-loadable public URL, not a signed one.
@@ -50,7 +69,7 @@ export const uploadFile = async (req: Request, res: Response): Promise<void> => 
       res.status(200).json({
         url: `https://storage.googleapis.com/${bucket.name}/${filename}`,
         filename,
-        mimetype: req.file.mimetype,
+        mimetype,
         size: req.file.size,
       });
       return;
@@ -65,7 +84,7 @@ export const uploadFile = async (req: Request, res: Response): Promise<void> => 
     res.status(200).json({
       url: `/uploads/${filename}`,
       filename,
-      mimetype: req.file.mimetype,
+      mimetype,
       size: req.file.size,
     });
   } catch (error) {
