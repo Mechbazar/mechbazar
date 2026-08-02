@@ -86,15 +86,24 @@ type DeliveryCreditOrder = {
 // that transition. Previously only the rider's own endpoint credited anyone,
 // so an order the admin or a vendor set straight to DELIVERED (bypassing the
 // rider flow entirely) silently never paid the vendor for it.
+//
+// Returns who got credited so callers can notify them once their own
+// transaction commits -- previously this only ever notified the customer, so
+// a rider/vendor had no way to learn a wallet credit happened except by
+// polling their wallet balance.
 export const creditOrderDelivery = async (
   tx: Prisma.TransactionClient,
   order: DeliveryCreditOrder
-) => {
+): Promise<{ userId: string; amount: number }[]> => {
+  const credits: { userId: string; amount: number }[] = [];
+
   if (order.deliveryPartnerId) {
     await tx.deliveryPartner.update({
       where: { id: order.deliveryPartnerId },
       data: { walletBalance: { increment: order.deliveryFee } },
     });
+    const rider = await tx.deliveryPartner.findUnique({ where: { id: order.deliveryPartnerId }, select: { userId: true } });
+    if (rider) credits.push({ userId: rider.userId, amount: order.deliveryFee });
   }
 
   // An order can contain items from multiple vendors under one global status
@@ -112,6 +121,25 @@ export const creditOrderDelivery = async (
       where: { id: vendorId },
       data: { walletBalance: { increment: share } },
     });
+    const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { userId: true } });
+    if (vendor) credits.push({ userId: vendor.userId, amount: share });
+  }
+
+  return credits;
+};
+
+// Fire-and-forget notification for each wallet credit creditOrderDelivery
+// made -- called after the transaction that produced them has committed.
+// notifyUser already swallows its own errors. Exported for
+// vendor.controller.ts's updateOrderStatus, which shares creditOrderDelivery.
+export const notifyWalletCredits = (credits: { userId: string; amount: number }[]) => {
+  for (const credit of credits) {
+    notifyUser(
+      credit.userId,
+      'Wallet credited',
+      `Your wallet was credited ₹${credit.amount.toFixed(2)} for a delivered order.`,
+      { amount: credit.amount }
+    );
   }
 };
 
@@ -544,7 +572,7 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
     const isBeingClosed = status === 'CANCELLED' || status === 'RETURNED';
     const isBeingDelivered = status === 'DELIVERED' && existing.status !== 'DELIVERED';
 
-    const order = await prisma.$transaction(async (tx) => {
+    const { order, credits } = await prisma.$transaction(async (tx) => {
       // Atomically claim the transition: only matches if the order's status
       // is still what we just read, re-checked under Postgres's row lock at
       // UPDATE time -- not against the stale `existing.status` read above.
@@ -572,11 +600,9 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
       // assigned, or the rider's own app wasn't used) -- without this, the
       // rider/vendor wallet credit that normally happens in
       // updateMyDeliveryStatus would just never happen for these orders.
-      if (isBeingDelivered) {
-        await creditOrderDelivery(tx, existing);
-      }
+      const credits = isBeingDelivered ? await creditOrderDelivery(tx, existing) : [];
 
-      return tx.order.findUniqueOrThrow({ where: { id } });
+      return { order: await tx.order.findUniqueOrThrow({ where: { id } }), credits };
     });
 
     notifyUser(
@@ -585,6 +611,7 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
       `Your order #${id.slice(0, 8)} is now ${order.status}.`,
       { orderId: id, status: order.status }
     );
+    notifyWalletCredits(credits);
 
     res.status(200).json(stripDeliveryOtp(order));
   } catch (error: any) {
@@ -727,7 +754,7 @@ export const updateMyDeliveryStatus = async (req: AuthRequest, res: Response) =>
       return res.status(400).json({ error: 'issueReason is required when reporting a delivery issue' });
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const { updated, credits } = await prisma.$transaction(async (tx) => {
       // Atomically claim the transition: only matches if the order's status
       // is still what we just read, re-checked under Postgres's row lock at
       // UPDATE time -- not against the stale `order.status` read above.
@@ -754,11 +781,9 @@ export const updateMyDeliveryStatus = async (req: AuthRequest, res: Response) =>
       // Credit the rider's and vendors' wallets. RIDER_STATUS_FLOW has no
       // transitions out of DELIVERED, so this only ever fires once per order
       // (the atomic claim above additionally guards against a concurrent retry).
-      if (status === 'DELIVERED') {
-        await creditOrderDelivery(tx, order);
-      }
+      const credits = status === 'DELIVERED' ? await creditOrderDelivery(tx, order) : [];
 
-      return updatedOrder;
+      return { updated: updatedOrder, credits };
     });
 
     notifyUser(
@@ -767,6 +792,7 @@ export const updateMyDeliveryStatus = async (req: AuthRequest, res: Response) =>
       `Your order #${id.slice(0, 8)} is now ${updated.status}.`,
       { orderId: id, status: updated.status }
     );
+    notifyWalletCredits(credits);
 
     res.status(200).json(stripDeliveryOtp(updated));
   } catch (error: any) {

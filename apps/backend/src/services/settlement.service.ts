@@ -1,5 +1,6 @@
 import { SettlementStatus } from '@prisma/client';
 import prisma from '../config/prisma';
+import { notifyUser } from '../utils/notify';
 
 // VendorSettlement, RiderSettlement, and TechnicianSettlement are three
 // otherwise-unrelated payout ledgers (different owning entity, different
@@ -34,14 +35,18 @@ interface SettlementDelegate<T extends SettlementRow> {
  * concurrent/duplicated requests both crediting the wallet back for the same
  * settlement), and credits the owning wallet back if the transition is to
  * FAILED. `delegate` and `creditBackOnFailure` are the only model-specific
- * pieces each caller supplies.
+ * pieces each caller supplies; `resolveOwnerUserId` is the same idea for
+ * notifications -- this function doesn't know whether it's talking to a
+ * Vendor, DeliveryPartner, or ServiceTechnician, so it can't look up their
+ * User row itself.
  */
 export async function transitionSettlement<T extends SettlementRow>(
   settlement: T,
   status: unknown,
   transactionId: string | undefined,
   delegate: (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => SettlementDelegate<T>,
-  creditBackOnFailure: (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => Promise<void>
+  creditBackOnFailure: (tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) => Promise<void>,
+  resolveOwnerUserId: () => Promise<string | null>
 ): Promise<T> {
   assertValidSettlementStatus(status);
 
@@ -49,7 +54,7 @@ export async function transitionSettlement<T extends SettlementRow>(
     throw new SettlementAlreadyFinalisedError();
   }
 
-  return prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     const claim = await delegate(tx).updateMany({
       where: { id: settlement.id, status: settlement.status },
       data: { status, transactionId },
@@ -62,4 +67,25 @@ export async function transitionSettlement<T extends SettlementRow>(
     }
     return delegate(tx).findUniqueOrThrow({ where: { id: settlement.id } });
   });
+
+  // Fire-and-forget, after commit -- a payout completing or (more
+  // importantly) failing and reverting to the wallet was previously silent
+  // to the affected vendor/rider/mechanic except by polling their payout
+  // history. notifyUser already swallows its own errors, so this can't fail
+  // or roll back the transition that already committed above.
+  resolveOwnerUserId()
+    .then((userId) => {
+      if (!userId) return;
+      const amountLabel = `₹${settlement.amount.toFixed(2)}`;
+      if (status === 'FAILED') {
+        notifyUser(userId, 'Payout failed', `Your payout of ${amountLabel} could not be completed and has been credited back to your wallet.`, { settlementId: settlement.id, status });
+      } else if (status === 'COMPLETED') {
+        notifyUser(userId, 'Payout completed', `Your payout of ${amountLabel} has been completed.`, { settlementId: settlement.id, status });
+      } else {
+        notifyUser(userId, 'Payout update', `Your payout of ${amountLabel} is now ${String(status).replace(/_/g, ' ').toLowerCase()}.`, { settlementId: settlement.id, status });
+      }
+    })
+    .catch((error) => console.error('transitionSettlement: failed to resolve owner for notification:', error));
+
+  return updated;
 }

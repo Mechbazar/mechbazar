@@ -951,7 +951,8 @@ export const updateRiderSettlementStatus = async (req: Request, res: Response): 
       (tx) => tx.deliveryPartner.update({
         where: { id: settlement.deliveryPartnerId },
         data: { walletBalance: { increment: settlement.amount } },
-      }).then(() => {})
+      }).then(() => {}),
+      async () => (await prisma.deliveryPartner.findUnique({ where: { id: settlement.deliveryPartnerId }, select: { userId: true } }))?.userId ?? null
     );
 
     res.status(200).json(updatedSettlement);

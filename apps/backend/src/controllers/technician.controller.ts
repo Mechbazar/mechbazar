@@ -1073,7 +1073,8 @@ export const updateTechnicianSettlementStatus = async (req: Request, res: Respon
       (tx) => tx.serviceTechnician.update({
         where: { id: settlement.technicianId },
         data: { walletBalance: { increment: settlement.amount } },
-      }).then(() => {})
+      }).then(() => {}),
+      async () => (await prisma.serviceTechnician.findUnique({ where: { id: settlement.technicianId }, select: { userId: true } }))?.userId ?? null
     );
 
     res.status(200).json(updatedSettlement);
