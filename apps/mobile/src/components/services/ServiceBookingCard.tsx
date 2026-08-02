@@ -68,7 +68,12 @@ export default function ServiceBookingCard({ booking, token, onChanged }: Props)
 
   const technician = booking.technician;
   const status = booking.status;
-  const badge = STATUS_STYLE[status];
+  // Falls back for legacy statuses (SEARCHING, NO_MECHANIC_FOUND) that predate
+  // admin-controlled assignment -- STATUS_STYLE/STATUS_LABEL don't cover them,
+  // but old rows and an already-in-flight dispatch can still carry them. Same
+  // fallback ServiceBookingHistoryScreen already uses for this.
+  const badge = STATUS_STYLE[status] || { bg: colors.pageBg, border: colors.borderLight, text: colors.textMuted };
+  const label = STATUS_LABEL[status] || status.replace(/_/g, ' ');
   const isActive = !CLOSED.has(status) && status !== 'REJECTED';
   const canContact = isActive && !!technician;
 
@@ -147,7 +152,7 @@ export default function ServiceBookingCard({ booking, token, onChanged }: Props)
       <View style={styles.cardHeader}>
         <Text style={styles.bookingId}>#{booking.bookingNumber}</Text>
         <View style={[styles.badge, { backgroundColor: badge.bg, borderColor: badge.border }]}>
-          <Text style={[styles.badgeText, { color: badge.text }]}>{STATUS_LABEL[status]}</Text>
+          <Text style={[styles.badgeText, { color: badge.text }]}>{label}</Text>
         </View>
       </View>
 
