@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import axios from 'axios';
@@ -8,23 +8,29 @@ import { useSelector } from 'react-redux';
 import type { RootState } from './store';
 import { updateVendorProfile, logout } from './store/slices/authSlice';
 import { auth } from './config/firebase';
-import Login from './pages/Login';
-import ForgotPassword from './pages/ForgotPassword';
-import VerifyEmail from './pages/VerifyEmail';
-import AuthAction from './pages/AuthAction';
-import Register from './pages/Register';
-import PendingApproval from './pages/PendingApproval';
-import Dashboard from './pages/Dashboard';
-import Products from './pages/Products';
-import Orders from './pages/Orders';
-import Inventory from './pages/Inventory';
-import Wallet from './pages/Wallet';
-import Profile from './pages/Profile';
-import Coupons from './pages/Coupons';
-import Notifications from './pages/Notifications';
-import Returns from './pages/Returns';
 import Layout from './components/Layout';
+import PageLoader from './components/PageLoader';
 import { API_URL } from './config/api';
+
+// Route-level code-splitting, same as apps/admin's App.tsx -- each page is
+// its own chunk, fetched only when its route is actually visited, instead of
+// every page shipping in the single bundle every vendor downloads just to
+// see the login screen.
+const Login = lazy(() => import('./pages/Login'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const AuthAction = lazy(() => import('./pages/AuthAction'));
+const Register = lazy(() => import('./pages/Register'));
+const PendingApproval = lazy(() => import('./pages/PendingApproval'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Products = lazy(() => import('./pages/Products'));
+const Orders = lazy(() => import('./pages/Orders'));
+const Inventory = lazy(() => import('./pages/Inventory'));
+const Wallet = lazy(() => import('./pages/Wallet'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Coupons = lazy(() => import('./pages/Coupons'));
+const Notifications = lazy(() => import('./pages/Notifications'));
+const Returns = lazy(() => import('./pages/Returns'));
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, vendorProfile } = useSelector((state: RootState) => state.auth);
@@ -65,6 +71,7 @@ function App() {
     <>
       <Toaster toastOptions={{ style: { background: '#171717', color: '#fff', border: '1px solid #262626' } }} />
       <BrowserRouter>
+        <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -83,6 +90,7 @@ function App() {
           <Route path="/returns" element={Wrapped(Returns)} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </>
   );

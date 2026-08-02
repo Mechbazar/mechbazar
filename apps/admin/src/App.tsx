@@ -1,41 +1,76 @@
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Car, ShoppingBag, Users, Layers, Package, LogOut, Store, Navigation, Warehouse, Image, Tag, CreditCard, Bike, Wrench, ClipboardList, Layers3, Menu, X, FileText, ScrollText, KeyRound } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { Logo } from '@mechbazar/shared/web';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { signOut } from 'firebase/auth';
 import { logout } from './store';
+import type { RootState } from './store';
 import { auth } from './config/firebase';
-import Vehicles from './pages/Vehicles';
-import Products from './pages/Products';
-import Customers from './pages/Customers';
-import Vendors from './pages/Vendors';
-import Riders from './pages/Riders';
-import Banners from './pages/Banners';
-import Coupons from './pages/Coupons';
-import Categories from './pages/Categories';
-import Orders from './pages/Orders';
-import Login from './pages/Login';
-import ForgotPassword from './pages/ForgotPassword';
-import VerifyEmail from './pages/VerifyEmail';
-import Dashboard from './pages/Dashboard';
-import InventorySystem from './pages/inventory';
-import ServicesManagement from './pages/services';
-import ServiceBookingsPage from './pages/ServiceBookingsPage';
-import MechanicsPage from './pages/MechanicsPage';
-import Payouts from './pages/Payouts';
-import RiderPayouts from './pages/RiderPayouts';
-import Reports from './pages/Reports';
-import AuditLogs from './pages/AuditLogs';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import NotificationBell from './components/NotificationBell';
 import OfflineBanner from './components/OfflineBanner';
 import ChangePasswordDialog from './components/ChangePasswordDialog';
+import PageLoader from './components/PageLoader';
+
+// Route-level code-splitting: each page is its own chunk, fetched only when
+// its route is actually visited, instead of every page's code (and every
+// third-party lib only one page uses, e.g. charting on Reports) shipping in
+// the single main bundle every user downloads just to see the login screen.
+const Vehicles = lazy(() => import('./pages/Vehicles'));
+const Products = lazy(() => import('./pages/Products'));
+const Customers = lazy(() => import('./pages/Customers'));
+const Vendors = lazy(() => import('./pages/Vendors'));
+const Riders = lazy(() => import('./pages/Riders'));
+const Banners = lazy(() => import('./pages/Banners'));
+const Coupons = lazy(() => import('./pages/Coupons'));
+const Categories = lazy(() => import('./pages/Categories'));
+const Orders = lazy(() => import('./pages/Orders'));
+const Login = lazy(() => import('./pages/Login'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const InventorySystem = lazy(() => import('./pages/inventory'));
+const ServicesManagement = lazy(() => import('./pages/services'));
+const ServiceBookingsPage = lazy(() => import('./pages/ServiceBookingsPage'));
+const MechanicsPage = lazy(() => import('./pages/MechanicsPage'));
+const Payouts = lazy(() => import('./pages/Payouts'));
+const RiderPayouts = lazy(() => import('./pages/RiderPayouts'));
+const Reports = lazy(() => import('./pages/Reports'));
+const AuditLogs = lazy(() => import('./pages/AuditLogs'));
+
+// Mirrors each page's real backend authorization (the `admins`/`inventoryAdmins`/
+// etc. arrays in apps/backend/src/routes/*.routes.ts) -- server-side authorize()
+// already enforces these correctly, so this is UX polish only: without it, a
+// lower-privilege login (e.g. CUSTOMER_SUPPORT) saw every nav item and only
+// found out which ones it couldn't use by clicking into a raw 403. A path with
+// no entry here has no role restriction server-side either (e.g. Vehicle
+// Master), so every authenticated admin-panel role can see it.
+const NAV_ROLES: Record<string, string[]> = {
+  '/': ['SUPER_ADMIN', 'ADMIN'],
+  '/orders': ['SUPER_ADMIN', 'ADMIN', 'OPERATIONS_MANAGER', 'INVENTORY_MANAGER', 'VENDOR_MANAGER', 'FINANCE_MANAGER', 'CUSTOMER_SUPPORT'],
+  '/service-bookings': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
+  '/mechanics': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
+  '/products': ['ADMIN', 'SUPER_ADMIN', 'INVENTORY_MANAGER', 'VENDOR_MANAGER'],
+  '/categories': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
+  '/inventory': ['ADMIN', 'SUPER_ADMIN', 'INVENTORY_MANAGER', 'OPERATIONS_MANAGER', 'VENDOR_MANAGER'],
+  '/services': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
+  '/vendors': ['ADMIN', 'SUPER_ADMIN', 'VENDOR_MANAGER'],
+  '/riders': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
+  '/customers': ['ADMIN', 'SUPER_ADMIN', 'CUSTOMER_SUPPORT'],
+  '/cms': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER', 'VENDOR_MANAGER'],
+  '/coupons': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER', 'FINANCE_MANAGER'],
+  '/payouts': ['ADMIN', 'SUPER_ADMIN', 'VENDOR_MANAGER'],
+  '/rider-payouts': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
+  '/reports': ['SUPER_ADMIN', 'ADMIN'],
+  '/audit-logs': ['SUPER_ADMIN', 'ADMIN'],
+};
 
 function MainLayout({ children }: { children: React.ReactNode }) {
   const dispatch = useDispatch();
   const location = useLocation();
+  const role = useSelector((state: RootState) => state.auth.user?.role);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
 
@@ -46,7 +81,7 @@ function MainLayout({ children }: { children: React.ReactNode }) {
     signOut(auth).catch(() => {});
   };
 
-  const navLinks = [
+  const allNavLinks = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/orders', icon: Package, label: 'Product Orders' },
     { to: '/service-bookings', icon: ClipboardList, label: 'Service Bookings' },
@@ -66,6 +101,7 @@ function MainLayout({ children }: { children: React.ReactNode }) {
     { to: '/reports', icon: FileText, label: 'Reports' },
     { to: '/audit-logs', icon: ScrollText, label: 'Audit Logs' },
   ];
+  const navLinks = allNavLinks.filter((link) => !NAV_ROLES[link.to] || (role && NAV_ROLES[link.to].includes(role)));
 
   return (
     <div className="flex min-h-screen bg-neutral-50 text-neutral-900">
@@ -162,6 +198,7 @@ function App() {
     <div className="admin-light">
       <Toaster />
       <Router>
+      <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -195,6 +232,7 @@ function App() {
           </ProtectedRoute>
         } />
       </Routes>
+      </Suspense>
     </Router>
     </div>
   );
