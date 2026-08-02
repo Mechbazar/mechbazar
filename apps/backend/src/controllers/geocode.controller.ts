@@ -24,6 +24,15 @@ export const getReverseGeocode = async (req: Request, res: Response): Promise<vo
     res.status(400).json({ error: 'lat and lng query params are required and must be numbers' });
     return;
   }
+  // An out-of-range coordinate (e.g. lat=999) is finite, so the check above
+  // let it through to Google, which rejected it -- surfacing as a 503
+  // "unavailable" that looks identical to a real API outage to anything
+  // monitoring this endpoint. Reject it here as the client error it actually
+  // is instead.
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    res.status(400).json({ error: 'lat must be between -90 and 90, and lng between -180 and 180' });
+    return;
+  }
 
   const result = await reverseGeocode(lat, lng);
   if ('reason' in result) {

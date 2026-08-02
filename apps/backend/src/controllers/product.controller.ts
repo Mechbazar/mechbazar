@@ -98,7 +98,15 @@ export const getProducts = async (req: AuthRequest, res: Response) => {
       return;
     }
     const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 20;
+    // Clamped to 1-100: unclamped, `?limit=-1` fell into Prisma's negative-
+    // `take` reverse-pagination behaviour instead of being rejected, and
+    // `?limit=999999` had no upper bound at all -- harmless at today's
+    // catalog size, but an unbounded page size is a resource-exhaustion
+    // vector once it grows.
+    const requestedLimit = Number(req.query.limit);
+    const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
+      ? Math.min(Math.trunc(requestedLimit), 100)
+      : 20;
     const brandNames = brand ? String(brand).split(',').map(s => s.trim()).filter(Boolean) : [];
 
     // Core Compatibility Engine filtering. vehicleType is a first-class field on
