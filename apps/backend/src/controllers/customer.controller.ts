@@ -239,9 +239,17 @@ export const createMyAddress = async (req: AuthRequest, res: Response): Promise<
     }
 
     const userId = req.user!.userId;
-    const existingCount = await prisma.address.count({ where: { userId } });
 
     const address = await prisma.$transaction(async (tx) => {
+      // Serializes this whole check-then-act sequence per user: without it,
+      // two concurrent createMyAddress calls for a brand-new user (both
+      // reading existingCount===0) could each independently decide
+      // shouldBeDefault=true and INSERT their own row with isDefault=true --
+      // there's no unique constraint on isDefault itself to catch that, since
+      // they're two separate new rows, not a conflicting update to one row.
+      // Released automatically at transaction end.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
+      const existingCount = await tx.address.count({ where: { userId } });
       // First address is always the default; otherwise only flip other rows
       // over when the caller explicitly asks for this one to become default.
       const shouldBeDefault = existingCount === 0 || !!isDefault;
@@ -284,7 +292,11 @@ export const updateMyAddress = async (req: AuthRequest, res: Response): Promise<
     const { title, line1, line2, city, state, pincode, country, lat, lng, placeId, formattedAddress, isDefault } = req.body;
 
     const address = await prisma.$transaction(async (tx) => {
+      // Same per-user lock as createMyAddress -- shares the hashtext(userId)
+      // key so the two endpoints can't race each other into two isDefault
+      // rows either.
       if (isDefault === true) {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
         await tx.address.updateMany({ where: { userId }, data: { isDefault: false } });
       }
       return tx.address.update({

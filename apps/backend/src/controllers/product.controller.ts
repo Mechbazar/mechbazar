@@ -382,31 +382,45 @@ export const bulkCreateProducts = async (req: AuthRequest, res: Response): Promi
     let brand = await prisma.brand.findFirst();
     if (!brand) brand = await prisma.brand.create({ data: { name: 'Generic Brand' } });
 
-    // Deduplicate and ensure categories exist
-    const categoriesToEnsure = Array.from(new Set(productsArray.map((p: any) => p.category)));
-    const existingCats = await prisma.category.findMany({
-      where: { name: { in: categoriesToEnsure } }
-    });
-    
-    const existingCatNames = existingCats.map(c => c.name);
-    const newCatsToCreate = categoriesToEnsure.filter(c => !existingCatNames.includes(c));
-    
+    // Deduplicate and ensure categories exist. Case-insensitive throughout --
+    // an exact-match lookup let e.g. "Engine Oil" and "Engine oil" create two
+    // separate categories from a typo (see the single-product create/update
+    // paths above, which already guard against this; this bulk path hadn't).
+    // Dedup by lowercase key first so two differently-cased spellings of the
+    // same category *within one upload* don't each look "new" independently.
+    const categoryNameByKey = new Map<string, string>();
+    for (const p of productsArray) {
+      const raw = String(p?.category ?? '').trim();
+      if (raw && !categoryNameByKey.has(raw.toLowerCase())) {
+        categoryNameByKey.set(raw.toLowerCase(), raw);
+      }
+    }
+    const categoriesToEnsure = Array.from(categoryNameByKey.values());
+    const insensitiveNameFilter = categoriesToEnsure.map((name) => ({ name: { equals: name, mode: 'insensitive' as const } }));
+
+    const existingCats = categoriesToEnsure.length
+      ? await prisma.category.findMany({ where: { OR: insensitiveNameFilter } })
+      : [];
+    const existingKeys = new Set(existingCats.map((c) => c.name.toLowerCase()));
+    const newCatsToCreate = categoriesToEnsure.filter((name) => !existingKeys.has(name.toLowerCase()));
+
     if (newCatsToCreate.length > 0) {
       await prisma.category.createMany({
-        data: newCatsToCreate.map(name => ({ name }))
+        data: newCatsToCreate.map(name => ({ name })),
+        skipDuplicates: true,
       });
     }
-    
+
     // Refetch all categories needed
-    const allRelevantCats = await prisma.category.findMany({
-      where: { name: { in: categoriesToEnsure } }
-    });
-    const catMap = new Map(allRelevantCats.map(c => [c.name, c.id]));
+    const allRelevantCats = categoriesToEnsure.length
+      ? await prisma.category.findMany({ where: { OR: insensitiveNameFilter } })
+      : [];
+    const catMap = new Map(allRelevantCats.map(c => [c.name.toLowerCase(), c.id]));
 
     const productsToInsert = productsArray.map((p: any) => ({
       vendorId: vendor?.id || '',
       brandId: brand?.id || '',
-      categoryId: catMap.get(p.category) || allRelevantCats[0].id,
+      categoryId: catMap.get(String(p?.category ?? '').trim().toLowerCase()) || allRelevantCats[0]?.id,
       name: p.name,
       description: p.description || 'Bulk uploaded product',
       price: Number(p.basePrice) || Number(p.price) || 0,

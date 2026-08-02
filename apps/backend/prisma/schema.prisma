@@ -25,6 +25,7 @@ enum Role {
 enum VendorStatus {
   PENDING
   UNDER_VERIFICATION
+  RESUBMISSION_REQUIRED
   APPROVED
   REJECTED
   SUSPENDED
@@ -317,11 +318,24 @@ model Vendor {
 }
 
 model VendorDocument {
-  id         String                     @id @default(uuid())
-  vendorId   String
-  vendor     Vendor                     @relation(fields: [vendorId], references: [id])
-  type       String // GST, PAN, AADHAAR, SHOP_PHOTO, OWNER_PHOTO, BUSINESS_LICENSE, CANCELLED_CHEQUE
-  url        String
+  id       String @id @default(uuid())
+  vendorId String
+  vendor   Vendor @relation(fields: [vendorId], references: [id])
+  type     String // GST, PAN, AADHAAR, SHOP_PHOTO, OWNER_PHOTO, BUSINESS_LICENSE, CANCELLED_CHEQUE
+  // Deprecated: the old public Firebase Storage URL. PAN/Aadhaar/GST/
+  // business-license/cancelled-cheque are exactly the private KYC content
+  // RiderDocument and TechnicianDocument already moved to Postgres-stored
+  // bytes for (see their fileData comments) -- this brings VendorDocument in
+  // line with that pattern instead of being the one KYC document type still
+  // sitting in a public-read bucket. Kept (nullable) only so documents
+  // uploaded before this change stay viewable until
+  // prisma/backfill-vendor-documents.ts has migrated them; new uploads never
+  // set this, they go straight to fileData. Safe to drop once that backfill
+  // has run in every environment.
+  url        String?
+  filePath   String? // original filename, display only -- bytes are the source of truth
+  fileData   Bytes? // file bytes, stored in Postgres instead of public object storage
+  mimeType   String?
   status     DocumentVerificationStatus @default(PENDING)
   uploadedAt DateTime                   @default(now())
 }
@@ -391,6 +405,12 @@ model DeliveryPartner {
   submittedAt               DateTime?
   reviewedAt                DateTime?
   remarks                   String?
+
+  // Previously absent despite this model mutating constantly (status,
+  // online/offline, wallet, live lat/lng) -- there was no way to answer "when
+  // was this account created" or "when did anything on this row last change."
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   orders       Order[]
   bankAccounts RiderBankAccount[]
@@ -631,6 +651,10 @@ model ProductCompatibility {
   vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
 
   @@unique([productId, vehicleId])
+  // The unique index above is productId-first, so it doesn't efficiently
+  // serve "which products fit vehicle X" -- the customer-facing compatibility
+  // lookup -- without this standalone index.
+  @@index([vehicleId])
 }
 
 // =======================
@@ -687,6 +711,7 @@ model OrderItem {
   price     Float
 
   @@index([productId])
+  @@index([orderId])
 }
 
 model Payment {
@@ -709,6 +734,10 @@ model Payment {
   razorpaySignature String?
   failureReason     String?
   createdAt         DateTime        @default(now())
+  // Tracks when status last moved (PENDING -> SUCCESS/FAILED/REFUNDED) --
+  // needed for reconciliation/dispute investigation, which createdAt alone
+  // can't answer once a row has gone through more than one transition.
+  updatedAt         DateTime        @updatedAt
 
   // Every webhook delivery and the client-side verify call look this row up
   // by gatewayOrderId (see controllers/payment.controller.ts) -- without an
@@ -962,6 +991,12 @@ model StockMovement {
   reason       String?
 
   createdAt DateTime @default(now())
+
+  // High-write, ever-growing ledger -- both "history for this inventory row"
+  // and "movements by this user" are common lookups with no supporting index
+  // otherwise (Postgres does not auto-index foreign key columns).
+  @@index([inventoryId])
+  @@index([userId])
 }
 
 model StockTransfer {
@@ -1074,6 +1109,10 @@ model ServiceTechnician {
   submittedAt           DateTime?
   reviewedAt            DateTime?
   remarks               String?
+
+  // See DeliveryPartner's identical addition -- same gap, same reason.
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   bookings       ServiceBooking[]
   documents      TechnicianDocument[]

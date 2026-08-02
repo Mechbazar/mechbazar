@@ -37,13 +37,26 @@ export const getCategories = async (req: Request, res: Response) => {
 export const createCategory = async (req: Request, res: Response) => {
   try {
     const { name, icon, status, vehicleType } = req.body;
+    const resolvedVehicleType = normalizeVehicleType(vehicleType);
+
+    // The DB unique constraint on [name, vehicleType] is case-sensitive, so
+    // "Engine Oil" and "Engine oil" wouldn't collide there -- check
+    // case-insensitively first so an admin can't create a duplicate that
+    // only the exact-match constraint would have caught.
+    const duplicate = name
+      ? await prisma.category.findFirst({ where: { name: { equals: name, mode: 'insensitive' }, vehicleType: resolvedVehicleType } })
+      : null;
+    if (duplicate) {
+      res.status(400).json({ error: `A category named "${duplicate.name}" already exists for this vehicle type.` });
+      return;
+    }
 
     const newCategory = await prisma.category.create({
       data: {
         name,
         icon: icon || '📦',
         status: status || 'Active',
-        vehicleType: normalizeVehicleType(vehicleType)
+        vehicleType: resolvedVehicleType
       }
     });
 
@@ -62,6 +75,21 @@ export const updateCategory = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { name, icon, status, vehicleType } = req.body;
+    const resolvedVehicleType = vehicleType !== undefined ? normalizeVehicleType(vehicleType) : undefined;
+
+    if (name) {
+      const duplicate = await prisma.category.findFirst({
+        where: {
+          id: { not: String(id) },
+          name: { equals: name, mode: 'insensitive' },
+          vehicleType: resolvedVehicleType ?? (await prisma.category.findUnique({ where: { id: String(id) }, select: { vehicleType: true } }))?.vehicleType,
+        },
+      });
+      if (duplicate) {
+        res.status(400).json({ error: `A category named "${duplicate.name}" already exists for this vehicle type.` });
+        return;
+      }
+    }
 
     const updated = await prisma.category.update({
       where: { id: String(id) },
@@ -69,7 +97,7 @@ export const updateCategory = async (req: Request, res: Response) => {
         name,
         icon,
         status,
-        vehicleType: vehicleType !== undefined ? normalizeVehicleType(vehicleType) : undefined
+        vehicleType: resolvedVehicleType
       }
     });
 
