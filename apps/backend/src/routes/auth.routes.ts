@@ -2,6 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { register, login, switchMode, adminLogin, registerPushToken, clearPushToken, refreshToken, changePassword, forgotPassword, resendVerificationEmail } from '../controllers/auth.controller';
 import { authenticate } from '../middlewares/auth';
+import { requireAppCheck } from '../middlewares/appCheck';
 
 const router = Router();
 
@@ -29,11 +30,32 @@ const resendVerificationLimiter = rateLimit({
   message: { error: 'Too many verification email requests. Please try again in a few minutes.' },
 });
 
-router.post('/register', register);
-router.post('/login', login);
-router.post('/admin/login', adminLogin);
-router.post('/forgot-password', forgotPasswordLimiter, forgotPassword);
-router.post('/resend-verification-email', resendVerificationLimiter, resendVerificationEmail);
+// Per-account lockout for the admin login's legacy password path, independent
+// of the generic /api/auth IP limiter above it in index.ts -- that one only
+// slows down a single attacking IP, so a distributed (multi-IP) guess/stuffing
+// attempt against one known admin email wouldn't be throttled at all without
+// this. Keyed on the submitted email (not IP) and only counts failed
+// attempts (skipSuccessfulRequests), so a legitimately-logging-in admin never
+// trips it. Covers the Firebase idToken path too since both share this route,
+// though that path can't be brute-forced the same way.
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  keyGenerator: (req) => String(req.body?.email || '').trim().toLowerCase() || req.ip || 'unknown',
+  message: { error: 'Too many failed login attempts for this account. Please try again in 15 minutes.' },
+});
+
+// requireAppCheck only on the routes apps/mobile itself calls -- /admin/login
+// is apps/admin's web login form, which has no App Check client wired up (see
+// middlewares/appCheck.ts), so it's deliberately left ungated.
+router.post('/register', requireAppCheck, register);
+router.post('/login', requireAppCheck, login);
+router.post('/admin/login', adminLoginLimiter, adminLogin);
+router.post('/forgot-password', requireAppCheck, forgotPasswordLimiter, forgotPassword);
+router.post('/resend-verification-email', requireAppCheck, resendVerificationLimiter, resendVerificationEmail);
 router.post('/switch-mode', authenticate, switchMode);
 router.post('/refresh', authenticate, refreshToken);
 router.patch('/change-password', authenticate, changePassword);
