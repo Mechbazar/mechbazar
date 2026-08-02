@@ -2,7 +2,6 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { register, login, switchMode, adminLogin, registerPushToken, clearPushToken, refreshToken, changePassword, forgotPassword, resendVerificationEmail } from '../controllers/auth.controller';
 import { authenticate } from '../middlewares/auth';
-import { requireAppCheck } from '../middlewares/appCheck';
 
 const router = Router();
 
@@ -48,14 +47,11 @@ const adminLoginLimiter = rateLimit({
   message: { error: 'Too many failed login attempts for this account. Please try again in 15 minutes.' },
 });
 
-// requireAppCheck only on the routes apps/mobile itself calls -- /admin/login
-// is apps/admin's web login form, which has no App Check client wired up (see
-// middlewares/appCheck.ts), so it's deliberately left ungated.
-router.post('/register', requireAppCheck, register);
-router.post('/login', requireAppCheck, login);
+router.post('/register', register);
+router.post('/login', login);
 router.post('/admin/login', adminLoginLimiter, adminLogin);
-router.post('/forgot-password', requireAppCheck, forgotPasswordLimiter, forgotPassword);
-router.post('/resend-verification-email', requireAppCheck, resendVerificationLimiter, resendVerificationEmail);
+router.post('/forgot-password', forgotPasswordLimiter, forgotPassword);
+router.post('/resend-verification-email', resendVerificationLimiter, resendVerificationEmail);
 router.post('/switch-mode', authenticate, switchMode);
 router.post('/refresh', authenticate, refreshToken);
 router.patch('/change-password', authenticate, changePassword);

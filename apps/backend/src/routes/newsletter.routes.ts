@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { subscribeNewsletter } from '../controllers/newsletter.controller';
-import { requireAppCheck } from '../middlewares/appCheck';
 
 const router = Router();
 
@@ -17,6 +16,6 @@ const subscribeLimiter = rateLimit({
   message: { error: 'Too many subscription requests. Please try again in a few minutes.' },
 });
 
-router.post('/subscribe', requireAppCheck, subscribeLimiter, subscribeNewsletter);
+router.post('/subscribe', subscribeLimiter, subscribeNewsletter);
 
 export default router;
