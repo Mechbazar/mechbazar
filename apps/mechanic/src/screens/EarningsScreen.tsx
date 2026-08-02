@@ -44,7 +44,7 @@ const settlementBadge = (status: string) => {
 export const EarningsScreen = () => {
   const queryClient = useQueryClient();
 
-  const { data: earnings, isLoading: earningsLoading, refetch, isRefetching } = useQuery<Earnings>({
+  const { data: earnings, isLoading: earningsLoading, isError: earningsError, refetch, isRefetching } = useQuery<Earnings>({
     queryKey: ['technician-earnings'],
     queryFn: technicianService.getMyEarnings,
   });
@@ -86,7 +86,13 @@ export const EarningsScreen = () => {
   const completedTotal = list.filter(isCompletedBooking).length;
   const completedToday = list.filter(isCompletedToday).length;
 
-  const walletBalance = earnings?.walletBalance || 0;
+  // earnings is undefined only when the fetch genuinely hasn't succeeded --
+  // don't conflate that with "balance is actually zero" (previously
+  // `earnings?.walletBalance || 0` displayed a real-looking ₹0 either way,
+  // and disabled the payout button in both cases, which could block a
+  // technician with a real balance from requesting a payout during an outage).
+  const hasEarnings = earnings !== undefined;
+  const walletBalance = earnings?.walletBalance ?? 0;
   const bankAccount = earnings?.bankAccounts?.[0];
 
   const handleRequestPayout = () => {
@@ -95,7 +101,12 @@ export const EarningsScreen = () => {
       Alert.alert('Invalid amount', 'Enter a valid amount to withdraw.');
       return;
     }
-    if (amt > walletBalance) {
+    // Only pre-check against a balance we actually know. requestMyPayout on
+    // the backend re-validates atomically against the real balance
+    // regardless, so skipping this when the balance failed to load doesn't
+    // let anyone withdraw more than they actually have -- it just stops a
+    // stale/missing local read from blocking a legitimate request.
+    if (hasEarnings && amt > walletBalance) {
       Alert.alert('Insufficient balance', 'Amount exceeds your available balance.');
       return;
     }
@@ -122,14 +133,19 @@ export const EarningsScreen = () => {
         <Card style={styles.walletCard}>
           <WalletCards color="#ffffff" size={26} />
           <Typography variant="caption" style={{ color: '#ffffffcc', marginTop: 8 }}>Available Balance</Typography>
-          <Typography variant="h1" style={{ color: '#ffffff', marginTop: 4 }}>{formatINR(walletBalance)}</Typography>
+          <Typography variant="h1" style={{ color: '#ffffff', marginTop: 4 }}>{hasEarnings ? formatINR(walletBalance) : '—'}</Typography>
+          {earningsError && !hasEarnings && (
+            <Typography variant="caption" style={{ color: '#ffffffcc', marginTop: 4, textAlign: 'center' }}>
+              Couldn't load your balance right now. You can still request a payout.
+            </Typography>
+          )}
           {!showPayoutForm && (
             <Button
               title="Request Payout"
               onPress={() => setShowPayoutForm(true)}
               style={{ backgroundColor: '#ffffff', marginTop: 16, alignSelf: 'stretch' }}
               textStyle={{ color: colors.primary }}
-              disabled={walletBalance <= 0}
+              disabled={hasEarnings && walletBalance <= 0}
             />
           )}
         </Card>
@@ -138,7 +154,7 @@ export const EarningsScreen = () => {
           <Card style={{ marginTop: -4 }}>
             <Typography variant="h3">Request Payout</Typography>
             <Input
-              label={`Amount (Available: ${formatINR(walletBalance)})`}
+              label={hasEarnings ? `Amount (Available: ${formatINR(walletBalance)})` : 'Amount'}
               keyboardType="numeric"
               value={payoutAmount}
               onChangeText={setPayoutAmount}

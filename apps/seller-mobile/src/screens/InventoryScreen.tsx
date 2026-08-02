@@ -15,7 +15,7 @@ const getStockStatus = (inv: any): { label: string; variant: 'danger' | 'warning
 export const InventoryScreen = () => {
   const [filter, setFilter] = useState<Filter>('all');
 
-  const { data: inventory = [], isLoading, refetch, isRefetching } = useQuery({
+  const { data: inventory = [], isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['vendor-inventory'],
     queryFn: vendorService.getInventory,
   });
@@ -42,6 +42,14 @@ export const InventoryScreen = () => {
       <Typography variant="body" style={{ color: colors.textSecondary, marginBottom: 16 }}>
         Live stock levels for your products across warehouses
       </Typography>
+
+      {isError && (
+        <Card style={{ marginBottom: 8, backgroundColor: '#FDECEA' }}>
+          <Typography variant="caption" style={{ color: colors.dangerStrong }}>
+            Could not load inventory. Pull down to retry.
+          </Typography>
+        </Card>
+      )}
 
       <View style={styles.filterRow}>
         {([

@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 export const OrdersScreen = () => {
   const queryClient = useQueryClient();
 
-  const { data: orders, isLoading, refetch, isRefetching } = useQuery({
+  const { data: orders, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['vendor-orders'],
     queryFn: vendorService.getOrders,
   });
@@ -40,6 +40,13 @@ export const OrdersScreen = () => {
   return (
     <View style={styles.container}>
       <Typography variant="h2" style={{padding: 16}}>Orders</Typography>
+      {isError && (
+        <Card style={{ marginHorizontal: 16, marginBottom: 8, backgroundColor: '#FDECEA' }}>
+          <Typography variant="caption" style={{ color: colors.dangerStrong }}>
+            Could not load orders. Pull down to retry.
+          </Typography>
+        </Card>
+      )}
       <FlatList
         data={orders}
         keyExtractor={item => item.id}
