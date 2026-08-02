@@ -4,6 +4,8 @@
 // extra dependency. Revisit once there's a third template and the
 // duplication actually hurts.
 
+import { escapeHtml } from '../utils/escapeHtml';
+
 export interface OrderConfirmationItem {
   name: string;
   quantity: number;
@@ -25,11 +27,11 @@ const rupees = (amount: number) => `₹${amount.toFixed(2)}`;
 const shortId = (id: string) => id.slice(0, 8).toUpperCase();
 
 export function buildOrderConfirmationEmail(order: OrderConfirmationInput): { subject: string; html: string; text: string } {
-  const greeting = order.customerName ? `Hi ${order.customerName},` : 'Hi,';
+  const greeting = order.customerName ? `Hi ${escapeHtml(order.customerName)},` : 'Hi,';
   const rows = order.items
     .map(
       (item) =>
-        `<tr><td style="padding:8px 0;border-bottom:1px solid #E6E9ED;">${item.name} &times; ${item.quantity}</td>` +
+        `<tr><td style="padding:8px 0;border-bottom:1px solid #E6E9ED;">${escapeHtml(item.name)} &times; ${item.quantity}</td>` +
         `<td style="padding:8px 0;border-bottom:1px solid #E6E9ED;text-align:right;">${rupees(item.price * item.quantity)}</td></tr>`
     )
     .join('');
@@ -51,7 +53,7 @@ export function buildOrderConfirmationEmail(order: OrderConfirmationInput): { su
       ${order.discountAmount > 0 ? `<tr><td>Discount</td><td style="text-align:right;">-${rupees(order.discountAmount)}</td></tr>` : ''}
       <tr style="font-weight:700;"><td style="padding-top:8px;">Total</td><td style="text-align:right;padding-top:8px;">${rupees(order.finalAmount)}</td></tr>
     </table>
-    <p style="font-size:14px;color:#6B7480;margin-top:16px;">Delivering to: ${order.addressLine}</p>
+    <p style="font-size:14px;color:#6B7480;margin-top:16px;">Delivering to: ${escapeHtml(order.addressLine)}</p>
     <p style="font-size:12px;color:#9AA5B1;margin-top:24px;">You can track this order any time in the MechBazar app under Orders.</p>
   </div>
 </div>`.trim();

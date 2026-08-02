@@ -4,6 +4,8 @@
 // configured in the project, in case anything ever falls back to them) so
 // switching senders doesn't change what users read.
 
+import { escapeHtml } from '../utils/escapeHtml';
+
 function wrap(bodyHtml: string): string {
   return `
 <div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;color:#1C2430;">
@@ -17,10 +19,11 @@ function wrap(bodyHtml: string): string {
 }
 
 export function buildVerifyEmailMessage(link: string): { subject: string; html: string; text: string } {
+  const safeLink = escapeHtml(link);
   const html = wrap(`
     <p>Hello,</p>
     <p>Follow this link to verify your email address.</p>
-    <p><a href="${link}" style="color:#DA3830;">${link}</a></p>
+    <p><a href="${safeLink}" style="color:#DA3830;">${safeLink}</a></p>
     <p style="font-size:12px;color:#9AA5B1;margin-top:24px;">If you didn't ask to verify this address, you can ignore this email.</p>
   `);
   const text = `Follow this link to verify your email address.\n\n${link}\n\nIf you didn't ask to verify this address, you can ignore this email.`;
@@ -28,10 +31,11 @@ export function buildVerifyEmailMessage(link: string): { subject: string; html: 
 }
 
 export function buildPasswordResetMessage(link: string): { subject: string; html: string; text: string } {
+  const safeLink = escapeHtml(link);
   const html = wrap(`
     <p>Hello,</p>
     <p>Follow this link to reset your MechBazar password.</p>
-    <p><a href="${link}" style="color:#DA3830;">${link}</a></p>
+    <p><a href="${safeLink}" style="color:#DA3830;">${safeLink}</a></p>
     <p style="font-size:12px;color:#9AA5B1;margin-top:24px;">If you didn't ask to reset your password, you can ignore this email.</p>
   `);
   const text = `Follow this link to reset your MechBazar password.\n\n${link}\n\nIf you didn't ask to reset your password, you can ignore this email.`;
