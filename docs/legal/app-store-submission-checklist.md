@@ -293,6 +293,40 @@ be implemented.
 - ☐ No debug menus, test data, placeholder Lorem Ipsum, or `console` output
   visible in release builds
 - ☐ Deep links and app links verified; no dead links in the footer
+  - `apps/mobile/app.config.js` now declares `ios.associatedDomains` and
+    `android.intentFilters` for `mechbazar.com`, and
+    `apps/mobile/public/.well-known/` has both verification files, copied
+    into the web export and served by `nginx.conf`. Two things still block
+    real verification:
+    1. `apple-app-site-association`'s `appID` has a placeholder
+       (`REPLACE_WITH_APPLE_TEAM_ID.com.mechbazar.mobile`) — swap in the real
+       10-character Apple Developer Team ID once an Apple Developer account
+       exists for this app (none of the repo's config files currently record
+       one).
+    2. `assetlinks.json`'s `sha256_cert_fingerprints` is the fingerprint of
+       `apps/mobile/release.keystore` (the upload key `eas.json`'s
+       `credentialsSource: "local"` signs with) — if Play App Signing gets
+       enabled for this app, Google re-signs the distributed APK with its own
+       key and this file needs the **App Signing certificate's** fingerprint
+       instead (Play Console → Setup → App signing), not the upload key's.
+  - After both are fixed and deployed, verify with Google's
+    [Statement List Generator](https://developers.google.com/digital-asset-links/tools/generator)
+    and Apple's `swcutil` / the [AASA validator](https://search.developer.apple.com/appsearch-validation-tool/).
+- ☐ Firebase App Check (abuse protection for the customer register/login/
+  forgot-password/newsletter endpoints — `apps/backend/src/middlewares/appCheck.ts`,
+  `apps/mobile/src/services/appCheck.ts` + `appCheckToken.web.ts`) is wired
+  client- and server-side but **inert** until both are done, in order:
+  1. Firebase Console → App Check → register a Play Integrity provider for
+     the Android app and an App Attest/DeviceCheck provider for the iOS app
+     (project `mech-bazar-8fd86`).
+  2. Firebase Console → App Check → Apps → this web app → create a reCAPTCHA
+     v3 site key, set it as `EXPO_PUBLIC_RECAPTCHA_V3_SITE_KEY` for the web
+     build.
+  3. Ship a build with the above so real clients start sending
+     `X-Firebase-AppCheck`, confirm traffic in the Console's App Check
+     metrics tab, **then** set `ENFORCE_APP_CHECK=true` on the backend.
+     Flipping that env var before step 3 has shipped 401s every customer
+     register/login/forgot-password/newsletter-subscribe request.
 - ☐ Contact/support reachable from within the app in ≤ 2 taps
 
 ---
