@@ -62,6 +62,13 @@ export const env = {
   PORT: Number(process.env.PORT) || 5001,
   DATABASE_URL: process.env.DATABASE_URL as string,
   JWT_SECRET: process.env.JWT_SECRET as string,
+  // Optional -- powers only the Socket.IO Redis adapter (realtime/gateway.ts),
+  // for cross-process fan-out when more than one backend container is
+  // running. Nothing else reads this: there is no general-purpose cache layer
+  // (there used to be an OTP cache here; it was migrated to Postgres's
+  // PhoneOtp table after Redis proved unreliable in the serverless prod
+  // environment, and the standalone cache client was removed as dead code
+  // rather than left half-connected).
   REDIS_URL: process.env.REDIS_URL || '',
   // Optional -- server-side Google Maps Platform key (services/geocoding.service.ts).
   // Distinct from apps/mobile's EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: that one ships in a
@@ -128,6 +135,16 @@ export const env = {
   EXOTEL_CALLER_ID: process.env.EXOTEL_CALLER_ID || '',
   EXOTEL_SUBDOMAIN: process.env.EXOTEL_SUBDOMAIN || 'api.exotel.com',
 
+  // ---- Razorpay (payment gateway) ----
+  // All three must be present for online payment to be offered. When they are
+  // not, payment.service.ts resolves every order to COD -- see its module
+  // comment. TODO(razorpay-live): set these from the Razorpay Dashboard
+  // (Settings -> API Keys for the first two; Settings -> Webhooks for the
+  // third, after creating a webhook pointed at POST /api/payments/razorpay/webhook).
+  RAZORPAY_KEY_ID: process.env.RAZORPAY_KEY_ID || '',
+  RAZORPAY_KEY_SECRET: process.env.RAZORPAY_KEY_SECRET || '',
+  RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET || '',
+
   // ---- Transactional email (Hostinger SMTP via Nodemailer) ----
   // All four SMTP_* vars gate sending -- see services/email.service.ts. When
   // any is unset, every send resolves to an EmailLog row with status SKIPPED
@@ -144,6 +161,13 @@ export const env = {
   // doesn't belong to the authenticated mailbox.
   EMAIL_FROM: process.env.EMAIL_FROM || 'MechBazar <no-reply@mechbazar.com>',
 };
+
+export const isRazorpayConfigured = (): boolean =>
+  Boolean(env.RAZORPAY_KEY_ID && env.RAZORPAY_KEY_SECRET && env.RAZORPAY_WEBHOOK_SECRET);
+
+if (!isRazorpayConfigured()) {
+  console.warn('[WARN] Razorpay not configured -- checkout will offer Cash on Delivery only.');
+}
 
 export const isEmailConfigured = (): boolean =>
   Boolean(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);

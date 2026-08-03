@@ -5,9 +5,9 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
-import { connectRedis, disconnectRedis } from './config/redis';
 import { connectDatabase, disconnectDatabase } from './config/prisma';
 import { notFoundHandler, errorHandler } from './middlewares/errorHandler';
+import { verifyAppCheck } from './middlewares/appCheck';
 import healthRoutes from './routes/health.routes';
 import authRoutes from './routes/auth.routes';
 import productRoutes from './routes/product.routes';
@@ -32,6 +32,7 @@ import uploadRoutes from './routes/upload.routes';
 import newsletterRoutes from './routes/newsletter.routes';
 import geocodeRoutes from './routes/geocode.routes';
 import jobRoutes from './routes/job.routes';
+import paymentRoutes from './routes/payment.routes';
 import { initRealtime, shutdownRealtime } from './realtime/gateway';
 import { startSweepers, stopSweepers } from './jobs/sweeper';
 // Imported for its side effect: registers the socket location-batch handler
@@ -52,6 +53,11 @@ app.set('trust proxy', 1);
 
 // Middlewares
 app.use(compression());
+// Razorpay signs the exact raw bytes of the webhook body; express.json() below
+// would parse-and-reserialize it, which never reproduces the same bytes and
+// would make every signature check fail. So this one route gets its body
+// parsed as a raw Buffer, ahead of (and exempted from) the global JSON parser.
+app.use('/api/payments/razorpay/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 // Auth is Bearer-token based (not cookies), so this isn't CSRF-exploitable,
 // but a wide-open '*' still lets any origin's JS read authenticated responses
@@ -65,6 +71,10 @@ const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
   .filter(Boolean);
 app.use(cors(allowedOrigins.length > 0 ? { origin: allowedOrigins } : undefined));
 app.use(helmet());
+// Soft-verify only (see middlewares/appCheck.ts) -- attaches
+// req.appCheckVerified for any route that opts into requireAppCheck, without
+// affecting requests that don't send the header at all.
+app.use(verifyAppCheck);
 // 'dev' is a verbose, colorized per-request format meant for a local
 // terminal; 'combined' (standard Apache-style access log, no ANSI colors) is
 // what production log collectors expect.
@@ -150,6 +160,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/warehouses', warehouseRoutes);
@@ -223,11 +234,11 @@ async function startServer() {
   // own once connectivity is restored -- which is exactly what prisma.ts's
   // "shouldn't take the whole API down" contract promises.
   connectDatabase().catch((err) => console.error('[db] Fatal connection error:', err));
-  connectRedis().catch((err) => console.error('[redis] Fatal connection error:', err));
 
   // Realtime and the dispatch sweepers attach to the same HTTP server, after
-  // it is listening, and on the same non-blocking terms as the DB/Redis
-  // connections above: a Socket.IO failure degrades live tracking to the HTTP
+  // it is listening, and on the same non-blocking terms as the DB connection
+  // above: a Socket.IO failure (including its own optional Redis pub/sub
+  // adapter, see realtime/gateway.ts) degrades live tracking to the HTTP
   // polling fallback but must never stop the REST API from serving.
   initRealtime(server)
     .then(() => startSweepers())
@@ -251,7 +262,6 @@ async function startServer() {
 
     server.close(() => console.log('[shutdown] HTTP server closed'));
     await disconnectDatabase();
-    await disconnectRedis();
 
     console.log('[shutdown] Cleanup complete, exiting');
     process.exit(0);
