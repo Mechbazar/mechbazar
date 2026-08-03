@@ -126,7 +126,17 @@ const resetRecaptcha = () => {
   }
 };
 
-export const sendPhoneOtp = async (phone10Digit: string): Promise<void> => {
+// Kept in lockstep with phoneAuth.ts's exported shape (SendOtpResult,
+// confirmPhoneOtp's phone10Digit param, watchForAutoVerification) even though
+// the web/reCAPTCHA flow has no Android auto-verification concept -- both
+// files back the same import path (Metro picks whichever matches the
+// platform) and call sites are written once against one signature.
+export type SendOtpResult = {
+  autoVerified: boolean;
+  idToken?: string;
+};
+
+export const sendPhoneOtp = async (phone10Digit: string): Promise<SendOtpResult> => {
   const e164 = `+91${phone10Digit}`;
   log(`sendPhoneOtp called for ${e164}`);
   log('firebase auth config', {
@@ -166,6 +176,7 @@ export const sendPhoneOtp = async (phone10Digit: string): Promise<void> => {
     } else {
       log('WARNING: no verificationId on the ConfirmationResult -- confirm cannot survive a reload');
     }
+    return { autoVerified: false };
   } catch (err: any) {
     // Surface the exact Firebase error code -- this is what identifies a
     // Console-side blocker (auth/unauthorized-domain, auth/billing-not-enabled,
@@ -184,7 +195,10 @@ export const sendPhoneOtp = async (phone10Digit: string): Promise<void> => {
 // Resolves to a Firebase ID token -- sent as the `otp` field to the
 // /auth/login and /auth/register endpoints, which verify it via firebase-admin
 // (see apps/backend/src/utils/otp.ts).
-export const confirmPhoneOtp = async (code: string): Promise<string> => {
+// Second param exists only so call sites can pass the same arguments on both
+// platforms -- the web/reCAPTCHA flow has nothing that needs the phone number
+// (there is no auto-verified-user check to match it against).
+export const confirmPhoneOtp = async (code: string, _phone10Digit?: string): Promise<string> => {
   // Logged before anything else, so pressing Verify always leaves a trace even
   // if something downstream never settles.
   log('confirmPhoneOtp called', { hasInMemoryConfirmation: !!confirmationResult });
@@ -230,4 +244,14 @@ export const confirmPhoneOtp = async (code: string): Promise<string> => {
   clearPending();
   resetRecaptcha();
   return idToken;
+};
+
+// No-op on web: the reCAPTCHA flow has no instant/auto-verification, so there
+// is nothing to watch. Exists purely so call sites can invoke it unconditionally
+// without branching on platform.
+export const watchForAutoVerification = (
+  _phone10Digit: string,
+  _onVerified: (idToken: string) => void
+): (() => void) => {
+  return () => {};
 };

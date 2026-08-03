@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
+import { getSocket, subscribeToJob, SERVER_EVENTS, JobStatusEvent } from '@mechbazar/shared';
 import { ServiceBooking, BookingStatus } from '../../types/service';
 import { fetchBookingById, cancelServiceBooking, respondToBookingApproval, fetchTechnicianPhotoDataUri, fetchBookingImageDataUri } from '../../services/service.service';
 import { HeaderCartButton } from '../../components/HeaderCartButton';
@@ -12,18 +13,23 @@ import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPage
 import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
 import LiveTrackingMap from '../../components/shared/maps/LiveTrackingMap';
+import AssignmentWaitingCard from '../../components/services/AssignmentWaitingCard';
 import { colors } from './theme';
 
 type ParamList = { ServiceTracking: { bookingId: string } };
 const POLL_INTERVAL_MS = 10000;
-const CANCELLABLE = new Set<BookingStatus>(['PENDING', 'CONFIRMED', 'MECHANIC_ASSIGNED', 'MECHANIC_ACCEPTED']);
+// Mirrors CANCELLABLE_STATUSES in service.controller.ts. REJECTED is included
+// so a customer isn't stuck waiting indefinitely for an admin to reassign --
+// they can cancel and rebook themselves.
+const CANCELLABLE = new Set<BookingStatus>(['PENDING_ADMIN_ASSIGNMENT', 'MECHANIC_ASSIGNED', 'MECHANIC_ACCEPTED', 'REJECTED']);
 
-// PENDING and CONFIRMED collapse into a single "Booking Confirmed" step --
-// the transition between them is synchronous server-side (no payment
-// gateway to wait on yet), so a customer never meaningfully observes PENDING
-// on its own.
+// PENDING/CONFIRMED/PENDING_ADMIN_ASSIGNMENT collapse into a single "Booking
+// Confirmed" step -- there is no automatic matching any more, so a booking
+// simply waits here until an admin assigns a mechanic (see
+// AssignmentWaitingCard, rendered separately from this timeline while
+// waiting).
 const STATUS_STEPS: { statuses: BookingStatus[]; title: string; icon: string }[] = [
-  { statuses: ['PENDING', 'CONFIRMED'], title: 'Booking Confirmed', icon: '📝' },
+  { statuses: ['PENDING', 'CONFIRMED', 'PENDING_ADMIN_ASSIGNMENT'], title: 'Booking Confirmed', icon: '📝' },
   { statuses: ['MECHANIC_ASSIGNED'], title: 'Mechanic Assigned', icon: '👨‍🔧' },
   { statuses: ['MECHANIC_ACCEPTED'], title: 'Mechanic Accepted', icon: '✅' },
   { statuses: ['MECHANIC_ON_THE_WAY'], title: 'Mechanic On The Way', icon: '🚗' },
@@ -32,7 +38,7 @@ const STATUS_STEPS: { statuses: BookingStatus[]; title: string; icon: string }[]
   { statuses: ['COMPLETED'], title: 'Completed', icon: '🎉' },
 ];
 const STATUS_WEIGHT: Record<BookingStatus, number> = {
-  PENDING: 1, CONFIRMED: 1, MECHANIC_ASSIGNED: 2, MECHANIC_ACCEPTED: 3, MECHANIC_ON_THE_WAY: 4,
+  PENDING: 1, CONFIRMED: 1, PENDING_ADMIN_ASSIGNMENT: 1, MECHANIC_ASSIGNED: 2, MECHANIC_ACCEPTED: 3, MECHANIC_ON_THE_WAY: 4,
   ARRIVED: 5, WORK_STARTED: 6, COMPLETED: 7, CANCELLED: 0, REJECTED: 0,
 };
 
@@ -81,22 +87,56 @@ export default function ServiceTrackingScreen() {
     ).start();
   }, []);
 
+  const refresh = useCallback(async () => {
+    if (!token) return;
+    const data = await fetchBookingById(token, bookingId);
+    if (data) {
+      setBooking(data);
+      setLoading(false);
+    }
+  }, [token, bookingId]);
+
   useEffect(() => {
     if (!token) return;
-    let cancelled = false;
+    refresh();
+    const interval = setInterval(refresh, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [token, refresh]);
 
-    const poll = async () => {
-      const data = await fetchBookingById(token, bookingId);
-      if (!cancelled && data) {
-        setBooking(data);
-        setLoading(false);
-      }
+  // Booking creation, admin assignment, and mechanic accept/reject all now
+  // broadcast over the same job:<bookingId> socket room the emergency flow
+  // uses (see realtimeBooking.ts's broadcastBookingStatus) -- subscribe so
+  // this screen updates instantly instead of waiting up to POLL_INTERVAL_MS,
+  // matching EmergencyTrackingScreen's pattern.
+  useEffect(() => {
+    if (!token) return;
+    let unsubscribe: (() => void) | undefined;
+    let mounted = true;
+
+    (async () => {
+      const socket = await getSocket();
+      unsubscribe = await subscribeToJob(bookingId);
+      if (!mounted) return;
+
+      const onStatus = (payload: JobStatusEvent) => {
+        if (payload.bookingId !== bookingId) return;
+        setBooking((prev) => (prev ? { ...prev, status: payload.status as BookingStatus } : prev));
+        refresh();
+      };
+      socket.on(SERVER_EVENTS.JOB_STATUS, onStatus);
+
+      const prevUnsubscribe = unsubscribe;
+      unsubscribe = () => {
+        socket.off(SERVER_EVENTS.JOB_STATUS, onStatus);
+        prevUnsubscribe?.();
+      };
+    })();
+
+    return () => {
+      mounted = false;
+      unsubscribe?.();
     };
-
-    poll();
-    const interval = setInterval(poll, POLL_INTERVAL_MS);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [token, bookingId]);
+  }, [token, bookingId, refresh]);
 
   const technicianId = booking?.technician?.id;
   useEffect(() => {
@@ -187,6 +227,10 @@ export default function ServiceTrackingScreen() {
   const isCancelled = booking.status === 'CANCELLED';
   const isRejected = booking.status === 'REJECTED';
   const isCompleted = booking.status === 'COMPLETED';
+  const isPendingAssignment =
+    booking.status === 'PENDING_ADMIN_ASSIGNMENT' || booking.status === 'PENDING' || booking.status === 'CONFIRMED';
+  const isAwaitingMechanicAcceptance = booking.status === 'MECHANIC_ASSIGNED';
+  const isWaiting = isPendingAssignment || isAwaitingMechanicAcceptance || isRejected;
   // Non-blocking: approvalStatus is a flag layered on top of WORK_STARTED, not
   // a status of its own -- the timeline below keeps showing normally while
   // this banner is up.
@@ -216,16 +260,22 @@ export default function ServiceTrackingScreen() {
 
       <CompactBookingShell maxWidth={880} style={styles.flexFill}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        {isCancelled || isRejected ? (
+        {isCancelled ? (
           <View style={styles.cancelledBanner}>
             <Text style={styles.cancelledIcon}>✕</Text>
-            <Text style={styles.cancelledTitle}>{isRejected ? 'Finding a New Mechanic' : 'Booking Cancelled'}</Text>
-            {isRejected ? (
-              <Text style={styles.cancelledReason}>Your previous mechanic became unavailable. We're assigning a new one shortly.</Text>
-            ) : (
-              !!booking.cancelReason && <Text style={styles.cancelledReason}>{booking.cancelReason}</Text>
-            )}
+            <Text style={styles.cancelledTitle}>Booking Cancelled</Text>
+            {!!booking.cancelReason && <Text style={styles.cancelledReason}>{booking.cancelReason}</Text>}
           </View>
+        ) : isWaiting ? (
+          <AssignmentWaitingCard
+            phase={isAwaitingMechanicAcceptance ? 'MECHANIC_ASSIGNED' : isRejected ? 'REJECTED' : 'PENDING_ADMIN_ASSIGNMENT'}
+            bookingNumber={booking.bookingNumber}
+            serviceName={booking.package?.name || 'Service'}
+            vehicleLabel={`${booking.vehicleBrand} ${booking.vehicleModel}`}
+            onContactSupport={() => navigation.navigate('HelpCenter')}
+            onCancel={CANCELLABLE.has(booking.status) ? handleCancel : undefined}
+            cancelling={cancelling}
+          />
         ) : (
           <>
             {technician && technician.currentLat != null && technician.currentLng != null ? (
@@ -379,7 +429,7 @@ export default function ServiceTrackingScreen() {
         </View>
 
         <View style={{ paddingHorizontal: 16, gap: 10 }}>
-          {!isCancelled && !isCompleted && CANCELLABLE.has(booking.status) && (
+          {!isCancelled && !isCompleted && !isWaiting && CANCELLABLE.has(booking.status) && (
             <TouchableOpacity style={styles.cancelBtn} disabled={cancelling} onPress={handleCancel}>
               <Text style={styles.cancelBtnText}>{cancelling ? 'Cancelling...' : 'Cancel Booking'}</Text>
             </TouchableOpacity>

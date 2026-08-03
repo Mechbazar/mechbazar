@@ -8,8 +8,9 @@ import { colors } from '../../screens/services/theme';
 // Customer-facing labels -- PENDING/CONFIRMED and ASSIGNED/ACCEPTED collapse
 // into single steps for the same reason as ServiceTrackingScreen's timeline.
 const STATUS_LABEL: Record<BookingStatus, string> = {
-  PENDING: 'Booking Confirmed',
-  CONFIRMED: 'Booking Confirmed',
+  PENDING: 'Finding a Mechanic',
+  CONFIRMED: 'Finding a Mechanic',
+  PENDING_ADMIN_ASSIGNMENT: 'Finding a Mechanic',
   MECHANIC_ASSIGNED: 'Mechanic Assigned',
   MECHANIC_ACCEPTED: 'Mechanic Assigned',
   MECHANIC_ON_THE_WAY: 'Mechanic On The Way',
@@ -17,12 +18,13 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
   WORK_STARTED: 'Service In Progress',
   COMPLETED: 'Completed',
   CANCELLED: 'Cancelled',
-  REJECTED: 'Reassigning Mechanic',
+  REJECTED: 'Finding a Mechanic',
 };
 
 const STATUS_STYLE: Record<BookingStatus, { bg: string; border: string; text: string }> = {
   PENDING: { bg: '#FFF8E1', border: colors.warning, text: colors.warning },
   CONFIRMED: { bg: '#FFF8E1', border: colors.warning, text: colors.warning },
+  PENDING_ADMIN_ASSIGNMENT: { bg: '#FFF8E1', border: colors.warning, text: colors.warning },
   MECHANIC_ASSIGNED: { bg: '#FFF8E1', border: colors.warning, text: colors.warning },
   MECHANIC_ACCEPTED: { bg: '#FFF8E1', border: colors.warning, text: colors.warning },
   MECHANIC_ON_THE_WAY: { bg: '#EEF2FF', border: colors.primary, text: colors.primary },
@@ -33,9 +35,11 @@ const STATUS_STYLE: Record<BookingStatus, { bg: string; border: string; text: st
   REJECTED: { bg: '#FFF8E1', border: colors.warning, text: colors.warning },
 };
 
-// Mirrors CANCELLABLE in ServiceTrackingScreen -- once the mechanic is en
-// route the backend rejects customer cancellation.
-const CANCELLABLE = new Set<BookingStatus>(['PENDING', 'CONFIRMED', 'MECHANIC_ASSIGNED', 'MECHANIC_ACCEPTED']);
+// Mirrors CANCELLABLE_STATUSES in service.controller.ts -- once the mechanic
+// is en route the backend rejects customer cancellation. REJECTED is
+// included so a customer isn't stuck waiting indefinitely for an admin to
+// reassign -- they can cancel and rebook themselves.
+const CANCELLABLE = new Set<BookingStatus>(['PENDING_ADMIN_ASSIGNMENT', 'MECHANIC_ASSIGNED', 'MECHANIC_ACCEPTED', 'REJECTED']);
 const CLOSED = new Set<BookingStatus>(['COMPLETED', 'CANCELLED']);
 
 // Same rough client-side ETA as ServiceTrackingScreen: haversine at an

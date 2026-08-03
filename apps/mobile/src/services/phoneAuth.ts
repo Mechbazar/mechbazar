@@ -33,11 +33,15 @@ const EXPO_GO_HINT =
 type PhoneCredential = { providerId: string; token: string; secret: string };
 
 type RnfbAuth = {
-  getAuthInstance: () => unknown;
+  getAuthInstance: () => any;
   signInWithPhoneNumber: (auth: unknown, phone: string) => Promise<ConfirmationResult>;
   phoneCredential: (verificationId: string, code: string) => PhoneCredential;
   signInWithCredential: (auth: unknown, credential: PhoneCredential) => Promise<any>;
+  onAuthStateChanged: (auth: unknown, cb: (user: any) => void) => () => void;
+  signOut: (auth: unknown) => Promise<void>;
 };
+
+const e164For = (phone10Digit: string) => `+91${phone10Digit}`;
 
 // WARNING: these are console.log, and babel.config.js applies
 // `transform-remove-console` with `exclude: ['error','warn']` for production
@@ -117,6 +121,8 @@ const loadRnfbAuth = (): RnfbAuth => {
       getAuth,
       signInWithPhoneNumber,
       signInWithCredential,
+      onAuthStateChanged,
+      signOut,
       PhoneAuthProvider,
     } = require('@react-native-firebase/auth');
     return {
@@ -125,12 +131,59 @@ const loadRnfbAuth = (): RnfbAuth => {
       phoneCredential: (verificationId: string, code: string) =>
         PhoneAuthProvider.credential(verificationId, code),
       signInWithCredential,
+      onAuthStateChanged,
+      signOut,
     };
   } catch (err) {
     // Thrown while the RNFB module initialises against a missing native
     // counterpart -- the Expo Go case. Anything else is a genuine bug, so keep
     // the original message attached rather than swallowing it.
     throw new Error(`${EXPO_GO_HINT} (${(err as Error)?.message ?? String(err)})`);
+  }
+};
+
+// --- Android auto-verification ------------------------------------------------
+//
+// Android completes phone verification WITHOUT the user typing anything in two
+// situations: instant verification (this device+number pair was verified before,
+// so no SMS is even sent) and SMS auto-retrieval (Google Play services reads the
+// incoming Firebase SMS itself). Either fires the native SDK's
+// onVerificationCompleted callback, and @react-native-firebase responds to that
+// by calling signInWithCredential immediately, resolving the JS promise anyway
+// with a verificationId scraped out of the already-consumed credential. So the
+// app happily shows an OTP box, the user types the code, confirm() calls
+// signInWithCredential against a session Firebase already spent, and the server
+// answers auth/session-expired. The code was never wrong and never expired -- it
+// had already been used, by the phone, on the user's behalf.
+//
+// Armed by sendPhoneOtp only once it has confirmed the auth instance holds NO
+// signed-in user, and disarmed again the moment a token is handed out -- this is
+// what stops a LEFTOVER Firebase session (persisted across app launches, and not
+// cleared by logging out of MechBazar) from being mistaken for a fresh
+// auto-verification.
+let autoVerificationArmed = false;
+
+/**
+ * The Firebase user that auto-verification just signed in, or null. Requires
+ * both that the shortcut is armed and that the user's number is the one being
+ * verified -- an ID token for a different number would log the wrong user in.
+ */
+const autoVerifiedUser = (rnfb: RnfbAuth, e164: string): any | null => {
+  try {
+    const user = rnfb.getAuthInstance()?.currentUser;
+    if (!user) return null;
+    if (!autoVerificationArmed) {
+      log('signed-in Firebase user predates this verification -- ignoring');
+      return null;
+    }
+    if (user.phoneNumber !== e164) {
+      log('signed-in Firebase user is for a different number -- ignoring');
+      return null;
+    }
+    return user;
+  } catch (err) {
+    log('failed to read current Firebase user', (err as Error)?.message ?? err);
+    return null;
   }
 };
 
@@ -163,6 +216,11 @@ type PendingVerification = {
   verificationId: string;
   phone: string;
   createdAt: number;
+  // Mirrors the in-memory autoVerificationArmed flag at the moment this record
+  // was written -- a bare `let` does not survive the exact runtime restart this
+  // persistence block exists to survive (the user backgrounding the app to read
+  // the SMS). readPending() restores it below.
+  armed: boolean;
 };
 
 const savePending = async (pending: PendingVerification): Promise<void> => {
@@ -188,6 +246,10 @@ const readPending = async (): Promise<PendingVerification | null> => {
       await clearPending();
       return null;
     }
+    // Restore the arming gate every time a still-valid record is read, not just
+    // after a restart -- readPending() runs on the normal path too, and this
+    // keeps the two copies from ever silently diverging.
+    autoVerificationArmed = !!parsed.armed;
     return parsed;
   } catch (err) {
     log('failed to read pending verification', (err as Error)?.message ?? err);
@@ -205,8 +267,19 @@ const clearPending = async (): Promise<void> => {
 
 let confirmationResult: ConfirmationResult | null = null;
 
-export const sendPhoneOtp = async (phone10Digit: string): Promise<void> => {
-  const e164 = `+91${phone10Digit}`;
+export type SendOtpResult = {
+  /**
+   * True when Android verified the number on its own and there is no code for
+   * the user to enter -- the caller should log straight in with `idToken`
+   * instead of showing an OTP field.
+   */
+  autoVerified: boolean;
+  /** Firebase ID token, ready for the backend. Set only when autoVerified. */
+  idToken?: string;
+};
+
+export const sendPhoneOtp = async (phone10Digit: string): Promise<SendOtpResult> => {
+  const e164 = e164For(phone10Digit);
   log(`sendPhoneOtp called for ${e164}`);
 
   // A fresh send supersedes anything still pending, so drop the old handle
@@ -219,6 +292,7 @@ export const sendPhoneOtp = async (phone10Digit: string): Promise<void> => {
   // installed build does not contain, would otherwise stall the whole flow
   // with no error and no log line to show for it.
   confirmationResult = null;
+  autoVerificationArmed = false;
   void clearPending();
 
   try {
@@ -228,6 +302,24 @@ export const sendPhoneOtp = async (phone10Digit: string): Promise<void> => {
     const authInstance = rnfb.getAuthInstance();
     log('auth instance resolved');
     breadcrumb('send:firebase-ready');
+
+    // Firebase persists sign-ins, so a user from an earlier login is very
+    // likely still attached to this auth instance. Clearing it is what makes
+    // "currentUser is set once signInWithPhoneNumber resolves" an unambiguous
+    // signal that THIS verification auto-completed, rather than a leftover.
+    if (authInstance?.currentUser) {
+      try {
+        await rnfb.signOut(authInstance);
+        log('signed out the previously cached Firebase user');
+      } catch (err: any) {
+        // Leaves the shortcut disarmed rather than acting on a session we could
+        // not prove is fresh. The manual code path still works, and a genuine
+        // auto-verification still gets recovered in confirmPhoneOtp -- there,
+        // Firebase itself reports the session as spent, which is proof enough.
+        log('sign-out before send failed -- auto-verification shortcut stays off', err?.message ?? err);
+      }
+    }
+    autoVerificationArmed = !authInstance?.currentUser;
 
     // Every await below is bracketed by a log so a hang is attributable to one
     // specific call rather than to "somewhere in sendPhoneOtp".
@@ -242,15 +334,34 @@ export const sendPhoneOtp = async (phone10Digit: string): Promise<void> => {
     });
     breadcrumb('send:sms-dispatched');
 
+    // Instant verification: no SMS was ever sent and the sign-in is already
+    // done. Asking for a code here is what produced auth/session-expired. Best
+    // effort by design -- the native auth_state_changed event that updates
+    // currentUser is not ordered against this promise, so if it hasn't landed
+    // yet this reads null and the OTP step shows for a moment;
+    // watchForAutoVerification (wired up by the caller) closes that window.
+    const autoUser = autoVerifiedUser(rnfb, e164);
+    if (autoUser) {
+      log('Android auto-verified this number -- skipping the OTP step');
+      const idToken = await autoUser.getIdToken();
+      confirmationResult = null;
+      autoVerificationArmed = false;
+      await clearPending();
+      breadcrumb('send:auto-verified');
+      return { autoVerified: true, idToken };
+    }
+
     if (result?.verificationId) {
       await savePending({
         verificationId: String(result.verificationId),
         phone: e164,
         createdAt: Date.now(),
+        armed: autoVerificationArmed,
       });
     } else {
       log('WARNING: no verificationId on the ConfirmationResult -- confirm cannot survive a restart');
     }
+    return { autoVerified: false };
   } catch (err: any) {
     log(`signInWithPhoneNumber FAILED code=${err?.code ?? 'unknown'}`, err?.message ?? err);
     logAuthErrorDetail('sendPhoneOtp/signInWithPhoneNumber', err);
@@ -258,17 +369,92 @@ export const sendPhoneOtp = async (phone10Digit: string): Promise<void> => {
   }
 };
 
+/**
+ * Watches for a sign-in that this app never asked for -- i.e. Google Play
+ * services auto-retrieving the SMS a few seconds after it lands, while the user
+ * is still staring at the OTP box. Without this the session is consumed behind
+ * the user's back and whatever they type next fails with auth/session-expired.
+ *
+ * Call this only after a successful sendPhoneOtp for `phone10Digit`, and
+ * unsubscribe when the OTP step is left. Returns a no-op unsubscribe if the
+ * native module is unavailable, so Expo Go keeps working.
+ */
+export const watchForAutoVerification = (
+  phone10Digit: string,
+  onVerified: (idToken: string) => void
+): (() => void) => {
+  const e164 = e164For(phone10Digit);
+  let cancelled = false;
+  let unsubscribe: (() => void) | undefined;
+
+  try {
+    const rnfb = loadRnfbAuth();
+    unsubscribe = rnfb.onAuthStateChanged(rnfb.getAuthInstance(), () => {
+      // Deliberately re-reads currentUser through autoVerifiedUser rather than
+      // trusting the callback's argument: onAuthStateChanged also fires once on
+      // subscribe with whatever is already there, and only the gated read can
+      // tell a genuine auto-verification from a persisted earlier session.
+      const user = cancelled ? null : autoVerifiedUser(rnfb, e164);
+      if (!user) return;
+      log('auth state went signed-in without a confirm() call -- Android auto-verified');
+      user
+        .getIdToken()
+        .then((idToken: string) => {
+          if (cancelled) return;
+          confirmationResult = null;
+          autoVerificationArmed = false;
+          void clearPending();
+          onVerified(idToken);
+        })
+        .catch((err: any) =>
+          log('failed to read ID token after auto-verification', err?.message ?? err)
+        );
+    });
+  } catch (err) {
+    // Expo Go, or a build without the native module: there is nothing to watch
+    // and the manual code path is unaffected.
+    log('auto-verification watch unavailable', (err as Error)?.message ?? err);
+  }
+
+  return () => {
+    cancelled = true;
+    unsubscribe?.();
+  };
+};
+
 // Resolves to a Firebase ID token -- sent as the `otp` field to the
 // /auth/login and /auth/register endpoints, which verify it via firebase-admin
 // (see apps/backend/src/utils/otp.ts).
-export const confirmPhoneOtp = async (code: string): Promise<string> => {
+export const confirmPhoneOtp = async (code: string, phone10Digit: string): Promise<string> => {
   // Logged before any await, so pressing Verify always leaves a trace even if
   // something downstream never settles.
   log('confirmPhoneOtp called', { hasInMemoryConfirmation: !!confirmationResult });
 
+  const e164 = e164For(phone10Digit);
   const rnfb = loadRnfbAuth();
+
+  // Read (and, if the runtime restarted since sendPhoneOtp, RESTORE) pending
+  // state before the first auto-verification check below -- autoVerified is
+  // gated on autoVerificationArmed, and that flag is a bare `let` that resets
+  // to false across exactly the kind of restart this persistence layer exists
+  // to survive. Checking it first, unrestored, would silently refuse to
+  // recognise a real auto-verification that completed while the app was
+  // backgrounded.
   const pending = await readPending();
   log('pending verification lookup done', { hasPersistedVerification: !!pending });
+
+  // Auto-verification may have completed between the user tapping Login and
+  // this call. If it did, the sign-in already exists and there is nothing left
+  // to confirm -- going through confirm() would only spend a consumed session
+  // and surface it as "the sms code has expired".
+  const alreadyVerified = autoVerifiedUser(rnfb, e164);
+  if (alreadyVerified) {
+    log('already signed in for this number -- returning that token instead of confirming');
+    confirmationResult = null;
+    autoVerificationArmed = false;
+    await clearPending();
+    return alreadyVerified.getIdToken();
+  }
 
   if (!confirmationResult && !pending) {
     throw new Error('No OTP request in progress. Send an OTP first.');
@@ -291,12 +477,25 @@ export const confirmPhoneOtp = async (code: string): Promise<string> => {
   } catch (err: any) {
     log(`confirm FAILED code=${err?.code ?? 'unknown'}`, err?.message ?? err);
     logAuthErrorDetail('confirmPhoneOtp/confirm', err);
+
     // A wrong code is retryable and must NOT drop the pending verification; an
     // expired/consumed session is not, so clear it and make the user resend.
     if (err?.code === 'auth/session-expired' || err?.code === 'auth/code-expired') {
       confirmationResult = null;
       await clearPending();
+
+      // ...unless the session was consumed by auto-verification signing this
+      // very number in, in which case the "expired" session did its job and the
+      // user is logged in. Checked after the catch rather than before because
+      // the race is only observable once confirm() has round-tripped.
+      const raced = autoVerifiedUser(rnfb, e164);
+      if (raced) {
+        log('session was consumed by Android auto-verification -- treating as success');
+        autoVerificationArmed = false;
+        return raced.getIdToken();
+      }
     }
+
     throw new Error(friendlyAuthErrorMessage(err?.code, err?.message || 'Failed to verify OTP.'));
   }
 
@@ -307,6 +506,9 @@ export const confirmPhoneOtp = async (code: string): Promise<string> => {
   const idToken = await userCredential.user.getIdToken();
   log('OTP confirmed, ID token obtained');
   confirmationResult = null;
+  // confirm() itself just signed a user in, so leaving the shortcut armed would
+  // let the watcher fire a second, redundant login for the same token.
+  autoVerificationArmed = false;
   await clearPending();
   return idToken;
 };

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -27,7 +27,7 @@ import { logout, updateUserSuccess } from '../store/authSlice';
 import { setThemePreference } from '../store/themeSlice';
 import { API_BASE_URL, SERVER_ORIGIN } from '../services/api';
 import { fetchMyBookings, cancelServiceBooking } from '../services/service.service';
-import { sendPhoneOtp, confirmPhoneOtp } from '../services/phoneAuth';
+import { sendPhoneOtp, confirmPhoneOtp, watchForAutoVerification } from '../services/phoneAuth';
 
 const { width } = Dimensions.get('window');
 
@@ -112,6 +112,10 @@ export default function AccountScreen() {
   const [otpCode, setOtpCode] = useState('');
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isVerifyingPhone, setIsVerifyingPhone] = useState(false);
+  // Guards against completeUpdatePhone running twice if the auto-verification
+  // watcher and a manual submit both resolve to an ID token around the same
+  // time (see completeUpdatePhone below).
+  const completingPhoneUpdateRef = useRef(false);
   
   // Section Collapse/Expand states
   const [isSupportExpanded, setIsSupportExpanded] = useState(true);
@@ -198,6 +202,51 @@ export default function AccountScreen() {
     }
   };
 
+  // Everything after Firebase is happy: submit the ID token to update the
+  // phone number. Shared by the manual-code path and both auto-verification
+  // paths (instant, and late-arriving while the OTP box is showing) -- they
+  // differ only in how the token was obtained.
+  const completeUpdatePhone = async (idToken: string) => {
+    if (completingPhoneUpdateRef.current) return;
+    completingPhoneUpdateRef.current = true;
+    setIsOtpSent(false);
+    setIsVerifyingPhone(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/customers/me/phone`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ newPhone, otp: idToken }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        Alert.alert('Error', data.error || 'Failed to update phone number.');
+        return;
+      }
+      setIsChangePhoneModalVisible(false);
+      setOtpCode('');
+      setNewPhone('');
+      if (user) dispatch(updateUserSuccess({ ...user, phone: data.phone }));
+      Alert.alert('Success', 'Phone number updated successfully!');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      Alert.alert('Network Error', `Could not update phone number: ${message}`);
+    } finally {
+      completingPhoneUpdateRef.current = false;
+      setIsVerifyingPhone(false);
+    }
+  };
+
+  // Covers auto-verification arriving LATE, while this OTP box is up -- see
+  // services/phoneAuth.ts for why Android can sign a number in without the
+  // user ever typing a code.
+  useEffect(() => {
+    if (!isOtpSent) return;
+    if (newPhone.length !== 10) return;
+    return watchForAutoVerification(newPhone, (idToken) => {
+      void completeUpdatePhone(idToken);
+    });
+  }, [isOtpSent, newPhone]);
+
   const handleSendPhoneOtp = async () => {
     if (!newPhone.trim() || newPhone.length < 10) {
       Alert.alert('Validation Error', 'Please enter a valid 10-digit mobile number.');
@@ -206,9 +255,15 @@ export default function AccountScreen() {
     setIsVerifyingPhone(true);
     try {
       // Firebase Phone Auth against the NEW number sends the real SMS; the
-      // confirmed ID token is submitted in handleVerifyAndUpdatePhone. Same
+      // confirmed ID token is submitted via completeUpdatePhone. Same
       // Firebase-only flow as login -- there is no backend send-otp step.
-      await sendPhoneOtp(newPhone);
+      const result = await sendPhoneOtp(newPhone);
+      // ...unless Android verified the number instantly, in which case no SMS
+      // was sent and there is nothing to enter.
+      if (result.autoVerified && result.idToken) {
+        await completeUpdatePhone(result.idToken);
+        return;
+      }
       setIsOtpSent(true);
       Alert.alert('Verification Code Sent', 'A 6-digit OTP code has been sent to your new mobile number.');
     } catch (err) {
@@ -225,32 +280,18 @@ export default function AccountScreen() {
       return;
     }
     setIsVerifyingPhone(true);
+    // Confirm the SMS code with Firebase -> ID token, which the backend
+    // verifies (verifyOtpAndResolvePhone) before updating the number.
+    let idToken: string;
     try {
-      // Confirm the SMS code with Firebase -> ID token, which the backend
-      // verifies (verifyOtpAndResolvePhone) before updating the number.
-      const idToken = await confirmPhoneOtp(otpCode);
-      const res = await fetch(`${API_BASE_URL}/customers/me/phone`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ newPhone, otp: idToken }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        Alert.alert('Error', data.error || 'Failed to update phone number.');
-        return;
-      }
-      setIsChangePhoneModalVisible(false);
-      setIsOtpSent(false);
-      setOtpCode('');
-      setNewPhone('');
-      if (user) dispatch(updateUserSuccess({ ...user, phone: data.phone }));
-      Alert.alert('Success', 'Phone number updated successfully!');
+      idToken = await confirmPhoneOtp(otpCode, newPhone);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      Alert.alert('Network Error', `Could not update phone number: ${message}`);
-    } finally {
       setIsVerifyingPhone(false);
+      const message = err instanceof Error ? err.message : String(err);
+      Alert.alert('Error', message || 'The OTP you entered is incorrect or has expired.');
+      return;
     }
+    await completeUpdatePhone(idToken);
   };
 
   // Self-service account deletion. Required by Google Play's data deletion

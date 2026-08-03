@@ -1,30 +1,35 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Alert, ScrollView, Image } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import {
   jobService, Job, getSocket, subscribeToJob, SERVER_EVENTS,
-  JobStatusEvent, JobLocationEvent, JobEtaEvent, JobDispatchEvent, NotificationEvent,
+  JobStatusEvent, JobLocationEvent, JobEtaEvent, NotificationEvent,
 } from '@mechbazar/shared';
 import LiveTrackingMap from '../../components/shared/maps/LiveTrackingMap';
+import AssignmentWaitingCard from '../../components/services/AssignmentWaitingCard';
 import { colors } from './theme';
 
 // Live emergency job tracking. Distinct from ServiceTrackingScreen (the
-// scheduled-booking tracker, which polls every 10s and has no dispatch phase)
-// because this screen has a whole phase -- SEARCHING -- that scheduled
-// bookings never enter, and because "instant" only feels instant if updates
-// arrive over the socket rather than on the next poll tick.
+// scheduled-booking tracker, which polls every 10s) because "instant" only
+// feels instant if updates arrive over the socket rather than on the next
+// poll tick -- an emergency job's whole point is urgency.
 //
 // The socket is the primary channel; a 20s poll is kept underneath purely as
 // a safety net for a dropped connection (background app, dead Wi-Fi) so the
 // screen can never get permanently stuck showing a stale status.
+//
+// There is no automatic mechanic matching any more -- PENDING_ADMIN_ASSIGNMENT,
+// MECHANIC_ASSIGNED (not yet accepted) and REJECTED all render the same
+// reassuring AssignmentWaitingCard rather than a status-specific banner; only
+// MECHANIC_ACCEPTED and later show the live map/timeline.
 
 type ParamList = { EmergencyTracking: { bookingId: string } };
 const POLL_FALLBACK_MS = 20000;
 
 const STATUS_STEPS: { statuses: string[]; title: string; icon: string }[] = [
-  { statuses: ['PENDING', 'CONFIRMED', 'SEARCHING'], title: 'Searching...', icon: '🔍' },
-  { statuses: ['MECHANIC_ASSIGNED'], title: 'Mechanic Found', icon: '👨‍🔧' },
+  { statuses: ['PENDING', 'CONFIRMED', 'PENDING_ADMIN_ASSIGNMENT'], title: 'Request Received', icon: '📝' },
+  { statuses: ['MECHANIC_ASSIGNED'], title: 'Mechanic Assigned', icon: '👨‍🔧' },
   { statuses: ['MECHANIC_ACCEPTED'], title: 'Mechanic Accepted', icon: '✅' },
   { statuses: ['MECHANIC_ON_THE_WAY'], title: 'Mechanic En Route', icon: '🚗' },
   { statuses: ['ARRIVED'], title: 'Mechanic Arrived', icon: '📍' },
@@ -32,7 +37,7 @@ const STATUS_STEPS: { statuses: string[]; title: string; icon: string }[] = [
   { statuses: ['COMPLETED'], title: 'Work Completed', icon: '🎉' },
 ];
 const STATUS_WEIGHT: Record<string, number> = {
-  PENDING: 1, CONFIRMED: 1, SEARCHING: 1, MECHANIC_ASSIGNED: 2, MECHANIC_ACCEPTED: 3,
+  PENDING: 1, CONFIRMED: 1, PENDING_ADMIN_ASSIGNMENT: 1, SEARCHING: 1, MECHANIC_ASSIGNED: 2, MECHANIC_ACCEPTED: 3,
   MECHANIC_ON_THE_WAY: 4, ARRIVED: 5, WORK_STARTED: 6, COMPLETED: 7,
   CANCELLED: 0, REJECTED: 0, NO_MECHANIC_FOUND: 0,
 };
@@ -51,24 +56,12 @@ export default function EmergencyTrackingScreen() {
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [liveMechanic, setLiveMechanic] = useState<{ lat: number; lng: number } | null>(null);
-  const [dispatchProgress, setDispatchProgress] = useState<JobDispatchEvent | null>(null);
   const [otp, setOtp] = useState<{ purpose: 'START' | 'COMPLETION'; code: string; expiresAt: string } | null>(null);
   const [cancelling, setCancelling] = useState(false);
-  const [retrying, setRetrying] = useState(false);
   const [callMessage, setCallMessage] = useState<string | null>(null);
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [submittingRating, setSubmittingRating] = useState(false);
-
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.5, duration: 1000, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
-      ])
-    ).start();
-  }, []);
 
   const refresh = useCallback(async () => {
     const data = await jobService.getJob(bookingId);
@@ -114,7 +107,6 @@ export default function EmergencyTrackingScreen() {
       const onStatus = (payload: JobStatusEvent) => {
         if (payload.bookingId !== bookingId) return;
         setJob((prev) => (prev ? { ...prev, status: payload.status, statusMessage: payload.message } as Job : prev));
-        setDispatchProgress(null);
         // A fresh technician object only exists on the full job payload
         // (this event is deliberately thin) -- refetch once per real
         // transition rather than on every high-frequency location tick.
@@ -140,10 +132,6 @@ export default function EmergencyTrackingScreen() {
             : prev
         );
       };
-      const onDispatch = (payload: JobDispatchEvent) => {
-        if (payload.bookingId !== bookingId) return;
-        setDispatchProgress(payload);
-      };
       const onNotification = (payload: NotificationEvent) => {
         const data = payload.data as { bookingId?: string; otp?: string; purpose?: string } | null;
         if (data?.bookingId !== bookingId || !data?.otp) return;
@@ -157,14 +145,12 @@ export default function EmergencyTrackingScreen() {
       socket.on(SERVER_EVENTS.JOB_STATUS, onStatus);
       socket.on(SERVER_EVENTS.JOB_LOCATION, onLocation);
       socket.on(SERVER_EVENTS.JOB_ETA, onEta);
-      socket.on(SERVER_EVENTS.JOB_DISPATCH, onDispatch);
       socket.on(SERVER_EVENTS.NOTIFICATION, onNotification);
 
       unsubscribe = () => {
         socket.off(SERVER_EVENTS.JOB_STATUS, onStatus);
         socket.off(SERVER_EVENTS.JOB_LOCATION, onLocation);
         socket.off(SERVER_EVENTS.JOB_ETA, onEta);
-        socket.off(SERVER_EVENTS.JOB_DISPATCH, onDispatch);
         socket.off(SERVER_EVENTS.NOTIFICATION, onNotification);
         socket.emit('job:unsubscribe', { bookingId });
       };
@@ -189,14 +175,6 @@ export default function EmergencyTrackingScreen() {
         },
       },
     ]);
-  };
-
-  const handleRetry = async () => {
-    setRetrying(true);
-    const res = await jobService.retryDispatch(bookingId);
-    setRetrying(false);
-    if ('error' in res && res.error) Alert.alert('Error', res.error);
-    else refresh();
   };
 
   const handleCall = async () => {
@@ -228,11 +206,14 @@ export default function EmergencyTrackingScreen() {
     );
   }
 
-  const isSearching = job.status === 'SEARCHING' || job.status === 'PENDING' || job.status === 'CONFIRMED';
-  const isNoMechanic = job.status === 'NO_MECHANIC_FOUND';
+  const isPendingAssignment =
+    job.status === 'PENDING_ADMIN_ASSIGNMENT' || job.status === 'PENDING' ||
+    job.status === 'CONFIRMED' || job.status === 'SEARCHING' || job.status === 'NO_MECHANIC_FOUND';
+  const isAwaitingMechanicAcceptance = job.status === 'MECHANIC_ASSIGNED';
   const isCancelled = job.status === 'CANCELLED';
   const isRejected = job.status === 'REJECTED';
   const isCompleted = job.status === 'COMPLETED';
+  const isWaiting = isPendingAssignment || isAwaitingMechanicAcceptance || isRejected;
   const isLive = job.tracking.isLive;
   const currentWeight = STATUS_WEIGHT[job.status] ?? 0;
 
@@ -258,40 +239,16 @@ export default function EmergencyTrackingScreen() {
             <Text style={styles.bannerTitle}>Request Cancelled</Text>
             {!!job.cancelReason && <Text style={styles.bannerText}>{job.cancelReason}</Text>}
           </View>
-        ) : isNoMechanic ? (
-          <View style={styles.bannerBlock}>
-            <Text style={styles.bannerIcon}>😕</Text>
-            <Text style={styles.bannerTitle}>No Mechanic Available</Text>
-            <Text style={styles.bannerText}>
-              We couldn't reach a mechanic near you right now. You can retry, or our team has been notified and may call you.
-            </Text>
-            <TouchableOpacity style={styles.retryBtn} disabled={retrying} onPress={handleRetry}>
-              <Text style={styles.retryBtnText}>{retrying ? 'Retrying...' : 'Retry Now'}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : isRejected ? (
-          <View style={styles.bannerBlock}>
-            <Text style={styles.bannerIcon}>🔄</Text>
-            <Text style={styles.bannerTitle}>Finding a New Mechanic</Text>
-            <Text style={styles.bannerText}>Your previous mechanic became unavailable. We're searching for a replacement.</Text>
-          </View>
-        ) : isSearching ? (
-          <View style={styles.searchingBlock}>
-            <Animated.View style={[styles.searchPulse, { transform: [{ scale: pulseAnim }] }]} />
-            <Text style={styles.searchIcon}>🔍</Text>
-            <Text style={styles.searchTitle}>Searching for a mechanic near you...</Text>
-            {dispatchProgress && (
-              <Text style={styles.searchMeta}>
-                {dispatchProgress.exhausted
-                  ? 'No mechanics responded yet -- expanding search...'
-                  : `Wave ${dispatchProgress.wave} · notified ${dispatchProgress.totalNotified} mechanic${dispatchProgress.totalNotified === 1 ? '' : 's'}` +
-                    (dispatchProgress.radiusKm ? ` within ${dispatchProgress.radiusKm}km` : '')}
-              </Text>
-            )}
-            <TouchableOpacity style={styles.cancelBtn} disabled={cancelling} onPress={handleCancel}>
-              <Text style={styles.cancelBtnText}>{cancelling ? 'Cancelling...' : 'Cancel Request'}</Text>
-            </TouchableOpacity>
-          </View>
+        ) : isWaiting ? (
+          <AssignmentWaitingCard
+            phase={isAwaitingMechanicAcceptance ? 'MECHANIC_ASSIGNED' : isRejected ? 'REJECTED' : 'PENDING_ADMIN_ASSIGNMENT'}
+            bookingNumber={job.bookingNumber}
+            serviceName={job.package.name}
+            vehicleLabel={`${job.vehicle.brand} ${job.vehicle.model}`}
+            onContactSupport={() => navigation.navigate('HelpCenter')}
+            onCancel={handleCancel}
+            cancelling={cancelling}
+          />
         ) : (
           <>
             {mechanicLat != null && mechanicLng != null ? (
@@ -419,7 +376,7 @@ export default function EmergencyTrackingScreen() {
         </View>
 
         <View style={{ paddingHorizontal: 16, gap: 10 }}>
-          {!isCancelled && !isCompleted && !isSearching && !isNoMechanic && job.status !== 'WORK_STARTED' && (
+          {!isCancelled && !isCompleted && !isWaiting && job.status !== 'WORK_STARTED' && (
             <TouchableOpacity style={styles.cancelOutlineBtn} disabled={cancelling} onPress={handleCancel}>
               <Text style={styles.cancelOutlineBtnText}>{cancelling ? 'Cancelling...' : 'Cancel Request'}</Text>
             </TouchableOpacity>
@@ -442,16 +399,6 @@ const styles = StyleSheet.create({
   bannerIcon: { fontSize: 40, marginBottom: 12 },
   bannerTitle: { fontSize: 18, fontWeight: '800', color: colors.textDark, marginBottom: 8 },
   bannerText: { fontSize: 13, color: colors.textMuted, textAlign: 'center', lineHeight: 19 },
-  retryBtn: { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24, marginTop: 16 },
-  retryBtnText: { color: colors.white, fontWeight: '800', fontSize: 14 },
-
-  searchingBlock: { alignItems: 'center', padding: 50 },
-  searchPulse: { position: 'absolute', top: 40, width: 70, height: 70, borderRadius: 35, backgroundColor: '#FFE4E1' },
-  searchIcon: { fontSize: 44, marginBottom: 16 },
-  searchTitle: { fontSize: 16, fontWeight: '800', color: colors.textDark, marginBottom: 8, textAlign: 'center' },
-  searchMeta: { fontSize: 12, color: colors.textMuted, textAlign: 'center', marginBottom: 20 },
-  cancelBtn: { borderWidth: 1.5, borderColor: colors.danger, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24, marginTop: 10 },
-  cancelBtnText: { color: colors.danger, fontWeight: '800', fontSize: 13 },
 
   mapPlaceholder: { height: 180, backgroundColor: colors.borderLight, justifyContent: 'center', alignItems: 'center' },
   mapEmoji: { fontSize: 40, marginBottom: 8 },

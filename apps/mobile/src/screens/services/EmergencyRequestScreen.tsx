@@ -12,13 +12,14 @@ import { fetchServicePackageById } from '../../services/service.service';
 import { AddressPickerSheet } from '../../components/services/AddressPickerSheet';
 import { colors } from './theme';
 
-// Instant emergency booking. Deliberately NOT a variant of ServiceBookingScreen
+// Instant emergency request. Deliberately NOT a variant of ServiceBookingScreen
 // -- that screen's SCHEDULE step (date + time slot) has no meaning here: this
-// is a breakdown, help is dispatched the moment the customer submits, not on a
-// slot someone picks. Rather than thread an "emergency mode" flag through every
-// step of the scheduled wizard (and risk a future edit to that wizard silently
-// reintroducing a date picker onto this flow), this is its own screen with its
-// own four steps: VEHICLE -> ISSUE -> ADDRESS -> REVIEW.
+// is a breakdown, an admin assigns the nearest available mechanic the moment
+// the customer submits, not on a slot someone picks. Rather than thread an
+// "emergency mode" flag through every step of the scheduled wizard (and risk
+// a future edit to that wizard silently reintroducing a date picker onto this
+// flow), this is its own screen with its own four steps: VEHICLE -> ISSUE ->
+// ADDRESS -> REVIEW.
 
 type ParamList = { EmergencyRequest: { packageId: string; categoryId: string } };
 type Step = 'VEHICLE' | 'ISSUE' | 'ADDRESS' | 'REVIEW';
@@ -273,7 +274,7 @@ export default function EmergencyRequestScreen() {
     <ScrollView contentContainerStyle={styles.stepContent}>
       <View style={styles.urgentBanner}>
         <Text style={styles.urgentIcon}>🚨</Text>
-        <Text style={styles.urgentText}>We'll dispatch the nearest available mechanic to you immediately.</Text>
+        <Text style={styles.urgentText}>Our team will assign the nearest available mechanic to your request right away.</Text>
       </View>
 
       <View style={styles.summaryCard}>

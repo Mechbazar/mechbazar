@@ -3,6 +3,9 @@ import { VehicleType } from './product';
 export type BookingStatus =
   | 'PENDING'
   | 'CONFIRMED'
+  // Every new booking starts here and stays until an admin manually assigns
+  // a mechanic -- there is no automatic matching any more.
+  | 'PENDING_ADMIN_ASSIGNMENT'
   | 'MECHANIC_ASSIGNED'
   | 'MECHANIC_ACCEPTED'
   | 'MECHANIC_ON_THE_WAY'
@@ -138,6 +141,10 @@ export interface ServiceBooking {
   approvalNote?: string | null;
   cancelReason?: string | null;
   completedAt?: string | null;
+  // Deadline for the currently assigned mechanic to accept/reject. Set when
+  // an admin assigns, cleared on accept. Drives the waiting-screen copy and
+  // (mechanic-side) the accept/reject countdown.
+  assignmentExpiresAt?: string | null;
   // Only ever present in the customer's own view of the booking -- the
   // backend strips these from a technician's response, since the whole point
   // is the customer reads the code aloud rather than the technician seeing it.
