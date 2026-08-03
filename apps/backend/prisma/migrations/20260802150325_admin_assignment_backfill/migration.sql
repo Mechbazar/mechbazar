@@ -9,6 +9,12 @@
 -- dispatch offer left open by the old wave engine mid-flight. Idempotent --
 -- safe to run more than once, since the WHERE clauses only match rows still
 -- in the old states.
+--
+-- Also sets the column DEFAULT here rather than in the enum-adding migration
+-- -- see that migration's header comment, it hit exactly this constraint on
+-- first deploy (error 55P04).
+
+ALTER TABLE "ServiceBooking" ALTER COLUMN "status" SET DEFAULT 'PENDING_ADMIN_ASSIGNMENT';
 
 UPDATE "ServiceBooking"
 SET "status" = 'PENDING_ADMIN_ASSIGNMENT', "dispatchWave" = 0, "dispatchEndedAt" = NOW()

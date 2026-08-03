@@ -12,17 +12,19 @@
 -- enum values so old rows still satisfy the schema; no code writes them any
 -- more.
 --
--- The data backfill (moving existing rows out of the retired statuses) is a
--- SEPARATE migration (…_admin_assignment_backfill) rather than appended
--- here: Postgres refuses to use a newly-added enum value inside the same
--- transaction that added it, and each migration.sql runs as one transaction.
+-- The data backfill (moving existing rows out of the retired statuses) AND
+-- the column default (also a use of the new value) are BOTH pushed into the
+-- separate …_admin_assignment_backfill migration rather than appended here:
+-- Postgres refuses to use a newly-added enum value -- including as a column
+-- DEFAULT -- inside the same transaction that added it, and each
+-- migration.sql runs as one transaction. (First deploy attempt hit exactly
+-- this as error 55P04 on the SET DEFAULT line below; fixed by moving it.)
 
 -- AlterEnum
 ALTER TYPE "BookingStatus" ADD VALUE 'PENDING_ADMIN_ASSIGNMENT';
 
 -- AlterTable
 ALTER TABLE "ServiceBooking" ADD COLUMN     "assignmentExpiresAt" TIMESTAMP(3);
-ALTER TABLE "ServiceBooking" ALTER COLUMN "status" SET DEFAULT 'PENDING_ADMIN_ASSIGNMENT';
 
 -- DropIndex
 DROP INDEX "ServiceBooking_status_dispatchStartedAt_idx";
