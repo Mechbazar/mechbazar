@@ -31,6 +31,7 @@ export default function Orders() {
   const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [loadError, setLoadError] = useState('');
+  const [reconciling, setReconciling] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -54,9 +55,11 @@ export default function Orders() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setOrders(res.data);
+      return res.data;
     } catch (error) {
       console.error('Failed to fetch orders', error);
       setLoadError('Could not load orders. Please sign out and sign in again.');
+      return null;
     }
   };
 
@@ -124,6 +127,46 @@ export default function Orders() {
         return <Badge variant="danger" className="!rounded-full flex items-center gap-1 w-fit"><X className="w-3 h-3"/> Returned</Badge>;
       default:
         return <Badge variant="neutral" className="!rounded-full flex items-center gap-1 w-fit">{status}</Badge>;
+    }
+  };
+
+  // Payment.method/status only ever diverge from COD/PENDING once Razorpay is
+  // configured on the backend -- see apps/backend/src/services/payment.service.ts.
+  // Rendered defensively (falls back to COD) since orders placed before this
+  // column existed have no payment row shape guarantees beyond method/status.
+  const getPaymentBadge = (payment: any) => {
+    const method = payment?.method || 'COD';
+    if (method === 'COD') {
+      return <Badge variant="neutral" className="!rounded-full w-fit">COD</Badge>;
+    }
+    const status = payment?.status || 'PENDING';
+    switch (status) {
+      case 'SUCCESS':
+        return <Badge variant="success" className="!rounded-full w-fit">Paid Online</Badge>;
+      case 'FAILED':
+        return <Badge variant="danger" className="!rounded-full w-fit">Payment Failed</Badge>;
+      case 'REFUNDED':
+        return <Badge variant="warning" className="!rounded-full w-fit">Refunded</Badge>;
+      default:
+        return <Badge variant="warning" className="!rounded-full w-fit">Payment Pending</Badge>;
+    }
+  };
+
+  const handleReconcilePayment = async (orderId: string) => {
+    setReconciling(true);
+    try {
+      const res = await axios.post(`${API_URL}/payments/${orderId}/reconcile`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert(res.data.message || 'Reconciliation complete.');
+      const refreshed = await fetchOrders();
+      const refreshedOrder = refreshed?.find((o: any) => o.id === orderId);
+      if (refreshedOrder) setSelectedOrder(refreshedOrder);
+    } catch (error: any) {
+      console.error('Failed to reconcile payment', error);
+      alert(error.response?.data?.error || 'Failed to check payment status');
+    } finally {
+      setReconciling(false);
     }
   };
 
@@ -265,6 +308,7 @@ export default function Orders() {
                 <th className="p-4 font-semibold">Customer</th>
                 <th className="p-4 font-semibold">Type</th>
                 <th className="p-4 font-semibold">Status</th>
+                <th className="p-4 font-semibold">Payment</th>
                 <th className="p-4 font-semibold">Driver</th>
                 <th className="p-4 font-semibold text-right">Actions</th>
               </tr>
@@ -272,7 +316,7 @@ export default function Orders() {
             <tbody className="divide-y divide-neutral-800">
               {paginatedOrders.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-neutral-500">No orders found.</td>
+                  <td colSpan={7} className="text-center py-12 text-neutral-500">No orders found.</td>
                 </tr>
               )}
               {paginatedOrders.map((order) => {
@@ -294,6 +338,9 @@ export default function Orders() {
                   </td>
                   <td className="p-4">
                     {getStatusBadge(order.status)}
+                  </td>
+                  <td className="p-4">
+                    {getPaymentBadge(order.payment)}
                   </td>
                   <td className="p-4">
                     {order.deliveryPartner ? (
@@ -486,14 +533,38 @@ export default function Orders() {
                 <p className="text-xl font-bold text-white">₹{selectedOrder.finalAmount?.toLocaleString()}</p>
               </div>
 
-              {selectedOrder.payment?.method === 'COD' && (
-                <div className="bg-neutral-950 p-4 rounded-lg flex justify-between items-center mb-6">
-                  <p className="font-medium text-neutral-300">COD Collection</p>
-                  <p className={`text-sm font-bold ${selectedOrder.codCollected ? 'text-success-400' : 'text-danger-400'}`}>
-                    {selectedOrder.codCollected ? 'Collected' : 'Not yet collected'}
-                  </p>
+              <div className="bg-neutral-950 p-4 rounded-lg mb-6">
+                <div className="flex justify-between items-center">
+                  <p className="font-medium text-neutral-300">Payment</p>
+                  {getPaymentBadge(selectedOrder.payment)}
                 </div>
-              )}
+                {(!selectedOrder.payment || selectedOrder.payment.method === 'COD') ? (
+                  <div className="flex justify-between items-center mt-3">
+                    <p className="text-sm text-neutral-400">Cash Collection</p>
+                    <p className={`text-sm font-bold ${selectedOrder.codCollected ? 'text-success-400' : 'text-danger-400'}`}>
+                      {selectedOrder.codCollected ? 'Collected' : 'Not yet collected'}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {selectedOrder.payment.status === 'FAILED' && selectedOrder.payment.failureReason && (
+                      <p className="text-sm text-danger-400 mt-3">{selectedOrder.payment.failureReason}</p>
+                    )}
+                    {selectedOrder.payment.gatewayPaymentId && (
+                      <p className="text-xs text-neutral-500 mt-3">Gateway payment ID: {selectedOrder.payment.gatewayPaymentId}</p>
+                    )}
+                    {selectedOrder.payment.status === 'PENDING' && (
+                      <button
+                        onClick={() => handleReconcilePayment(selectedOrder.id)}
+                        disabled={reconciling}
+                        className="mt-3 w-full bg-navy-500/10 text-navy-400 hover:bg-navy-500/20 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+                      >
+                        {reconciling ? 'Checking...' : 'Recheck Payment Status'}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
 
               {selectedOrder.proofImageUrl && (
                 <div className="mb-6">

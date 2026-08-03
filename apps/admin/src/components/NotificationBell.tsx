@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import { Bell } from 'lucide-react';
 import { API_URL } from '../config/api';
+import { getAdminSocket } from '../services/adminRealtime';
 
 const POLL_INTERVAL_MS = 20000;
 
@@ -32,6 +33,21 @@ export default function NotificationBell() {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
+  }, [token]);
+
+  // A new booking, a rejection, or an assignment expiring all push a
+  // notification the instant they happen (see notify.ts's notifyUser/
+  // notifyAdmins) -- react to that socket event instead of waiting up to
+  // POLL_INTERVAL_MS so admins see "New service booking" the moment it lands.
+  useEffect(() => {
+    if (!token) return;
+    const socket = getAdminSocket();
+    const onNotification = () => fetchNotifications();
+    socket.on('notification', onNotification);
+    return () => {
+      socket.off('notification', onNotification);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   useEffect(() => {

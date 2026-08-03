@@ -14,10 +14,10 @@ import type { LocationMapMarker } from '../../components/maps/LocationMapView';
 const POLL_MS = 6000;
 
 const STATUS_LABEL: Record<string, string> = {
-  PENDING: 'Pending', CONFIRMED: 'Confirmed', SEARCHING: 'Searching',
+  PENDING_ADMIN_ASSIGNMENT: 'Pending Assignment',
   MECHANIC_ASSIGNED: 'Assigned', MECHANIC_ACCEPTED: 'Accepted', MECHANIC_ON_THE_WAY: 'En Route',
   ARRIVED: 'Arrived', WORK_STARTED: 'Work Started', COMPLETED: 'Completed',
-  CANCELLED: 'Cancelled', REJECTED: 'Rejected', NO_MECHANIC_FOUND: 'Unfilled',
+  CANCELLED: 'Cancelled', REJECTED: 'Needs Reassignment',
 };
 
 const ALERT_BADGE: Record<string, 'success' | 'warning' | 'danger'> = { ok: 'success', warn: 'warning', critical: 'danger' };
@@ -34,7 +34,7 @@ export default function LiveOps() {
   const [data, setData] = useState<LiveOpsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState<LiveOpsJobRow | null>(null);
-  const [filter, setFilter] = useState<'all' | 'critical' | 'searching'>('all');
+  const [filter, setFilter] = useState<'all' | 'critical' | 'pending'>('all');
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -81,7 +81,7 @@ export default function LiveOps() {
   const filteredJobs = useMemo(() => {
     const jobs = data?.jobs || [];
     if (filter === 'critical') return jobs.filter((j) => j.alert.level === 'critical');
-    if (filter === 'searching') return jobs.filter((j) => j.status === 'SEARCHING');
+    if (filter === 'pending') return jobs.filter((j) => j.status === 'PENDING_ADMIN_ASSIGNMENT' || j.status === 'REJECTED');
     return jobs;
   }, [data, filter]);
 
@@ -113,10 +113,10 @@ export default function LiveOps() {
   return (
     <div className="flex flex-col h-full gap-4">
       <div className="flex flex-wrap gap-3">
-        <StatCard icon={Search} label="Searching" value={data?.stats.searching ?? 0} color="text-warning-500" />
+        <StatCard icon={Search} label="Pending Assignment" value={data?.stats.pendingAssignment ?? 0} color="text-warning-500" />
         <StatCard icon={Navigation} label="En Route" value={data?.stats.enRoute ?? 0} color="text-info-500" />
         <StatCard icon={Wrench} label="Working" value={data?.stats.working ?? 0} color="text-primary-500" />
-        <StatCard icon={AlertTriangle} label="Unfilled Today" value={data?.stats.unfilledToday ?? 0} color="text-danger-500" />
+        <StatCard icon={AlertTriangle} label="Needs Reassignment Today" value={data?.stats.needsReassignmentToday ?? 0} color="text-danger-500" />
         <StatCard icon={MapPin} label="Mechanics Online" value={data?.stats.mechanicsOnline ?? 0} color="text-success-500" />
       </div>
 
@@ -128,7 +128,7 @@ export default function LiveOps() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-neutral-100">Active Jobs</h2>
           <div className="flex gap-2">
-            {(['all', 'critical', 'searching'] as const).map((f) => (
+            {(['all', 'critical', 'pending'] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -249,14 +249,14 @@ function JobDetailPanel({
     }
   };
 
-  const handleRedispatch = async () => {
+  const handleReturnToQueue = async () => {
     setBusy(true);
     try {
       await liveOpsService.redispatch(token, job.id);
       onChanged();
       onClose();
     } catch (err: any) {
-      alert(err?.response?.data?.error || 'Failed to redispatch');
+      alert(err?.response?.data?.error || 'Failed to return to queue');
     } finally {
       setBusy(false);
     }
@@ -320,12 +320,12 @@ function JobDetailPanel({
 
         {detail?.dispatchOffers?.length > 0 && (
           <div className="mb-4">
-            <div className="text-neutral-500 text-sm mb-2">Dispatch Offers ({detail.dispatchOffers.length})</div>
+            <div className="text-neutral-500 text-sm mb-2">Assignment Offer</div>
             <div className="space-y-1 text-sm">
               {detail.dispatchOffers.map((o: any) => (
                 <div key={o.id} className="flex justify-between text-neutral-300">
-                  <span>{o.technicianName || 'Unknown'} · wave {o.wave} · {o.distanceKm?.toFixed(1)}km</span>
-                  <Badge size="sm" variant={o.status === 'ACCEPTED' ? 'success' : o.status === 'DECLINED' ? 'danger' : 'neutral'}>{o.status}</Badge>
+                  <span>{o.technicianName || 'Unknown'}{o.distanceKm != null ? ` · ${o.distanceKm.toFixed(1)}km` : ''}</span>
+                  <Badge size="sm" variant={o.status === 'ACCEPTED' ? 'success' : o.status === 'DECLINED' || o.status === 'EXPIRED' ? 'danger' : 'neutral'}>{o.status}</Badge>
                 </div>
               ))}
             </div>
@@ -351,13 +351,13 @@ function JobDetailPanel({
           </div>
         )}
 
-        {job.status === 'NO_MECHANIC_FOUND' && (
+        {job.status === 'MECHANIC_ASSIGNED' && (
           <button
             disabled={busy}
-            onClick={handleRedispatch}
+            onClick={handleReturnToQueue}
             className="w-full mb-4 px-4 py-2 rounded bg-info-600 hover:bg-info-500 text-white font-semibold disabled:opacity-50"
           >
-            Re-dispatch
+            Return to Queue (mechanic not responding)
           </button>
         )}
 

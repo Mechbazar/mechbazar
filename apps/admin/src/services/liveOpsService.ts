@@ -50,7 +50,7 @@ export interface LiveOpsMechanicRow {
 export interface LiveOpsResponse {
   jobs: LiveOpsJobRow[];
   mechanics: LiveOpsMechanicRow[];
-  stats: { searching: number; enRoute: number; working: number; unfilledToday: number; mechanicsOnline: number };
+  stats: { pendingAssignment: number; enRoute: number; working: number; needsReassignmentToday: number; mechanicsOnline: number };
   serverTime: string;
 }
 

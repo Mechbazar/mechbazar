@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Badge, Dialog, Button, Loader } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
+import { getAdminSocket } from '../services/adminRealtime';
 
 const BOOKINGS_POLL_INTERVAL_MS = 15000;
 const PAGE_SIZE = 20;
@@ -29,27 +30,25 @@ const ADMIN_STATUS_ACTIONS: Record<string, { next: string; label: string }[]> = 
 // "Today" is a date filter, not a status -- handled separately from the
 // status-bucket tabs below. "In Progress" groups ARRIVED+WORK_STARTED, same
 // grouping convention the previous single-tab page used for its wider
-// mid-flow statuses.
+// mid-flow statuses. "Pending Assignment" is now the primary admin queue --
+// there is no more automatic matching, so this is where every fresh booking
+// (and every booking a mechanic declined/ignored) lands and waits for an
+// admin to manually assign a mechanic.
 const STATUS_TABS: { label: string; statuses?: string[] }[] = [
   { label: 'All' },
   { label: 'Today' },
-  { label: 'Pending', statuses: ['PENDING', 'CONFIRMED'] },
+  { label: 'Pending Assignment', statuses: ['PENDING_ADMIN_ASSIGNMENT', 'REJECTED'] },
   { label: 'Assigned', statuses: ['MECHANIC_ASSIGNED'] },
   { label: 'Accepted', statuses: ['MECHANIC_ACCEPTED'] },
   { label: 'On The Way', statuses: ['MECHANIC_ON_THE_WAY'] },
   { label: 'In Progress', statuses: ['ARRIVED', 'WORK_STARTED'] },
   { label: 'Completed', statuses: ['COMPLETED'] },
   { label: 'Cancelled', statuses: ['CANCELLED'] },
-  // Not in the original filter spec, but a rejected job still needs
-  // reassignment and must stay visible/actionable to the admin -- folding it
-  // into "Pending" would hide that it needs attention for a different reason.
-  { label: 'Rejected', statuses: ['REJECTED'] },
 ];
 
 const getStatusBadge = (status: string) => {
   switch (status) {
-    case 'PENDING': return <Badge variant="secondary" className="!rounded-full flex items-center gap-1 w-fit"><Clock className="w-3 h-3" /> Pending</Badge>;
-    case 'CONFIRMED': return <Badge variant="secondary" className="!rounded-full flex items-center gap-1 w-fit">Confirmed</Badge>;
+    case 'PENDING_ADMIN_ASSIGNMENT': return <Badge variant="secondary" className="!rounded-full flex items-center gap-1 w-fit"><Clock className="w-3 h-3" /> Pending Assignment</Badge>;
     case 'MECHANIC_ASSIGNED': return <Badge variant="warning" className="!rounded-full flex items-center gap-1 w-fit"><Wrench className="w-3 h-3" /> Assigned</Badge>;
     case 'MECHANIC_ACCEPTED': return <Badge variant="primary" className="!rounded-full flex items-center gap-1 w-fit">Accepted</Badge>;
     case 'MECHANIC_ON_THE_WAY': return <Badge variant="primary" className="!rounded-full flex items-center gap-1 w-fit">On The Way</Badge>;
@@ -137,6 +136,21 @@ export default function ServiceBookingsPage() {
     fetchBookings();
     const interval = setInterval(fetchBookings, BOOKINGS_POLL_INTERVAL_MS);
     return () => clearInterval(interval);
+  }, [token, page, activeTab, paymentFilter, vehicleFilter, searchQuery]);
+
+  // New booking, admin assignment, mechanic accept/reject -- every status
+  // change now broadcasts admin:job-update (see realtimeBooking.ts and
+  // jobState.ts's broadcastJobStatus), so this page can refresh instantly
+  // instead of waiting up to BOOKINGS_POLL_INTERVAL_MS for the next poll.
+  useEffect(() => {
+    if (!token) return;
+    const socket = getAdminSocket();
+    const onUpdate = () => fetchBookings();
+    socket.on('admin:job-update', onUpdate);
+    return () => {
+      socket.off('admin:job-update', onUpdate);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, page, activeTab, paymentFilter, vehicleFilter, searchQuery]);
 
   const openAssignDialog = async (booking: any) => {
