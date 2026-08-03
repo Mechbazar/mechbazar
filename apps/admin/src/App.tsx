@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Car, Users, Layers, Package, LogOut, Store, Navigation, Warehouse, Image, Tag, CreditCard, Bike, Wrench, ClipboardList, Layers3, Menu, X, FileText, ScrollText, KeyRound } from 'lucide-react';
+import { LayoutDashboard, Car, Users, Layers, Package, LogOut, Store, Navigation, Warehouse, Image, Tag, CreditCard, Wrench, ClipboardList, Layers3, Menu, X, FileText, ScrollText, KeyRound } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { Logo } from '@mechbazar/shared/web';
 import { useDispatch, useSelector } from 'react-redux';
@@ -36,7 +36,6 @@ const ServicesManagement = lazy(() => import('./pages/services'));
 const ServiceBookingsPage = lazy(() => import('./pages/ServiceBookingsPage'));
 const MechanicsPage = lazy(() => import('./pages/MechanicsPage'));
 const Payouts = lazy(() => import('./pages/Payouts'));
-const RiderPayouts = lazy(() => import('./pages/RiderPayouts'));
 const Reports = lazy(() => import('./pages/Reports'));
 const AuditLogs = lazy(() => import('./pages/AuditLogs'));
 
@@ -60,8 +59,11 @@ const NAV_ROLES: Record<string, string[]> = {
   '/customers': ['ADMIN', 'SUPER_ADMIN', 'CUSTOMER_SUPPORT'],
   '/cms': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER', 'VENDOR_MANAGER'],
   '/coupons': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER', 'FINANCE_MANAGER'],
-  '/payouts': ['ADMIN', 'SUPER_ADMIN', 'VENDOR_MANAGER'],
-  '/rider-payouts': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
+  // Now covers vendor + rider + mechanic payouts in one page (used to be
+  // three separate pages/tabs with three separate role sets: vendor payouts
+  // was VENDOR_MANAGER-only, rider/technician payouts were
+  // OPERATIONS_MANAGER-only) -- union of both so neither role loses access.
+  '/payouts': ['ADMIN', 'SUPER_ADMIN', 'VENDOR_MANAGER', 'OPERATIONS_MANAGER'],
   '/reports': ['SUPER_ADMIN', 'ADMIN'],
   '/audit-logs': ['SUPER_ADMIN', 'ADMIN'],
 };
@@ -95,7 +97,6 @@ function MainLayout({ children }: { children: React.ReactNode }) {
     { to: '/cms', icon: Image, label: 'Banners & CMS' },
     { to: '/coupons', icon: Tag, label: 'Coupons' },
     { to: '/payouts', icon: CreditCard, label: 'Payouts' },
-    { to: '/rider-payouts', icon: Bike, label: 'Rider Payouts' },
     { to: '/reports', icon: FileText, label: 'Reports' },
     { to: '/audit-logs', icon: ScrollText, label: 'Audit Logs' },
   ];
@@ -216,7 +217,6 @@ function App() {
                 <Route path="cms" element={<Banners />} />
                 <Route path="coupons" element={<Coupons />} />
                 <Route path="payouts" element={<Payouts />} />
-                <Route path="rider-payouts" element={<RiderPayouts />} />
                 <Route path="reports" element={<Reports />} />
                 <Route path="audit-logs" element={<AuditLogs />} />
                 <Route path="vehicles" element={<Vehicles />} />

@@ -1,23 +1,23 @@
 import { useState } from 'react';
-import { LayoutDashboard, Layers, Package, Clock3, Wallet, Siren } from 'lucide-react';
+import { LayoutDashboard, Layers, Package, Clock3, Siren } from 'lucide-react';
 import ServicesDashboard from './ServicesDashboard';
 import ServiceCategories from './ServiceCategories';
 import ServicePackages from './ServicePackages';
 import ServiceTimeSlots from './ServiceTimeSlots';
-import TechnicianPayouts from './TechnicianPayouts';
 import LiveOps from './LiveOps';
 
 // Bookings and Technicians are now dedicated top-level pages (Service
 // Bookings / Mechanics in the sidebar) -- this tab set is just the service
-// catalog/config side (categories, packages, time slots, payouts) plus the
-// emergency-dispatch live-ops board.
+// catalog/config side (categories, packages, time slots) plus the
+// emergency-dispatch live-ops board. Technician payouts moved into the
+// unified Payouts page (vendor + rider + mechanic in one place) instead of
+// living here as its own tab.
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'live-ops', label: 'Live Ops', icon: Siren },
   { id: 'categories', label: 'Categories', icon: Layers },
   { id: 'packages', label: 'Packages', icon: Package },
   { id: 'slots', label: 'Time Slots', icon: Clock3 },
-  { id: 'payouts', label: 'Technician Payouts', icon: Wallet },
 ];
 
 export default function ServicesManagement() {
@@ -52,7 +52,6 @@ export default function ServicesManagement() {
         {activeTab === 'categories' && <ServiceCategories />}
         {activeTab === 'packages' && <ServicePackages />}
         {activeTab === 'slots' && <ServiceTimeSlots />}
-        {activeTab === 'payouts' && <TechnicianPayouts />}
       </div>
     </div>
   );
