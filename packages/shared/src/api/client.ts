@@ -66,6 +66,22 @@ export const resolveUploadUrl = (path?: string | null): string | null => {
   return `${getApiBaseUrl().replace(/\/api\/?$/, '')}${path.startsWith('/') ? '' : '/'}${path}`;
 };
 
+/**
+ * Push-token registration for apps whose account lives on the base User
+ * model rather than a role-specific table (admin-mobile, seller-mobile --
+ * both sign in through User.password, same as changePassword above). Riders
+ * and technicians use their own /riders/me/push-token and
+ * /technicians/me/push-token instead, which target DeliveryPartner /
+ * ServiceTechnician directly.
+ */
+export const registerPushToken = async (token: string): Promise<void> => {
+  await apiClient.patch('/auth/push-token', { token, type: 'expo' });
+};
+
+export const clearPushToken = async (): Promise<void> => {
+  await apiClient.delete('/auth/push-token', { params: { type: 'expo' } });
+};
+
 export const apiClient = axios.create({
   baseURL: API_URL,
   timeout: 10000,
@@ -99,10 +115,19 @@ export const setUnauthorizedHandler = (handler: () => void) => {
   onUnauthorized = handler;
 };
 
+// /auth/change-password's 401 means "current password is wrong", not "your
+// session expired" (see its own backend handler and each app's
+// ChangePasswordScreen, which already render that exact message) -- treating
+// it like every other 401 here would delete a still-valid token and force-
+// logout a user who just made a typo.
+const isSessionExpired401 = (error: any) =>
+  error?.response?.status === 401 &&
+  !(typeof error?.config?.url === 'string' && error.config.url.includes('/auth/change-password'));
+
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error?.response?.status === 401) {
+    if (isSessionExpired401(error)) {
       try {
         await SecureStore.deleteItemAsync('token');
       } catch {

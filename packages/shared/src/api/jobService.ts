@@ -173,15 +173,6 @@ export const jobService = {
     }
   },
 
-  retryDispatch: async (id: string): Promise<{ job?: Job } & Partial<ApiErrorShape>> => {
-    try {
-      const res = await apiClient.post(`/jobs/${id}/retry`);
-      return res.data;
-    } catch (err) {
-      return unwrapError(err);
-    }
-  },
-
   getTrail: async (id: string): Promise<{ lat: number; lng: number; recordedAt: string }[]> => {
     try {
       const res = await apiClient.get(`/jobs/${id}/trail`);
