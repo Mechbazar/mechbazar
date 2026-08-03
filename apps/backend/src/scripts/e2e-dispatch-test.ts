@@ -1,5 +1,13 @@
 /**
- * End-to-end test harness for the emergency dispatch workflow.
+ * SUPERSEDED -- this exercises the automatic multi-mechanic wave-dispatch
+ * engine (fan-out, accept race, NO_MECHANIC_FOUND) that was removed in favor
+ * of pure admin-controlled single-mechanic assignment. Kept only as a
+ * historical reference for the old contract; it will fail against the
+ * current backend (there is no more wave fan-out, no accept race, and
+ * NO_MECHANIC_FOUND is never produced). See scratchpad replay scripts for
+ * coverage of the current admin-assign + accept/reject/expiry flow instead.
+ *
+ * End-to-end test harness for the (removed) emergency dispatch workflow.
  *
  * This is a real client: it talks to a RUNNING backend over plain HTTP and a
  * real Socket.IO connection, exactly like the customer/mechanic/admin apps

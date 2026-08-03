@@ -86,10 +86,12 @@ enum TechnicianStatus {
 enum BookingStatus {
   PENDING
   CONFIRMED
-  // Emergency dispatch is in flight: offers have been fanned out to nearby
-  // mechanics and we are waiting for the first accept. Distinct from
-  // MECHANIC_ASSIGNED, which means exactly one mechanic already owns the job
-  // (admin manual assignment, or the legacy scheduled-booking auto-assign).
+  // Booking has been created and is waiting for an admin to manually pick a
+  // mechanic. This is the resting state for every newly created booking
+  // (scheduled or emergency) now that automatic matching has been removed.
+  PENDING_ADMIN_ASSIGNMENT
+  // Retained only so historical rows created before automatic matching was
+  // removed still satisfy the enum -- no longer written by any code path.
   SEARCHING
   MECHANIC_ASSIGNED
   MECHANIC_ACCEPTED
@@ -99,10 +101,8 @@ enum BookingStatus {
   COMPLETED
   CANCELLED
   REJECTED
-  // Every dispatch wave expired with no acceptance. Terminal for the dispatch
-  // engine but NOT for the booking -- an admin can still assign manually, and
-  // the customer can retry or cancel, so it is deliberately not lumped in with
-  // CANCELLED.
+  // Retained only so historical rows created before automatic matching was
+  // removed still satisfy the enum -- no longer written by any code path.
   NO_MECHANIC_FOUND
 }
 
@@ -1275,7 +1275,7 @@ model ServiceBooking {
   customerNotes  String?
 
   issueDescription String?
-  status           BookingStatus @default(PENDING)
+  status           BookingStatus @default(PENDING_ADMIN_ASSIGNMENT)
 
   estimatedCost  Float
   additionalCost Float @default(0)
@@ -1299,6 +1299,12 @@ model ServiceBooking {
   // Radius the winning offer was made at -- kept for ops analytics ("how far
   // are we having to reach to fill jobs in this area at this hour").
   dispatchRadiusKm  Float?
+
+  // Deadline for the currently assigned mechanic to accept/reject (set by an
+  // admin's manual assignment, both scheduled and emergency flows). The
+  // sweeper flips status MECHANIC_ASSIGNED -> REJECTED once this passes with
+  // no response -- see sweepExpiredAssignments in dispatch.service.ts.
+  assignmentExpiresAt DateTime?
 
   // ---- Timeline timestamps ----
   // Each one is written exactly once, inside the same transaction as the
@@ -1362,8 +1368,8 @@ model ServiceBooking {
   // Admin live-ops board and the dispatch sweeper both scan "emergency jobs
   // currently in a non-terminal state, newest first".
   @@index([isEmergency, status, createdAt])
-  // Sweeper: "jobs still SEARCHING whose current wave may have timed out".
-  @@index([status, dispatchStartedAt])
+  // Sweeper: "assigned jobs whose accept/reject deadline may have passed".
+  @@index([status, assignmentExpiresAt])
 }
 
 // =======================

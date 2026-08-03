@@ -6,7 +6,7 @@ import { env } from '../config/env';
 import { AuthRequest } from '../middlewares/auth';
 import { pendingPaymentCreateInput } from '../services/payment.service';
 import {
-  startDispatch, acceptOffer, declineOffer, closeOpenOffers, DispatchError,
+  acceptOffer, declineOffer, closeOpenOffers, DispatchError,
 } from '../services/dispatch.service';
 import {
   transitionJob, JobTransitionError, buildTimeline, STATUS_MESSAGE,
@@ -20,6 +20,7 @@ import { placeMaskedCall, contactAvailability, CallError, recordCallStatus } fro
 import { emitToJob } from '../realtime/gateway';
 import { SERVER_EVENTS } from '../realtime/events';
 import { notifyUser, notifyAdmins, NOTIFY } from '../utils/notify';
+import { broadcastBookingStatus } from '../utils/realtimeBooking';
 
 // Emergency job API.
 //
@@ -348,11 +349,11 @@ export const createEmergencyJob = async (req: AuthRequest, res: Response) => {
           landmark: landmark || null,
           customerNotes: customerNotes || null,
           issueDescription: issueDescription || null,
-          status: 'PENDING',
+          status: 'PENDING_ADMIN_ASSIGNMENT',
           estimatedCost,
           finalAmount: estimatedCost,
           payment: { create: pendingPaymentCreateInput(payment_method, estimatedCost) },
-          statusHistory: { create: [{ status: 'PENDING', changedByUserId: userId, note: 'Emergency request created' }] },
+          statusHistory: { create: [{ status: 'PENDING_ADMIN_ASSIGNMENT', changedByUserId: userId, note: 'Emergency request created' }] },
         },
         include: JOB_INCLUDE,
       });
@@ -360,20 +361,18 @@ export const createEmergencyJob = async (req: AuthRequest, res: Response) => {
 
     console.log(`[job] created emergency job=${job.bookingNumber} user=${userId}`);
 
+    // No automatic dispatch any more -- an admin manually assigns the nearest
+    // available mechanic from the live-ops queue (see jobAdmin.controller.ts's
+    // adminAssign).
     await notifyUser(
       userId,
-      'Finding a mechanic',
-      'We are contacting mechanics near you right now.',
+      'Booking received',
+      'Your service request has been received successfully. Our team is assigning the nearest available mechanic for your request.',
       { bookingId: job.id },
       { type: NOTIFY.JOB_SEARCHING }
     );
-
-    // Dispatch runs after the response so the customer's screen flips to
-    // "Searching…" immediately rather than waiting on push fan-out. Failures
-    // are recoverable: the sweeper picks up any job left in PENDING/SEARCHING.
-    setImmediate(() => {
-      startDispatch(job.id).catch((err) => console.error(`[job] dispatch kickoff failed for ${job.bookingNumber}:`, err));
-    });
+    await notifyAdmins('New emergency job', `Job #${job.bookingNumber} needs a mechanic assigned.`, { bookingId: job.id });
+    broadcastBookingStatus(job);
 
     res.status(201).json({ job: serializeJob(job, 'CUSTOMER') });
   } catch (err) {
@@ -482,36 +481,6 @@ export const cancelJob = async (req: AuthRequest, res: Response) => {
     res.status(200).json({ job: serializeJob({ ...job, ...booking } as JobRow, viewer) });
   } catch (err) {
     fail(res, err, 'cancelJob');
-  }
-};
-
-/** POST /api/jobs/:id/retry — re-dispatch a job nobody accepted. */
-export const retryDispatch = async (req: AuthRequest, res: Response) => {
-  try {
-    const bookingId = String(req.params.id);
-    const { job, viewer } = await loadJobFor(req, bookingId);
-    if (viewer !== 'CUSTOMER' && viewer !== 'ADMIN') throw new ApiError(403, 'FORBIDDEN', 'Not your job.');
-    if (job.status !== 'NO_MECHANIC_FOUND' && job.status !== 'REJECTED') {
-      throw new ApiError(409, 'NOT_RETRYABLE', `A job that is ${job.status} cannot be re-dispatched.`);
-    }
-
-    // Reset the wave counter so the retry starts from the innermost radius
-    // again -- mechanics who were busy five minutes ago may be free now, and
-    // the previous run's offers are all closed, so nobody is re-rung mid-wave.
-    await prisma.serviceBooking.update({
-      where: { id: bookingId },
-      data: { dispatchWave: 0, dispatchEndedAt: null },
-    });
-    // Clear the offer history so previously-declined mechanics become eligible
-    // again; this is an explicit second attempt, not a continuation.
-    await prisma.jobDispatchOffer.deleteMany({ where: { bookingId } });
-
-    await startDispatch(bookingId);
-
-    const refreshed = await prisma.serviceBooking.findUniqueOrThrow({ where: { id: bookingId }, include: JOB_INCLUDE });
-    res.status(200).json({ job: serializeJob(refreshed, viewer) });
-  } catch (err) {
-    fail(res, err, 'retryDispatch');
   }
 };
 
@@ -662,7 +631,7 @@ export const getMyOffers = async (req: AuthRequest, res: Response) => {
       offers: offers
         // A job that moved on while this mechanic's app was backgrounded is
         // not an offer any more, regardless of what the offer row still says.
-        .filter((o) => o.booking.status === 'SEARCHING')
+        .filter((o) => o.booking.status === 'MECHANIC_ASSIGNED')
         .map((o) => ({
           offerId: o.id,
           bookingId: o.bookingId,

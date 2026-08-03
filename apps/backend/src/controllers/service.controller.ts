@@ -5,8 +5,10 @@ import { AuthRequest } from '../middlewares/auth';
 import { sendExpoPush } from '../utils/expoPush';
 import { notifyUser, notifyAdmins } from '../utils/notify';
 import { sanitizeBooking, sanitizeBookings } from '../utils/sanitizeUser';
-import { haversineKm, findNearestApprovedTechnician } from '../utils/geo';
+import { haversineKm } from '../utils/geo';
 import { pendingPaymentCreateInput, creditWalletForOnlineRefund } from '../services/payment.service';
+import { broadcastBookingStatus } from '../utils/realtimeBooking';
+import { ASSIGNMENT_RESPONSE_WINDOW_MS } from '../services/jobState';
 
 // Thrown from inside createBooking's $transaction to carry an intended HTTP
 // status (400/404/409) back out, mirroring order.controller.ts's OrderError.
@@ -407,13 +409,10 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
 
       const estimatedCost = pkg.discountPrice ?? pkg.price;
 
-      // No real payment gateway exists yet to gate CONFIRMED on, so the
-      // PENDING -> CONFIRMED transition happens synchronously here (its own
-      // history row, for the audit trail and as a hook for real payment
-      // confirmation later) before attempting auto-assignment.
-      const technician = await findNearestApprovedTechnician(tx, vehicleType as VehicleType, address.lat, address.lng);
-      const status: BookingStatus = technician ? 'MECHANIC_ASSIGNED' : 'CONFIRMED';
-
+      // No real payment gateway exists yet to gate CONFIRMED on, and there is
+      // no automatic mechanic matching any more -- every new booking lands in
+      // PENDING_ADMIN_ASSIGNMENT and waits for an admin to manually assign a
+      // technician (see assignTechnician). Never auto-assign here.
       const newBooking = await tx.serviceBooking.create({
         data: {
           bookingNumber: generateBookingNumber(),
@@ -426,12 +425,11 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
           vehicleRegistrationNumber: vehicleRegistrationNumber || null,
           categoryId,
           packageId,
-          technicianId: technician?.id,
           addressId,
           scheduledDate: normalizedDate,
           timeSlotId,
           issueDescription: issueDescription || null,
-          status,
+          status: 'PENDING_ADMIN_ASSIGNMENT',
           estimatedCost,
           finalAmount: estimatedCost,
           payment: {
@@ -440,8 +438,7 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
           statusHistory: {
             create: [
               { status: 'PENDING', changedByUserId: userId },
-              { status: 'CONFIRMED', changedByUserId: userId },
-              ...(status === 'MECHANIC_ASSIGNED' ? [{ status: 'MECHANIC_ASSIGNED' as BookingStatus, changedByUserId: userId }] : []),
+              { status: 'PENDING_ADMIN_ASSIGNMENT', changedByUserId: userId },
             ],
           },
         },
@@ -451,31 +448,16 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
       return newBooking;
     });
 
-    console.log(`[booking] created booking=${booking.bookingNumber} user=${userId} status=${booking.status} technician=${booking.technicianId || 'none'}`);
+    console.log(`[booking] created booking=${booking.bookingNumber} user=${userId} status=${booking.status}`);
 
-    // One combined push for the (same-request, instant) PENDING->CONFIRMED
-    // transition rather than two back-to-back notifications for what a
-    // customer would perceive as the same moment.
-    notifyUser(userId, 'Booking confirmed', `Your service booking #${booking.bookingNumber} has been confirmed.`, { bookingId: booking.id });
-    notifyAdmins(
-      'New service booking',
-      booking.technicianId
-        ? `Booking #${booking.bookingNumber} was created and auto-assigned.`
-        : `Booking #${booking.bookingNumber} needs a mechanic assigned.`,
+    notifyUser(
+      userId,
+      'Booking received',
+      `Your service request has been received successfully. Our team is assigning the nearest available mechanic for booking #${booking.bookingNumber}.`,
       { bookingId: booking.id }
     );
-    if (booking.technicianId && booking.technician) {
-      notifyUser(userId, 'Mechanic assigned', `A technician has been assigned to your booking #${booking.bookingNumber}.`, { bookingId: booking.id });
-      notifyUser(booking.technician.userId, 'New service job assigned', `Booking #${booking.bookingNumber} is ready for you.`, { bookingId: booking.id });
-      if (booking.technician.expoPushToken) {
-        sendExpoPush(
-          booking.technician.expoPushToken,
-          'New service job assigned',
-          `Booking #${booking.bookingNumber} is ready for you.`,
-          { bookingId: booking.id }
-        );
-      }
-    }
+    notifyAdmins('New service booking', `Booking #${booking.bookingNumber} needs a mechanic assigned.`, { bookingId: booking.id });
+    broadcastBookingStatus(booking);
 
     res.status(201).json({ message: 'Booking placed successfully', booking });
   } catch (error: any) {
@@ -552,9 +534,9 @@ export const getBookingById = async (req: AuthRequest, res: Response) => {
 };
 
 // REJECTED included so a customer isn't stuck waiting indefinitely for an
-// admin to manually reassign a booking whose technician rejected it with no
-// automatic replacement found -- they can now cancel and rebook themselves.
-const CANCELLABLE_STATUSES = new Set(['PENDING', 'CONFIRMED', 'MECHANIC_ASSIGNED', 'MECHANIC_ACCEPTED', 'REJECTED']);
+// admin to manually reassign a booking whose technician rejected it -- they
+// can now cancel and rebook themselves rather than wait.
+const CANCELLABLE_STATUSES = new Set(['PENDING_ADMIN_ASSIGNMENT', 'MECHANIC_ASSIGNED', 'MECHANIC_ACCEPTED', 'REJECTED']);
 
 export const cancelBooking = async (req: AuthRequest, res: Response) => {
   try {
@@ -699,6 +681,7 @@ export const updateMyBookingStatus = async (req: AuthRequest, res: Response) => 
     if (status === 'COMPLETED') {
       notifyUser(booking.userId, 'Invoice generated', `Your invoice for booking #${booking.bookingNumber} is ready.`, { bookingId: id });
     }
+    broadcastBookingStatus(updated, booking.status);
 
     res.status(200).json(updated);
   } catch (error: any) {
@@ -725,7 +708,11 @@ export const acceptBookingJob = async (req: AuthRequest, res: Response) => {
     }
 
     const updated = await prisma.$transaction(async (tx) => {
-      const b = await tx.serviceBooking.update({ where: { id }, data: { status: 'MECHANIC_ACCEPTED' } });
+      const b = await tx.serviceBooking.update({
+        where: { id },
+        data: { status: 'MECHANIC_ACCEPTED', assignmentExpiresAt: null },
+        include: { technician: { include: { user: true } } },
+      });
       await tx.bookingStatusHistory.create({
         data: { bookingId: id, status: 'MECHANIC_ACCEPTED', changedByUserId: req.user!.userId },
       });
@@ -733,7 +720,8 @@ export const acceptBookingJob = async (req: AuthRequest, res: Response) => {
     });
 
     console.log(`[booking] accepted booking=${booking.bookingNumber} technician=${technician.id}`);
-    notifyUser(booking.userId, 'Mechanic accepted', `Your mechanic has accepted booking #${booking.bookingNumber}.`, { bookingId: id });
+    notifyUser(booking.userId, 'Mechanic accepted', `Your mechanic has been assigned. Your mechanic has accepted booking #${booking.bookingNumber}.`, { bookingId: id });
+    broadcastBookingStatus(updated, 'MECHANIC_ASSIGNED');
 
     res.status(200).json(updated);
   } catch (error: any) {
@@ -749,14 +737,20 @@ export const rejectBookingJob = async (req: AuthRequest, res: Response) => {
     const technician = await prisma.serviceTechnician.findUnique({ where: { userId: req.user!.userId } });
     if (!technician) return res.status(404).json({ error: 'Technician profile not found' });
 
-    const booking = await prisma.serviceBooking.findFirst({ where: { id, technicianId: technician.id }, include: { address: true } });
+    const booking = await prisma.serviceBooking.findFirst({ where: { id, technicianId: technician.id } });
     if (!booking) return res.status(404).json({ error: 'Booking not found or not assigned to you' });
     if (booking.status !== 'MECHANIC_ASSIGNED') {
       return res.status(400).json({ error: `Cannot reject a booking that is currently ${booking.status}` });
     }
 
-    const { updated, reassignedTechnicianId } = await prisma.$transaction(async (tx) => {
-      await tx.serviceBooking.update({ where: { id }, data: { status: 'REJECTED', technicianId: null } });
+    // No automatic reassignment -- the booking simply returns to the admin
+    // queue (status REJECTED) and waits for an admin to manually assign
+    // another mechanic, same as a fresh PENDING_ADMIN_ASSIGNMENT booking.
+    const updated = await prisma.$transaction(async (tx) => {
+      const b = await tx.serviceBooking.update({
+        where: { id },
+        data: { status: 'REJECTED', technicianId: null, assignmentExpiresAt: null },
+      });
       await tx.bookingStatusHistory.create({
         data: {
           bookingId: id,
@@ -765,42 +759,14 @@ export const rejectBookingJob = async (req: AuthRequest, res: Response) => {
           changedByUserId: req.user!.userId,
         },
       });
-
-      const replacement = await findNearestApprovedTechnician(
-        tx, booking.vehicleType, booking.address.lat, booking.address.lng, technician.id
-      );
-
-      if (!replacement) {
-        const stillRejected = await tx.serviceBooking.findUniqueOrThrow({ where: { id } });
-        return { updated: stillRejected, reassignedTechnicianId: null as string | null };
-      }
-
-      const reassigned = await tx.serviceBooking.update({
-        where: { id },
-        data: { technicianId: replacement.id, status: 'MECHANIC_ASSIGNED' },
-        include: { technician: true },
-      });
-      await tx.bookingStatusHistory.create({
-        data: { bookingId: id, status: 'MECHANIC_ASSIGNED', note: 'Auto-reassigned after rejection', changedByUserId: req.user!.userId },
-      });
-      return { updated: reassigned, reassignedTechnicianId: replacement.id };
+      return b;
     });
 
-    if (reassignedTechnicianId) {
-      const reassignedTech = await prisma.serviceTechnician.findUnique({ where: { id: reassignedTechnicianId } });
-      if (reassignedTech) {
-        notifyUser(reassignedTech.userId, 'New service job assigned', `Booking #${booking.bookingNumber} is ready for you.`, { bookingId: id });
-        if (reassignedTech.expoPushToken) {
-          sendExpoPush(reassignedTech.expoPushToken, 'New service job assigned', `Booking #${booking.bookingNumber} is ready for you.`, { bookingId: id });
-        }
-      }
-      notifyUser(booking.userId, 'Mechanic assigned', `A new technician has been assigned to your booking #${booking.bookingNumber}.`, { bookingId: id });
-    } else {
-      notifyUser(booking.userId, 'Finding a new mechanic', `Your mechanic for booking #${booking.bookingNumber} became unavailable. We're finding a replacement.`, { bookingId: id });
-      notifyAdmins('Booking needs reassignment', `Booking #${booking.bookingNumber} was rejected and has no available replacement technician.`, { bookingId: id });
-    }
+    notifyUser(booking.userId, 'Finding a new mechanic', `We are assigning another nearby mechanic for booking #${booking.bookingNumber}. Thank you for your patience.`, { bookingId: id });
+    notifyAdmins('Booking needs reassignment', `Booking #${booking.bookingNumber} was rejected by the technician and needs to be reassigned.`, { bookingId: id });
+    broadcastBookingStatus(updated, 'MECHANIC_ASSIGNED');
 
-    console.log(`[booking] rejected booking=${booking.bookingNumber} technician=${technician.id} reassigned=${reassignedTechnicianId || 'none'}`);
+    console.log(`[booking] rejected booking=${booking.bookingNumber} technician=${technician.id}`);
 
     res.status(200).json(updated);
   } catch (error: any) {
@@ -1358,11 +1324,13 @@ export const assignTechnician = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'This is an emergency job -- use POST /api/jobs/admin/:id/assign instead.' });
     }
 
+    const assignmentExpiresAt = new Date(Date.now() + ASSIGNMENT_RESPONSE_WINDOW_MS);
+
     const updated = await prisma.$transaction(async (tx) => {
       const b = await tx.serviceBooking.update({
         where: { id },
-        data: { technicianId, status: 'MECHANIC_ASSIGNED' },
-        include: { technician: { include: { user: true } } },
+        data: { technicianId, status: 'MECHANIC_ASSIGNED', assignmentExpiresAt },
+        include: { technician: { include: { user: true } }, user: true, package: true },
       });
       await tx.bookingStatusHistory.create({
         data: { bookingId: id, status: 'MECHANIC_ASSIGNED', changedByUserId: req.user!.userId, note: 'Assigned by admin' },
@@ -1371,18 +1339,15 @@ export const assignTechnician = async (req: AuthRequest, res: Response) => {
     });
 
     if (updated.technician) {
-      notifyUser(updated.technician.userId, 'New service job assigned', `Booking #${updated.bookingNumber} is ready for you.`, { bookingId: id });
+      const pushBody = `Customer: ${updated.user.name || 'Customer'}\nService: ${updated.package.name}\nTap to Accept`;
+      notifyUser(updated.technician.userId, 'New Service Request', pushBody, { bookingId: id });
       if (updated.technician.expoPushToken) {
-        sendExpoPush(
-          updated.technician.expoPushToken,
-          'New service job assigned',
-          `Booking #${updated.bookingNumber} is ready for you.`,
-          { bookingId: id }
-        );
+        sendExpoPush(updated.technician.expoPushToken, 'New Service Request', pushBody, { bookingId: id });
       }
     }
-    notifyUser(updated.userId, 'Mechanic assigned', `A technician has been assigned to your booking #${updated.bookingNumber}.`, { bookingId: id });
+    notifyUser(updated.userId, 'Waiting for mechanic acceptance', `We are assigning a nearby mechanic to your booking #${updated.bookingNumber}. Thank you for your patience.`, { bookingId: id });
     console.log(`[booking] assigned booking=${updated.bookingNumber} technician=${technicianId} by=${req.user!.userId}`);
+    broadcastBookingStatus(updated, booking.status);
 
     res.status(200).json(sanitizeBooking(updated));
   } catch (error: any) {
@@ -1526,7 +1491,7 @@ export const getServiceDashboard = async (req: Request, res: Response) => {
     ] = await Promise.all([
       prisma.serviceBooking.count(),
       prisma.serviceBooking.count({ where: { createdAt: { gte: startOfToday } } }),
-      prisma.serviceBooking.count({ where: { status: { in: ['PENDING', 'CONFIRMED'] } } }),
+      prisma.serviceBooking.count({ where: { status: 'PENDING_ADMIN_ASSIGNMENT' } }),
       prisma.serviceBooking.count({ where: { status: { in: ACTIVE_BOOKING_STATUSES } } }),
       prisma.serviceBooking.count({ where: { status: { in: ASSIGNED_BOOKING_STATUSES } } }),
       prisma.serviceBooking.count({ where: { status: { in: IN_PROGRESS_BOOKING_STATUSES } } }),

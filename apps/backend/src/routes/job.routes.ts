@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import {
-  createEmergencyJob, getMyActiveJob, getJob, getJobOtpForCustomer, cancelJob, retryDispatch,
+  createEmergencyJob, getMyActiveJob, getJob, getJobOtpForCustomer, cancelJob,
   getJobTrailHandler, rateJob, callCounterparty, callStatusWebhook,
   getMyOffers, acceptJob, declineJob, markEnRoute, markArrived,
   startWork, requestCompletion, completeJob,
@@ -94,7 +94,6 @@ router.get('/:id/trail', authenticate, getJobTrailHandler);
 router.get('/:id/photos', authenticate, listJobPhotos);
 router.post('/:id/photos', authenticate, technicianUpload.single('file'), uploadJobPhoto);
 router.post('/:id/cancel', authenticate, cancelJob);
-router.post('/:id/retry', authenticate, createLimiter, retryDispatch);
 router.post('/:id/rating', authenticate, technicianUpload.single('file'), rateJob);
 router.post('/:id/call', authenticate, callLimiter, callCounterparty);
 

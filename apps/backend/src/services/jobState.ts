@@ -18,6 +18,13 @@ import { SERVER_EVENTS, JobStatusEvent, JobTimelineStep } from '../realtime/even
 //  * the realtime broadcast happens only after the transaction commits, so no
 //    client can ever observe a status that was later rolled back.
 
+// How long a manually assigned mechanic has to accept/reject before the
+// sweeper (sweepExpiredAssignments in dispatch.service.ts) returns the
+// booking to REJECTED for the admin to reassign. Shared by the legacy
+// (scheduled) flow in service.controller.ts and the emergency/offer flow in
+// dispatch.service.ts/jobAdmin.controller.ts.
+export const ASSIGNMENT_RESPONSE_WINDOW_MS = 60_000;
+
 // ---------------------------------------------------------------------------
 // Legal transitions
 // ---------------------------------------------------------------------------
@@ -30,14 +37,15 @@ import { SERVER_EVENTS, JobStatusEvent, JobTimelineStep } from '../realtime/even
  * programmatically below rather than repeated eleven times.
  */
 const BASE_TRANSITIONS: Partial<Record<BookingStatus, BookingStatus[]>> = {
-  PENDING: ['SEARCHING', 'MECHANIC_ASSIGNED'],
-  // Dispatch either finds someone, exhausts its waves, or is superseded by an
-  // admin assigning manually.
-  SEARCHING: ['MECHANIC_ACCEPTED', 'NO_MECHANIC_FOUND', 'MECHANIC_ASSIGNED'],
-  // A job nobody took can be re-dispatched (customer retry) or hand-assigned.
-  NO_MECHANIC_FOUND: ['SEARCHING', 'MECHANIC_ASSIGNED'],
-  // The scheduled-booking path and admin manual assignment both land here.
-  MECHANIC_ASSIGNED: ['MECHANIC_ACCEPTED', 'REJECTED', 'SEARCHING'],
+  // Every new booking starts here and waits for an admin to manually assign a
+  // mechanic -- there is no automatic matching any more.
+  PENDING_ADMIN_ASSIGNMENT: ['MECHANIC_ASSIGNED'],
+  // A single mechanic has been offered/assigned the job and has an accept/
+  // reject countdown running (see ServiceBooking.assignmentExpiresAt).
+  MECHANIC_ASSIGNED: ['MECHANIC_ACCEPTED', 'REJECTED'],
+  // Declined or timed out with no response -- back in the admin queue for a
+  // fresh manual pick. No auto-reassignment.
+  REJECTED: ['MECHANIC_ASSIGNED'],
   MECHANIC_ACCEPTED: ['MECHANIC_ON_THE_WAY'],
   MECHANIC_ON_THE_WAY: ['ARRIVED'],
   // WORK_STARTED is only reachable by verifying the START OTP -- there is no
@@ -45,9 +53,6 @@ const BASE_TRANSITIONS: Partial<Record<BookingStatus, BookingStatus[]>> = {
   ARRIVED: ['WORK_STARTED'],
   // COMPLETED is only reachable by verifying the COMPLETION OTP.
   WORK_STARTED: ['COMPLETED'],
-  // A mechanic declining a job they already owned goes back into dispatch.
-  REJECTED: ['SEARCHING', 'MECHANIC_ASSIGNED'],
-  CONFIRMED: ['MECHANIC_ASSIGNED', 'SEARCHING'],
 };
 
 export const TERMINAL_STATUSES: BookingStatus[] = ['COMPLETED', 'CANCELLED'];
@@ -59,7 +64,7 @@ export const LIVE_TRACKING_STATUSES: BookingStatus[] = [
 
 /** Statuses that count as "this job is still open" for dispatch/ops purposes. */
 export const ACTIVE_JOB_STATUSES: BookingStatus[] = [
-  'PENDING', 'CONFIRMED', 'SEARCHING', 'MECHANIC_ASSIGNED',
+  'PENDING_ADMIN_ASSIGNMENT', 'MECHANIC_ASSIGNED', 'REJECTED',
   'MECHANIC_ACCEPTED', 'MECHANIC_ON_THE_WAY', 'ARRIVED', 'WORK_STARTED',
 ];
 
@@ -83,22 +88,23 @@ export function canTransition(from: BookingStatus, to: BookingStatus): boolean {
 export const STATUS_MESSAGE: Record<BookingStatus, string> = {
   PENDING: 'We have your request.',
   CONFIRMED: 'Your request is confirmed.',
-  SEARCHING: 'Searching for a mechanic near you…',
-  MECHANIC_ASSIGNED: 'A mechanic has been assigned to you.',
-  MECHANIC_ACCEPTED: 'Your mechanic accepted the job.',
+  PENDING_ADMIN_ASSIGNMENT: 'Our team is assigning the nearest available mechanic for your request.',
+  // Retained only so historical rows still resolve to a message -- dead statuses.
+  SEARCHING: 'We have your request.',
+  NO_MECHANIC_FOUND: 'We have your request.',
+  MECHANIC_ASSIGNED: 'We are assigning a nearby mechanic. Thank you for your patience.',
+  MECHANIC_ACCEPTED: 'Your mechanic has been assigned and accepted the job.',
   MECHANIC_ON_THE_WAY: 'Your mechanic is on the way.',
   ARRIVED: 'Your mechanic has arrived.',
   WORK_STARTED: 'Work has started on your vehicle.',
   COMPLETED: 'Your service is complete.',
   CANCELLED: 'This job was cancelled.',
-  REJECTED: 'Your mechanic became unavailable. Finding another…',
-  NO_MECHANIC_FOUND: 'No mechanic is available right now.',
+  REJECTED: 'We are assigning another nearby mechanic. Thank you for your patience.',
 };
 
 /** The customer-facing progress labels from the spec, in order. */
 const TIMELINE_SPEC: { key: string; label: string; field: string }[] = [
   { key: 'REQUESTED', label: 'Requested', field: 'createdAt' },
-  { key: 'MECHANIC_NOTIFIED', label: 'Mechanic Notified', field: 'dispatchStartedAt' },
   { key: 'ACCEPTED', label: 'Accepted', field: 'acceptedAt' },
   { key: 'TRAVELLING', label: 'Travelling', field: 'enRouteAt' },
   { key: 'ARRIVED', label: 'Arrived', field: 'arrivedAt' },
@@ -126,7 +132,6 @@ export function buildTimeline(booking: TimelineSource): JobTimelineStep[] {
  * bounce back and forth can't rewrite history.
  */
 const STATUS_TIMESTAMP_FIELD: Partial<Record<BookingStatus, string>> = {
-  SEARCHING: 'dispatchStartedAt',
   MECHANIC_ACCEPTED: 'acceptedAt',
   MECHANIC_ON_THE_WAY: 'enRouteAt',
   ARRIVED: 'arrivedAt',

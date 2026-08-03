@@ -3,10 +3,13 @@ import { Prisma, BookingStatus } from '@prisma/client';
 import prisma from '../config/prisma';
 import { env } from '../config/env';
 import { AuthRequest } from '../middlewares/auth';
-import { transitionJob, JobTransitionError, buildTimeline, ACTIVE_JOB_STATUSES, LIVE_TRACKING_STATUSES } from '../services/jobState';
-import { closeOpenOffers, startDispatch } from '../services/dispatch.service';
+import {
+  transitionJob, JobTransitionError, buildTimeline, ACTIVE_JOB_STATUSES, LIVE_TRACKING_STATUSES,
+  ASSIGNMENT_RESPONSE_WINDOW_MS,
+} from '../services/jobState';
+import { closeOpenOffers, createSingleOffer } from '../services/dispatch.service';
 import { getJobTrail } from '../services/tracking.service';
-import { notifyUser, NOTIFY } from '../utils/notify';
+import { notifyUser, notifyAdmins, NOTIFY } from '../utils/notify';
 import { recordAuditLog } from '../utils/auditLog';
 
 // Admin live-ops surface for emergency dispatch.
@@ -65,10 +68,11 @@ export const getLiveOps = async (req: AuthRequest, res: Response) => {
         isEmergency: job.isEmergency,
         createdAt: job.createdAt,
         ageSeconds,
-        // Ops triage signal. A job SEARCHING for more than the full dispatch
-        // budget, or ACCEPTED with a mechanic who has not moved, is what an
-        // operator needs to spot on a wall display without reading each row.
-        alert: computeAlert(job.status, ageSeconds, job.technician?.lastLocationAt ?? null, job.etaSeconds),
+        // Ops triage signal. A job waiting on admin assignment for too long,
+        // an assigned mechanic who hasn't responded, or one who has stopped
+        // moving, is what an operator needs to spot on a wall display without
+        // reading each row.
+        alert: computeAlert(job.status, ageSeconds, job.assignmentExpiresAt, job.technician?.lastLocationAt ?? null, job.etaSeconds),
         customer: { id: job.user.id, name: job.user.name, phone: job.user.phone },
         customerLocation: { lat, lng, city: job.address.city, pincode: job.address.pincode },
         category: job.category.name,
@@ -128,12 +132,12 @@ export const getLiveOps = async (req: AuthRequest, res: Response) => {
       take: 500,
     });
 
-    const [searching, enRoute, working, unfilledToday] = await Promise.all([
-      prisma.serviceBooking.count({ where: { status: 'SEARCHING' } }),
+    const [pendingAssignment, enRoute, working, needsReassignmentToday] = await Promise.all([
+      prisma.serviceBooking.count({ where: { status: 'PENDING_ADMIN_ASSIGNMENT' } }),
       prisma.serviceBooking.count({ where: { status: { in: ['MECHANIC_ACCEPTED', 'MECHANIC_ON_THE_WAY'] } } }),
       prisma.serviceBooking.count({ where: { status: { in: ['ARRIVED', 'WORK_STARTED'] } } }),
       prisma.serviceBooking.count({
-        where: { status: 'NO_MECHANIC_FOUND', createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } },
+        where: { status: 'REJECTED', createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) } },
       }),
     ]);
 
@@ -149,7 +153,7 @@ export const getLiveOps = async (req: AuthRequest, res: Response) => {
         lastLocationAt: m.lastLocationAt,
         busy: m._count.bookings > 0,
       })),
-      stats: { searching, enRoute, working, unfilledToday, mechanicsOnline: mechanics.length },
+      stats: { pendingAssignment, enRoute, working, needsReassignmentToday, mechanicsOnline: mechanics.length },
       serverTime: new Date().toISOString(),
     });
   } catch (err) {
@@ -158,21 +162,24 @@ export const getLiveOps = async (req: AuthRequest, res: Response) => {
 };
 
 /**
- * Triage severity for the ops board. Thresholds are deliberately derived from
- * the configured dispatch budget rather than hard-coded, so retuning dispatch
- * retunes the alerting with it.
+ * Triage severity for the ops board. Thresholds are derived from the
+ * assignment response window (how long a mechanic has to accept/reject) now
+ * that there is no automatic dispatch budget to derive them from.
  */
 function computeAlert(
   status: string,
   ageSeconds: number,
+  assignmentExpiresAt: Date | null,
   lastLocationAt: Date | null,
   etaSeconds: number | null
 ): { level: 'ok' | 'warn' | 'critical'; reason: string | null } {
-  const dispatchBudget = env.DISPATCH_WAVE_RADII_KM.length * env.DISPATCH_OFFER_TTL_SECONDS;
-
-  if (status === 'SEARCHING') {
-    if (ageSeconds > dispatchBudget * 1.5) return { level: 'critical', reason: 'Searching well past the dispatch budget' };
-    if (ageSeconds > dispatchBudget) return { level: 'warn', reason: 'Dispatch budget exceeded' };
+  if (status === 'PENDING_ADMIN_ASSIGNMENT' || status === 'REJECTED') {
+    if (ageSeconds > 600) return { level: 'critical', reason: 'Waiting for admin assignment for over 10 minutes' };
+    if (ageSeconds > 180) return { level: 'warn', reason: 'Waiting for admin assignment' };
+  }
+  if (status === 'MECHANIC_ASSIGNED' && assignmentExpiresAt) {
+    const overdueSeconds = (Date.now() - assignmentExpiresAt.getTime()) / 1000;
+    if (overdueSeconds > 0) return { level: 'warn', reason: 'Mechanic has not responded to the assignment' };
   }
   if (status === 'MECHANIC_ACCEPTED' && ageSeconds > 300) {
     return { level: 'warn', reason: 'Accepted but not yet en route' };
@@ -287,16 +294,23 @@ export const adminAssign = async (req: AuthRequest, res: Response) => {
     const job = await prisma.serviceBooking.findUnique({ where: { id }, select: { status: true, bookingNumber: true, userId: true } });
     if (!job) return res.status(404).json({ error: 'Job not found' });
 
+    const assignmentExpiresAt = new Date(Date.now() + ASSIGNMENT_RESPONSE_WINDOW_MS);
+
+    // Emergency jobs go through a single-candidate offer (same accept/decline/
+    // countdown lifecycle the mechanic app already renders for OfferInboxScreen)
+    // rather than writing technicianId directly -- the mechanic still has to
+    // explicitly accept before the job is really theirs.
     const { booking } = await transitionJob({
       bookingId: id,
       to: 'MECHANIC_ASSIGNED',
       expectedFrom: job.status as BookingStatus,
       actorUserId: req.user!.userId,
       note: `Manually assigned by admin`,
-      data: { technicianId, dispatchEndedAt: new Date() },
+      data: { assignmentExpiresAt },
     });
 
     await closeOpenOffers(id, 'CANCELLED');
+    await createSingleOffer(id, technicianId, assignmentExpiresAt);
 
     recordAuditLog({
       userId: req.user!.userId,
@@ -307,8 +321,7 @@ export const adminAssign = async (req: AuthRequest, res: Response) => {
       req,
     });
 
-    await notifyUser(tech.userId, 'Job assigned to you', `Job #${booking.bookingNumber} was assigned to you by the ops team.`, { bookingId: id }, { type: NOTIFY.JOB_ASSIGNED });
-    await notifyUser(job.userId, 'Mechanic assigned', 'Our team has assigned a mechanic to your request.', { bookingId: id }, { type: NOTIFY.JOB_MECHANIC_FOUND });
+    await notifyUser(job.userId, 'Waiting for mechanic acceptance', `We are assigning a nearby mechanic to your request #${booking.bookingNumber}. Thank you for your patience.`, { bookingId: id }, { type: NOTIFY.JOB_MECHANIC_FOUND });
 
     res.status(200).json({ ok: true, status: booking.status });
   } catch (err) {
@@ -316,30 +329,40 @@ export const adminAssign = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/** POST /api/jobs/admin/:id/redispatch — put a job back into the auction. */
+/**
+ * POST /api/jobs/admin/:id/redispatch — bail on a stuck MECHANIC_ASSIGNED job
+ * (offer sent, mechanic not responding) without waiting out the full 60s
+ * countdown. Cancels the open offer and returns the job to REJECTED, the same
+ * "needs reassignment" resting state a decline or a timed-out sweep produces
+ * -- an admin can immediately assign someone else from there.
+ */
 export const adminRedispatch = async (req: AuthRequest, res: Response) => {
   try {
     const id = String(req.params.id);
-    const job = await prisma.serviceBooking.findUnique({ where: { id }, select: { status: true, bookingNumber: true } });
+    const job = await prisma.serviceBooking.findUnique({ where: { id }, select: { status: true, bookingNumber: true, userId: true } });
     if (!job) return res.status(404).json({ error: 'Job not found' });
 
-    await prisma.serviceBooking.update({
-      where: { id },
-      data: { dispatchWave: 0, technicianId: null, dispatchEndedAt: null },
-    });
-    await prisma.jobDispatchOffer.deleteMany({ where: { bookingId: id } });
+    await closeOpenOffers(id, 'CANCELLED');
 
-    await startDispatch(id);
+    const { booking } = await transitionJob({
+      bookingId: id,
+      to: 'REJECTED',
+      expectedFrom: job.status as BookingStatus,
+      actorUserId: req.user!.userId,
+      note: 'Returned to queue by admin',
+      data: { technicianId: null, assignmentExpiresAt: null },
+    });
+
     recordAuditLog({
       userId: req.user!.userId,
       action: 'JOB_REDISPATCH',
       entity: 'ServiceBooking',
       entityId: id,
-      details: `Re-dispatched ${job.bookingNumber}`,
+      details: `Returned ${job.bookingNumber} to the assignment queue`,
       req,
     });
 
-    res.status(200).json({ ok: true });
+    res.status(200).json({ ok: true, status: booking.status });
   } catch (err) {
     fail(res, err, 'adminRedispatch');
   }
