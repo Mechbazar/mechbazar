@@ -1,18 +1,20 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
+import { Link } from 'react-router-dom';
 import type { RootState } from '../store';
-import { 
-  Package, 
-  CheckCircle, 
-  AlertCircle, 
-  X, 
+import {
+  Package,
+  CheckCircle,
+  AlertCircle,
+  X,
   Search,
   Edit,
   Copy,
   Trash2,
   MoreVertical,
-  ImagePlus
+  ImagePlus,
+  ArrowLeft
 } from 'lucide-react';
 import { Button, Card, Badge, Dialog, Input } from '@mechbazar/shared/web';
 import { API_URL, resolveUploadUrl } from '../config/api';
@@ -83,27 +85,27 @@ export default function Products() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageError, setImageError] = useState('');
 
-  const handleOpenForm = (product: any = null) => {
-    if (product) {
-      setEditMode(product.id);
-      setFormData({
-        name: product.name || '',
-        category: product.category?.name || 'Engine Oils',
-        vehicleType: product.vehicleType || 'CAR',
-        oem: product.oemNumber || '',
-        price: product.price?.toString() || '',
-        mrp: product.mrp?.toString() || '',
-        b2bPrice: product.b2bPrice?.toString() || '',
-        stock: product.stock?.toString() || '',
-        lowStockThreshold: product.lowStockThreshold?.toString() || '10',
-        status: product.status || 'APPROVED',
-        images: product.images || [],
-      });
-    } else {
-      setEditMode(null);
-      const defaultCategory = categoriesForVehicleType('CAR')[0]?.name || initialFormState.category;
-      setFormData({ ...initialFormState, category: defaultCategory });
-    }
+  // MechBazar doesn't sell products directly -- every product belongs to a
+  // real vendor, so this page (and its form) is edit-only. There used to be
+  // an "Add Internal Product" entry point here that created a vendorless
+  // product, which the backend silently attributed to a fake "MechBazar
+  // Direct" house vendor to satisfy the schema's required vendorId. Removed
+  // along with that button.
+  const handleOpenForm = (product: any) => {
+    setEditMode(product.id);
+    setFormData({
+      name: product.name || '',
+      category: product.category?.name || 'Engine Oils',
+      vehicleType: product.vehicleType || 'CAR',
+      oem: product.oemNumber || '',
+      price: product.price?.toString() || '',
+      mrp: product.mrp?.toString() || '',
+      b2bPrice: product.b2bPrice?.toString() || '',
+      stock: product.stock?.toString() || '',
+      lowStockThreshold: product.lowStockThreshold?.toString() || '10',
+      status: product.status || 'APPROVED',
+      images: product.images || [],
+    });
     setIsModalOpen(true);
     setActionMenuId(null);
   };
@@ -144,18 +146,12 @@ export default function Products() {
   };
 
   const handleSave = async () => {
-    if (!formData.name) return;
-    
+    if (!formData.name || !editMode) return;
+
     try {
-      if (editMode) {
-        await axios.put(`${API_URL}/products/${editMode}`, { ...formData, oemNumber: formData.oem }, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      } else {
-        await axios.post(`${API_URL}/products`, formData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-      }
+      await axios.put(`${API_URL}/products/${editMode}`, { ...formData, oemNumber: formData.oem }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       fetchProducts();
       setIsModalOpen(false);
     } catch (err) {
@@ -204,6 +200,11 @@ export default function Products() {
         // Carry the images over too -- a duplicate that silently loses them
         // would land back in the imageless state this form now exists to fix.
         images: product.images || [],
+        // Without this, the backend has no vendorId to attribute the copy to
+        // and falls back to the "MechBazar Direct" house vendor -- silently
+        // turning a vendor's product into one MechBazar appears to sell
+        // itself. Keep the duplicate under the same real vendor.
+        vendorId: product.vendorId,
       };
       await axios.post(`${API_URL}/products`, dupeData, {
         headers: { Authorization: `Bearer ${token}` }
@@ -247,15 +248,15 @@ export default function Products() {
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
+          <Link to="/vendors" className="text-sm text-neutral-400 hover:text-primary-500 flex items-center gap-1 mb-2">
+            <ArrowLeft className="w-4 h-4" /> Back to Vendors
+          </Link>
           <h2 className="text-3xl font-bold text-neutral-100 tracking-tight flex items-center">
             <Package className="w-8 h-8 mr-3 text-primary-500" />
-            Product Catalog
+            Vendor Product Catalog
           </h2>
           <p className="text-neutral-400 mt-1">Review vendor products, manage inventory, pricing, and B2B discounts</p>
         </div>
-        <Button onClick={() => handleOpenForm()}>
-          <span>+</span> Add Internal Product
-        </Button>
       </div>
 
       {/* Stats Row */}
@@ -413,16 +414,16 @@ export default function Products() {
         </div>
       </div>
 
-      {/* Add/Edit Product Modal */}
+      {/* Edit Product Modal -- edit-only, see handleOpenForm's note above */}
       <Dialog
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title={editMode ? 'Edit Product' : 'Add Internal Product'}
+        title="Edit Product"
         size="xl"
         footer={
           <>
             <button onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 rounded-xl font-bold text-neutral-400 hover:text-neutral-100">Cancel</button>
-            <Button onClick={handleSave}>{editMode ? 'Save Changes' : 'Create Product'}</Button>
+            <Button onClick={handleSave}>Save Changes</Button>
           </>
         }
       >

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
+import { Link } from 'react-router-dom';
 import type { RootState } from '../store';
-import { Store, Phone, Search, Plus, Eye, FileText, Landmark, Building, FileCheck, MapPin } from 'lucide-react';
+import { Store, Phone, Search, Plus, Eye, FileText, Landmark, Building, FileCheck, MapPin, Package } from 'lucide-react';
 import { Button, Badge, Dialog, Input, Loader } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
 import AddressMapPicker from '../components/maps/AddressMapPicker';
@@ -184,9 +185,20 @@ export default function Vendors() {
           <Store className="w-8 h-8 mr-3 text-brand-primary" />
           Marketplace Vendors
         </h1>
-        <Button onClick={() => handleOpenEditModal()}>
-          <Plus className="w-5 h-5 mr-1" /> Add Vendor
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* Every product belongs to a real vendor -- this is where staff
+              review pending vendor submissions, low stock, and B2B pricing
+              across all of them, so it's linked here rather than living as
+              its own top-level nav item. */}
+          <Link to="/products">
+            <Button variant="outline">
+              <Package className="w-5 h-5 mr-1" /> Review Vendor Products
+            </Button>
+          </Link>
+          <Button onClick={() => handleOpenEditModal()}>
+            <Plus className="w-5 h-5 mr-1" /> Add Vendor
+          </Button>
+        </div>
       </div>
 
       <div className="bg-brand-panel border border-brand-border rounded-xl p-4 flex items-center">

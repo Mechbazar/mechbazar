@@ -1,6 +1,6 @@
 import React, { Suspense, lazy, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Car, ShoppingBag, Users, Layers, Package, LogOut, Store, Navigation, Warehouse, Image, Tag, CreditCard, Bike, Wrench, ClipboardList, Layers3, Menu, X, FileText, ScrollText, KeyRound } from 'lucide-react';
+import { LayoutDashboard, Car, Users, Layers, Package, LogOut, Store, Navigation, Warehouse, Image, Tag, CreditCard, Bike, Wrench, ClipboardList, Layers3, Menu, X, FileText, ScrollText, KeyRound } from 'lucide-react';
 import { Toaster } from 'react-hot-toast';
 import { Logo } from '@mechbazar/shared/web';
 import { useDispatch, useSelector } from 'react-redux';
@@ -52,7 +52,6 @@ const NAV_ROLES: Record<string, string[]> = {
   '/orders': ['SUPER_ADMIN', 'ADMIN', 'OPERATIONS_MANAGER', 'INVENTORY_MANAGER', 'VENDOR_MANAGER', 'FINANCE_MANAGER', 'CUSTOMER_SUPPORT'],
   '/service-bookings': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
   '/mechanics': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
-  '/products': ['ADMIN', 'SUPER_ADMIN', 'INVENTORY_MANAGER', 'VENDOR_MANAGER'],
   '/categories': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
   '/inventory': ['ADMIN', 'SUPER_ADMIN', 'INVENTORY_MANAGER', 'OPERATIONS_MANAGER', 'VENDOR_MANAGER'],
   '/services': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
@@ -86,7 +85,6 @@ function MainLayout({ children }: { children: React.ReactNode }) {
     { to: '/orders', icon: Package, label: 'Product Orders' },
     { to: '/service-bookings', icon: ClipboardList, label: 'Service Bookings' },
     { to: '/mechanics', icon: Wrench, label: 'Mechanics' },
-    { to: '/products', icon: ShoppingBag, label: 'Products' },
     { to: '/categories', icon: Layers, label: 'Categories' },
     { to: '/inventory', icon: Warehouse, label: 'Inventory' },
     { to: '/services', icon: Layers3, label: 'Service Catalog' },
@@ -223,6 +221,12 @@ function App() {
                 <Route path="audit-logs" element={<AuditLogs />} />
                 <Route path="vehicles" element={<Vehicles />} />
                 <Route path="/categories" element={<Categories />} />
+                {/* Deliberately not in allNavLinks -- MechBazar doesn't sell
+                    products directly, only vendors do, so this isn't a
+                    top-level section of its own. It's still the only place to
+                    review pending vendor product submissions, low stock, and
+                    B2B pricing across every vendor, so it stays routable and
+                    is linked from the Vendors page instead. */}
                 <Route path="/products" element={<Products />} />
                 <Route path="/inventory/*" element={<InventorySystem />} />
                 <Route path="/services/*" element={<ServicesManagement />} />
