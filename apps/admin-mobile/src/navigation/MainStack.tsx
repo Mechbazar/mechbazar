@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { colors } from '@mechbazar/shared';
+import { registerForPushNotificationsAsync } from '../services/notifications';
 import { TabNavigator } from './TabNavigator';
 import { OrderDetailScreen } from '../screens/OrderDetailScreen';
 import { CategoriesScreen } from '../screens/CategoriesScreen';
@@ -42,6 +43,10 @@ const screenOptions = {
 // row or the More menu) pushes on top of them for native back-button
 // navigation — mirrors apps/rider's MainStack pattern.
 export const MainStack = () => {
+  useEffect(() => {
+    registerForPushNotificationsAsync();
+  }, []);
+
   return (
     <Stack.Navigator screenOptions={screenOptions}>
       <Stack.Screen name="Tabs" component={TabNavigator} options={{ headerShown: false }} />

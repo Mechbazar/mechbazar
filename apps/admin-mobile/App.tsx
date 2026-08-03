@@ -6,7 +6,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Constants from 'expo-constants';
-import { setApiBaseUrl } from '@mechbazar/shared';
+import { setApiBaseUrl, setUnauthorizedHandler } from '@mechbazar/shared';
+import { logout } from './src/store';
 
 import * as SplashScreen from 'expo-splash-screen';
 
@@ -14,6 +15,14 @@ import * as SplashScreen from 'expo-splash-screen';
 // a hook body executes, expo-splash-screen may already have auto-hidden. Not
 // awaited, per Expo's docs -- awaiting it here would reintroduce the race.
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Without this, an expired/invalid token's 401 deletes the SecureStore token
+// (packages/shared/src/api/client.ts's response interceptor) but Redux never
+// learns about it -- isAuthenticated stays true, RootNavigator keeps rendering
+// MainStack, and every screen just keeps re-fetching and failing with no path
+// back to Login. rider/mechanic/seller-mobile all register this; admin-mobile
+// was the one sibling app that didn't.
+setUnauthorizedHandler(() => store.dispatch(logout()));
 
 const queryClient = new QueryClient();
 const ORDERS_POLL_INTERVAL_MS = 20000;
@@ -56,7 +65,10 @@ export default function App() {
     <Provider store={store}>
       <QueryClientProvider client={queryClient}>
         <SafeAreaProvider>
-          <StatusBar style="light" />
+          {/* App theme is light (colors.background/#F5F6F8, colors.card/#FFFFFF)
+              throughout -- "light" (white icons) made the status bar clock/
+              battery/signal unreadable. Every sibling app uses "dark" here. */}
+          <StatusBar style="dark" />
           <OrdersPoller />
           <RootNavigator />
         </SafeAreaProvider>

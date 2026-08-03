@@ -6,15 +6,16 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mechbazar.admin"
     },
     "android": {
       "package": "com.mechbazar.admin",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#1B1B1B",
+        "backgroundColor": "#0A1230",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -28,10 +29,17 @@
       "expo-secure-store",
       "expo-status-bar",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "MechBazar Admin accesses your photo library so you can pick images for banners and service packages.",
+          "cameraPermission": "MechBazar Admin uses your camera so you can photograph and attach images for banners and service packages."
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/android-icon-monochrome.png",
-          "color": "#E23B22",
+          "color": "#2F5BFF",
           "defaultChannel": "default",
           "enableBackgroundRemoteNotifications": false
         }
@@ -40,12 +48,12 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon-dark.png",
-          "imageWidth": 240,
+          "imageWidth": 176,
           "resizeMode": "contain",
-          "backgroundColor": "#1B1B1B",
+          "backgroundColor": "#0A1230",
           "dark": {
             "image": "./assets/splash-icon-dark.png",
-            "backgroundColor": "#1B1B1B"
+            "backgroundColor": "#0A1230"
           }
         }
       ]
