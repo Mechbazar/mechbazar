@@ -14,7 +14,6 @@ const hasHttpsCerts = fs.existsSync(certFile) && fs.existsSync(keyFile)
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
-  build: { sourcemap: true },
   resolve: {
     // Monorepo workspaces pin different React versions (RN apps need 19.2.3,
     // this app needs 19.2.7). npm's hoisting can land a mismatched react/react-dom
