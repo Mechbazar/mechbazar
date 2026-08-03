@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,161 +10,422 @@ import {
   Platform,
   ScrollView,
   Animated,
+  Easing,
   ActivityIndicator,
-  Alert,
-  Image,
   Modal,
-  Dimensions
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch } from 'react-redux';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
-import Svg, { Rect, Defs, LinearGradient, Stop, Circle, Path, G } from 'react-native-svg';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import Svg, { Rect, Defs, LinearGradient, RadialGradient, Stop, Circle, Path, Ellipse, Line } from 'react-native-svg';
 import { Logo } from '@mechbazar/shared';
+
+// Not re-exported from '@mechbazar/shared''s flat entry point (only the Logo
+// component itself is) -- matches Logo.tsx's own LogoTone definition.
+type LogoTone = 'light' | 'dark';
 import { loginSuccess } from '../../store/authSlice';
 import { API_BASE_URL } from '../../services/api';
-import { sendPhoneOtp, confirmPhoneOtp } from '../../services/phoneAuth';
+import { sendPhoneOtp, confirmPhoneOtp, watchForAutoVerification } from '../../services/phoneAuth';
 import { notify } from '../../utils/notify';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import Container from '../../components/desktop/shared/Container';
 import { spacing, typography, radius, shadows, darkColors, colors as brandColors } from '../../theme/tokens';
+import { useIsDarkMode } from '../../theme/useThemeColors';
 
-const { width } = Dimensions.get('window');
-
-// Deliberately a fixed dark theme regardless of the device's light/dark
-// preference -- this is the pre-login brand moment, not the app's normal
-// (light) content theme, so it does not read from useThemeColors(). Values
-// are sourced from theme/tokens.ts's `darkColors` (the design system's own
-// dark palette -- surfaces invert, brand hues are lifted for AA contrast
-// against dark backgrounds) rather than invented locally, so this screen
-// and the desktop layout below share one definition of "the app's dark
-// surface colours" instead of two.
-const colors = {
-  bg: darkColors.pageBg, // '#121212'
-  surface: darkColors.white, // '#1E1E1E' -- card/elevated-surface colour in dark mode
-  surfaceRaised: '#242C35', // one step brighter than `surface`, for the OTP card once it's the focused step
-  border: darkColors.borderLight, // '#2E2E2E'
-  borderFocus: darkColors.primary,
-  // Button fills use the canonical brand red (same hex as the rest of the
-  // app, e.g. GarageScreen/EditProfileScreen) since a solid-fill CTA needs
-  // white-on-red contrast, not dark-surface text contrast.
-  primary: brandColors.primary, // '#DA3830'
-  primaryLight: '#FF573C',
-  // Text/link colour on the dark surfaces below uses the dark-mode-tuned red
-  // (lifted for AA contrast against near-black, per tokens.ts's own rationale).
-  primaryOnDark: darkColors.primary, // '#FF5A4E'
-  white: '#FFFFFF',
-  textPrimary: darkColors.textDark, // '#F1F2F4'
-  textMuted: darkColors.textMuted, // '#A6ACB5'
-  danger: darkColors.danger, // '#FF6B6B'
+// Premium light-first palette per the redesign brief, wired through the
+// app's real dark-mode system (useIsDarkMode) instead of a fixed theme --
+// unlike the old dark-only version of this screen. `primary` stays the
+// AA-safe shade (DA3830) for text-bearing fills (buttons/links), while
+// `primaryBrand` is the exact spec hex (E53935) for decorative surfaces
+// where contrast isn't load-bearing -- the same split tokens.ts documents
+// for the rest of the app.
+type Palette = {
+  bg: string;
+  bgTop: string;
+  surface: string;
+  card: string;
+  chipBg: string;
+  border: string;
+  textPrimary: string;
+  textMuted: string;
+  primary: string;
+  primaryBrand: string;
+  danger: string;
+  success: string;
+  white: string;
 };
 
-const SvgBackground = ({ gearRotation, floatAnim }: any) => (
-  <View style={StyleSheet.absoluteFill}>
-    <Svg height="100%" width="100%">
-      <Defs>
-        <LinearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <Stop offset="0%" stopColor="#1A1D22" />
-          <Stop offset="100%" stopColor={colors.bg} />
-        </LinearGradient>
-      </Defs>
-      <Rect width="100%" height="100%" fill="url(#bgGrad)" />
+const LIGHT_PALETTE: Palette = {
+  bg: '#F7F8FC',
+  bgTop: '#FFFFFF',
+  surface: '#FFFFFF',
+  card: '#FFFFFF',
+  chipBg: '#FFFFFF',
+  border: '#E9ECF3',
+  textPrimary: '#111111',
+  textMuted: brandColors.textMuted,
+  primary: brandColors.primary,
+  primaryBrand: brandColors.primaryBrand,
+  danger: brandColors.danger,
+  success: brandColors.accentText,
+  white: '#FFFFFF',
+};
+
+const DARK_PALETTE: Palette = {
+  bg: darkColors.pageBg,
+  bgTop: '#1A1D22',
+  surface: darkColors.white,
+  card: darkColors.white,
+  chipBg: darkColors.white,
+  border: darkColors.borderLight,
+  textPrimary: darkColors.textDark,
+  textMuted: darkColors.textMuted,
+  primary: darkColors.primary,
+  primaryBrand: darkColors.primaryBrand,
+  danger: darkColors.danger,
+  success: darkColors.accentText,
+  white: '#FFFFFF',
+};
+
+const CARD_RADIUS = 28;
+const INPUT_RADIUS = 20;
+const INPUT_HEIGHT = 58;
+const BUTTON_HEIGHT = 58;
+const BUTTON_RADIUS = 20;
+// Caps how wide the stacked mobile column is allowed to grow (tablet
+// portrait, foldables) -- below this the layout is just full-width with
+// spacing.lg gutters, same as before.
+const CONTENT_MAX_WIDTH = 460;
+
+// Subtle gradient page background + a faint automotive outline pinned to
+// the very bottom of the screen only -- everything else stays open white
+// space per the "premium minimal" brief.
+function BackgroundLayer({ colors: c }: { colors: Palette }) {
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Svg height="100%" width="100%">
+        <Defs>
+          <LinearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+            <Stop offset="0%" stopColor={c.bgTop} />
+            <Stop offset="100%" stopColor={c.bg} />
+          </LinearGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill="url(#bgGrad)" />
+      </Svg>
+
+      <View style={styles_bottomOutline}>
+        <Svg width="100%" height="100%" viewBox="0 0 360 90" preserveAspectRatio="xMidYMax slice">
+          <Path
+            d="M20 70 L45 70 L55 45 L95 30 L180 28 L230 40 L260 55 L300 55 L320 70 L340 70"
+            stroke={c.textPrimary}
+            strokeWidth={2.5}
+            fill="none"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <Circle cx="95" cy="70" r="16" stroke={c.textPrimary} strokeWidth={2.5} fill="none" />
+          <Circle cx="260" cy="70" r="16" stroke={c.textPrimary} strokeWidth={2.5} fill="none" />
+        </Svg>
+      </View>
+    </View>
+  );
+}
+
+const styles_bottomOutline = {
+  position: 'absolute' as const,
+  bottom: 0,
+  left: 0,
+  right: 0,
+  height: 90,
+  opacity: 0.05,
+};
+
+// A small "glossy 3D" capsule: circular chip with a soft shadow and a top
+// highlight ellipse to fake depth, floating on its own independent loop so
+// the hero doesn't move in lockstep. No 3D engine is in this project --
+// real-time 3D (three.js/expo-gl) would be a heavy, fragile dependency for
+// a login screen's first paint, so depth is faked with layered vector
+// shading instead, which is the standard approach premium RN apps use here.
+function FloatingChip({
+  size,
+  colors: c,
+  positionStyle,
+  duration,
+  delay,
+  driftY,
+  rotateDeg,
+  children,
+}: {
+  size: number;
+  colors: Palette;
+  positionStyle: any;
+  duration: number;
+  delay: number;
+  driftY: number;
+  rotateDeg: number;
+  children: React.ReactNode;
+}) {
+  const float = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(float, { toValue: 1, duration, delay, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(float, { toValue: 0, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [duration, delay]);
+
+  const translateY = float.interpolate({ inputRange: [0, 1], outputRange: [0, driftY] });
+  const rotate = float.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${rotateDeg}deg`] });
+
+  return (
+    <Animated.View
+      style={[
+        positionStyle,
+        { position: 'absolute', width: size, height: size, transform: [{ translateY }, { rotate }] },
+      ]}
+    >
+      <View
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: c.chipBg,
+          borderWidth: 1,
+          borderColor: c.border,
+          alignItems: 'center',
+          justifyContent: 'center',
+          shadowColor: '#0B1220',
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.14,
+          shadowRadius: 12,
+          elevation: 6,
+        }}
+      >
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: size * 0.08,
+            left: size * 0.16,
+            width: size * 0.45,
+            height: size * 0.26,
+            borderRadius: size * 0.2,
+            backgroundColor: '#FFFFFF',
+            opacity: 0.5,
+          }}
+        />
+        {children}
+      </View>
+    </Animated.View>
+  );
+}
+
+// Hand-drawn: MaterialCommunityIcons has no "spring"/"coil" glyph.
+function SpringGlyph({ size, color }: { size: number; color: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Ellipse cx="12" cy="4" rx="7" ry="2.3" stroke={color} strokeWidth={1.6} fill="none" />
+      <Ellipse cx="12" cy="9.3" rx="7" ry="2.3" stroke={color} strokeWidth={1.6} fill="none" />
+      <Ellipse cx="12" cy="14.7" rx="7" ry="2.3" stroke={color} strokeWidth={1.6} fill="none" />
+      <Ellipse cx="12" cy="20" rx="7" ry="2.3" stroke={color} strokeWidth={1.6} fill="none" />
     </Svg>
+  );
+}
 
-    {/* Subtle animated floating gear background overlay */}
-    <Animated.View style={[
-      styles.animatedGear,
-      {
-        transform: [
-          {
-            rotate: gearRotation.interpolate({
-              inputRange: [0, 1],
-              outputRange: ['0deg', '360deg']
-            })
-          }
-        ]
-      }
-    ]}>
-      <Svg height="120" width="120" viewBox="0 0 100 100" opacity="0.04">
-        <Circle cx="50" cy="50" r="30" stroke="#FFFFFF" strokeWidth="4" fill="none" />
-        <Path d="M 50 10 L 50 20 M 50 80 L 50 90 M 10 50 L 20 50 M 80 50 L 90 50 M 22 22 L 29 29 M 71 71 L 78 78 M 22 78 L 29 71 M 71 22 L 78 29" stroke="#FFFFFF" strokeWidth="5" strokeLinecap="round" />
+// Hand-drawn: MaterialCommunityIcons has no "spark plug" glyph.
+function SparkPlugGlyph({ size, color }: { size: number; color: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Rect x="9.5" y="1.5" width="5" height="7" rx="1.5" fill="none" stroke={color} strokeWidth={1.5} />
+      <Rect x="8" y="8.5" width="8" height="5" rx="1" fill={color} />
+      <Path d="M12 13.5 L12 18 M12 18 L12 21 M12 21 L15 21" stroke={color} strokeWidth={1.6} strokeLinecap="round" fill="none" />
+      <Circle cx="12" cy="18" r="1" fill={color} />
+    </Svg>
+  );
+}
+
+// The hero: MechBazar mark on a white circular "platform" with a soft glow,
+// ringed by six floating automotive object chips. Shared between the mobile
+// and desktop layouts below so both stay visually identical.
+function HeroStage({ colors: c, logoTone }: { colors: Palette; logoTone: LogoTone }) {
+  return (
+    <View style={heroStyles.stage}>
+      <Svg width={200} height={200} style={heroStyles.glow}>
+        <Defs>
+          <RadialGradient id="platformGlow" cx="50%" cy="50%" r="50%">
+            <Stop offset="0%" stopColor={c.primaryBrand} stopOpacity={0.16} />
+            <Stop offset="100%" stopColor={c.primaryBrand} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={100} cy={100} r={100} fill="url(#platformGlow)" />
       </Svg>
-    </Animated.View>
 
-    {/* Subtle animated floating bike background outline overlay */}
-    <Animated.View style={[
-      styles.animatedBike,
-      {
-        transform: [
-          {
-            translateY: floatAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, 12]
-            })
-          }
-        ]
-      }
-    ]}>
-      <Svg height="100" width="150" viewBox="0 0 100 60" opacity="0.03">
-        <Path d="M 15,35 L 45,15 L 65,35 L 45,50 L 20,45 Z" fill="none" stroke="#FFFFFF" strokeWidth="2" />
-        <Circle cx="15" cy="45" r="12" fill="none" stroke="#FFFFFF" strokeWidth="2" />
-        <Circle cx="70" cy="45" r="12" fill="none" stroke="#FFFFFF" strokeWidth="2" />
-      </Svg>
-    </Animated.View>
-  </View>
-);
+      <View
+        style={[
+          heroStyles.platform,
+          { backgroundColor: c.surface, borderColor: c.border },
+        ]}
+      >
+        <Logo tone={logoTone} width={62} />
+      </View>
 
-const GradientButton = ({ onPress, children, disabled, isLoading }: any) => {
+      <FloatingChip size={52} colors={c} duration={3200} delay={0} driftY={-10} rotateDeg={-8} positionStyle={{ top: 4, left: '13%' }}>
+        <MaterialCommunityIcons name="tire" size={26} color={c.textPrimary} />
+      </FloatingChip>
+
+      <FloatingChip size={46} colors={c} duration={3600} delay={300} driftY={12} rotateDeg={10} positionStyle={{ top: 16, right: '9%' }}>
+        <MaterialCommunityIcons name="cog" size={24} color={c.primaryBrand} />
+      </FloatingChip>
+
+      <FloatingChip size={48} colors={c} duration={4000} delay={600} driftY={-9} rotateDeg={-6} positionStyle={{ bottom: 28, left: '3%' }}>
+        <MaterialCommunityIcons name="wrench" size={23} color={c.textPrimary} />
+      </FloatingChip>
+
+      <FloatingChip size={44} colors={c} duration={3400} delay={900} driftY={11} rotateDeg={9} positionStyle={{ top: 60, right: '0%' }}>
+        <MaterialCommunityIcons name="nut" size={22} color={c.textPrimary} />
+      </FloatingChip>
+
+      <FloatingChip size={46} colors={c} duration={3800} delay={450} driftY={-11} rotateDeg={7} positionStyle={{ bottom: 8, right: '19%' }}>
+        <SpringGlyph size={24} color={c.primaryBrand} />
+      </FloatingChip>
+
+      <FloatingChip size={44} colors={c} duration={3300} delay={750} driftY={10} rotateDeg={-9} positionStyle={{ top: 68, left: '0%' }}>
+        <SparkPlugGlyph size={22} color={c.textPrimary} />
+      </FloatingChip>
+    </View>
+  );
+}
+
+const heroStyles = StyleSheet.create({
+  stage: {
+    height: 260,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  glow: { position: 'absolute' },
+  platform: {
+    width: 116,
+    height: 116,
+    borderRadius: 58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    shadowColor: '#0B1220',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.16,
+    shadowRadius: 28,
+    elevation: 10,
+  },
+});
+
+// Wraps an input row with an animated focus glow: border fades from the
+// resting border color to brand red, plus a soft matching shadow. `error`
+// (validation failure) always wins over the focus color.
+function AnimatedInputRow({
+  colors: c,
+  focusAnim,
+  error,
+  style,
+  children,
+}: {
+  colors: Palette;
+  focusAnim: Animated.Value;
+  error?: boolean;
+  style?: any;
+  children: React.ReactNode;
+}) {
+  const borderColor = error
+    ? c.danger
+    : focusAnim.interpolate({ inputRange: [0, 1], outputRange: [c.border, c.primary] });
+  const shadowOpacity = error ? 0 : focusAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.14] });
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          borderColor,
+          shadowColor: c.primary,
+          shadowOffset: { width: 0, height: 0 },
+          shadowRadius: 10,
+          shadowOpacity,
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+// Full-width red-gradient CTA: press-scale animation, Android ripple, and a
+// loading spinner swap-in while an OTP request is in flight.
+function GradientButton({
+  onPress,
+  children,
+  disabled,
+  isLoading,
+  colors: c,
+}: {
+  onPress: () => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+  isLoading?: boolean;
+  colors: Palette;
+}) {
   const scaleValue = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
-    Animated.spring(scaleValue, {
-      toValue: 0.97,
-      useNativeDriver: true
-    }).start();
+    Animated.spring(scaleValue, { toValue: 0.97, useNativeDriver: true, speed: 40 }).start();
   };
-
   const handlePressOut = () => {
-    Animated.spring(scaleValue, {
-      toValue: 1,
-      useNativeDriver: true
-    }).start();
+    Animated.spring(scaleValue, { toValue: 1, useNativeDriver: true, speed: 40 }).start();
   };
 
   return (
-    <Animated.View style={{ transform: [{ scale: scaleValue }] }}>
-      <TouchableOpacity
+    <Animated.View style={{ transform: [{ scale: scaleValue }], marginTop: spacing.lg }}>
+      <Pressable
         onPress={onPress}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         disabled={disabled || isLoading}
-        activeOpacity={0.85}
-        style={styles.gradientBtnContainer}
+        android_ripple={{ color: '#FFFFFF3D' }}
+        style={{
+          height: BUTTON_HEIGHT,
+          borderRadius: BUTTON_RADIUS,
+          overflow: 'hidden',
+          shadowColor: c.primary,
+          shadowOffset: { width: 0, height: 10 },
+          shadowOpacity: disabled ? 0 : 0.28,
+          shadowRadius: 18,
+          elevation: disabled ? 0 : 6,
+        }}
       >
         <View style={StyleSheet.absoluteFill}>
           <Svg height="100%" width="100%">
             <Defs>
               <LinearGradient id="btnGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <Stop offset="0%" stopColor={colors.primaryLight} />
-                <Stop offset="100%" stopColor={colors.primary} />
+                <Stop offset="0%" stopColor={c.primaryBrand} />
+                <Stop offset="100%" stopColor={c.primary} />
               </LinearGradient>
             </Defs>
-            <Rect width="100%" height="100%" fill={disabled ? "#4A5562" : "url(#btnGrad)"} rx={radius.md} ry={radius.md} />
+            <Rect width="100%" height="100%" fill={disabled ? c.border : 'url(#btnGrad)'} rx={BUTTON_RADIUS} ry={BUTTON_RADIUS} />
           </Svg>
         </View>
-        <View style={styles.btnContent}>
-          {isLoading ? (
-            <ActivityIndicator color={colors.white} size="small" />
-          ) : (
-            children
-          )}
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          {isLoading ? <ActivityIndicator color={c.white} size="small" /> : children}
         </View>
-      </TouchableOpacity>
+      </Pressable>
     </Animated.View>
   );
-};
+}
 
 // The API base-URL switcher below is a DEVELOPMENT tool. It used to be
 // reachable in every build from a gear icon on the login screen, which meant a
@@ -182,164 +443,154 @@ const DEV_TOOLS_ENABLED = __DEV__;
 
 // Shared by both the native/mobile-web layout and the desktop layout below
 // -- same dev-only API base URL switcher, just rendered from either branch.
-const ApiSettingsModal = ({
-  visible, tempBaseUrl, setTempBaseUrl, onSave, onReset, onClose,
+function ApiSettingsModal({
+  visible, tempBaseUrl, setTempBaseUrl, onSave, onReset, onClose, colors: c,
 }: {
   visible: boolean; tempBaseUrl: string; setTempBaseUrl: (v: string) => void;
-  onSave: () => void; onReset: () => void; onClose: () => void;
-}) => (
-  <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-    <View style={styles.modalOverlay}>
-      <View style={styles.modalCard}>
-        <Text style={styles.modalTitle}>API Server Configuration</Text>
-        <Text style={styles.modalDesc}>Change backend API base URL for testing environment updates.</Text>
+  onSave: () => void; onReset: () => void; onClose: () => void; colors: Palette;
+}) {
+  const s = useMemo(() => createStyles(c), [c]);
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={s.modalOverlay}>
+        <View style={s.modalCard}>
+          <Text style={s.modalTitle}>API Server Configuration</Text>
+          <Text style={s.modalDesc}>Change backend API base URL for testing environment updates.</Text>
 
-        <TextInput
-          style={styles.modalInput}
-          value={tempBaseUrl}
-          onChangeText={setTempBaseUrl}
-          placeholder="http://<IP>:<PORT>/api"
-          placeholderTextColor={colors.textMuted}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+          <TextInput
+            style={s.modalInput}
+            value={tempBaseUrl}
+            onChangeText={setTempBaseUrl}
+            placeholder="http://<IP>:<PORT>/api"
+            placeholderTextColor={c.textMuted}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
 
-        <View style={styles.modalBtnRow}>
-          <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onReset}>
-            <Text style={styles.modalSecondaryBtnText}>Reset</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.modalSecondaryBtn} onPress={onClose}>
-            <Text style={styles.modalSecondaryBtnText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.modalPrimaryBtn} onPress={onSave}>
-            <Text style={styles.modalPrimaryBtnText}>Save</Text>
-          </TouchableOpacity>
+          <View style={s.modalBtnRow}>
+            <TouchableOpacity style={s.modalSecondaryBtn} onPress={onReset}>
+              <Text style={s.modalSecondaryBtnText}>Reset</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.modalSecondaryBtn} onPress={onClose}>
+              <Text style={s.modalSecondaryBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.modalPrimaryBtn} onPress={onSave}>
+              <Text style={s.modalPrimaryBtnText}>Save</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
-  </Modal>
-);
+    </Modal>
+  );
+}
 
 // Desktop-only login layout (>=1024px). Reuses every piece of state/logic
 // from WelcomeScreen unchanged -- send-otp/login/register calls, validation,
 // GradientButton -- only the JSX/layout differs from the native/mobile-web
-// version below. Split screen (banner+trust content left, centered login
-// card right) instead of one stacked full-height column, so the form is
-// visible without scrolling at 1366x768 and the leftover width isn't empty
-// space. Sits under DesktopHeader (kept as-is -- already has logo/search/
-// categories/nav from the earlier header-compaction pass) via
+// version below. Split screen (hero left, centered login card right) instead
+// of one stacked full-height column, so the form is visible without
+// scrolling at 1366x768. Sits under DesktopHeader via
 // setDesktopFullPageScreenActive, which also skips the shell's full
-// marketing DesktopFooter in favor of the compact one rendered here.
+// DesktopFooter in favor of the compact one rendered here.
 function DesktopWelcomeLayout({
-  mobile, otp, isOtpSent, isLoading, phoneError, resendCooldown,
+  colors: c, logoTone, mobile, otp, isOtpSent, isLoading, phoneError, resendCooldown, autoVerifiedReady,
+  mobileFocusAnim, otpFocusAnim, animateFocus,
   handlePhoneChange, setOtp, handleSendOtp, handleLogin,
   onOpenSettings, navigation,
 }: any) {
+  const s = useMemo(() => createDesktopStyles(c), [c]);
   return (
-    <View style={desktopStyles.page}>
+    <View style={s.page}>
       {/* Development builds only -- see the note on DEV_TOOLS_ENABLED. */}
       {DEV_TOOLS_ENABLED && (
         <Pressable
-          style={desktopStyles.settingsIconBtn}
+          style={s.settingsIconBtn}
           onPress={onOpenSettings}
           accessibilityRole="button"
           accessibilityLabel="Developer settings"
         >
-          <Ionicons name="settings-outline" size={16} color={colors.textMuted} />
+          <Ionicons name="settings-outline" size={16} color={c.textMuted} />
         </Pressable>
       )}
 
-      <Container style={desktopStyles.center}>
-        <View style={desktopStyles.splitRow}>
-          {/* LEFT: hero copy + banner + benefits */}
-          <View style={desktopStyles.leftCol}>
-            <View style={desktopStyles.leftLogoRow}>
-              <Logo tone="dark" width={168} />
-            </View>
-            <Text style={desktopStyles.heroTitle}>India's Smart Vehicle Marketplace</Text>
-            <Text style={desktopStyles.heroSubtitle}>Car Parts • Bike Parts • Home Mechanic Services</Text>
-
-            <Image
-              source={require('../../../assets/car_banner.jpg')}
-              style={desktopStyles.bannerImage}
-              resizeMode="cover"
-            />
-
-            <View style={desktopStyles.benefitsRow}>
-              <View style={desktopStyles.benefitItem}>
-                <Ionicons name="shield-checkmark-outline" size={18} color={colors.primaryOnDark} />
-                <Text style={desktopStyles.benefitText}>Genuine Parts</Text>
-              </View>
-              <View style={desktopStyles.benefitItem}>
-                <Ionicons name="home-outline" size={18} color={colors.primaryOnDark} />
-                <Text style={desktopStyles.benefitText}>Doorstep Service</Text>
-              </View>
-              <View style={desktopStyles.benefitItem}>
-                <Ionicons name="flash-outline" size={18} color={colors.primaryOnDark} />
-                <Text style={desktopStyles.benefitText}>Fast Delivery</Text>
-              </View>
-            </View>
+      <Container style={s.center}>
+        <View style={s.splitRow}>
+          <View style={s.leftCol}>
+            <HeroStage colors={c} logoTone={logoTone} />
           </View>
 
-          {/* RIGHT: login card */}
-          <View style={desktopStyles.rightCol}>
-            <View style={desktopStyles.card}>
-              <Text style={desktopStyles.welcomeBack}>Welcome Back</Text>
-              <Text style={desktopStyles.continueWith}>Continue with your mobile number</Text>
+          <View style={s.rightCol}>
+            <View style={s.card}>
+              <View style={s.cardLogoRow}>
+                <Logo tone={logoTone} height={22} />
+              </View>
 
-              <Text style={desktopStyles.inputLabel}>Mobile Number</Text>
-              <View style={[desktopStyles.inputRow, phoneError ? desktopStyles.inputRowError : null]}>
-                <View style={desktopStyles.flagBox}>
-                  <Text style={desktopStyles.flagText}>🇮🇳</Text>
-                  <Text style={desktopStyles.countryCode}>+91</Text>
-                  <View style={desktopStyles.verticalDivider} />
+              <Text style={s.inputLabel}>Mobile Number</Text>
+              <AnimatedInputRow colors={c} focusAnim={mobileFocusAnim} error={!!phoneError} style={s.inputRow}>
+                <View style={s.flagBox}>
+                  <Text style={s.flagText}>🇮🇳</Text>
+                  <Text style={s.countryCode}>+91</Text>
+                  <View style={s.verticalDivider} />
                 </View>
                 <TextInput
-                  style={desktopStyles.mobileInput}
+                  style={s.mobileInput}
                   placeholder="Enter 10-digit number"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={c.textMuted}
                   keyboardType="numeric"
                   maxLength={10}
                   value={mobile}
                   onChangeText={handlePhoneChange}
                   editable={!isOtpSent && !isLoading}
+                  onFocus={() => animateFocus(mobileFocusAnim, 1)}
+                  onBlur={() => animateFocus(mobileFocusAnim, 0)}
                 />
-              </View>
+              </AnimatedInputRow>
               {!!phoneError && (
-                <View style={desktopStyles.errorRow}>
-                  <Ionicons name="alert-circle" size={13} color={colors.danger} />
-                  <Text style={desktopStyles.errorText}>{phoneError}</Text>
+                <View style={s.errorRow}>
+                  <Ionicons name="alert-circle" size={13} color={c.danger} />
+                  <Text style={s.errorText}>{phoneError}</Text>
                 </View>
               )}
 
               {isOtpSent && (
-                <View style={desktopStyles.otpSection}>
-                  <View style={desktopStyles.otpSectionHeader}>
-                    <Text style={desktopStyles.inputLabel}>Enter OTP</Text>
-                    <Text style={desktopStyles.sentToText}>Sent to +91 {mobile}</Text>
-                  </View>
-                  <View style={desktopStyles.inputRow}>
-                    <Ionicons name="lock-closed-outline" size={17} color={colors.textMuted} style={{ marginRight: 10 }} />
-                    <TextInput
-                      style={desktopStyles.mobileInput}
-                      placeholder="Enter 6-digit OTP"
-                      placeholderTextColor={colors.textMuted}
-                      keyboardType="numeric"
-                      maxLength={6}
-                      value={otp}
-                      onChangeText={setOtp}
-                      editable={!isLoading}
-                    />
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => handleSendOtp(true)}
-                    disabled={resendCooldown > 0 || isLoading}
-                    style={desktopStyles.resendBtn}
-                  >
-                    <Text style={[desktopStyles.resendText, (resendCooldown > 0 || isLoading) && desktopStyles.resendTextDisabled]}>
-                      {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
-                    </Text>
-                  </TouchableOpacity>
+                <View style={s.otpSection}>
+                  {autoVerifiedReady ? (
+                    <View style={s.autoVerifiedRow}>
+                      <Ionicons name="checkmark-circle" size={18} color={c.success} />
+                      <Text style={s.autoVerifiedText}>Number verified automatically. Tap below to continue.</Text>
+                    </View>
+                  ) : (
+                    <>
+                      <View style={s.otpSectionHeader}>
+                        <Text style={s.inputLabel}>Enter OTP</Text>
+                        <Text style={s.sentToText}>Sent to +91 {mobile}</Text>
+                      </View>
+                      <AnimatedInputRow colors={c} focusAnim={otpFocusAnim} style={s.inputRow}>
+                        <Ionicons name="lock-closed-outline" size={17} color={c.textMuted} style={{ marginRight: 10 }} />
+                        <TextInput
+                          style={s.mobileInput}
+                          placeholder="Enter 6-digit OTP"
+                          placeholderTextColor={c.textMuted}
+                          keyboardType="numeric"
+                          maxLength={6}
+                          value={otp}
+                          onChangeText={setOtp}
+                          editable={!isLoading}
+                          onFocus={() => animateFocus(otpFocusAnim, 1)}
+                          onBlur={() => animateFocus(otpFocusAnim, 0)}
+                        />
+                      </AnimatedInputRow>
+                      <TouchableOpacity
+                        onPress={() => handleSendOtp(true)}
+                        disabled={resendCooldown > 0 || isLoading}
+                        style={s.resendBtn}
+                      >
+                        <Text style={[s.resendText, (resendCooldown > 0 || isLoading) && s.resendTextDisabled]}>
+                          {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
                 </View>
               )}
 
@@ -347,32 +598,39 @@ function DesktopWelcomeLayout({
                 onPress={isOtpSent ? handleLogin : () => handleSendOtp(false)}
                 isLoading={isLoading}
                 disabled={mobile.length < 10}
+                colors={c}
               >
-                <Text style={desktopStyles.primaryBtnText}>{isOtpSent ? 'Verify & Login' : 'Request OTP'}</Text>
+                <Text style={s.primaryBtnText}>{isOtpSent ? (autoVerifiedReady ? 'Continue' : 'Verify & Login') : 'Send OTP'}</Text>
+                <Ionicons name="arrow-forward" size={18} color={c.white} />
               </GradientButton>
 
+              <View style={s.securityNote}>
+                <Ionicons name="shield-checkmark-outline" size={14} color={c.textMuted} />
+                <Text style={s.securityNoteText}>Secure OTP Login</Text>
+              </View>
+
               <Pressable
-                style={({ hovered }: any) => [desktopStyles.wholesaleBtn, hovered && desktopStyles.wholesaleBtnHovered]}
+                style={s.wholesaleBtn}
                 onPress={() => navigation.navigate('WholesaleRegistration')}
                 accessibilityRole="button"
               >
-                <Text style={desktopStyles.wholesaleBtnText}>Create Wholesale Account</Text>
+                <Text style={s.wholesaleBtnText}>Create Wholesale Account</Text>
               </Pressable>
             </View>
           </View>
         </View>
       </Container>
 
-      <View style={desktopStyles.footer}>
-        <Container style={desktopStyles.footerRow}>
-          <Text style={desktopStyles.footerCopy}>© {new Date().getFullYear()} MechBazar. All rights reserved.</Text>
-          <View style={desktopStyles.footerLinks}>
-            <Text style={desktopStyles.footerStatic}>Privacy Policy</Text>
-            <Text style={desktopStyles.footerDot}>•</Text>
-            <Text style={desktopStyles.footerStatic}>Terms</Text>
-            <Text style={desktopStyles.footerDot}>•</Text>
+      <View style={s.footer}>
+        <Container style={s.footerRow}>
+          <Text style={s.footerCopy}>© {new Date().getFullYear()} MechBazar. All rights reserved.</Text>
+          <View style={s.footerLinks}>
+            <Text style={s.footerStatic}>Privacy Policy</Text>
+            <Text style={s.footerDot}>•</Text>
+            <Text style={s.footerStatic}>Terms</Text>
+            <Text style={s.footerDot}>•</Text>
             <Pressable onPress={() => navigation.navigate('HelpCenter')}>
-              <Text style={desktopStyles.footerLink}>Contact</Text>
+              <Text style={s.footerLink}>Contact</Text>
             </Pressable>
           </View>
         </Container>
@@ -384,6 +642,10 @@ function DesktopWelcomeLayout({
 export default function WelcomeScreen() {
   const dispatch = useDispatch();
   const navigation = useNavigation<any>();
+  const isDark = useIsDarkMode();
+  const c = isDark ? DARK_PALETTE : LIGHT_PALETTE;
+  const logoTone: LogoTone = isDark ? 'dark' : 'light';
+  const styles = useMemo(() => createStyles(c), [c]);
 
   // States
   const [mobile, setMobile] = useState('');
@@ -400,6 +662,22 @@ export default function WelcomeScreen() {
   // handleSendOtp before that; this ref flips immediately so the second call
   // bails before it ever reaches Firebase / the backend.
   const sendInFlightRef = useRef(false);
+  // A Firebase ID token can reach completeLogin from three places -- the
+  // manual code (handleLogin), Android verifying instantly (handleSendOtp),
+  // or Android auto-retrieving the SMS while the OTP box is showing
+  // (watchForAutoVerification below) -- and the last two can race the manual
+  // path. Without this a fast auto-verification could post the same login
+  // twice.
+  const completingRef = useRef(false);
+  // Holds the ID token Android's Firebase SDK produced on its own (instant
+  // verification, or SMS auto-retrieval while the OTP box is showing).
+  // Deliberately NOT auto-consumed by completeLogin -- see autoVerifiedReady.
+  const autoVerifiedTokenRef = useRef<string | null>(null);
+  // True once Android has verified the number without the user typing
+  // anything. The token above is real and ready, but login only proceeds once
+  // the user taps the button themselves -- Android completing this silently
+  // in the background is not the same as the user asking to be signed in.
+  const [autoVerifiedReady, setAutoVerifiedReady] = useState(false);
   const [activeBaseUrl, setActiveBaseUrl] = useState(API_BASE_URL);
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [tempBaseUrl, setTempBaseUrl] = useState(API_BASE_URL);
@@ -410,56 +688,24 @@ export default function WelcomeScreen() {
     return () => setDesktopFullPageScreenActive(false);
   }, []));
 
-  // Animations
+  // Entry animations
   const logoFadeAnim = useRef(new Animated.Value(0)).current;
   const heroSlideAnim = useRef(new Animated.Value(30)).current;
   const inputFadeAnim = useRef(new Animated.Value(0)).current;
-  const gearRotation = useRef(new Animated.Value(0)).current;
-  const floatAnim = useRef(new Animated.Value(0)).current;
+  // Border-color/glow animations for the two input rows (mobile number, OTP).
+  const mobileFocusAnim = useRef(new Animated.Value(0)).current;
+  const otpFocusAnim = useRef(new Animated.Value(0)).current;
+
+  const animateFocus = (anim: Animated.Value, toValue: number) => {
+    Animated.timing(anim, { toValue, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
+  };
 
   useEffect(() => {
-    // Start entry animations
     Animated.parallel([
-      Animated.timing(logoFadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true
-      }),
-      Animated.timing(heroSlideAnim, {
-        toValue: 0,
-        duration: 600,
-        useNativeDriver: true
-      }),
-      Animated.timing(inputFadeAnim, {
-        toValue: 1,
-        duration: 700,
-        useNativeDriver: true
-      })
+      Animated.timing(logoFadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(heroSlideAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
+      Animated.timing(inputFadeAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
     ]).start();
-
-    // Start background loops
-    Animated.loop(
-      Animated.timing(gearRotation, {
-        toValue: 1,
-        duration: 25000,
-        useNativeDriver: true
-      })
-    ).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(floatAnim, {
-          toValue: 1,
-          duration: 3500,
-          useNativeDriver: true
-        }),
-        Animated.timing(floatAnim, {
-          toValue: 0,
-          duration: 3500,
-          useNativeDriver: true
-        })
-      ])
-    ).start();
   }, []);
 
   // Ticks the resend cooldown down to zero once a send starts it.
@@ -483,61 +729,20 @@ export default function WelcomeScreen() {
     }
   };
 
-  const handleSendOtp = async (isResend = false) => {
-    if (mobile.length < 10) {
-      setPhoneError('Please enter a valid 10-digit mobile number.');
-      return;
-    }
-    // A resend is only allowed once the 60s cooldown has elapsed.
-    if (isResend && resendCooldown > 0) return;
-    // Reject a duplicate in-flight send synchronously (see sendInFlightRef).
-    if (sendInFlightRef.current) return;
-    sendInFlightRef.current = true;
-
-    // Timestamped so duplicate/rapid sends are identifiable in client logs.
-    console.log(`[otp] ${new Date().toISOString()} send requested (resend=${isResend})`);
-    setIsLoading(true);
-    setPhoneError('');
-
-    // Firebase Phone Auth sends the SMS itself as part of signInWithPhoneNumber
-    // and, once confirmed in handleLogin, yields an ID token the backend
-    // verifies. This is the only OTP path -- there is no backend send-otp
-    // fallback (see apps/backend/src/utils/otp.ts).
-    try {
-      await sendPhoneOtp(mobile);
-      setIsLoading(false);
-      setIsOtpSent(true);
-      startResendCooldown();
-      notify('OTP Sent', 'An OTP has been sent to your phone.');
-    } catch (err) {
-      setIsLoading(false);
-      const message = err instanceof Error ? err.message : String(err);
-      // notify() works on web (Alert.alert is a no-op there); also mirror the
-      // failure inline so it is visible even if a browser blocks window.alert.
-      setPhoneError(message || 'Failed to send OTP.');
-      notify('Error', message || 'Failed to send OTP.');
-    } finally {
-      sendInFlightRef.current = false;
-    }
-  };
-
-  const handleLogin = async () => {
-    if (otp.length < 6) {
-      notify('Validation Error', 'Please enter a valid 6-digit OTP.');
-      return;
-    }
-
+  // Everything after Firebase is happy: swap the ID token for a MechBazar
+  // session. Shared by all three ways an ID token can arrive (manual code,
+  // instant auto-verification, or late auto-verification while the OTP box
+  // is showing) -- they differ only in how the token was obtained.
+  const completeLogin = async (idToken: string) => {
+    if (completingRef.current) return;
+    completingRef.current = true;
+    setIsOtpSent(false);
     setIsLoading(true);
     try {
-      // `otp` (the code the user typed) confirms the pending Firebase
-      // phone-auth request and yields an ID token; that token -- not the raw
-      // code -- is what the backend verifies (verifyOtpAndResolvePhone).
-      const otpForBackend = await confirmPhoneOtp(otp);
-
       let res = await fetch(`${activeBaseUrl}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: mobile, otp: otpForBackend })
+        body: JSON.stringify({ phone: mobile, otp: idToken })
       });
 
       let data = await res.json();
@@ -548,7 +753,7 @@ export default function WelcomeScreen() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             phone: mobile,
-            otp: otpForBackend,
+            otp: idToken,
             name: 'Customer User',
             accountType: 'RETAIL'
           })
@@ -568,8 +773,112 @@ export default function WelcomeScreen() {
       const message = err instanceof Error ? err.message : String(err);
       notify('Network Error', `Failed to authenticate: ${message}`);
     } finally {
+      completingRef.current = false;
       setIsLoading(false);
     }
+  };
+
+  // Covers the auto-verification that arrives LATE: the SMS lands a few
+  // seconds after "Send OTP" and Play services reads it while this screen is
+  // still showing the code box. That signs the user in and spends the
+  // session, so anything typed afterwards comes back as auth/session-expired.
+  // Watching the auth state turns that into a successful login instead. See
+  // services/phoneAuth.ts for the full explanation.
+  useEffect(() => {
+    if (!isOtpSent) return;
+    if (mobile.length !== 10) return;
+    return watchForAutoVerification(mobile, (idToken) => {
+      // Hold the token and ask the user to confirm rather than logging them
+      // in the moment Android finishes -- see autoVerifiedTokenRef.
+      autoVerifiedTokenRef.current = idToken;
+      setAutoVerifiedReady(true);
+    });
+  }, [isOtpSent, mobile]);
+
+  const handleSendOtp = async (isResend = false) => {
+    if (mobile.length < 10) {
+      setPhoneError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    // A resend is only allowed once the 60s cooldown has elapsed.
+    if (isResend && resendCooldown > 0) return;
+    // Reject a duplicate in-flight send synchronously (see sendInFlightRef).
+    if (sendInFlightRef.current) return;
+    sendInFlightRef.current = true;
+
+    // Timestamped so duplicate/rapid sends are identifiable in client logs.
+    console.log(`[otp] ${new Date().toISOString()} send requested (resend=${isResend})`);
+    setIsLoading(true);
+    setPhoneError('');
+    autoVerifiedTokenRef.current = null;
+    setAutoVerifiedReady(false);
+
+    // Firebase Phone Auth sends the SMS itself as part of signInWithPhoneNumber
+    // and, once confirmed in handleLogin, yields an ID token the backend
+    // verifies. This is the only OTP path -- there is no backend send-otp
+    // fallback (see apps/backend/src/utils/otp.ts).
+    try {
+      const result = await sendPhoneOtp(mobile);
+      setIsLoading(false);
+      // ...unless Android verified the number instantly, in which case no SMS
+      // was ever sent. That used to log the user straight in with no
+      // confirmation step at all; now it holds the token and shows a
+      // "verified -- tap to continue" state instead (autoVerifiedTokenRef).
+      if (result.autoVerified && result.idToken) {
+        autoVerifiedTokenRef.current = result.idToken;
+        setAutoVerifiedReady(true);
+        setIsOtpSent(true);
+        return;
+      }
+      setIsOtpSent(true);
+      startResendCooldown();
+      notify('OTP Sent', 'An OTP has been sent to your phone.');
+    } catch (err) {
+      setIsLoading(false);
+      const message = err instanceof Error ? err.message : String(err);
+      // notify() works on web (Alert.alert is a no-op there); also mirror the
+      // failure inline so it is visible even if a browser blocks window.alert.
+      setPhoneError(message || 'Failed to send OTP.');
+      notify('Error', message || 'Failed to send OTP.');
+    } finally {
+      sendInFlightRef.current = false;
+    }
+  };
+
+  const handleLogin = async () => {
+    // Android already produced a valid token (see autoVerifiedTokenRef) --
+    // there is no code to confirm, just the user's explicit go-ahead.
+    if (autoVerifiedTokenRef.current) {
+      const token = autoVerifiedTokenRef.current;
+      autoVerifiedTokenRef.current = null;
+      setAutoVerifiedReady(false);
+      await completeLogin(token);
+      return;
+    }
+
+    if (otp.length < 6) {
+      notify('Validation Error', 'Please enter a valid 6-digit OTP.');
+      return;
+    }
+
+    setIsLoading(true);
+    // `otp` (the code the user typed) confirms the pending Firebase
+    // phone-auth request and yields an ID token; that token -- not the raw
+    // code -- is what the backend verifies (verifyOtpAndResolvePhone). A
+    // failure here is a wrong/expired code, distinct from the network/backend
+    // errors completeLogin handles.
+    let idToken: string;
+    try {
+      idToken = await confirmPhoneOtp(otp, mobile);
+    } catch (err) {
+      setIsLoading(false);
+      const message = err instanceof Error ? err.message : String(err);
+      notify('Authentication Failed', message || 'The OTP you entered is incorrect or has expired.');
+      return;
+    }
+
+    // Leaves `isLoading` set: completeLogin owns it from here.
+    await completeLogin(idToken);
   };
 
   const saveSettings = () => {
@@ -585,25 +894,33 @@ export default function WelcomeScreen() {
     notify('Settings Reset', `API base URL reset to default:\n${API_BASE_URL}`);
   };
 
+  const openSettings = () => {
+    setTempBaseUrl(activeBaseUrl);
+    setIsSettingsVisible(true);
+  };
+
   if (isDesktopUp) {
     return (
       <>
         <DesktopWelcomeLayout
+          colors={c}
+          logoTone={logoTone}
           mobile={mobile}
           otp={otp}
           isOtpSent={isOtpSent}
           isLoading={isLoading}
           phoneError={phoneError}
           resendCooldown={resendCooldown}
+          autoVerifiedReady={autoVerifiedReady}
+          mobileFocusAnim={mobileFocusAnim}
+          otpFocusAnim={otpFocusAnim}
+          animateFocus={animateFocus}
           handlePhoneChange={handlePhoneChange}
           setOtp={setOtp}
           handleSendOtp={handleSendOtp}
           handleLogin={handleLogin}
           navigation={navigation}
-          onOpenSettings={() => {
-            setTempBaseUrl(activeBaseUrl);
-            setIsSettingsVisible(true);
-          }}
+          onOpenSettings={openSettings}
         />
         <ApiSettingsModal
           visible={isSettingsVisible}
@@ -612,6 +929,7 @@ export default function WelcomeScreen() {
           onSave={saveSettings}
           onReset={resetSettings}
           onClose={() => setIsSettingsVisible(false)}
+          colors={c}
         />
       </>
     );
@@ -619,21 +937,13 @@ export default function WelcomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <SvgBackground gearRotation={gearRotation} floatAnim={floatAnim} />
+      <BackgroundLayer colors={c} />
 
-      {/* Top Header Settings Bar */}
       <View style={styles.topHeader}>
         {/* Development builds only -- see the note on DEV_TOOLS_ENABLED. */}
         {DEV_TOOLS_ENABLED && (
-          <TouchableOpacity
-            style={styles.settingsIconBtn}
-            onPress={() => {
-              setTempBaseUrl(activeBaseUrl);
-              setIsSettingsVisible(true);
-            }}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="settings-outline" size={20} color={colors.white} />
+          <TouchableOpacity style={styles.settingsIconBtn} onPress={openSettings} activeOpacity={0.7}>
+            <Ionicons name="settings-outline" size={18} color={c.textMuted} />
           </TouchableOpacity>
         )}
       </View>
@@ -646,57 +956,19 @@ export default function WelcomeScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           bounces={false}
-          scrollEnabled={false}
         >
           <View style={styles.mainContent}>
-
-            {/* LOGO -- dark tone: this screen's background is near-black. */}
-            <Animated.View style={[styles.logoSection, { opacity: logoFadeAnim }]}>
-              <Logo tone="dark" width={220} />
+            <Animated.View style={{ opacity: logoFadeAnim, transform: [{ translateY: heroSlideAnim }] }}>
+              <HeroStage colors={c} logoTone={logoTone} />
             </Animated.View>
 
-            {/* HERO TEXTS */}
-            <Animated.View style={[
-              styles.heroSection,
-              {
-                opacity: logoFadeAnim,
-                transform: [{ translateY: heroSlideAnim }]
-              }
-            ]}>
-              <Text style={styles.heroTitle}>India's Smart Vehicle Marketplace</Text>
-              <Text style={styles.heroSubtitle}>Car Parts • Bike Parts • Home Mechanic Services</Text>
-              <Text style={styles.heroDescription}>
-                Order genuine spare parts, book expert mechanics at home, and get instant assistance—all in one app.
-              </Text>
-            </Animated.View>
-
-            {/* FEATURE BADGES */}
-            <View style={styles.badgeRow}>
-              <View style={styles.featureBadge}>
-                <Text style={styles.badgeText}>🚗 Genuine Parts</Text>
-              </View>
-              <View style={styles.featureBadge}>
-                <Text style={styles.badgeText}>🏍 Bike & Car Support</Text>
-              </View>
-              <View style={styles.featureBadge}>
-                <Text style={styles.badgeText}>🔧 Home Service</Text>
-              </View>
-            </View>
-
-            {/* TRUST INDICATORS */}
-            <View style={styles.trustGrid}>
-              <View style={styles.trustItem}><Text style={styles.trustItemText}>✓ Verified Mechanics</Text></View>
-              <View style={styles.trustItem}><Text style={styles.trustItemText}>✓ Genuine Products</Text></View>
-              <View style={styles.trustItem}><Text style={styles.trustItemText}>✓ Fast Delivery</Text></View>
-              <View style={styles.trustItem}><Text style={styles.trustItemText}>✓ Secure OTP Login</Text></View>
-            </View>
-
-            {/* PREMIUM LOGIN CARD */}
             <Animated.View style={[styles.authContainer, { opacity: inputFadeAnim }]}>
-              <Text style={styles.cardEyebrow}>{isOtpSent ? 'VERIFY YOUR NUMBER' : 'LOG IN OR SIGN UP'}</Text>
+              <View style={styles.cardLogoRow}>
+                <Logo tone={logoTone} height={22} />
+              </View>
 
               <Text style={styles.inputLabel}>Mobile Number</Text>
-              <View style={[styles.inputRow, phoneError ? styles.inputRowError : null]}>
+              <AnimatedInputRow colors={c} focusAnim={mobileFocusAnim} error={!!phoneError} style={styles.inputRow}>
                 <View style={styles.flagBox}>
                   <Text style={styles.flagText}>🇮🇳</Text>
                   <Text style={styles.countryCode}>+91</Text>
@@ -705,51 +977,64 @@ export default function WelcomeScreen() {
                 <TextInput
                   style={styles.mobileInput}
                   placeholder="Enter 10-digit number"
-                  placeholderTextColor={colors.textMuted}
+                  placeholderTextColor={c.textMuted}
                   keyboardType="numeric"
                   maxLength={10}
                   value={mobile}
                   onChangeText={handlePhoneChange}
                   editable={!isOtpSent && !isLoading}
                   autoFocus={true}
+                  onFocus={() => animateFocus(mobileFocusAnim, 1)}
+                  onBlur={() => animateFocus(mobileFocusAnim, 0)}
                 />
-              </View>
+              </AnimatedInputRow>
               {!!phoneError && (
                 <View style={styles.errorRow}>
-                  <Ionicons name="alert-circle" size={13} color={colors.danger} />
+                  <Ionicons name="alert-circle" size={13} color={c.danger} />
                   <Text style={styles.errorText}>{phoneError}</Text>
                 </View>
               )}
 
               {isOtpSent && (
                 <View style={styles.otpSection}>
-                  <View style={styles.otpSectionHeader}>
-                    <Text style={styles.inputLabel}>Enter OTP</Text>
-                    <Text style={styles.sentToText}>Sent to +91 {mobile}</Text>
-                  </View>
-                  <View style={styles.otpInputRow}>
-                    <Ionicons name="lock-closed-outline" size={20} color={colors.textMuted} style={styles.inputIcon} />
-                    <TextInput
-                      style={styles.otpInput}
-                      placeholder="Enter 6-digit OTP"
-                      placeholderTextColor={colors.textMuted}
-                      keyboardType="numeric"
-                      maxLength={6}
-                      value={otp}
-                      onChangeText={setOtp}
-                      editable={!isLoading}
-                      autoFocus={true}
-                    />
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => handleSendOtp(true)}
-                    disabled={resendCooldown > 0 || isLoading}
-                    style={styles.resendBtn}
-                  >
-                    <Text style={[styles.resendText, (resendCooldown > 0 || isLoading) && styles.resendTextDisabled]}>
-                      {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
-                    </Text>
-                  </TouchableOpacity>
+                  {autoVerifiedReady ? (
+                    <View style={styles.autoVerifiedRow}>
+                      <Ionicons name="checkmark-circle" size={18} color={c.success} />
+                      <Text style={styles.autoVerifiedText}>Number verified automatically. Tap below to continue.</Text>
+                    </View>
+                  ) : (
+                    <>
+                      <View style={styles.otpSectionHeader}>
+                        <Text style={styles.inputLabel}>Enter OTP</Text>
+                        <Text style={styles.sentToText}>Sent to +91 {mobile}</Text>
+                      </View>
+                      <AnimatedInputRow colors={c} focusAnim={otpFocusAnim} style={styles.otpInputRow}>
+                        <Ionicons name="lock-closed-outline" size={20} color={c.textMuted} style={styles.inputIcon} />
+                        <TextInput
+                          style={styles.otpInput}
+                          placeholder="Enter 6-digit OTP"
+                          placeholderTextColor={c.textMuted}
+                          keyboardType="numeric"
+                          maxLength={6}
+                          value={otp}
+                          onChangeText={setOtp}
+                          editable={!isLoading}
+                          autoFocus={true}
+                          onFocus={() => animateFocus(otpFocusAnim, 1)}
+                          onBlur={() => animateFocus(otpFocusAnim, 0)}
+                        />
+                      </AnimatedInputRow>
+                      <TouchableOpacity
+                        onPress={() => handleSendOtp(true)}
+                        disabled={resendCooldown > 0 || isLoading}
+                        style={styles.resendBtn}
+                      >
+                        <Text style={[styles.resendText, (resendCooldown > 0 || isLoading) && styles.resendTextDisabled]}>
+                          {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
                 </View>
               )}
 
@@ -757,547 +1042,405 @@ export default function WelcomeScreen() {
                 onPress={isOtpSent ? handleLogin : () => handleSendOtp(false)}
                 isLoading={isLoading}
                 disabled={mobile.length < 10}
+                colors={c}
               >
                 <Text style={styles.primaryBtnText}>
-                  {isOtpSent ? 'Verify & Login' : 'Send OTP'}
+                  {isOtpSent ? (autoVerifiedReady ? 'Continue' : 'Verify & Login') : 'Send OTP'}
                 </Text>
+                <Ionicons name="arrow-forward" size={18} color={c.white} />
               </GradientButton>
 
               <View style={styles.securityNote}>
-                <Ionicons name="shield-checkmark-outline" size={13} color={colors.textMuted} />
-                <Text style={styles.securityNoteText}>Your number is used only for secure OTP login</Text>
+                <Ionicons name="shield-checkmark-outline" size={14} color={c.textMuted} />
+                <Text style={styles.securityNoteText}>Secure OTP Login</Text>
               </View>
             </Animated.View>
-
           </View>
 
-          {/* FOOTER */}
           <View style={styles.footerContainer}>
-            <View style={styles.footerTextRow}>
-              <TouchableOpacity onPress={() => navigation.navigate('WholesaleRegistration')} activeOpacity={0.7}>
-                <Text style={styles.linkText}>Create Wholesale Account</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity onPress={() => navigation.navigate('WholesaleRegistration')} activeOpacity={0.7}>
+              <Text style={styles.linkText}>Create Wholesale Account</Text>
+            </TouchableOpacity>
           </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Dynamic API Configuration Modal (Top-Right Settings) */}
-      <Modal
+      <ApiSettingsModal
         visible={isSettingsVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setIsSettingsVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>API Server Configuration</Text>
-            <Text style={styles.modalDesc}>Change backend API base URL for testing environment updates.</Text>
-
-            <TextInput
-              style={styles.modalInput}
-              value={tempBaseUrl}
-              onChangeText={setTempBaseUrl}
-              placeholder="http://<IP>:<PORT>/api"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-
-            <View style={styles.modalBtnRow}>
-              <TouchableOpacity style={styles.modalSecondaryBtn} onPress={resetSettings}>
-                <Text style={styles.modalSecondaryBtnText}>Reset</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSecondaryBtn} onPress={() => setIsSettingsVisible(false)}>
-                <Text style={styles.modalSecondaryBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalPrimaryBtn} onPress={saveSettings}>
-                <Text style={styles.modalPrimaryBtnText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
+        tempBaseUrl={tempBaseUrl}
+        setTempBaseUrl={setTempBaseUrl}
+        onSave={saveSettings}
+        onReset={resetSettings}
+        onClose={() => setIsSettingsVisible(false)}
+        colors={c}
+      />
     </SafeAreaView>
   );
 }
 
-// Caps how wide the stacked mobile column is allowed to grow (tablet
-// portrait, foldables) -- below this the layout is just full-width with
-// spacing.lg gutters, same as before.
-const CONTENT_MAX_WIDTH = 460;
+function createStyles(c: Palette) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: c.bg,
+    },
+    topHeader: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.sm,
+      zIndex: 10,
+    },
+    settingsIconBtn: {
+      padding: spacing.sm,
+      backgroundColor: c.surface,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    keyboardContainer: {
+      flex: 1,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      justifyContent: 'center',
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.sm,
+      paddingBottom: spacing.lg,
+    },
+    mainContent: {
+      width: '100%',
+      maxWidth: CONTENT_MAX_WIDTH,
+      alignSelf: 'center',
+    },
+    authContainer: {
+      backgroundColor: c.card,
+      borderRadius: CARD_RADIUS,
+      padding: spacing.lg,
+      marginTop: spacing.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      shadowColor: '#0B1220',
+      shadowOffset: { width: 0, height: 20 },
+      shadowOpacity: 0.08,
+      shadowRadius: 40,
+      elevation: 8,
+    },
+    cardLogoRow: {
+      alignItems: 'center',
+      marginBottom: spacing.lg,
+    },
+    inputLabel: {
+      ...typography.bodySmall,
+      fontWeight: '600',
+      color: c.textPrimary,
+      marginBottom: spacing.sm,
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.bg,
+      borderRadius: INPUT_RADIUS,
+      borderWidth: 1.5,
+      paddingHorizontal: spacing.sm + 4,
+      height: INPUT_HEIGHT,
+      marginBottom: spacing.xs,
+    },
+    flagBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    flagText: {
+      fontSize: 18,
+    },
+    countryCode: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: c.textPrimary,
+      marginLeft: spacing.xs + 2,
+    },
+    verticalDivider: {
+      width: 1,
+      height: 22,
+      backgroundColor: c.border,
+      marginHorizontal: spacing.sm,
+    },
+    mobileInput: {
+      flex: 1,
+      fontSize: 16,
+      color: c.textPrimary,
+      height: '100%',
+    },
+    errorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: spacing.xs,
+      marginBottom: spacing.xs,
+    },
+    errorText: {
+      ...typography.caption,
+      color: c.danger,
+    },
+    otpSection: {
+      marginTop: spacing.md,
+    },
+    otpSectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.sm,
+    },
+    sentToText: {
+      ...typography.caption,
+      color: c.textMuted,
+    },
+    autoVerifiedRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: c.bg,
+      borderRadius: INPUT_RADIUS,
+      paddingHorizontal: spacing.sm + 4,
+      paddingVertical: spacing.sm + 4,
+    },
+    autoVerifiedText: {
+      ...typography.bodySmall,
+      color: c.textPrimary,
+      flex: 1,
+    },
+    resendBtn: {
+      alignSelf: 'flex-end',
+      marginTop: spacing.sm,
+      paddingVertical: 4,
+    },
+    resendText: {
+      color: c.primary,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    resendTextDisabled: {
+      color: c.textMuted,
+    },
+    otpInputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.bg,
+      borderRadius: INPUT_RADIUS,
+      borderWidth: 1.5,
+      paddingHorizontal: spacing.sm + 4,
+      height: INPUT_HEIGHT,
+    },
+    inputIcon: {
+      marginRight: spacing.sm,
+    },
+    otpInput: {
+      flex: 1,
+      fontSize: 16,
+      letterSpacing: 2,
+      color: c.textPrimary,
+      height: '100%',
+    },
+    primaryBtnText: {
+      ...typography.button,
+      color: c.white,
+      textTransform: 'uppercase',
+      letterSpacing: 0.75,
+    },
+    securityNote: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      marginTop: spacing.md,
+    },
+    securityNoteText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: c.textMuted,
+    },
+    footerContainer: {
+      alignItems: 'center',
+      paddingVertical: spacing.lg,
+    },
+    linkText: {
+      color: c.primary,
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: '#00000066',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: spacing.lg,
+    },
+    modalCard: {
+      width: '100%',
+      maxWidth: 420,
+      backgroundColor: c.card,
+      borderRadius: CARD_RADIUS,
+      padding: spacing.lg,
+      borderWidth: 1,
+      borderColor: c.border,
+      ...shadows.lg,
+    },
+    modalTitle: {
+      ...typography.h4,
+      color: c.textPrimary,
+      marginBottom: spacing.xs,
+    },
+    modalDesc: {
+      ...typography.bodySmall,
+      color: c.textMuted,
+      marginBottom: spacing.lg,
+    },
+    modalInput: {
+      backgroundColor: c.bg,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: c.border,
+      color: c.textPrimary,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + 4,
+      fontSize: 15,
+      marginBottom: spacing.lg,
+    },
+    modalBtnRow: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+    },
+    modalSecondaryBtn: {
+      paddingHorizontal: spacing.sm + 6,
+      paddingVertical: spacing.sm + 2,
+      marginRight: spacing.sm,
+    },
+    modalSecondaryBtnText: {
+      color: c.textMuted,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    modalPrimaryBtn: {
+      backgroundColor: c.primary,
+      borderRadius: radius.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + 2,
+    },
+    modalPrimaryBtnText: {
+      color: c.white,
+      fontSize: 14,
+      fontWeight: '700',
+    }
+  });
+}
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  topHeader: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    zIndex: 10,
-  },
-  settingsIconBtn: {
-    padding: spacing.sm,
-    backgroundColor: '#FFFFFF12',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: '#FFFFFF1F',
-  },
-  animatedGear: {
-    position: 'absolute',
-    top: 50,
-    right: -20,
-  },
-  animatedBike: {
-    position: 'absolute',
-    bottom: 80,
-    left: -30,
-  },
-  keyboardContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    flex: 1,
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-  },
-  mainContent: {
-    flex: 1,
-    justifyContent: 'center',
-    width: '100%',
-    maxWidth: CONTENT_MAX_WIDTH,
-    alignSelf: 'center',
-  },
-  logoSection: {
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  heroSection: {
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  heroTitle: {
-    fontSize: 21,
-    fontWeight: '800',
-    color: colors.textPrimary,
-    textAlign: 'center',
-    letterSpacing: 0.2,
-  },
-  heroSubtitle: {
-    ...typography.caption,
-    fontWeight: '700',
-    color: colors.primaryOnDark,
-    marginTop: spacing.xs,
-    textAlign: 'center',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  heroDescription: {
-    ...typography.caption,
-    color: colors.textMuted,
-    textAlign: 'center',
-    paddingHorizontal: spacing.sm,
-    lineHeight: 18,
-    marginTop: spacing.sm,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: spacing.md,
-  },
-  featureBadge: {
-    backgroundColor: '#FFFFFF0D',
-    borderWidth: 1,
-    borderColor: '#FFFFFF14',
-    borderRadius: radius.lg,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 5,
-    marginHorizontal: 3,
-  },
-  badgeText: {
-    color: colors.textPrimary,
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  trustGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-    marginHorizontal: -4,
-  },
-  trustItem: {
-    width: '46%',
-    margin: 3,
-    backgroundColor: '#FFFFFF08',
-    borderRadius: radius.sm,
-    paddingVertical: 4,
-    paddingHorizontal: spacing.xs,
-    alignItems: 'center',
-    borderWidth: 0.5,
-    borderColor: '#FFFFFF0D',
-  },
-  trustItemText: {
-    color: colors.textMuted,
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  // "Premium OTP card" -- larger radius + real elevation shadow (tokens'
-  // shadows.lg) instead of the previous flat, barely-elevated panel, and a
-  // small eyebrow label so the card reads as its own distinct step rather
-  // than a continuation of the hero copy above it.
-  authContainer: {
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.lg,
-  },
-  cardEyebrow: {
-    ...typography.caption,
-    fontWeight: '700',
-    color: colors.textMuted,
-    letterSpacing: 1,
-    marginBottom: spacing.md,
-  },
-  inputLabel: {
-    ...typography.bodySmall,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.bg,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.sm + 4,
-    height: 56,
-    marginBottom: spacing.xs,
-  },
-  inputRowError: {
-    borderColor: colors.danger,
-  },
-  flagBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  flagText: {
-    fontSize: 18,
-  },
-  countryCode: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginLeft: spacing.xs + 2,
-  },
-  verticalDivider: {
-    width: 1,
-    height: 22,
-    backgroundColor: colors.border,
-    marginHorizontal: spacing.sm,
-  },
-  mobileInput: {
-    flex: 1,
-    fontSize: 16,
-    color: colors.textPrimary,
-    height: '100%',
-  },
-  errorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: spacing.xs,
-    marginBottom: spacing.xs,
-  },
-  errorText: {
-    ...typography.caption,
-    color: colors.danger,
-  },
-  otpSection: {
-    marginTop: spacing.md,
-  },
-  otpSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  sentToText: {
-    ...typography.caption,
-    color: colors.textMuted,
-  },
-  resendBtn: {
-    alignSelf: 'flex-end',
-    marginTop: spacing.sm,
-    paddingVertical: 4,
-  },
-  resendText: {
-    color: colors.primaryOnDark,
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  resendTextDisabled: {
-    color: colors.textMuted,
-  },
-  otpInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.bg,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.sm + 4,
-    height: 56,
-  },
-  inputIcon: {
-    marginRight: spacing.sm,
-  },
-  otpInput: {
-    flex: 1,
-    fontSize: 16,
-    letterSpacing: 2,
-    color: colors.textPrimary,
-    height: '100%',
-  },
-  gradientBtnContainer: {
-    height: 56,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: spacing.lg,
-    borderRadius: radius.md,
-  },
-  btnContent: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primaryBtnText: {
-    ...typography.button,
-    color: colors.white,
-    textTransform: 'uppercase',
-    letterSpacing: 0.75,
-  },
-  securityNote: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: spacing.md,
-  },
-  securityNoteText: {
-    fontSize: 11,
-    color: colors.textMuted,
-  },
-  footerContainer: {
-    alignItems: 'center',
-    paddingVertical: spacing.sm + 2,
-  },
-  footerTextRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  footerText: {
-    color: colors.textMuted,
-    fontSize: 14,
-  },
-  linkText: {
-    color: colors.primaryOnDark,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: '#00000080',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.lg,
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.lg,
-  },
-  modalTitle: {
-    ...typography.h4,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  modalDesc: {
-    ...typography.bodySmall,
-    color: colors.textMuted,
-    marginBottom: spacing.lg,
-  },
-  modalInput: {
-    backgroundColor: colors.bg,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    color: colors.textPrimary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 4,
-    fontSize: 15,
-    marginBottom: spacing.lg,
-  },
-  modalBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  modalSecondaryBtn: {
-    paddingHorizontal: spacing.sm + 6,
-    paddingVertical: spacing.sm + 2,
-    marginRight: spacing.sm,
-  },
-  modalSecondaryBtnText: {
-    color: colors.textMuted,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  modalPrimaryBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-  },
-  modalPrimaryBtnText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '700',
-  }
-});
-
-// Desktop-only (>=1024px, see DesktopWelcomeLayout above). Same dark brand
-// palette (`colors` above) as the native screen -- this is a layout change,
-// not a re-theme.
-const desktopStyles = StyleSheet.create({
-  page: { flex: 1, backgroundColor: colors.bg },
-  settingsIconBtn: {
-    position: 'absolute' as any,
-    top: spacing.md,
-    right: spacing.md,
-    zIndex: 10,
-    padding: spacing.sm,
-    backgroundColor: '#FFFFFF0D',
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: '#FFFFFF15',
-  },
-  center: { flex: 1, justifyContent: 'center', paddingVertical: spacing.xl },
-  splitRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xxl,
-  },
-  leftCol: { flex: 1.15 },
-  leftLogoRow: { marginBottom: spacing.lg },
-  heroTitle: {
-    ...typography.h2,
-    color: colors.textPrimary,
-  },
-  heroSubtitle: {
-    ...typography.bodySmall,
-    fontWeight: '700',
-    color: colors.primaryOnDark,
-    marginTop: spacing.xs,
-    marginBottom: spacing.md,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  bannerImage: {
-    width: '100%',
-    height: 320,
-    borderRadius: radius.lg,
-  },
-  benefitsRow: {
-    flexDirection: 'row',
-    gap: spacing.lg,
-    marginTop: spacing.md,
-  },
-  benefitItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  benefitText: { color: colors.textPrimary, fontSize: 13, fontWeight: '600' },
-  rightCol: { width: 480, maxWidth: 480, flexShrink: 0, alignItems: 'stretch' },
-  card: {
-    backgroundColor: colors.surfaceRaised,
-    borderRadius: radius.lg,
-    padding: spacing.xl,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.lg,
-  },
-  welcomeBack: { ...typography.h3, color: colors.textPrimary },
-  continueWith: { ...typography.bodySmall, color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.lg },
-  inputLabel: { ...typography.bodySmall, fontWeight: '600', color: colors.textPrimary, marginBottom: spacing.sm },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.bg,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.sm + 4,
-    height: 56,
-  },
-  inputRowError: { borderColor: colors.danger },
-  flagBox: { flexDirection: 'row', alignItems: 'center' },
-  flagText: { fontSize: 17 },
-  countryCode: { fontSize: 15, fontWeight: '700', color: colors.textPrimary, marginLeft: spacing.xs + 2 },
-  verticalDivider: { width: 1, height: 22, backgroundColor: colors.border, marginHorizontal: spacing.sm },
-  mobileInput: { flex: 1, fontSize: 15, color: colors.textPrimary, outlineStyle: 'none' as any },
-  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.xs },
-  errorText: { ...typography.caption, color: colors.danger },
-  otpSection: { marginTop: spacing.md },
-  otpSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  sentToText: { ...typography.caption, color: colors.textMuted },
-  resendBtn: { alignSelf: 'flex-end', marginTop: spacing.sm, paddingVertical: 4 },
-  resendText: { color: colors.primaryOnDark, fontSize: 13, fontWeight: '700' },
-  resendTextDisabled: { color: colors.textMuted },
-  primaryBtnText: {
-    ...typography.button,
-    color: colors.white,
-    textTransform: 'uppercase',
-    letterSpacing: 0.75,
-  },
-  wholesaleBtn: {
-    marginTop: spacing.md,
-    height: 48,
-    borderRadius: radius.md,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  wholesaleBtnHovered: { borderColor: colors.primaryOnDark },
-  wholesaleBtnText: { color: colors.textPrimary, fontSize: 13, fontWeight: '700' },
-  footer: { borderTopWidth: 1, borderTopColor: colors.border },
-  footerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-  },
-  footerCopy: { color: colors.textMuted, fontSize: 12 },
-  footerLinks: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  footerStatic: { color: colors.textMuted, fontSize: 12 },
-  footerLink: { color: colors.primaryOnDark, fontSize: 12, fontWeight: '700' },
-  footerDot: { color: '#3A4552', fontSize: 12 },
-});
+// Desktop-only (>=1024px, see DesktopWelcomeLayout above). Same palette (`c`)
+// as the native screen -- this is a layout change, not a re-theme.
+function createDesktopStyles(c: Palette) {
+  return StyleSheet.create({
+    page: { flex: 1, backgroundColor: c.bg },
+    settingsIconBtn: {
+      position: 'absolute' as any,
+      top: spacing.md,
+      right: spacing.md,
+      zIndex: 10,
+      padding: spacing.sm,
+      backgroundColor: c.surface,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: c.border,
+    },
+    center: { flex: 1, justifyContent: 'center', paddingVertical: spacing.xl },
+    splitRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xxl,
+    },
+    leftCol: { flex: 1, alignItems: 'center' },
+    rightCol: { width: 460, maxWidth: 460, flexShrink: 0 },
+    card: {
+      backgroundColor: c.card,
+      borderRadius: CARD_RADIUS,
+      padding: spacing.xl,
+      borderWidth: 1,
+      borderColor: c.border,
+      shadowColor: '#0B1220',
+      shadowOffset: { width: 0, height: 24 },
+      shadowOpacity: 0.08,
+      shadowRadius: 48,
+      elevation: 10,
+    },
+    cardLogoRow: { alignItems: 'center', marginBottom: spacing.lg },
+    inputLabel: { ...typography.bodySmall, fontWeight: '600', color: c.textPrimary, marginBottom: spacing.sm },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.bg,
+      borderRadius: INPUT_RADIUS,
+      borderWidth: 1.5,
+      paddingHorizontal: spacing.sm + 4,
+      height: INPUT_HEIGHT,
+    },
+    flagBox: { flexDirection: 'row', alignItems: 'center' },
+    flagText: { fontSize: 17 },
+    countryCode: { fontSize: 15, fontWeight: '700', color: c.textPrimary, marginLeft: spacing.xs + 2 },
+    verticalDivider: { width: 1, height: 22, backgroundColor: c.border, marginHorizontal: spacing.sm },
+    mobileInput: { flex: 1, fontSize: 15, color: c.textPrimary, outlineStyle: 'none' as any },
+    errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.xs },
+    errorText: { ...typography.caption, color: c.danger },
+    otpSection: { marginTop: spacing.md },
+    otpSectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.sm,
+    },
+    sentToText: { ...typography.caption, color: c.textMuted },
+    autoVerifiedRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: c.bg,
+      borderRadius: INPUT_RADIUS,
+      paddingHorizontal: spacing.sm + 4,
+      paddingVertical: spacing.sm + 4,
+    },
+    autoVerifiedText: { ...typography.bodySmall, color: c.textPrimary, flex: 1 },
+    resendBtn: { alignSelf: 'flex-end', marginTop: spacing.sm, paddingVertical: 4 },
+    resendText: { color: c.primary, fontSize: 13, fontWeight: '700' },
+    resendTextDisabled: { color: c.textMuted },
+    primaryBtnText: {
+      ...typography.button,
+      color: c.white,
+      textTransform: 'uppercase',
+      letterSpacing: 0.75,
+    },
+    securityNote: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      marginTop: spacing.md,
+    },
+    securityNoteText: { fontSize: 12, fontWeight: '600', color: c.textMuted },
+    wholesaleBtn: {
+      marginTop: spacing.md,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    wholesaleBtnText: { color: c.textMuted, fontSize: 13, fontWeight: '700' },
+    footer: { borderTopWidth: 1, borderTopColor: c.border },
+    footerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: spacing.sm,
+    },
+    footerCopy: { color: c.textMuted, fontSize: 12 },
+    footerLinks: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    footerStatic: { color: c.textMuted, fontSize: 12 },
+    footerLink: { color: c.primary, fontSize: 12, fontWeight: '700' },
+    footerDot: { color: c.border, fontSize: 12 },
+  });
+}

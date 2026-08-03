@@ -5,17 +5,18 @@
 // `diff <(tail -n +7 HomeScreen.tsx) <(tail -n +7 HomeScreenMobile.tsx)`.
 // They drifted once already (the reviewsCount branch); mirror every change.
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  ScrollView, 
-  TouchableOpacity, 
+import {
+  View,
+  Text,
+  TextInput,
+  ScrollView,
+  TouchableOpacity,
   StyleSheet,
   Image,
   Dimensions,
   LayoutChangeEvent,
-  Animated, 
+  Animated,
+  Easing,
   ImageBackground,
   Alert,
   Modal,
@@ -38,22 +39,30 @@ import { fetchMyAddresses } from '../services/address.service';
 import { locationService } from '../services/location.service';
 import { reverseGeocode } from '../services/geocode.service';
 import { API_BASE_URL } from '../services/api';
+import { Icon3D } from '../components/shared/Icon3D';
 
 const { width } = Dimensions.get('window');
 
-// Premium Design System Colors
+// Premium Design System Colors. `primary` is a shade darker than the brand
+// spec's #E53935 -- that hex only clears ~4.2:1 contrast on white text
+// (buttons/badges use it as a solid fill), under WCAG AA's 4.5:1 minimum.
+// This shade clears it (~4.6:1) while reading as the same red at a glance.
+// `primaryBrand` is the exact spec hex, used only for decorative surfaces
+// (gradients, icon accents) where contrast isn't load-bearing.
 const colors = {
-  primary: '#E53935',     // Brand Red
-  primaryDark: '#B71C1C', 
-  secondary: '#1C1C1E',   // Steel charcoal
-  darkInk: '#111112',
-  white: '#FFFFFF',
-  pageBg: '#F8F9FA',      // Creamy clean content bg
-  borderLight: '#E8ECEF',
-  textMuted: '#8E8E93',
-  lightGray: '#F2F2F7',
-  success: '#34C759'
+  bg: '#F7F8FC',
+  card: '#FFFFFF',
+  ink: '#111111',
+  textMuted: '#6B7480',
+  border: '#EDEFF5',
+  primary: '#DA3830',
+  primaryBrand: '#E53935',
+  success: '#1E9E5A',
+  warning: '#F59F00',
+  white: '#FFFFFF'
 };
+
+const CARD_RADIUS = 24;
 
 const SERVICES = [
   { id: 's1', type: 'wash', name: 'Premium Wash', price: 199 },
@@ -66,156 +75,31 @@ const SERVICES = [
   { id: 's8', type: 'emergency', name: 'Emergency Help', price: 499 }
 ];
 
-import Svg, { Rect, Defs, LinearGradient, Stop, Circle, Path } from 'react-native-svg';
+import Svg, { Rect, Defs, LinearGradient, RadialGradient, Stop, Circle } from 'react-native-svg';
+
+// One icon per service type, in the same Icon3D chip language used for
+// Quick Actions / Categories / the tab bar / header buttons -- replaces the
+// old bespoke dark-panel SVG illustrations (8 separate hand-drawn scenes),
+// which were their own visual language distinct from the rest of the app.
+const SERVICE_ICONS: Record<string, { set: 'ionicons' | 'mci'; name: string; tint: string; iconColor: string }> = {
+  wash: { set: 'mci', name: 'car-wash', tint: '#E8F7FF', iconColor: '#1C7ED6' },
+  ac: { set: 'mci', name: 'air-conditioner', tint: '#E8F7FF', iconColor: '#1C7ED6' },
+  oil: { set: 'mci', name: 'oil', tint: '#FFF9DB', iconColor: '#F59F00' },
+  battery: { set: 'mci', name: 'car-battery', tint: '#EBFBEE', iconColor: '#2B8A3E' },
+  tyre: { set: 'mci', name: 'tire', tint: '#F1F3F5', iconColor: '#495057' },
+  brake: { set: 'mci', name: 'car-brake-alert', tint: '#FFECEB', iconColor: colors.primary },
+  spa: { set: 'ionicons', name: 'sparkles-outline', tint: '#F8F0FC', iconColor: '#9C36B5' },
+  emergency: { set: 'mci', name: 'car-emergency', tint: '#FFF0F6', iconColor: '#D6336C' },
+};
 
 const ServiceIllustration = ({ type }: { type: string }) => {
-  switch (type) {
-    case 'wash':
-      return (
-        <View style={styles.svgCardContainer}>
-          <Svg height="90" width="100%" viewBox="0 0 100 60">
-            <Defs>
-              <LinearGradient id="washGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <Stop offset="0%" stopColor="#2C3540" />
-                <Stop offset="100%" stopColor="#1C2229" />
-              </LinearGradient>
-            </Defs>
-            <Rect width="100" height="60" fill="url(#washGrad)" />
-            <Path d="M 25,40 C 25,40 30,25 45,25 L 65,25 C 65,25 75,30 80,40 Z" fill="none" stroke="#E53935" strokeWidth="2.5" />
-            <Circle cx="35" cy="40" r="5" fill="#FFFFFF" />
-            <Circle cx="65" cy="40" r="5" fill="#FFFFFF" />
-            <Circle cx="50" cy="15" r="2" fill="#E53935" />
-            <Circle cx="45" cy="18" r="1.5" fill="#FFFFFF" />
-            <Circle cx="55" cy="18" r="1.5" fill="#FFFFFF" />
-            <Circle cx="40" cy="20" r="1" fill="#E53935" />
-            <Circle cx="60" cy="20" r="1" fill="#FFFFFF" />
-          </Svg>
-        </View>
-      );
-    case 'ac':
-      return (
-        <View style={styles.svgCardContainer}>
-          <Svg height="90" width="100%" viewBox="0 0 100 60">
-            <Defs>
-              <LinearGradient id="acGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <Stop offset="0%" stopColor="#2C3540" />
-                <Stop offset="100%" stopColor="#1C2229" />
-              </LinearGradient>
-            </Defs>
-            <Rect width="100" height="60" fill="url(#acGrad)" />
-            <Path d="M 50,15 L 50,45 M 35,30 L 65,30 M 39,20 L 61,40 M 39,40 L 61,20" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
-            <Path d="M 46,18 L 50,22 L 54,18 M 46,42 L 50,38 L 54,42 M 38,26 L 42,30 L 38,34 M 62,26 L 58,30 L 62,34" stroke="#E53935" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-          </Svg>
-        </View>
-      );
-    case 'oil':
-      return (
-        <View style={styles.svgCardContainer}>
-          <Svg height="90" width="100%" viewBox="0 0 100 60">
-            <Defs>
-              <LinearGradient id="oilGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <Stop offset="0%" stopColor="#2C3540" />
-                <Stop offset="100%" stopColor="#1C2229" />
-              </LinearGradient>
-            </Defs>
-            <Rect width="100" height="60" fill="url(#oilGrad)" />
-            <Path d="M 35,45 L 35,25 L 42,20 L 48,20 L 48,25 L 55,27 L 55,45 Z" fill="none" stroke="#FFFFFF" strokeWidth="2.5" />
-            <Path d="M 65,30 C 65,35 60,38 60,38 C 60,38 55,35 55,30 C 55,27 60,24 60,24 C 60,24 65,27 65,30 Z" fill="#E53935" />
-            <Path d="M 25,20 L 30,25 M 23,17 C 25,19 25,22 23,24" stroke="#E53935" strokeWidth="2" strokeLinecap="round" />
-          </Svg>
-        </View>
-      );
-    case 'battery':
-      return (
-        <View style={styles.svgCardContainer}>
-          <Svg height="90" width="100%" viewBox="0 0 100 60">
-            <Defs>
-              <LinearGradient id="battGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <Stop offset="0%" stopColor="#2C3540" />
-                <Stop offset="100%" stopColor="#1C2229" />
-              </LinearGradient>
-            </Defs>
-            <Rect width="100" height="60" fill="url(#battGrad)" />
-            <Rect x="25" y="22" width="50" height="26" rx="4" fill="none" stroke="#FFFFFF" strokeWidth="2.5" />
-            <Rect x="32" y="16" width="10" height="6" fill="#E53935" rx="1" />
-            <Rect x="58" y="16" width="10" height="6" fill="#FFFFFF" rx="1" />
-            <Path d="M 35,28 L 39,28 M 37,26 L 37,30" stroke="#E53935" strokeWidth="1.5" />
-            <Path d="M 61,28 L 65,28" stroke="#FFFFFF" strokeWidth="1.5" />
-          </Svg>
-        </View>
-      );
-    case 'tyre':
-      return (
-        <View style={styles.svgCardContainer}>
-          <Svg height="90" width="100%" viewBox="0 0 100 60">
-            <Defs>
-              <LinearGradient id="tyreGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <Stop offset="0%" stopColor="#2C3540" />
-                <Stop offset="100%" stopColor="#1C2229" />
-              </LinearGradient>
-            </Defs>
-            <Rect width="100" height="60" fill="url(#tyreGrad)" />
-            <Circle cx="50" cy="30" r="18" fill="none" stroke="#FFFFFF" strokeWidth="4" />
-            <Circle cx="50" cy="30" r="10" fill="none" stroke="#E53935" strokeWidth="2" />
-            <Path d="M 50,19 L 50,41 M 39,30 L 61,30" stroke="#FFFFFF" strokeWidth="1.5" />
-          </Svg>
-        </View>
-      );
-    case 'brake':
-      return (
-        <View style={styles.svgCardContainer}>
-          <Svg height="90" width="100%" viewBox="0 0 100 60">
-            <Defs>
-              <LinearGradient id="brakeGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <Stop offset="0%" stopColor="#2C3540" />
-                <Stop offset="100%" stopColor="#1C2229" />
-              </LinearGradient>
-            </Defs>
-            <Rect width="100" height="60" fill="url(#brakeGrad)" />
-            <Circle cx="50" cy="30" r="18" fill="none" stroke="#FFFFFF" strokeWidth="2.5" />
-            <Circle cx="50" cy="30" r="6" fill="none" stroke="#FFFFFF" strokeWidth="1.5" />
-            <Path d="M 33,18 C 36,13 42,11 48,11 L 46,24 C 43,24 38,26 33,18 Z" fill="#E53935" />
-          </Svg>
-        </View>
-      );
-    case 'spa':
-      return (
-        <View style={styles.svgCardContainer}>
-          <Svg height="90" width="100%" viewBox="0 0 100 60">
-            <Defs>
-              <LinearGradient id="spaGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <Stop offset="0%" stopColor="#2C3540" />
-                <Stop offset="100%" stopColor="#1C2229" />
-              </LinearGradient>
-            </Defs>
-            <Rect width="100" height="60" fill="url(#spaGrad)" />
-            <Path d="M 20,38 C 20,38 25,23 40,23 L 65,23 C 65,23 75,28 78,38 Z" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
-            <Circle cx="32" cy="38" r="5" fill="#E53935" />
-            <Circle cx="62" cy="38" r="5" fill="#E53935" />
-            <Path d="M 45,15 L 47,18 L 50,15 L 47,12 Z" fill="#FFD700" />
-            <Path d="M 75,18 L 76,20 L 78,18 L 76,16 Z" fill="#FFFFFF" />
-          </Svg>
-        </View>
-      );
-    case 'emergency':
-      return (
-        <View style={styles.svgCardContainer}>
-          <Svg height="90" width="100%" viewBox="0 0 100 60">
-            <Defs>
-              <LinearGradient id="emGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <Stop offset="0%" stopColor="#2C3540" />
-                <Stop offset="100%" stopColor="#1C2229" />
-              </LinearGradient>
-            </Defs>
-            <Rect width="100" height="60" fill="url(#emGrad)" />
-            <Path d="M 50,15 L 75,45 L 25,45 Z" fill="none" stroke="#E53935" strokeWidth="3" strokeLinejoin="round" />
-            <Path d="M 50,26 L 50,35 M 50,39 L 50,41" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" />
-          </Svg>
-        </View>
-      );
-    default:
-      return null;
-  }
+  const cfg = SERVICE_ICONS[type];
+  if (!cfg) return null;
+  return (
+    <View style={styles.serviceIconBand}>
+      <Icon3D set={cfg.set} name={cfg.name} size={64} tint={cfg.tint} iconColor={cfg.iconColor} elevated />
+    </View>
+  );
 };
 
 // Rotating card palette for real offers fetched from the backend (Offer
@@ -227,9 +111,106 @@ const OFFER_PALETTE = [
   { color: '#E8F7FF', borderColor: '#74C0FC' },
 ];
 
+// Two-color pill for the Cars/Bikes selector. Scales up and gains a red
+// gradient fill when selected -- the sliding-indicator-behind-static-labels
+// design this replaced is now two independently animated pills instead.
+function VehiclePill({ label, emoji, active, onPress }: { label: string; emoji: string; active: boolean; onPress: () => void }) {
+  const scale = useRef(new Animated.Value(active ? 1.03 : 1)).current;
+  useEffect(() => {
+    Animated.spring(scale, { toValue: active ? 1.03 : 1, useNativeDriver: true, bounciness: 8 }).start();
+  }, [active]);
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={{ flex: 1 }}>
+      <Animated.View style={[styles.pill, active && styles.pillActiveShadow, { transform: [{ scale }] }]}>
+        {active && (
+          <View style={StyleSheet.absoluteFill}>
+            <Svg height="100%" width="100%">
+              <Defs>
+                <LinearGradient id={`pillGrad-${label}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                  <Stop offset="0%" stopColor={colors.primaryBrand} />
+                  <Stop offset="100%" stopColor={colors.primary} />
+                </LinearGradient>
+              </Defs>
+              <Rect width="100%" height="100%" fill={`url(#pillGrad-${label})`} rx={18} ry={18} />
+            </Svg>
+          </View>
+        )}
+        <Text style={[styles.pillText, active && styles.pillTextActive]}>{emoji}  {label}</Text>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
+// Animated banner pagination dot -- widens into a pill when active instead
+// of just swapping color, so the carousel position reads as a smooth
+// transition rather than a jump cut.
+function PaginationDot({ active }: { active: boolean }) {
+  const anim = useRef(new Animated.Value(active ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.timing(anim, { toValue: active ? 1 : 0, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
+  }, [active]);
+  const dotWidth = anim.interpolate({ inputRange: [0, 1], outputRange: [7, 22] });
+  const bg = anim.interpolate({ inputRange: [0, 1], outputRange: ['#D8DCE3', colors.primary] });
+  return <Animated.View style={[styles.paginationDot, { width: dotWidth, backgroundColor: bg as any }]} />;
+}
+
+// Quick-action tile: a glossy Icon3D chip with a gentle idle float (one of
+// the few tap targets this app lets breathe continuously -- see Icon3D's
+// `floating` doc comment for why the rest of the icon system doesn't) that
+// also lifts slightly on press.
+function QuickActionCard({ icon, label, tint, iconColor, onPress }: { icon: any; label: string; tint: string; iconColor: string; onPress: () => void }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const pressIn = () => Animated.spring(scale, { toValue: 0.94, useNativeDriver: true, speed: 50 }).start();
+  const pressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 50 }).start();
+  return (
+    <TouchableOpacity onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} activeOpacity={0.9} style={styles.quickCardTouchable}>
+      <Animated.View style={[styles.quickCard, { transform: [{ scale }] }]}>
+        <Icon3D name={icon} size={54} tint={tint} iconColor={iconColor} floating elevated style={{ marginBottom: 8 }} />
+        <Text style={styles.quickLabel} numberOfLines={1}>{label}</Text>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
+
+// Circular "floating orb" category icon -- a soft gradient ring behind a
+// white disc holding the real category image (or an emoji fallback).
+function CategoryOrb({ cat, onPress }: { cat: Category; onPress: () => void }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const pressIn = () => Animated.spring(scale, { toValue: 0.92, useNativeDriver: true, speed: 50 }).start();
+  const pressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 50 }).start();
+  return (
+    <TouchableOpacity onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} activeOpacity={0.9} style={styles.categoryItem}>
+      <Animated.View style={[styles.categoryRing, { transform: [{ scale }] }]}>
+        <Svg style={StyleSheet.absoluteFill} height="100%" width="100%">
+          <Defs>
+            <RadialGradient id={`catGlow-${cat.id}`} cx="50%" cy="50%" r="50%">
+              <Stop offset="0%" stopColor={colors.primaryBrand} stopOpacity={0.16} />
+              <Stop offset="100%" stopColor={colors.primaryBrand} stopOpacity={0} />
+            </RadialGradient>
+          </Defs>
+          <Circle cx="50%" cy="50%" r="50%" fill={`url(#catGlow-${cat.id})`} />
+        </Svg>
+        {/* Same top-left glass highlight Icon3D uses -- kept as a hand overlay
+            here (rather than routed through Icon3D) since this ring wraps a
+            real photo or emoji, not one of our vector glyphs. */}
+        <View pointerEvents="none" style={styles.categoryRingHighlight} />
+        <View style={styles.categoryOrb}>
+          {cat.image ? (
+            <Image source={{ uri: cat.image }} style={styles.categoryIconImg} />
+          ) : (
+            <Text style={styles.categoryEmoji}>{cat.icon || '📦'}</Text>
+          )}
+        </View>
+      </Animated.View>
+      <Text style={styles.categoryLabelText} numberOfLines={2}>{cat.name}</Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function HomeScreen({ navigation }: any) {
   const dispatch = useDispatch();
-  const { user, token } = useSelector((state: RootState) => state.auth);
+  const { token } = useSelector((state: RootState) => state.auth);
   const cartItems = useSelector((state: RootState) => state.cart.items);
   const vehicleType = useSelector((state: RootState) => state.app.vehicleType);
   const myGarage = useSelector((state: RootState) => state.app.myGarage);
@@ -353,16 +334,6 @@ export default function HomeScreen({ navigation }: any) {
     })();
   }, []);
 
-  // Animating Vehicle Switch Toggle Indicator
-  const toggleIndicatorPosition = useRef(new Animated.Value(vehicleType === VehicleType.BIKE ? 1 : 0)).current;
-  useEffect(() => {
-    Animated.spring(toggleIndicatorPosition, {
-      toValue: vehicleType === VehicleType.BIKE ? 1 : 0,
-      useNativeDriver: true,
-      bounciness: 6,
-    }).start();
-  }, [vehicleType]);
-
   const toggleVehicleType = (type: VehicleType) => {
     dispatch(setVehicleType(type));
   };
@@ -389,6 +360,17 @@ export default function HomeScreen({ navigation }: any) {
     navigation.navigate('CategoryProducts', {
       categoryName: 'Search Results',
       initialSearchQuery: term,
+      brandId: activeVehicle?.brand || undefined,
+      modelId: activeVehicle?.model || undefined,
+      year: activeVehicle?.year || undefined
+    });
+  };
+
+  // Real product-listing screen (with its own working filter sheet) instead
+  // of a fake filter UI on this screen -- see CategoryProductsScreen.
+  const handleOpenFilters = () => {
+    navigation.navigate('CategoryProducts', {
+      categoryName: 'All Products',
       brandId: activeVehicle?.brand || undefined,
       modelId: activeVehicle?.model || undefined,
       year: activeVehicle?.year || undefined
@@ -443,119 +425,98 @@ export default function HomeScreen({ navigation }: any) {
     ? [defaultAddress.title, defaultAddress.city].filter(Boolean).join(' · ')
     : locationName;
 
+  const QUICK_ACTIONS = [
+    { key: 'parts', label: 'Spare Parts', icon: 'car' as const, tint: '#FFECEB', iconColor: colors.primary, onPress: () => scrollToSection('categories') },
+    { key: 'mechanic', label: 'Home Mechanic', icon: 'build' as const, tint: '#EBFBEE', iconColor: '#2B8A3E', onPress: () => scrollToSection('services') },
+    { key: 'orders', label: 'Track Order', icon: 'cube-outline' as const, tint: '#E8F7FF', iconColor: '#1C7ED6', onPress: () => navigation.navigate('MainTabs', { screen: 'Orders' }) },
+    { key: 'breakdown', label: 'Breakdown', icon: 'flash' as const, tint: '#FFF9DB', iconColor: '#F59F00', onPress: handleEmergencyBreakdown },
+    { key: 'tools', label: 'Garage Tools', icon: 'construct' as const, tint: '#F8F0FC', iconColor: '#9C36B5', onPress: () => scrollToSection('categories') },
+    { key: 'deals', label: "Today's Deals", icon: 'gift' as const, tint: '#FFF0F6', iconColor: '#D6336C', onPress: () => scrollToSection('offers', 'trending') },
+  ];
+
   const renderHeader = () => (
-    <View style={styles.header}>
-      {/* The delivery address leads the header. The wordmark used to occupy
-          this row and pushed the address down onto one of its own -- an extra
-          band of vertical space spent telling customers the name of the app
-          they already opened, above the one line they came to check. */}
-      <View style={styles.headerTop}>
-        <TouchableOpacity
-          style={styles.deliverToBlock}
-          onPress={() => navigation.navigate('AddressManagement')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.deliverToLabelRow}>
-            <Ionicons name="location" size={12} color={colors.primary} />
-            <Text style={styles.deliverToLabel}>Deliver to</Text>
-          </View>
-          <View style={styles.deliverToValueRow}>
-            <Text style={styles.deliverToValue} numberOfLines={1}>{deliveryLabel}</Text>
-            <Ionicons name="chevron-down" size={13} color={colors.white} style={{ marginLeft: 4 }} />
-          </View>
-        </TouchableOpacity>
-
-        {/* Right side icons row */}
-        <View style={styles.headerRight}>
+    <View style={styles.headerWrap}>
+      <View style={styles.headerCard}>
+        {/* The delivery address leads the header. The wordmark used to occupy
+            this row and pushed the address down onto one of its own -- an extra
+            band of vertical space spent telling customers the name of the app
+            they already opened, above the one line they came to check. */}
+        <View style={styles.headerTop}>
           <TouchableOpacity
-            style={styles.headerIconBtn}
-            onPress={() => navigation.navigate('Wishlist')}
+            style={styles.deliverToBlock}
+            onPress={() => navigation.navigate('AddressManagement')}
+            activeOpacity={0.7}
           >
-            <Ionicons name="heart-outline" size={22} color={colors.white} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.headerIconBtn}
-            onPress={() => navigation.navigate('Cart')}
-          >
-            {cartItemCount > 0 && (
-              <View style={styles.badgeBubble}>
-                <Text style={styles.badgeText}>{cartItemCount}</Text>
-              </View>
-            )}
-            <Ionicons name="cart-outline" size={22} color={colors.white} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.headerIconBtn}
-            onPress={() => navigation.navigate('Notifications')}
-          >
-            {/* Was rendered unconditionally, so the bell claimed unread
-                notifications permanently -- including for accounts that had
-                never received one. */}
-            {unreadCount > 0 && <View style={styles.notificationDot} />}
-            <Ionicons name="notifications-outline" size={22} color={colors.white} />
-          </TouchableOpacity>
-
-          {/* Settings and the avatar both open 'Account' -- there is no
-              separate settings screen in this app, so this is not a second
-              destination, just a second way in. Restored as its own control
-              rather than folded into the avatar: it was asked for explicitly
-              as functionality to preserve. */}
-          <TouchableOpacity
-            style={styles.headerIconBtn}
-            onPress={() => navigation.navigate('Account')}
-          >
-            <Ionicons name="settings-outline" size={22} color={colors.white} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.avatarBtn}
-            onPress={() => navigation.navigate('Account')}
-          >
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarInitial}>{user?.name ? user.name[0] : 'U'}</Text>
+            <View style={styles.deliverToLabelRow}>
+              <Ionicons name="location" size={12} color={colors.primary} />
+              <Text style={styles.deliverToLabel}>Deliver to</Text>
+            </View>
+            <View style={styles.deliverToValueRow}>
+              <Text style={styles.deliverToValue} numberOfLines={1}>{deliveryLabel}</Text>
+              <Ionicons name="chevron-down" size={13} color={colors.ink} style={{ marginLeft: 4 }} />
             </View>
           </TouchableOpacity>
+
+          {/* Right side icons row */}
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => navigation.navigate('Wishlist')}
+              activeOpacity={0.8}
+            >
+              <Icon3D name="heart-outline" size={36} tint={colors.bg} iconColor={colors.ink} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => navigation.navigate('Cart')}
+              activeOpacity={0.8}
+            >
+              {cartItemCount > 0 && (
+                <View style={styles.badgeBubble}>
+                  <Text style={styles.badgeText}>{cartItemCount}</Text>
+                </View>
+              )}
+              <Icon3D name="cart-outline" size={36} tint={colors.bg} iconColor={colors.ink} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => navigation.navigate('Notifications')}
+              activeOpacity={0.8}
+            >
+              {/* Was rendered unconditionally, so the bell claimed unread
+                  notifications permanently -- including for accounts that had
+                  never received one. */}
+              {unreadCount > 0 && <View style={styles.notificationDot} />}
+              <Icon3D name="notifications-outline" size={36} tint={colors.bg} iconColor={colors.ink} />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
 
-      {/* Search Input bar */}
-      <View style={styles.searchBarRow}>
-        <Ionicons name="search" size={20} color={colors.textMuted} style={{ marginLeft: 12 }} />
-        <TextInput 
-          style={styles.searchInput} 
-          placeholder="Search genuine parts, accessories & services..."
-          placeholderTextColor={colors.textMuted}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          onFocus={() => setIsSearchFocused(true)}
-          onSubmitEditing={handleSearch}
-          returnKeyType="search"
-        />
-      </View>
+        {/* Search Input bar */}
+        <View style={styles.searchBarRow}>
+          <Ionicons name="search" size={19} color={colors.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search genuine parts, accessories & services..."
+            placeholderTextColor={colors.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            onFocus={() => setIsSearchFocused(true)}
+            onSubmitEditing={handleSearch}
+            returnKeyType="search"
+          />
+          <TouchableOpacity onPress={handleOpenFilters} accessibilityLabel="Filter products" activeOpacity={0.85}>
+            <Icon3D name="options-outline" size={38} shape="squircle" tint={colors.primary} iconColor={colors.white} elevated />
+          </TouchableOpacity>
+        </View>
 
-      {/* Segmented Cars/Bikes Toggle inside sticky header to avoid overlapping */}
-      <View style={styles.toggleContainer}>
-        <Animated.View
-          style={[
-            styles.toggleIndicator,
-            {
-              transform: [{
-                translateX: toggleIndicatorPosition.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [4, ((width - 32) / 2) - 4],
-                }),
-              }],
-            },
-          ]}
-        />
-        <TouchableOpacity style={styles.toggleButton} onPress={() => toggleVehicleType(VehicleType.CAR)}>
-          <Text style={[styles.toggleText, vehicleType === VehicleType.CAR && styles.toggleTextActive]}>Cars 🚗</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.toggleButton} onPress={() => toggleVehicleType(VehicleType.BIKE)}>
-          <Text style={[styles.toggleText, vehicleType === VehicleType.BIKE && styles.toggleTextActive]}>Bikes 🏍️</Text>
-        </TouchableOpacity>
+        {/* Cars/Bikes premium pill selector */}
+        <View style={styles.pillRow}>
+          <VehiclePill label="Cars" emoji="🚗" active={vehicleType === VehicleType.CAR} onPress={() => toggleVehicleType(VehicleType.CAR)} />
+          <VehiclePill label="Bikes" emoji="🏍️" active={vehicleType === VehicleType.BIKE} onPress={() => toggleVehicleType(VehicleType.BIKE)} />
+        </View>
       </View>
     </View>
   );
@@ -563,11 +524,11 @@ export default function HomeScreen({ navigation }: any) {
   const renderBanners = () => {
     return (
       <View>
-        <ScrollView 
+        <ScrollView
           ref={bannerScrollRef}
-          horizontal 
+          horizontal
           pagingEnabled
-          showsHorizontalScrollIndicator={false} 
+          showsHorizontalScrollIndicator={false}
           onScroll={(e) => {
             const scrollPos = e.nativeEvent.contentOffset.x;
             const index = Math.round(scrollPos / width);
@@ -576,19 +537,20 @@ export default function HomeScreen({ navigation }: any) {
           scrollEventThrottle={16}
         >
           {banners.map((banner, index) => (
-            <View key={banner.id} style={{ width }}>
-              <ImageBackground 
-                source={banner.image} 
+            <View key={banner.id} style={{ width, paddingHorizontal: 16 }}>
+              <ImageBackground
+                source={banner.image}
                 style={styles.fullBanner}
-                imageStyle={{ borderRadius: 16 }}
+                imageStyle={{ borderRadius: CARD_RADIUS }}
               >
-                <View style={styles.bannerOverlay}>
+                <View style={styles.bannerGlass}>
                   <Text style={styles.bannerTitleText}>{banner.title}</Text>
                   <Text style={styles.bannerSubtitleText}>{banner.subtitle}</Text>
                   <Text style={styles.bannerOfferText}>{banner.offer}</Text>
-                  
-                  <TouchableOpacity style={styles.shopNowBtn} onPress={handleSearch}>
-                    <Text style={styles.shopNowText}>Shop Now ➔</Text>
+
+                  <TouchableOpacity style={styles.shopNowBtn} onPress={handleSearch} activeOpacity={0.85}>
+                    <Text style={styles.shopNowText}>Shop Now</Text>
+                    <Ionicons name="arrow-forward" size={14} color={colors.white} />
                   </TouchableOpacity>
                 </View>
               </ImageBackground>
@@ -597,13 +559,7 @@ export default function HomeScreen({ navigation }: any) {
         </ScrollView>
         <View style={styles.paginationContainer}>
           {banners.map((_, index) => (
-            <View 
-              key={index} 
-              style={[
-                styles.paginationDot, 
-                activeBannerIndex === index ? styles.paginationDotActive : styles.paginationDotInactive
-              ]} 
-            />
+            <PaginationDot key={index} active={activeBannerIndex === index} />
           ))}
         </View>
       </View>
@@ -615,7 +571,7 @@ export default function HomeScreen({ navigation }: any) {
       {renderHeader()}
 
       <ScrollView ref={mainScrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 }}>
-        
+
         {/* Banner Section */}
         <View style={styles.bannerSection}>
           {renderBanners()}
@@ -624,69 +580,16 @@ export default function HomeScreen({ navigation }: any) {
         {/* QUICK ACTIONS SECTION */}
         <View style={styles.quickActionsContainer}>
           <View style={styles.quickGrid}>
-            <TouchableOpacity
-              style={styles.quickCard}
-              onPress={() => scrollToSection('categories')}
-            >
-              <View style={[styles.quickIconCircle, { backgroundColor: '#FFECEB' }]}>
-                <Ionicons name="car" size={24} color={colors.primary} />
-              </View>
-              <Text style={styles.quickLabel}>Spare Parts</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickCard}
-              onPress={() => scrollToSection('services')}
-            >
-              <View style={[styles.quickIconCircle, { backgroundColor: '#EBFBEE' }]}>
-                <Ionicons name="build" size={24} color="#2B8A3E" />
-              </View>
-              <Text style={styles.quickLabel}>Home Mechanic</Text>
-            </TouchableOpacity>
-
-            {/* Was a "Video Call" tile faking a live video consultation --
-                removed along with the rest of that fabricated feature (see
-                the video-call removal commit); replaced with a real,
-                working destination instead of just leaving a gap. */}
-            <TouchableOpacity
-              style={styles.quickCard}
-              onPress={() => navigation.navigate('MainTabs', { screen: 'Orders' })}
-            >
-              <View style={[styles.quickIconCircle, { backgroundColor: '#E8F7FF' }]}>
-                <Ionicons name="cube-outline" size={24} color="#1C7ED6" />
-              </View>
-              <Text style={styles.quickLabel}>Track Order</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={styles.quickCard} 
-              onPress={handleEmergencyBreakdown}
-            >
-              <View style={[styles.quickIconCircle, { backgroundColor: '#FFF9DB' }]}>
-                <Ionicons name="flash" size={24} color="#F59F00" />
-              </View>
-              <Text style={styles.quickLabel}>Breakdown</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickCard}
-              onPress={() => scrollToSection('categories')}
-            >
-              <View style={[styles.quickIconCircle, { backgroundColor: '#F8F0FC' }]}>
-                <Ionicons name="construct" size={24} color="#9C36B5" />
-              </View>
-              <Text style={styles.quickLabel}>Garage Tools</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickCard}
-              onPress={() => scrollToSection('offers', 'trending')}
-            >
-              <View style={[styles.quickIconCircle, { backgroundColor: '#FFF0F6' }]}>
-                <Ionicons name="gift" size={24} color="#D6336C" />
-              </View>
-              <Text style={styles.quickLabel}>Today's Deals</Text>
-            </TouchableOpacity>
+            {QUICK_ACTIONS.map((qa) => (
+              <QuickActionCard
+                key={qa.key}
+                icon={qa.icon}
+                label={qa.label}
+                tint={qa.tint}
+                iconColor={qa.iconColor}
+                onPress={qa.onPress}
+              />
+            ))}
           </View>
         </View>
 
@@ -702,25 +605,16 @@ export default function HomeScreen({ navigation }: any) {
           ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoriesContainer}>
             {categories.map((cat) => (
-              <TouchableOpacity 
-                key={cat.id} 
-                style={styles.categoryItem} 
-                onPress={() => navigation.navigate('CategoryProducts', { 
+              <CategoryOrb
+                key={cat.id}
+                cat={cat}
+                onPress={() => navigation.navigate('CategoryProducts', {
                   categoryName: cat.name,
                   brandId: activeVehicle?.brand || undefined,
                   modelId: activeVehicle?.model || undefined,
                   year: activeVehicle?.year || undefined
                 })}
-              >
-                <View style={styles.categoryIconCircle}>
-                  {cat.image ? (
-                    <Image source={{ uri: cat.image }} style={styles.categoryIconImg} />
-                  ) : (
-                    <Text style={styles.categoryEmoji}>{cat.icon || '📦'}</Text>
-                  )}
-                </View>
-                <Text style={styles.categoryLabelText} numberOfLines={2}>{cat.name}</Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
           )}
@@ -734,7 +628,7 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={styles.seeAllText}>See all</Text>
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
             {SERVICES.map((serv) => (
               <View key={serv.id} style={styles.serviceCard}>
@@ -742,7 +636,7 @@ export default function HomeScreen({ navigation }: any) {
                 <View style={styles.serviceInfo}>
                   <Text style={styles.serviceName}>{serv.name}</Text>
                   <Text style={styles.servicePrice}>Starts at ₹{serv.price}</Text>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.serviceBookBtn}
                     onPress={() => navigation.navigate('Services')}
                   >
@@ -759,7 +653,7 @@ export default function HomeScreen({ navigation }: any) {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Trending {vehicleType === VehicleType.CAR ? 'Car Parts' : 'Bike Parts'}</Text>
           </View>
-          
+
           {isHomeContentLoading ? (
             <View style={{ paddingVertical: 24, alignItems: 'center' }}>
               <Loader size="small" />
@@ -773,10 +667,10 @@ export default function HomeScreen({ navigation }: any) {
                   {/* Share & Wishlist overlay */}
                   <View style={styles.cardHeaderOverlay}>
                     <TouchableOpacity onPress={() => handleWishlistToggle(prod.id)} style={styles.badgeRoundBtn}>
-                      <Ionicons 
-                        name={wishlist[prod.id] ? "heart" : "heart-outline"} 
-                        size={16} 
-                        color={wishlist[prod.id] ? colors.primary : colors.textMuted} 
+                      <Ionicons
+                        name={wishlist[prod.id] ? "heart" : "heart-outline"}
+                        size={16}
+                        color={wishlist[prod.id] ? colors.primary : colors.textMuted}
                       />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => handleShareProduct(prod.name)} style={[styles.badgeRoundBtn, { marginTop: 6 }]}>
@@ -784,7 +678,7 @@ export default function HomeScreen({ navigation }: any) {
                     </TouchableOpacity>
                   </View>
 
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     onPress={() => navigation.navigate('ProductDetails', { productId: prod.id })}
                     style={styles.imageContainer}
                   >
@@ -802,11 +696,11 @@ export default function HomeScreen({ navigation }: any) {
                       </View>
                     )}
                   </TouchableOpacity>
-                
+
                   <View style={styles.productInfo}>
                     <Text style={styles.productBrand}>{prod.brand}</Text>
                     <Text style={styles.productName} numberOfLines={2}>{prod.name}</Text>
-                    
+
                     {/* Ratings */}
                     <View style={styles.ratingRow}>
                       {prod.reviewsCount ? (
@@ -820,7 +714,7 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
 
                     {/* Stock status */}
-                    <Text style={[styles.stockLabel, { color: prod.stockStatus === 'In Stock' ? colors.success : '#F5A300' }]}>
+                    <Text style={[styles.stockLabel, { color: prod.stockStatus === 'In Stock' ? colors.success : colors.warning }]}>
                       ● {prod.stockStatus}
                     </Text>
 
@@ -832,14 +726,14 @@ export default function HomeScreen({ navigation }: any) {
 
                       {qtyInCart > 0 ? (
                         <View style={styles.qtyContainer}>
-                          <TouchableOpacity 
+                          <TouchableOpacity
                             style={styles.qtyBtn}
                             onPress={() => handleProductCardQtyChange(prod, -1)}
                           >
                             <Text style={styles.qtyBtnText}>-</Text>
                           </TouchableOpacity>
                           <Text style={styles.qtyTextVal}>{qtyInCart}</Text>
-                          <TouchableOpacity 
+                          <TouchableOpacity
                             style={styles.qtyBtn}
                             onPress={() => handleProductCardQtyChange(prod, 1)}
                           >
@@ -847,14 +741,14 @@ export default function HomeScreen({ navigation }: any) {
                           </TouchableOpacity>
                         </View>
                       ) : (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                           style={styles.addButton}
-                          onPress={() => dispatch(addToCart({ 
-                            id: prod.id, 
-                            name: prod.name, 
-                            price: prod.price, 
-                            originalPrice: prod.originalPrice, 
-                            image: prod.image, 
+                          onPress={() => dispatch(addToCart({
+                            id: prod.id,
+                            name: prod.name,
+                            price: prod.price,
+                            originalPrice: prod.originalPrice,
+                            image: prod.image,
                             isB2B: prod.isB2B,
                             moq: prod.moq,
                             vehicleType: prod.vehicleType
@@ -865,16 +759,16 @@ export default function HomeScreen({ navigation }: any) {
                       )}
                     </View>
 
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.buyNowBtn}
                       onPress={() => {
                         if (qtyInCart === 0) {
-                          dispatch(addToCart({ 
-                            id: prod.id, 
-                            name: prod.name, 
-                            price: prod.price, 
-                            originalPrice: prod.originalPrice, 
-                            image: prod.image, 
+                          dispatch(addToCart({
+                            id: prod.id,
+                            name: prod.name,
+                            price: prod.price,
+                            originalPrice: prod.originalPrice,
+                            image: prod.image,
                             isB2B: prod.isB2B,
                             moq: prod.moq,
                             vehicleType: prod.vehicleType
@@ -951,27 +845,27 @@ export default function HomeScreen({ navigation }: any) {
           </View>
           <View style={styles.whyGrid}>
             <View style={styles.whyCard}>
-              <Ionicons name="home-outline" size={24} color={colors.primary} />
+              <Ionicons name="home-outline" size={22} color={colors.primary} />
               <Text style={styles.whyTitle}>Doorstep Service</Text>
             </View>
             <View style={styles.whyCard}>
-              <Ionicons name="shield-checkmark-outline" size={24} color={colors.primary} />
+              <Ionicons name="shield-checkmark-outline" size={22} color={colors.primary} />
               <Text style={styles.whyTitle}>Expert Mechanics</Text>
             </View>
             <View style={styles.whyCard}>
-              <Ionicons name="map-outline" size={24} color={colors.primary} />
+              <Ionicons name="map-outline" size={22} color={colors.primary} />
               <Text style={styles.whyTitle}>Live Tracking</Text>
             </View>
             <View style={styles.whyCard}>
-              <Ionicons name="chatbubbles-outline" size={24} color={colors.primary} />
+              <Ionicons name="chatbubbles-outline" size={22} color={colors.primary} />
               <Text style={styles.whyTitle}>In-App Chat</Text>
             </View>
             <View style={styles.whyCard}>
-              <Ionicons name="ribbon-outline" size={24} color={colors.primary} />
+              <Ionicons name="ribbon-outline" size={22} color={colors.primary} />
               <Text style={styles.whyTitle}>Warranty Support</Text>
             </View>
             <View style={styles.whyCard}>
-              <Ionicons name="arrow-undo-outline" size={24} color={colors.primary} />
+              <Ionicons name="arrow-undo-outline" size={22} color={colors.primary} />
               <Text style={styles.whyTitle}>Easy Returns</Text>
             </View>
           </View>
@@ -1017,8 +911,8 @@ export default function HomeScreen({ navigation }: any) {
                 </View>
                 <View style={styles.recentRow}>
                   {recentSearches.map((term, i) => (
-                    <TouchableOpacity 
-                      key={i} 
+                    <TouchableOpacity
+                      key={i}
                       style={styles.recentItem}
                       onPress={() => handleSuggestionPress(term)}
                     >
@@ -1035,8 +929,8 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={styles.overlayBlockTitle}>Popular Suggestions</Text>
               <View style={styles.suggestionsGrid}>
                 {suggestions.map((term, i) => (
-                  <TouchableOpacity 
-                    key={i} 
+                  <TouchableOpacity
+                    key={i}
                     style={styles.suggestionTag}
                     onPress={() => handleSuggestionPress(term)}
                   >
@@ -1061,23 +955,28 @@ export default function HomeScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: colors.pageBg 
+  container: {
+    flex: 1,
+    backgroundColor: colors.bg
   },
-  header: {
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 16,
+  headerWrap: {
+    paddingHorizontal: 12,
     paddingTop: 8,
-    paddingBottom: 12,
     zIndex: 10,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 6
+  },
+  headerCard: {
+    backgroundColor: colors.card,
+    borderRadius: CARD_RADIUS,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#0B1220',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 6,
   },
   headerTop: {
     flexDirection: 'row',
@@ -1085,719 +984,566 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10
   },
+  deliverToBlock: { flex: 1, marginRight: 8 },
+  deliverToLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  deliverToLabel: { fontSize: 11, fontWeight: '600', color: colors.textMuted },
+  deliverToValueRow: { flexDirection: 'row', alignItems: 'center', marginTop: 1 },
+  deliverToValue: { fontSize: 14, fontWeight: '700', color: colors.ink, maxWidth: width * 0.5 },
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center'
   },
-  // Padding/marginLeft trimmed from 6 to make room for the settings icon
-  // restored alongside wishlist/cart/notifications/avatar -- five controls in
-  // one row eats into the "Deliver to" block's width on narrow phones (~360dp),
-  // and that block is the element this header is meant to foreground.
   headerIconBtn: {
-    padding: 5,
-    marginLeft: 5,
+    marginLeft: 6,
     position: 'relative'
   },
   badgeBubble: {
     position: 'absolute',
-    top: 2,
-    right: 2,
+    top: -2,
+    right: -2,
     backgroundColor: colors.primary,
-    minWidth: 14,
-    height: 14,
-    borderRadius: 7,
+    minWidth: 15,
+    height: 15,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 4,
-    paddingHorizontal: 2
+    paddingHorizontal: 2,
+    borderWidth: 1.5,
+    borderColor: colors.card,
   },
   badgeText: {
     color: '#FFF',
     fontSize: 8,
     fontWeight: 'bold'
   },
-  avatarBtn: {
-    marginLeft: 6
-  },
-  avatarCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF'
-  },
-  avatarInitial: {
-    color: colors.white,
-    fontWeight: 'bold',
-    fontSize: 14
-  },
   notificationDot: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    width: 8,
-    height: 8,
+    top: 6,
+    right: 6,
+    width: 7,
+    height: 7,
     borderRadius: 4,
     backgroundColor: colors.primary,
-    zIndex: 4
-  },
-  // flexShrink lets a long address ellipsize instead of shoving the icon row
-  // off the right edge; the icons keep their intrinsic width.
-  deliverToBlock: {
-    flexShrink: 1,
-    marginRight: 12
-  },
-  deliverToLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  deliverToLabel: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '600',
-    marginLeft: 4,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4
-  },
-  deliverToValueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 1
-  },
-  deliverToValue: {
-    color: colors.white,
-    fontSize: 13,
-    fontWeight: '800',
-    flexShrink: 1
+    zIndex: 4,
+    borderWidth: 1.5,
+    borderColor: colors.card,
   },
   searchBarRow: {
     flexDirection: 'row',
-    backgroundColor: colors.white,
-    borderRadius: 12,
     alignItems: 'center',
-    height: 44,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    marginBottom: 10
+    backgroundColor: colors.bg,
+    borderRadius: 20,
+    height: 48,
+    paddingLeft: 14,
+    paddingRight: 5,
+    gap: 8,
   },
   searchInput: {
-    flex: 1, 
-    fontSize: 14, 
-    color: '#111', 
-    height: '100%', 
-    marginLeft: 8 
+    flex: 1,
+    fontSize: 14,
+    color: colors.ink,
+    height: '100%',
   },
-  searchSideBtn: {
-    padding: 8,
-    marginRight: 4
-  },
-  toggleContainer: {
+  pillRow: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 20,
-    position: 'relative',
-    height: 38,
-    padding: 3,
+    gap: 10,
+    marginTop: 10,
   },
-  toggleIndicator: { 
-    position: 'absolute', 
-    width: '50%', 
-    height: '100%', 
-    backgroundColor: colors.primary, 
+  pill: {
+    height: 40,
     borderRadius: 18,
-    top: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg,
+    overflow: 'hidden',
   },
-  toggleButton: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    zIndex: 1 
+  pillActiveShadow: {
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
   },
-  toggleText: { 
-    fontSize: 13, 
-    fontWeight: '700', 
-    color: 'rgba(255,255,255,0.6)' 
+  pillText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textMuted,
   },
-  toggleTextActive: { 
-    color: '#FFF', 
-    fontWeight: '900' 
+  pillTextActive: {
+    color: colors.white,
   },
   bannerSection: {
-    zIndex: 1,
-    paddingBottom: 12,
-    paddingTop: 12
+    marginTop: 16,
   },
-  fullBanner: { 
-    width: width - 32, 
-    height: 140, 
-    marginHorizontal: 16, 
+  fullBanner: {
+    height: 190,
+    borderRadius: CARD_RADIUS,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+  },
+  bannerGlass: {
+    margin: 12,
+    padding: 14,
+    borderRadius: 18,
+    backgroundColor: 'rgba(17,17,17,0.42)',
+  },
+  bannerTitleText: {
+    color: '#FFFFFF',
+    fontSize: 19,
+    fontWeight: '800',
+  },
+  bannerSubtitleText: {
+    color: '#F1F2F4',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  bannerOfferText: {
+    color: colors.primaryBrand,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 4,
+  },
+  shopNowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    backgroundColor: colors.primary,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginTop: 10,
+  },
+  shopNowText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  paginationContainer: {
+    flexDirection: 'row',
     justifyContent: 'center',
-    overflow: 'hidden'
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 10,
   },
-  bannerOverlay: { 
-    flex: 1, 
-    backgroundColor: 'rgba(0,0,0,0.4)', 
-    borderRadius: 16, 
-    padding: 16, 
-    justifyContent: 'center', 
-    alignItems: 'flex-start' 
-  },
-  bannerTitleText: { 
-    fontSize: 20, 
-    fontWeight: '900', 
-    color: '#FFF', 
-    textTransform: 'uppercase', 
-    marginBottom: 2 
-  },
-  bannerSubtitleText: { 
-    fontSize: 12, 
-    fontWeight: '800', 
-    color: '#FFF', 
-    textTransform: 'uppercase', 
-    marginBottom: 4 
-  },
-  bannerOfferText: { 
-    fontSize: 12, 
-    color: '#FFD700', 
-    fontWeight: '700', 
-    marginBottom: 10 
-  },
-  shopNowBtn: { 
-    backgroundColor: colors.primary, 
-    paddingHorizontal: 12, 
-    paddingVertical: 6, 
-    borderRadius: 8 
-  },
-  shopNowText: { 
-    color: '#FFF', 
-    fontWeight: 'bold', 
-    fontSize: 11, 
-    textTransform: 'uppercase' 
-  },
-  paginationContainer: { 
-    flexDirection: 'row', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginTop: 8 
-  },
-  paginationDot: { 
-    width: 6, 
-    height: 6, 
-    borderRadius: 3, 
-    marginHorizontal: 3 
-  },
-  paginationDotActive: { 
-    backgroundColor: colors.secondary, 
-    width: 14 
-  },
-  paginationDotInactive: { 
-    backgroundColor: '#D1D1D6' 
+  paginationDot: {
+    height: 7,
+    borderRadius: 4,
   },
   quickActionsContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    paddingHorizontal: 10,
+    marginTop: 22,
   },
   quickGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+  },
+  quickCardTouchable: {
+    width: '33.33%',
+    paddingHorizontal: 6,
+    marginBottom: 16,
   },
   quickCard: {
-    width: '33.33%',
     alignItems: 'center',
-    paddingVertical: 10,
-  },
-  quickIconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 6,
   },
   quickLabel: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: colors.secondary,
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: colors.ink,
     textAlign: 'center',
   },
   section: {
-    marginBottom: 18
+    marginTop: 26,
   },
-  sectionHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    paddingHorizontal: 16, 
-    marginBottom: 12 
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 12,
   },
-  sectionTitle: { 
-    fontSize: 16, 
-    fontWeight: '800', 
-    color: colors.secondary,
-    letterSpacing: 0.25
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: colors.ink,
   },
-  seeAllText: { 
-    fontSize: 13, 
-    color: colors.primary, 
-    fontWeight: '700' 
-  },
-  categoriesContainer: { 
-    paddingHorizontal: 16, 
-    gap: 12, 
-    paddingBottom: 4 
-  },
-  categoryItem: { 
-    alignItems: 'center', 
-    width: 72 
-  },
-  categoryIconCircle: { 
-    width: 58, 
-    height: 58, 
-    borderRadius: 29, 
-    backgroundColor: colors.white, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    borderWidth: 1, 
-    borderColor: colors.borderLight,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 2,
-    overflow: 'hidden'
-  },
-  categoryIconImg: { 
-    width: '100%', 
-    height: '100%', 
-    resizeMode: 'cover' 
-  },
-  categoryEmoji: { 
-    fontSize: 22 
-  },
-  categoryLabelText: { 
-    fontSize: 11, 
-    fontWeight: '600', 
-    color: colors.secondary, 
-    textAlign: 'center', 
-    marginTop: 6, 
-    height: 30, 
-    lineHeight: 13 
-  },
-  serviceCard: {
-    width: 150,
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    borderBottomWidth: 3,
-    borderBottomColor: colors.primary,
-    overflow: 'hidden',
-  },
-  svgCardContainer: {
-    width: '100%',
-    height: 90,
-    overflow: 'hidden',
-  },
-  serviceInfo: {
-    padding: 10,
-  },
-  serviceName: {
+  seeAllText: {
     fontSize: 13,
-    fontWeight: 'bold',
-    color: colors.secondary,
-    marginBottom: 2,
+    fontWeight: '700',
+    color: colors.primary,
   },
-  servicePrice: {
-    fontSize: 11,
-    color: colors.textMuted,
+  categoriesContainer: {
+    paddingHorizontal: 16,
+  },
+  categoryItem: {
+    alignItems: 'center',
+    marginRight: 18,
+    width: 72,
+  },
+  categoryRing: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#0B1220',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
     marginBottom: 8,
   },
+  categoryRingHighlight: {
+    position: 'absolute',
+    top: 8,
+    left: 10,
+    width: 24,
+    height: 14,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.55,
+  },
+  categoryOrb: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  categoryIconImg: {
+    width: '100%',
+    height: '100%',
+  },
+  categoryEmoji: {
+    fontSize: 24,
+  },
+  categoryLabelText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: colors.ink,
+    textAlign: 'center',
+  },
+  serviceIconBand: {
+    height: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: CARD_RADIUS,
+    borderTopRightRadius: CARD_RADIUS,
+  },
+  serviceCard: {
+    width: 190,
+    backgroundColor: colors.card,
+    borderRadius: CARD_RADIUS,
+    marginRight: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#0B1220',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
+  },
+  serviceInfo: {
+    padding: 14,
+  },
+  serviceName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.ink,
+  },
+  servicePrice: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: 2,
+    marginBottom: 10,
+  },
   serviceBookBtn: {
-    backgroundColor: colors.secondary,
-    borderRadius: 8,
-    paddingVertical: 6,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 9,
     alignItems: 'center',
   },
   serviceBookBtnText: {
     color: colors.white,
-    fontSize: 10,
-    fontWeight: 'bold',
+    fontSize: 12.5,
+    fontWeight: '700',
   },
-  productCard: { 
-    width: 170, 
-    backgroundColor: colors.white, 
-    borderRadius: 16, 
-    marginRight: 12, 
-    padding: 12, 
-    borderWidth: 1, 
-    borderColor: colors.borderLight, 
-    position: 'relative' 
+  productCard: {
+    width: 168,
+    backgroundColor: colors.card,
+    borderRadius: CARD_RADIUS,
+    marginRight: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: '#0B1220',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 4,
   },
   cardHeaderOverlay: {
     position: 'absolute',
-    top: 10,
-    right: 10,
+    top: 8,
+    right: 8,
     zIndex: 5,
   },
   badgeRoundBtn: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.92)',
     alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  imageContainer: { 
-    position: 'relative', 
-    height: 95, 
-    marginBottom: 10,
     justifyContent: 'center',
-    alignItems: 'center',
+    shadowColor: '#0B1220',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+    elevation: 2,
   },
-  productImage: { 
-    width: '90%', 
-    height: '90%', 
-    resizeMode: 'contain' 
+  imageContainer: {
+    width: '100%',
+    height: 130,
+    backgroundColor: colors.bg,
   },
-  timerBadge: { 
-    position: 'absolute', 
-    bottom: 2, 
-    left: 2, 
-    backgroundColor: '#F2F2F7', 
-    paddingHorizontal: 6, 
-    paddingVertical: 2, 
-    borderRadius: 6 
+  productImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
-  timerText: { 
-    fontSize: 8, 
-    fontWeight: 'bold', 
-    color: colors.secondary 
+  timerBadge: {
+    position: 'absolute',
+    bottom: 6,
+    left: 6,
+    backgroundColor: 'rgba(17,17,17,0.72)',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  timerText: {
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '700',
   },
   discountTag: {
     position: 'absolute',
-    top: 2,
-    left: 2,
+    top: 8,
+    left: 8,
     backgroundColor: colors.primary,
+    borderRadius: 8,
     paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    paddingVertical: 3,
   },
   discountTagText: {
-    color: colors.white,
-    fontSize: 8,
-    fontWeight: '900',
+    color: '#FFFFFF',
+    fontSize: 9.5,
+    fontWeight: '800',
+  },
+  productInfo: {
+    padding: 12,
   },
   productBrand: {
     fontSize: 10,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: colors.textMuted,
     textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
-  productInfo: { 
-    flex: 1, 
-    justifyContent: 'space-between' 
-  },
-  productName: { 
-    fontSize: 12, 
-    fontWeight: 'bold', 
-    color: colors.secondary, 
-    marginBottom: 4, 
-    height: 32, 
-    lineHeight: 16 
+  productName: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: colors.ink,
+    marginTop: 2,
+    minHeight: 32,
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
+    gap: 3,
+    marginTop: 4,
   },
   ratingText: {
-    fontSize: 9,
+    fontSize: 10.5,
     color: colors.textMuted,
-    marginLeft: 3,
     fontWeight: '600',
   },
   stockLabel: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontSize: 10,
+    fontWeight: '700',
+    marginTop: 3,
   },
-  priceRow: { 
+  priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8 
+    alignItems: 'flex-end',
+    marginTop: 8,
   },
-  originalPrice: { 
-    fontSize: 10, 
-    color: colors.textMuted, 
-    textDecorationLine: 'line-through' 
+  originalPrice: {
+    fontSize: 10,
+    color: colors.textMuted,
+    textDecorationLine: 'line-through',
   },
-  price: { 
-    fontSize: 14, 
-    fontWeight: '800', 
-    color: colors.secondary 
-  },
-  addButton: { 
-    backgroundColor: colors.primary, 
-    borderRadius: 8, 
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    alignItems: 'center' 
-  },
-  addButtonText: { 
-    color: '#FFF', 
-    fontWeight: 'bold', 
-    fontSize: 11, 
+  price: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.ink,
   },
   qtyContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
+    borderRadius: 10,
+    overflow: 'hidden',
   },
   qtyBtn: {
-    paddingHorizontal: 4,
+    width: 24,
+    height: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   qtyBtnText: {
     color: colors.white,
-    fontSize: 13,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '700',
   },
   qtyTextVal: {
     color: colors.white,
     fontSize: 12,
-    fontWeight: 'bold',
-    marginHorizontal: 8,
+    fontWeight: '700',
+    minWidth: 16,
+    textAlign: 'center',
+  },
+  addButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  addButtonText: {
+    color: colors.white,
+    fontSize: 11.5,
+    fontWeight: '800',
   },
   buyNowBtn: {
-    backgroundColor: colors.secondary,
-    borderRadius: 8,
-    paddingVertical: 6,
+    marginTop: 8,
+    borderRadius: 10,
+    paddingVertical: 8,
     alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: colors.primary,
   },
   buyNowBtnText: {
-    color: colors.white,
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  mechanicCard: {
-    width: 250,
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    marginRight: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-  },
-  mechHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  mechAvatarBox: {
-    position: 'relative',
-  },
-  mechAvatarImg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    resizeMode: 'cover',
-  },
-  mechOnlineDot: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.success,
-    borderWidth: 1.5,
-    borderColor: colors.white,
-  },
-  mechName: {
-    fontSize: 13,
-    fontWeight: 'bold',
-    color: colors.secondary,
-  },
-  mechRating: {
-    fontSize: 11,
-    color: colors.textMuted,
-    fontWeight: '500',
-  },
-  mechDistance: {
-    fontSize: 10,
-    color: colors.textMuted,
-  },
-  mechBtnRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  mechCallBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  mechCallText: {
     color: colors.primary,
-    fontSize: 11,
-    fontWeight: 'bold',
-    marginLeft: 4,
-  },
-  mechBookBtn: {
-    backgroundColor: colors.secondary,
-    borderRadius: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-  },
-  mechBookBtnDisabled: {
-    backgroundColor: colors.textMuted,
-  },
-  mechBookText: {
-    color: colors.white,
-    fontSize: 11,
-    fontWeight: 'bold',
+    fontSize: 12,
+    fontWeight: '700',
   },
   offersGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 10,
+    paddingHorizontal: 16,
+    gap: 10,
   },
   offerCard: {
-    width: '46%',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    margin: '2%',
-    justifyContent: 'space-between',
+    width: (width - 32 - 10) / 2,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    padding: 14,
   },
   offerTitle: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: colors.secondary,
+    fontSize: 13.5,
+    fontWeight: '800',
+    color: colors.ink,
   },
   offerDesc: {
     fontSize: 11,
     color: colors.textMuted,
-    marginVertical: 6,
+    marginTop: 3,
   },
   offerBadge: {
-    backgroundColor: '#00000010',
-    borderRadius: 4,
-    paddingVertical: 3,
-    paddingHorizontal: 6,
     alignSelf: 'flex-start',
+    backgroundColor: colors.white,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginTop: 8,
   },
   offerBadgeText: {
-    fontSize: 9,
-    fontWeight: 'bold',
-    color: colors.secondary,
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: colors.ink,
+    letterSpacing: 0.5,
   },
   trustCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.card,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.borderLight,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderColor: colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     marginRight: 10,
   },
   trustCardText: {
-    color: colors.secondary,
-    fontSize: 11,
-    fontWeight: 'bold',
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: colors.ink,
   },
   whyGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
   },
   whyCard: {
-    width: '29.3%',
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    borderRadius: 12,
-    padding: 10,
-    margin: '2%',
+    width: '33.33%',
     alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 4,
   },
   whyTitle: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: colors.secondary,
-    marginTop: 6,
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.ink,
     textAlign: 'center',
-  },
-  animatedGear: {
-    position: 'absolute',
-    top: 180,
-    right: -40,
-  },
-  animatedBike: {
-    position: 'absolute',
-    bottom: 220,
-    left: -40,
+    marginTop: 8,
   },
   overlaySafe: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: colors.bg,
   },
   overlayContainer: {
     flex: 1,
-    backgroundColor: colors.white,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
     padding: 16,
   },
   overlayInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.lightGray,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 46,
-    marginBottom: 20,
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    height: 48,
+    paddingHorizontal: 14,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   overlayInput: {
     flex: 1,
     fontSize: 14,
-    marginLeft: 8,
-    color: colors.secondary,
+    color: colors.ink,
+    height: '100%',
   },
   overlayCloseBtn: {
     padding: 4,
   },
   overlayBlock: {
-    marginBottom: 24,
+    marginTop: 22,
   },
   overlayBlockHeader: {
     flexDirection: 'row',
@@ -1807,49 +1553,50 @@ const styles = StyleSheet.create({
   },
   overlayBlockTitle: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: colors.secondary,
+    fontWeight: '800',
+    color: colors.ink,
   },
   clearText: {
     fontSize: 12,
+    fontWeight: '700',
     color: colors.primary,
-    fontWeight: '600',
   },
   recentRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 8,
   },
   recentItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.lightGray,
+    backgroundColor: colors.card,
     borderRadius: 12,
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    marginRight: 8,
-    marginBottom: 8,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   recentText: {
     fontSize: 12,
-    color: colors.secondary,
+    color: colors.ink,
+    fontWeight: '600',
   },
   suggestionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 8,
   },
   suggestionTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderLight,
+    backgroundColor: '#FFF1F0',
     borderRadius: 12,
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    marginRight: 8,
-    marginBottom: 8,
+    paddingVertical: 8,
   },
   suggestionTagText: {
     fontSize: 12,
-    color: colors.secondary,
+    color: colors.primary,
+    fontWeight: '700',
   },
 });

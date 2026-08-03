@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Image, Animated, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import Svg, { Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { useSelector, useDispatch } from 'react-redux';
 import { useFocusEffect } from '@react-navigation/native';
 import { RootState } from '../../store';
@@ -11,6 +12,7 @@ import { ServiceCategory, ServicePackage, ServiceBooking } from '../../types/ser
 import { fetchServiceCategories, fetchMyBookings } from '../../services/service.service';
 import { jobService, Job } from '@mechbazar/shared';
 import { HeaderCartButton } from '../../components/HeaderCartButton';
+import { Icon3D } from '../../components/shared/Icon3D';
 import { colors } from './theme';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
@@ -18,6 +20,41 @@ import CompactBookingShell from '../../components/desktop/shared/CompactBookingS
 import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
 
 type PkgWithCategory = ServicePackage & { category?: ServiceCategory };
+
+// Same "gradient fill on select" pill Home's Cars/Bikes selector uses --
+// kept as a local copy (not exported from HomeScreen) so this screen's
+// vehicle toggle reads as the same premium control instead of the old flat
+// dark pill it replaced.
+function ServiceVehiclePill({ label, emoji, active, onPress }: { label: string; emoji: string; active: boolean; onPress: () => void }) {
+  const scale = useRef(new Animated.Value(active ? 1.03 : 1)).current;
+  useEffect(() => {
+    Animated.spring(scale, { toValue: active ? 1.03 : 1, useNativeDriver: true, bounciness: 8 }).start();
+  }, [active]);
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={{ flex: 1 }}>
+      <Animated.View style={[styles.togglePill, active && styles.togglePillActiveShadow, { transform: [{ scale }] }]}>
+        {active && (
+          <View style={StyleSheet.absoluteFill}>
+            <Svg height="100%" width="100%">
+              <Defs>
+                {/* id must be url()-safe -- a raw label like "Car Services"
+                    breaks the fragment reference on web SVG (silently falls
+                    back to a black fill), so strip whitespace. */}
+                <LinearGradient id={`svcPillGrad-${label.replace(/\s+/g, '')}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                  <Stop offset="0%" stopColor="#FF6B5D" />
+                  <Stop offset="100%" stopColor={colors.primary} />
+                </LinearGradient>
+              </Defs>
+              <Rect width="100%" height="100%" fill={`url(#svcPillGrad-${label.replace(/\s+/g, '')})`} rx={16} ry={16} />
+            </Svg>
+          </View>
+        )}
+        <Text style={[styles.toggleText, active && styles.toggleTextActive]}>{emoji}  {label}</Text>
+      </Animated.View>
+    </TouchableOpacity>
+  );
+}
 
 export default function ServicesHomeScreen({ navigation }: any) {
   const dispatch = useDispatch();
@@ -154,6 +191,11 @@ export default function ServicesHomeScreen({ navigation }: any) {
             <Image source={{ uri: pkg.image }} style={styles.packageImage} />
           ) : (
             <View style={styles.packageImageFallback}>
+              {/* Same glass-highlight overlay Icon3D chips use, hand-rolled
+                  since the glyph here is a dynamic backend emoji, not one of
+                  our vector names -- see CategoryOrb in HomeScreen.tsx for
+                  the same exception. */}
+              <View pointerEvents="none" style={styles.packageIconHighlight} />
               <Text style={styles.packageIcon}>{pkg.category?.icon || '🔧'}</Text>
             </View>
           )}
@@ -216,46 +258,54 @@ export default function ServicesHomeScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.headerTitle}>Doorstep Services</Text>
-            <Text style={styles.headerSubtitle}>Mechanic comes to you, not the other way around</Text>
+      <View style={styles.headerWrap}>
+        {/* CompactBookingShell is a pure passthrough below desktop width, so
+            this only aligns the header card with the 960-wide body below it
+            on desktop -- it previously stretched full-bleed while the cards
+            underneath stayed centered. */}
+        <CompactBookingShell maxWidth={960}>
+          <View style={styles.headerCard}>
+            <View style={styles.headerTop}>
+              <View>
+                <Text style={styles.headerTitle}>Doorstep Services</Text>
+                <Text style={styles.headerSubtitle}>Mechanic comes to you, not the other way around</Text>
+              </View>
+              <HeaderCartButton color={colors.darkInk} backgroundColor={colors.pageBg} />
+            </View>
+
+            <View style={styles.searchContainer}>
+              <Ionicons name="search" size={19} color={colors.textMuted} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search for a service (e.g. wash, brakes)..."
+                placeholderTextColor={colors.textMuted}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                returnKeyType="search"
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 4 }}>
+                  <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+
+            <View style={styles.toggleContainer}>
+              <ServiceVehiclePill
+                label="Car Services"
+                emoji="🚗"
+                active={vehicleType === VehicleType.CAR}
+                onPress={() => dispatch(setVehicleType(VehicleType.CAR))}
+              />
+              <ServiceVehiclePill
+                label="Bike Services"
+                emoji="🏍️"
+                active={vehicleType === VehicleType.BIKE}
+                onPress={() => dispatch(setVehicleType(VehicleType.BIKE))}
+              />
+            </View>
           </View>
-          <HeaderCartButton />
-        </View>
-
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color={colors.textMuted} style={{ marginLeft: 10 }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search for a service (e.g. wash, brakes)..."
-            placeholderTextColor={colors.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            returnKeyType="search"
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 4, marginRight: 6 }}>
-              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={[styles.toggleButton, vehicleType === VehicleType.CAR && styles.toggleButtonActive]}
-            onPress={() => dispatch(setVehicleType(VehicleType.CAR))}
-          >
-            <Text style={[styles.toggleText, vehicleType === VehicleType.CAR && styles.toggleTextActive]}>🚗 Car Services</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleButton, vehicleType === VehicleType.BIKE && styles.toggleButtonActive]}
-            onPress={() => dispatch(setVehicleType(VehicleType.BIKE))}
-          >
-            <Text style={[styles.toggleText, vehicleType === VehicleType.BIKE && styles.toggleTextActive]}>🏍️ Bike Services</Text>
-          </TouchableOpacity>
-        </View>
+        </CompactBookingShell>
       </View>
 
       <CompactBookingShell maxWidth={960} style={styles.flexFill}>
@@ -306,10 +356,10 @@ export default function ServicesHomeScreen({ navigation }: any) {
         >
           {activeJob && (
             <TouchableOpacity
-              style={[styles.emergencyBanner, { backgroundColor: colors.success }]}
+              style={[styles.emergencyBanner, { backgroundColor: colors.success, shadowColor: colors.success }]}
               onPress={() => navigation.navigate('EmergencyTracking', { bookingId: activeJob.id })}
             >
-              <Text style={styles.emergencyIcon}>🚨</Text>
+              <Icon3D name="navigate" size={44} tint="rgba(255,255,255,0.22)" iconColor={colors.white} elevated style={{ marginRight: 12 }} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.emergencyTitle}>Request in progress</Text>
                 <Text style={styles.emergencySubtitle}>{activeJob.statusMessage} · Tap to track</Text>
@@ -320,7 +370,7 @@ export default function ServicesHomeScreen({ navigation }: any) {
 
           {!activeJob && emergencyCategory && (
             <TouchableOpacity style={styles.emergencyBanner} onPress={() => goToCategory(emergencyCategory)}>
-              <Text style={styles.emergencyIcon}>🚨</Text>
+              <Icon3D name="alert-circle" size={44} tint="rgba(255,255,255,0.22)" iconColor={colors.white} elevated style={{ marginRight: 12 }} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.emergencyTitle}>Emergency Assistance</Text>
                 <Text style={styles.emergencySubtitle}>Breakdown or stuck on the road? Get help now.</Text>
@@ -416,22 +466,35 @@ export default function ServicesHomeScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   flexFill: { flex: 1 },
-  header: { backgroundColor: colors.darkInk, padding: 14, paddingBottom: 16 },
+  headerWrap: { backgroundColor: colors.pageBg, paddingHorizontal: 12, paddingTop: 10 },
+  headerCard: {
+    backgroundColor: colors.white,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    shadowColor: '#0B1220',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 6,
+  },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
-  headerTitle: { fontSize: 20, fontWeight: '900', color: colors.white },
-  headerSubtitle: { fontSize: 12, color: '#9AA5B1', marginTop: 4, maxWidth: 240 },
+  headerTitle: { fontSize: 20, fontWeight: '900', color: colors.darkInk },
+  headerSubtitle: { fontSize: 12, color: colors.textMuted, marginTop: 4, maxWidth: 240 },
 
-  searchContainer: { flexDirection: 'row', backgroundColor: colors.white, borderRadius: 10, alignItems: 'center', height: 44, paddingHorizontal: 10, marginBottom: 12 },
-  searchInput: { flex: 1, fontSize: 14, color: '#111', height: '100%', marginLeft: 8 },
+  searchContainer: { flexDirection: 'row', backgroundColor: colors.pageBg, borderRadius: 16, alignItems: 'center', height: 46, paddingHorizontal: 12, marginBottom: 12, gap: 8 },
+  searchInput: { flex: 1, fontSize: 14, color: colors.darkInk, height: '100%' },
 
-  toggleContainer: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 24, height: 44 },
-  toggleButton: { flex: 1, justifyContent: 'center', alignItems: 'center', borderRadius: 24 },
-  toggleButtonActive: { backgroundColor: colors.primary },
-  toggleText: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.6)' },
-  toggleTextActive: { color: '#FFF', fontWeight: '800' },
+  toggleContainer: { flexDirection: 'row', gap: 10, height: 42 },
+  togglePill: { flex: 1, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.pageBg, overflow: 'hidden' },
+  togglePillActiveShadow: { shadowColor: colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.28, shadowRadius: 10, elevation: 4 },
+  toggleText: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
+  toggleTextActive: { color: colors.white, fontWeight: '800' },
 
-  emergencyBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.danger, marginHorizontal: 14, marginTop: 14, borderRadius: 14, padding: 16 },
-  emergencyIcon: { fontSize: 28, marginRight: 12 },
+  emergencyBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary, marginHorizontal: 14, marginTop: 14, borderRadius: 20, padding: 14, shadowColor: colors.primary, shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.25, shadowRadius: 16, elevation: 6 },
   emergencyTitle: { fontSize: 15, fontWeight: '800', color: colors.white },
   emergencySubtitle: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
 
@@ -441,13 +504,29 @@ const styles = StyleSheet.create({
   seeAllText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
 
   packageGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 14 },
-  packageCard: { width: 170, backgroundColor: colors.white, borderRadius: 14, marginRight: 10, marginBottom: 12, padding: 12, borderWidth: 1, borderColor: colors.borderLight, overflow: 'hidden' },
+  packageCard: {
+    width: 170,
+    backgroundColor: colors.white,
+    borderRadius: 18,
+    marginRight: 10,
+    marginBottom: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    overflow: 'hidden',
+    shadowColor: '#0B1220',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
+  },
   packageCardWide: { width: '48%', marginRight: 0 },
   packageCardDisabled: { opacity: 0.5 },
 
-  packageImageWrap: { height: 84, borderRadius: 10, overflow: 'hidden', marginBottom: 8, backgroundColor: colors.pageBg, position: 'relative' },
+  packageImageWrap: { height: 84, borderRadius: 14, overflow: 'hidden', marginBottom: 8, backgroundColor: colors.pageBg, position: 'relative' },
   packageImage: { width: '100%', height: '100%', resizeMode: 'cover' },
-  packageImageFallback: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
+  packageImageFallback: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFF1F0' },
+  packageIconHighlight: { position: 'absolute', top: 8, left: 12, width: 36, height: 18, borderRadius: 14, backgroundColor: '#FFFFFF', opacity: 0.5 },
   packageIcon: { fontSize: 30 },
 
   discountBadge: { position: 'absolute', top: 6, left: 6, backgroundColor: colors.primary, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6 },

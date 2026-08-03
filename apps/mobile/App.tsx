@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet, Platform, Appearance } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Platform, Appearance, Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import * as SplashScreen from 'expo-splash-screen';
@@ -178,18 +178,103 @@ const MOBILE_TAB_BAR_STYLE = {
   bottom: 20,
   left: 16,
   right: 16,
-  backgroundColor: '#1C1C1E',
+  // Translucent charcoal rather than a flat fill -- the closest a floating
+  // RN tab bar gets to glassmorphism without pulling in expo-blur (a new
+  // native module every existing build would need to be rebuilt to include).
+  backgroundColor: 'rgba(28,28,30,0.88)',
   borderRadius: 24,
   height: 64,
   paddingBottom: Platform.OS === 'ios' ? 0 : 8,
   paddingTop: 8,
   borderTopWidth: 0,
+  borderWidth: 1,
+  borderColor: 'rgba(255,255,255,0.08)',
   shadowColor: '#000000',
   shadowOffset: { width: 0, height: 10 },
   shadowOpacity: 0.35,
   shadowRadius: 10,
   elevation: 8,
 };
+
+// Selected tab gets a red circular backdrop, a glow, and a spring "pop" --
+// the rest just tint the glyph, same as before.
+function AnimatedTabIcon({ focused, name }: { focused: boolean; name: keyof typeof Ionicons.glyphMap }) {
+  const scale = useRef(new Animated.Value(focused ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.spring(scale, { toValue: focused ? 1 : 0, useNativeDriver: true, bounciness: 10, speed: 16 }).start();
+  }, [focused]);
+
+  return (
+    <View style={tabIconStyles.wrap}>
+      <Animated.View
+        style={[
+          tabIconStyles.glowBubble,
+          {
+            opacity: scale,
+            transform: [{ scale }],
+          },
+        ]}
+      >
+        {/* Same top-left glass highlight / bottom-right shade Icon3D uses
+            everywhere else (Services/Categories/Feature Cards/header
+            buttons) -- so the selected tab reads as the same chip material
+            as the rest of the app's icon system instead of a flat dot. */}
+        <View style={tabIconStyles.glowInner}>
+          <View pointerEvents="none" style={tabIconStyles.glowHighlight} />
+          <View pointerEvents="none" style={tabIconStyles.glowShade} />
+        </View>
+      </Animated.View>
+      <Ionicons name={name} size={focused ? 21 : 22} color={focused ? '#FFFFFF' : '#8E8E93'} />
+    </View>
+  );
+}
+
+const tabIconStyles = StyleSheet.create({
+  wrap: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  glowBubble: {
+    position: 'absolute',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    shadowColor: '#E53935',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  glowInner: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: '#E53935',
+  },
+  glowHighlight: {
+    position: 'absolute',
+    top: 3,
+    left: 5,
+    width: 16,
+    height: 9,
+    borderRadius: 7,
+    backgroundColor: '#FFFFFF',
+    opacity: 0.4,
+  },
+  glowShade: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    width: 25,
+    height: 25,
+    borderRadius: 13,
+    backgroundColor: '#0B1220',
+    opacity: 0.1,
+  },
+});
 
 function MainTabs() {
   // DesktopAppShell already provides desktop navigation (header + mega menu),
@@ -205,15 +290,7 @@ function MainTabs() {
         tabBarActiveTintColor: '#E53935',
         tabBarInactiveTintColor: '#8E8E93',
         tabBarStyle: Platform.OS === 'web' && isDesktopUp ? { display: 'none' } : MOBILE_TAB_BAR_STYLE,
-        tabBarIcon: ({ focused, color, size }) => (
-          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons 
-              name={TAB_ICONS[route.name]} 
-              size={focused ? 24 : 22} 
-              color={focused ? '#E53935' : '#8E8E93'} 
-            />
-          </View>
-        ),
+        tabBarIcon: ({ focused }) => <AnimatedTabIcon focused={focused} name={TAB_ICONS[route.name]} />,
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
