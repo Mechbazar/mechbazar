@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Alert, Pressable, TouchableOpacity } from 'react-native';
 import { useDispatch } from 'react-redux';
 import * as SecureStore from 'expo-secure-store';
@@ -21,6 +21,12 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
   const [sendingOtp, setSendingOtp] = useState(false);
 
   const [loading, setLoading] = useState(false);
+  // Holds the token when Android verifies the number on its own (instant
+  // verification, or SMS auto-retrieval). Login only proceeds once the user
+  // taps the button -- Android completing this silently is not the same as
+  // the user asking to be signed in.
+  const autoVerifiedTokenRef = useRef<string | null>(null);
+  const [autoVerifiedReady, setAutoVerifiedReady] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -39,7 +45,52 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
         Alert.alert('Login Failed', 'No token received from server');
       }
     } catch (error: any) {
-      Alert.alert('Login Failed', error.response?.data?.message || error.message || 'An error occurred');
+      // TEMPORARY diagnostic verbosity -- revert once the network-error root
+      // cause is found. The normal error.response?.data?.message ||
+      // error.message collapses exactly the details (axios error code,
+      // whether a response was ever received, the resolved baseURL) needed to
+      // tell "DNS/TLS failure", "timeout", and "server reachable but rejected
+      // the request" apart from a device that can't attach a debugger.
+      const diag = [
+        `message: ${error?.message}`,
+        `code: ${error?.code}`,
+        `baseURL: ${error?.config?.baseURL}`,
+        `url: ${error?.config?.url}`,
+        `hasResponse: ${!!error?.response}`,
+        `status: ${error?.response?.status}`,
+      ].join('\n');
+
+      // Probes three hostnames that should all reach the SAME backend, to
+      // tell apart "this phone's DNS resolver still has the apex domain's old
+      // (dead-IPv6-including) answer cached" from "nothing this phone does
+      // reaches mechbazar.com at all right now" -- api./vendor. were plain
+      // A-only records even before today's DNS fix, so if either of those
+      // succeeds while the apex fails, that's conclusive: it's DNS caching,
+      // not a code/network-stack problem.
+      const probe = async (url: string): Promise<string> => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+        const start = Date.now();
+        try {
+          const res = await fetch(url, { signal: controller.signal });
+          return `${res.status} in ${Date.now() - start}ms`;
+        } catch (e: any) {
+          return `FAILED (${e?.name}: ${e?.message}) after ${Date.now() - start}ms`;
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+
+      const [apex, apiSub, vendorSub] = await Promise.all([
+        probe('https://mechbazar.com/api/health'),
+        probe('https://api.mechbazar.com/api/health'),
+        probe('https://vendor.mechbazar.com/api/health'),
+      ]);
+
+      Alert.alert(
+        'Login Failed (diagnostic)',
+        `${diag}\n\n-- probes --\napex: ${apex}\napi.: ${apiSub}\nvendor.: ${vendorSub}`
+      );
     } finally {
       setLoading(false);
     }
@@ -74,8 +125,10 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
   useEffect(() => {
     if (authMode !== 'otp' || !otpSent || normalizedPhone.length !== 10) return;
     return watchForAutoVerification(normalizedPhone, (idToken) => {
-      setOtpSent(false);
-      void completeOtpLogin(idToken);
+      // Hold the token and ask the user to confirm rather than logging them
+      // in the moment Android finishes -- see autoVerifiedTokenRef.
+      autoVerifiedTokenRef.current = idToken;
+      setAutoVerifiedReady(true);
     });
   }, [authMode, otpSent, normalizedPhone, completeOtpLogin]);
 
@@ -84,12 +137,19 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
       Alert.alert('Error', 'Phone number must be 10 digits');
       return;
     }
+    autoVerifiedTokenRef.current = null;
+    setAutoVerifiedReady(false);
     try {
       setSendingOtp(true);
       const result = await sendPhoneOtp(normalizedPhone);
+      // Android verified the number instantly -- no SMS was ever sent. That
+      // used to log the user straight in with no confirmation step at all;
+      // now it holds the token and shows a "verified -- tap to continue"
+      // state instead (autoVerifiedTokenRef).
       if (result.autoVerified && result.idToken) {
-        setOtpSent(false);
-        await completeOtpLogin(result.idToken);
+        autoVerifiedTokenRef.current = result.idToken;
+        setAutoVerifiedReady(true);
+        setOtpSent(true);
         return;
       }
       setOtpSent(true);
@@ -102,6 +162,16 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
   };
 
   const handleVerifyOtp = async () => {
+    // Android already produced a valid token (see autoVerifiedTokenRef) --
+    // there is no code to confirm, just the user's explicit go-ahead.
+    if (autoVerifiedTokenRef.current) {
+      const token = autoVerifiedTokenRef.current;
+      autoVerifiedTokenRef.current = null;
+      setAutoVerifiedReady(false);
+      await completeOtpLogin(token);
+      return;
+    }
+
     const normalizedOtp = otp.replace(/\D/g, '');
     if (normalizedOtp.length < 6) {
       Alert.alert('Error', 'OTP must be at least 6 digits');
@@ -187,19 +257,27 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
               onChangeText={(text) => {
                 setPhone(text.replace(/\D/g, '').slice(0, 10));
                 setOtpSent(false);
+                autoVerifiedTokenRef.current = null;
+                setAutoVerifiedReady(false);
               }}
               keyboardType="phone-pad"
               editable={!otpSent}
             />
             {otpSent && (
-              <Input
-                label="OTP"
-                placeholder="Enter OTP"
-                value={otp}
-                onChangeText={(text) => setOtp(text.replace(/\D/g, '').slice(0, 6))}
-                keyboardType="number-pad"
-                secureTextEntry
-              />
+              autoVerifiedReady ? (
+                <Typography variant="body" style={{ color: colors.text, marginBottom: 8 }}>
+                  ✓ Number verified automatically. Tap below to continue.
+                </Typography>
+              ) : (
+                <Input
+                  label="OTP"
+                  placeholder="Enter OTP"
+                  value={otp}
+                  onChangeText={(text) => setOtp(text.replace(/\D/g, '').slice(0, 6))}
+                  keyboardType="number-pad"
+                  secureTextEntry
+                />
+              )
             )}
             {!otpSent ? (
               <Button
@@ -211,7 +289,7 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
             ) : (
               <>
                 <Button
-                  title="Login"
+                  title={autoVerifiedReady ? 'Continue' : 'Login'}
                   onPress={handleVerifyOtp}
                   loading={loading}
                   style={{ width: '100%', marginTop: 24, paddingVertical: 16 }}

@@ -167,7 +167,11 @@ export const OnboardingWizard = () => {
 
   const goBack = () => setStep((s) => Math.max(s - 1, 0));
 
-  const canSubmit = uploadedTypes.has('PAN') && uploadedTypes.has('CANCELLED_CHEQUE');
+  // hasBank used to only affect the step-1 button label; a vendor could tap
+  // Next through Bank Info with nothing entered and reach Submit, get
+  // APPROVED, then find Wallet withdrawals have nowhere to pay out to (the
+  // backend's submitForApproval doesn't check this either).
+  const canSubmit = hasBank && uploadedTypes.has('PAN') && uploadedTypes.has('CANCELLED_CHEQUE');
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
@@ -247,6 +251,7 @@ export const OnboardingWizard = () => {
             {!canSubmit && (
               <View style={styles.missingBox}>
                 <Typography variant="body" style={{ color: colors.danger, fontWeight: '700' }}>Missing before you can submit:</Typography>
+                {!hasBank && <Typography variant="caption" style={{ color: colors.danger, marginTop: 4 }}>• Bank Account details</Typography>}
                 {!uploadedTypes.has('PAN') && <Typography variant="caption" style={{ color: colors.danger, marginTop: 4 }}>• PAN Card Copy</Typography>}
                 {!uploadedTypes.has('CANCELLED_CHEQUE') && <Typography variant="caption" style={{ color: colors.danger, marginTop: 4 }}>• Cancelled Cheque</Typography>}
               </View>
