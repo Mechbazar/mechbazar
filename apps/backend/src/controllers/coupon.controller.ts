@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Prisma, PrismaClient, VehicleType } from '@prisma/client';
+import { Prisma, PrismaClient, VehicleType, DiscountType } from '@prisma/client';
 import { normalizeVehicleType } from '../utils/vehicleType';
 import { AuthRequest } from '../middlewares/auth';
 import { recordAuditLog } from '../utils/auditLog';
@@ -54,6 +54,11 @@ export const createCoupon = async (req: AuthRequest, res: Response): Promise<voi
   try {
     const { code, discountType, discountValue, minOrderValue, isActive, vehicleType } = req.body;
 
+    if (!Object.values(DiscountType).includes(discountType)) {
+      res.status(400).json({ error: `Invalid discountType "${discountType}". Must be one of ${Object.values(DiscountType).join(', ')}.` });
+      return;
+    }
+
     // Check if code exists
     const existing = await prisma.coupon.findUnique({ where: { code } });
     if (existing) {
@@ -88,6 +93,11 @@ export const updateCoupon = async (req: AuthRequest, res: Response): Promise<voi
   try {
     const id = String(req.params.id);
     const { code, discountType, discountValue, minOrderValue, isActive, vehicleType } = req.body;
+
+    if (!Object.values(DiscountType).includes(discountType)) {
+      res.status(400).json({ error: `Invalid discountType "${discountType}". Must be one of ${Object.values(DiscountType).join(', ')}.` });
+      return;
+    }
 
     // Check if updating code to one that already exists
     const existing = await prisma.coupon.findUnique({ where: { code } });

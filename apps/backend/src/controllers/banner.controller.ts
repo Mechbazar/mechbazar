@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { BannerType } from '@prisma/client';
 import { normalizeVehicleType, parseVehicleTypeFilter } from '../utils/vehicleType';
 import { AuthRequest } from '../middlewares/auth';
 import { recordAuditLog } from '../utils/auditLog';
@@ -41,6 +42,11 @@ export const createBanner = async (req: AuthRequest, res: Response): Promise<voi
   try {
     const { title, image, type, link, buttonText, redirectLink, vehicleType, isActive, startDate, endDate } = req.body;
 
+    if (type && !Object.values(BannerType).includes(type)) {
+      res.status(400).json({ error: `Invalid type "${type}". Must be one of ${Object.values(BannerType).join(', ')}.` });
+      return;
+    }
+
     const banner = await prisma.banner.create({
       data: {
         title,
@@ -71,6 +77,11 @@ export const updateBanner = async (req: AuthRequest, res: Response): Promise<voi
   try {
     const { id } = req.params;
     const { title, image, type, link, buttonText, redirectLink, vehicleType, isActive, startDate, endDate } = req.body;
+
+    if (type && !Object.values(BannerType).includes(type)) {
+      res.status(400).json({ error: `Invalid type "${type}". Must be one of ${Object.values(BannerType).join(', ')}.` });
+      return;
+    }
 
     const banner = await prisma.banner.update({
       where: { id: String(id) },

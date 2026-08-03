@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { StockMovementAction } from '@prisma/client';
 import prisma from '../config/prisma';
 
 export const getInventory = async (req: Request, res: Response): Promise<void> => {
@@ -30,6 +31,11 @@ export const adjustStock = async (req: Request, res: Response): Promise<void> =>
   try {
     const { inventoryId, newQuantity, reason, actionType } = req.body;
     const userId = (req as any).user.userId;
+
+    if (actionType && !Object.values(StockMovementAction).includes(actionType)) {
+      res.status(400).json({ error: `Invalid actionType "${actionType}". Must be one of ${Object.values(StockMovementAction).join(', ')}.` });
+      return;
+    }
 
     const inventory = await prisma.inventory.findUnique({ where: { id: inventoryId } });
     if (!inventory) {

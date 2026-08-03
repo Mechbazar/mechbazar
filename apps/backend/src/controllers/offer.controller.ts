@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { DiscountType } from '@prisma/client';
 import prisma from '../config/prisma';
 import { normalizeVehicleType, parseVehicleTypeFilter } from '../utils/vehicleType';
 
@@ -51,6 +52,11 @@ export const createOffer = async (req: Request, res: Response): Promise<void> =>
       endDate,
     } = req.body;
 
+    if (discountType && !Object.values(DiscountType).includes(discountType)) {
+      res.status(400).json({ error: `Invalid discountType "${discountType}". Must be one of ${Object.values(DiscountType).join(', ')}.` });
+      return;
+    }
+
     const offer = await prisma.offer.create({
       data: {
         title,
@@ -90,6 +96,11 @@ export const updateOffer = async (req: Request, res: Response): Promise<void> =>
       startDate,
       endDate,
     } = req.body;
+
+    if (discountType && !Object.values(DiscountType).includes(discountType)) {
+      res.status(400).json({ error: `Invalid discountType "${discountType}". Must be one of ${Object.values(DiscountType).join(', ')}.` });
+      return;
+    }
 
     const offer = await prisma.offer.update({
       where: { id },
