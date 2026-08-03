@@ -40,3 +40,11 @@ firebaseServiceAccount.json
 .DS_Store
 qr-codes/
 MECHBAZAR/
+
+# Icon redesign backups (temporary, not for commit)
+apps/*/assets/_backup/
+apps/mobile/assets/Media*.jpg
+apps/mobile/build-output/
+
+# Built APKs (local Gradle/EAS output) -- large binaries, never commit
+build-output/
