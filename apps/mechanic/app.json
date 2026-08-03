@@ -22,7 +22,7 @@
       "package": "com.mechbazar.mechanic",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#EF6C00",
+        "backgroundColor": "#0B0B0B",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -51,6 +51,13 @@
     "plugins": [
       "expo-secure-store",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "MechBazar Mechanic accesses your photo library so you can attach KYC documents and job completion photos.",
+          "cameraPermission": "MechBazar Mechanic uses your camera so you can photograph KYC documents and job completion photos."
+        }
+      ],
+      [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "MechBazar shares your live location with the customer only while you have an active job.",
@@ -63,7 +70,7 @@
         "expo-notifications",
         {
           "icon": "./assets/android-icon-monochrome.png",
-          "color": "#EF6C00",
+          "color": "#16A34A",
           "defaultChannel": "default",
           "enableBackgroundRemoteNotifications": false
         }
@@ -72,17 +79,18 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon-dark.png",
-          "imageWidth": 240,
+          "imageWidth": 176,
           "resizeMode": "contain",
-          "backgroundColor": "#EF6C00",
+          "backgroundColor": "#071F12",
           "dark": {
             "image": "./assets/splash-icon-dark.png",
-            "backgroundColor": "#EF6C00"
+            "backgroundColor": "#071F12"
           }
         }
       ],
       "@react-native-firebase/app",
-      "@react-native-firebase/auth"
+      "@react-native-firebase/auth",
+      "./plugins/withAndroidReleaseSigning"
     ],
     "extra": {
       "eas": {

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import { colors, Typography, Card, Input, Button, technicianService } from '@mechbazar/shared';
 import { Send } from 'lucide-react-native';
@@ -53,6 +53,10 @@ export const BookingChatScreen = () => {
       setMessages(data);
     } catch (error: any) {
       console.error('Failed to send message', error);
+      // draft was cleared optimistically before the send -- restore it so a
+      // failed send doesn't silently lose what the technician typed.
+      setDraft(text);
+      Alert.alert('Message not sent', error?.response?.data?.error || 'Check your connection and try again.');
     } finally {
       setSending(false);
     }

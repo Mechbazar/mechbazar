@@ -1,12 +1,16 @@
 // ServiceBooking.status values relevant to a technician (Prisma BookingStatus
-// enum). PENDING/CONFIRMED/REJECTED never reach this app's own bookings list
-// with technicianId set to us -- technicianId is only set once a booking is
-// auto- or admin-assigned, and getMyBookings is scoped to technicianId.
-// completionOtp is always stripped server-side from a technician's own view.
+// enum). PENDING_ADMIN_ASSIGNMENT/REJECTED never reach this app's own
+// bookings list with technicianId set to us -- technicianId is only set once
+// an admin manually assigns a booking (no more automatic matching), and
+// getMyBookings is scoped to technicianId. completionOtp is always stripped
+// server-side from a technician's own view.
 export type Booking = {
   id: string;
   bookingNumber: string;
   status: string;
+  // Deadline to accept/reject a MECHANIC_ASSIGNED booking -- see
+  // AssignmentCountdown in BookingDetailScreen.tsx. Null once accepted.
+  assignmentExpiresAt?: string | null;
   // Distinguishes an instant emergency job (no scheduledDate/timeSlot,
   // reached via /api/jobs/*) from a scheduled booking (this generic
   // BookingsScreen/BookingDetailScreen flow) -- see EmergencyJobScreen for

@@ -9,12 +9,14 @@ import {
 import { AlertTriangle, MapPin, Clock } from 'lucide-react-native';
 
 // Live inbox of emergency job offers for this mechanic. Distinct from
-// BookingsScreen (which lists jobs already assigned) -- these are jobs NOT
-// yet won, in a race against every other mechanic who was offered the same
-// job in this wave. Accepting is first-come-first-served; the backend is the
-// only source of truth on who wins (see dispatch.service.ts's acceptOffer),
-// so this screen never assumes an accept succeeded -- it always reads the
-// server's answer.
+// BookingsScreen (which lists jobs already assigned) -- these are jobs an
+// admin has just assigned to this mechanic specifically and are awaiting an
+// explicit Accept/Reject within the countdown window. There is no automatic
+// matching or multi-mechanic race any more (see dispatch.service.ts's
+// createSingleOffer/acceptOffer) -- an offer here was offered to this
+// mechanic alone -- but this screen still always reads the server's answer
+// rather than assuming an accept succeeded, since a duplicated request or an
+// admin reassigning mid-flight are still real possibilities.
 
 function OfferCountdown({ expiresAt }: { expiresAt: string }) {
   const [remaining, setRemaining] = useState(() => Math.max(0, Math.round((new Date(expiresAt).getTime() - Date.now()) / 1000)));
@@ -93,12 +95,13 @@ export const OfferInboxScreen = () => {
       queryClient.invalidateQueries({ queryKey: ['technician-bookings'] });
       navigation.navigate('EmergencyJob', { bookingId: offer.bookingId });
     } else {
-      // ALREADY_TAKEN is the expected outcome of losing the race -- every
-      // other error (expired, at capacity) reads the same to the mechanic:
-      // this job is no longer theirs to take.
+      // ALREADY_TAKEN/OFFER_CLOSED shouldn't normally happen with a single-
+      // candidate offer, but stay defensive: an admin can reassign the job to
+      // someone else, or the countdown can expire, between this screen
+      // loading and the mechanic tapping Accept.
       Alert.alert(
-        res.code === 'ALREADY_TAKEN' ? 'Job already taken' : 'Could not accept',
-        res.error || 'Another mechanic may have already accepted this job.'
+        'Could not accept',
+        res.error || 'This offer is no longer available -- it may have expired or been reassigned.'
       );
       refetch();
     }
@@ -155,9 +158,6 @@ export const OfferInboxScreen = () => {
 
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
             <Typography variant="h3" style={{ color: colors.primary }}>₹{item.estimatedCost}</Typography>
-            {item.wave > 1 && (
-              <Typography variant="caption" style={{ color: colors.textSecondary }}>Wave {item.wave}</Typography>
-            )}
           </View>
 
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>

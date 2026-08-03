@@ -1,23 +1,46 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, StyleSheet, ScrollView, Linking, Alert, Image, TouchableOpacity } from 'react-native';
 import { useRoute, useNavigation, useIsFocused } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, Typography, Card, Button, Input, Loader, technicianService } from '@mechbazar/shared';
-import { Phone, Navigation as NavigationIcon, Camera, MessageCircle } from 'lucide-react-native';
+import { Phone, Navigation as NavigationIcon, Camera, MessageCircle, Clock } from 'lucide-react-native';
 import { formatINR } from '../utils/currency';
 
-// Backend flow: MECHANIC_ASSIGNED -> (Accept/Reject) -> MECHANIC_ACCEPTED ->
-// MECHANIC_ON_THE_WAY -> ARRIVED -> WORK_STARTED -> (generate OTP, customer
-// reads it aloud) -> COMPLETED. Rejecting sends the booking to REJECTED and
-// the backend auto-attempts reassignment to another technician -- it then
-// disappears from this technician's own bookings list entirely (technicianId
-// gets cleared), so there's nothing further to show here after a reject.
+// Backend flow: MECHANIC_ASSIGNED -> (Accept/Reject, within a countdown --
+// see AssignmentCountdown below) -> MECHANIC_ACCEPTED -> MECHANIC_ON_THE_WAY
+// -> ARRIVED -> WORK_STARTED -> (generate OTP, customer reads it aloud) ->
+// COMPLETED. Rejecting (or letting the countdown expire) sends the booking to
+// REJECTED -- there is no automatic reassignment any more, an admin manually
+// picks the next mechanic, so it just disappears from this technician's own
+// bookings list (technicianId gets cleared), and there's nothing further to
+// show here after a reject.
 // The additional-work-approval request is a non-blocking flag layered on top
 // of WORK_STARTED (approvalStatus), not a separate top-level status -- this
 // screen keeps polling while WORK_STARTED so the customer's response to a
 // pending request surfaces without the technician needing to leave and come
 // back.
+
+// Same client-side-only countdown pattern as OfferInboxScreen's
+// OfferCountdown (emergency-job offers) -- expiry itself is enforced
+// server-side by the assignment sweeper, this is purely a display.
+function AssignmentCountdown({ expiresAt }: { expiresAt: string }) {
+  const [remaining, setRemaining] = useState(() => Math.max(0, Math.round((new Date(expiresAt).getTime() - Date.now()) / 1000)));
+  useEffect(() => {
+    const t = setInterval(() => {
+      setRemaining(Math.max(0, Math.round((new Date(expiresAt).getTime() - Date.now()) / 1000)));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [expiresAt]);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 4 }}>
+      <Clock color={remaining <= 10 ? colors.danger : colors.textSecondary} size={16} />
+      <Typography variant="body" style={{ color: remaining <= 10 ? colors.danger : colors.textSecondary, fontWeight: '700' }}>
+        {remaining > 0 ? `${remaining}s to respond` : 'Expiring…'}
+      </Typography>
+    </View>
+  );
+}
 export const BookingDetailScreen = () => {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
@@ -114,8 +137,17 @@ export const BookingDetailScreen = () => {
   const handleStartWork = async () => {
     try {
       setSubmitting(true);
+      // The before-photo is optional (see the label below) -- its upload
+      // failing (e.g. a network blip on-site) must not block the required
+      // WORK_STARTED transition. Report it but keep going, same as
+      // EmergencyJobScreen's equivalent path.
       if (beforeUri) {
-        await technicianService.uploadBookingImage(bookingId, beforeUri, 'image/jpeg', `before-${bookingId}.jpg`, 'BEFORE');
+        try {
+          await technicianService.uploadBookingImage(bookingId, beforeUri, 'image/jpeg', `before-${bookingId}.jpg`, 'BEFORE');
+        } catch (uploadErr) {
+          console.error('Before-photo upload failed', uploadErr);
+          Alert.alert('Photo not saved', 'The before photo could not be uploaded, but work has started anyway. You can retry the photo from the booking screen.');
+        }
       }
       await statusMutation.mutateAsync({ status: 'WORK_STARTED' });
     } catch (err: any) {
@@ -250,6 +282,7 @@ export const BookingDetailScreen = () => {
 
       {booking.status === 'MECHANIC_ASSIGNED' && !showRejectForm && (
         <View style={{ marginTop: 16, gap: 8 }}>
+          {booking.assignmentExpiresAt && <AssignmentCountdown expiresAt={booking.assignmentExpiresAt} />}
           <Button title="Accept Job" onPress={() => acceptMutation.mutate()} loading={acceptMutation.isPending} />
           <Button title="Reject Job" variant="outline" onPress={() => setShowRejectForm(true)} />
         </View>
