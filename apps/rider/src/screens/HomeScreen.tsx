@@ -45,7 +45,19 @@ export const HomeScreen = () => {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     if (profile?.isOnline) {
-      pingLocationOnce();
+      // The Available toggle succeeds independently of location permission --
+      // without this, a rider could go "Available" with location sharing
+      // silently denied and never know their position isn't reaching the
+      // server. Only warn on the first ping of this online session, not
+      // every 60s.
+      pingLocationOnce().then(({ permissionDenied }) => {
+        if (permissionDenied) {
+          Alert.alert(
+            'Location permission needed',
+            "You're marked Available, but location access is off, so customers and dispatch can't see where you are. Enable location permission in your device settings."
+          );
+        }
+      });
       intervalRef.current = setInterval(pingLocationOnce, 60000);
     }
     return () => {

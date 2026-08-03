@@ -6,7 +6,7 @@ import { View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import * as SplashScreen from 'expo-splash-screen';
 import { useQuery } from '@tanstack/react-query';
-import { colors, riderService, Loader } from '@mechbazar/shared';
+import { colors, riderService, Loader, Typography, Button } from '@mechbazar/shared';
 import { RootState, setAuth, logout } from '../store';
 import { LoginScreen } from '../screens/LoginScreen';
 import { RegistrationScreen } from '../screens/registration/RegistrationScreen';
@@ -21,21 +21,22 @@ const Stack = createNativeStackNavigator();
 // (editable) go to the wizard; UNDER_VERIFICATION/SUSPENDED/BLOCKED/INACTIVE
 // are informational-only until an admin acts.
 const RiderGate = () => {
-  const dispatch = useDispatch();
   const [showWizard, setShowWizard] = useState(false);
-  const { data: profile, isLoading, isError } = useQuery({ 
-    queryKey: ['rider-profile'], 
+  const { data: profile, isLoading, isError, refetch, isRefetching } = useQuery({
+    queryKey: ['rider-profile'],
     queryFn: riderService.getProfile,
     retry: false
   });
 
-  React.useEffect(() => {
-    if (isError) {
-      SecureStore.deleteItemAsync('token').then(() => {
-        dispatch(logout());
-      });
-    }
-  }, [isError, dispatch]);
+  // A real auth failure (expired/invalid token) is already handled globally --
+  // packages/shared/src/api/client.ts's response interceptor deletes the token
+  // and fires setUnauthorizedHandler (wired to dispatch(logout()) in App.tsx)
+  // on any 401. This screen used to *also* delete the token and log out on
+  // isError, but that fires for every failure (500, timeout, a rider offline
+  // for a moment right after launch -- an elevator, a basement, the subway),
+  // not just auth ones -- so a transient network blip on cold start silently
+  // destroyed a perfectly valid session. Show a retry state instead and let
+  // the global 401 handler own logout.
 
   // Resubmitting from the wizard (RegistrationScreen's "Submit for Review")
   // moves status to UNDER_VERIFICATION -- without this, showWizard stayed
@@ -53,7 +54,15 @@ const RiderGate = () => {
   }
 
   if (isError || !profile) {
-    return null;
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: colors.background }}>
+        <Typography variant="h2" style={{ marginBottom: 8, textAlign: 'center' }}>Couldn't load your profile</Typography>
+        <Typography variant="body" style={{ marginBottom: 24, textAlign: 'center', color: colors.textSecondary }}>
+          Check your connection and try again.
+        </Typography>
+        <Button title={isRefetching ? 'Retrying...' : 'Retry'} onPress={() => refetch()} loading={isRefetching} disabled={isRefetching} />
+      </View>
+    );
   }
 
   if (profile.status === 'APPROVED') {

@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView, Linking, Alert, Image, TouchableOpacity, 
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import { colors, Typography, Card, Button, Loader, riderService } from '@mechbazar/shared';
+import { colors, Typography, Card, Button, Loader, riderService, resolveUploadUrl } from '@mechbazar/shared';
 import { Phone, Navigation as NavigationIcon, Camera, KeyRound } from 'lucide-react-native';
 import { Delivery } from '../utils/deliveries';
 import { formatINR } from '../utils/currency';
@@ -281,7 +281,7 @@ export const DeliveryDetailScreen = () => {
       {(order.status === 'DELIVERED' || order.status === 'RETURNED') && (
         <Card style={{ marginTop: 16 }}>
           <Typography variant="h3">{order.status === 'DELIVERED' ? 'Delivered' : 'Returned'}</Typography>
-          {order.proofImageUrl && <Image source={{ uri: order.proofImageUrl }} style={styles.proofImage} />}
+          {order.proofImageUrl && <Image source={{ uri: resolveUploadUrl(order.proofImageUrl)! }} style={styles.proofImage} />}
           {order.issueReason && <Typography variant="body" style={{ marginTop: 8 }}>Reason: {order.issueReason}</Typography>}
         </Card>
       )}

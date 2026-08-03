@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useDispatch } from 'react-redux';
+import * as SecureStore from 'expo-secure-store';
 import { colors, Typography, Card, Button } from '@mechbazar/shared';
 import { Clock, AlertTriangle, Ban } from 'lucide-react-native';
 import { logout } from '../../store';
@@ -55,6 +56,14 @@ export const StatusScreen = ({ status, remarks, onEdit }: { status: string; rema
   const meta = STATUS_META[status] || STATUS_META.PENDING;
   const Icon = meta.icon;
 
+  // Must clear SecureStore, not just Redux state -- otherwise RootNavigator's
+  // checkToken() finds the still-valid token on next launch and silently
+  // signs the rider back in despite the explicit logout (see ProfileScreen's
+  // logout for the correct pattern this now matches).
+  const handleLogout = () => {
+    SecureStore.deleteItemAsync('token').finally(() => dispatch(logout()));
+  };
+
   return (
     <View style={styles.container}>
       <Card style={{ alignItems: 'center', padding: 32 }}>
@@ -74,7 +83,7 @@ export const StatusScreen = ({ status, remarks, onEdit }: { status: string; rema
         {meta.editable && (
           <Button title="Edit & Continue" onPress={onEdit} style={{ marginTop: 24, alignSelf: 'stretch' }} />
         )}
-        <Button title="Log Out" variant="outline" onPress={() => dispatch(logout())} style={{ marginTop: 12, alignSelf: 'stretch' }} />
+        <Button title="Log Out" variant="outline" onPress={handleLogout} style={{ marginTop: 12, alignSelf: 'stretch' }} />
       </Card>
     </View>
   );

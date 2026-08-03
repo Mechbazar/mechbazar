@@ -15,7 +15,7 @@
       "package": "com.mechbazar.rider",
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
-        "backgroundColor": "#1B9E4B",
+        "backgroundColor": "#0B0B0B",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -43,10 +43,17 @@
       "expo-secure-store",
       "expo-location",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "MechBazar Rider accesses your photo library so you can attach KYC documents and delivery-proof photos.",
+          "cameraPermission": "MechBazar Rider uses your camera so you can photograph KYC documents and delivery-proof photos."
+        }
+      ],
+      [
         "expo-notifications",
         {
           "icon": "./assets/android-icon-monochrome.png",
-          "color": "#1B9E4B",
+          "color": "#8B5CF6",
           "defaultChannel": "default",
           "enableBackgroundRemoteNotifications": false
         }
@@ -55,17 +62,18 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon-dark.png",
-          "imageWidth": 240,
+          "imageWidth": 176,
           "resizeMode": "contain",
-          "backgroundColor": "#1B9E4B",
+          "backgroundColor": "#1B0A38",
           "dark": {
             "image": "./assets/splash-icon-dark.png",
-            "backgroundColor": "#1B9E4B"
+            "backgroundColor": "#1B0A38"
           }
         }
       ],
       "@react-native-firebase/app",
-      "@react-native-firebase/auth"
+      "@react-native-firebase/auth",
+      "./plugins/withAndroidReleaseSigning"
     ],
     "extra": {
       "eas": {
