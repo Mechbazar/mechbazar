@@ -79,3 +79,207 @@ export const getVehicleByDetails = async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to fetch vehicle' });
   }
 };
+
+// ============================================================
+// ADMIN: Vehicle Master Management (Manufacturer/Model/Variant/
+// FuelType/Vehicle CRUD). Everything above this point is the
+// public read-only taxonomy lookup used by the mobile app's
+// vehicle picker; everything below is authenticated and used by
+// the admin panel's Vehicle Master page.
+// ============================================================
+
+export const getAllVehiclesAdmin = async (_req: Request, res: Response) => {
+  try {
+    const vehicles = await prisma.vehicle.findMany({
+      include: { manufacturer: true, model: true, variant: true, fuelType: true },
+      orderBy: [{ manufacturer: { name: 'asc' } }, { model: { name: 'asc' } }, { year: 'desc' }],
+    });
+    res.json(vehicles);
+  } catch (error) {
+    console.error('Error fetching vehicles:', error);
+    res.status(500).json({ error: 'Failed to fetch vehicles' });
+  }
+};
+
+export const createManufacturer = async (req: Request, res: Response) => {
+  try {
+    const { name, type } = req.body;
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ error: 'name is required' });
+    }
+    const vehicleType = type === 'BIKE' ? 'BIKE' : 'CAR';
+    const trimmed = String(name).trim();
+    // Case-insensitive de-dupe so "Honda" typed twice from the admin's
+    // "+ Add new" field doesn't fork into two rows for the same brand.
+    const existing = await prisma.manufacturer.findFirst({
+      where: { type: vehicleType, name: { equals: trimmed, mode: 'insensitive' } },
+    });
+    if (existing) {
+      return res.status(200).json(existing);
+    }
+    const manufacturer = await prisma.manufacturer.create({ data: { name: trimmed, type: vehicleType } });
+    res.status(201).json(manufacturer);
+  } catch (error) {
+    console.error('Error creating manufacturer:', error);
+    res.status(500).json({ error: 'Failed to create manufacturer' });
+  }
+};
+
+export const createModel = async (req: Request, res: Response) => {
+  try {
+    const { manufacturerId, name } = req.body;
+    if (!manufacturerId || !name || !String(name).trim()) {
+      return res.status(400).json({ error: 'manufacturerId and name are required' });
+    }
+    const manufacturer = await prisma.manufacturer.findUnique({ where: { id: String(manufacturerId) } });
+    if (!manufacturer) {
+      return res.status(404).json({ error: 'Manufacturer not found' });
+    }
+    const trimmed = String(name).trim();
+    const existing = await prisma.model.findFirst({
+      where: { manufacturerId: String(manufacturerId), name: { equals: trimmed, mode: 'insensitive' } },
+    });
+    if (existing) {
+      return res.status(200).json(existing);
+    }
+    const model = await prisma.model.create({ data: { manufacturerId: String(manufacturerId), name: trimmed } });
+    res.status(201).json(model);
+  } catch (error) {
+    console.error('Error creating model:', error);
+    res.status(500).json({ error: 'Failed to create model' });
+  }
+};
+
+export const createVariant = async (req: Request, res: Response) => {
+  try {
+    const { modelId, name } = req.body;
+    if (!modelId || !name || !String(name).trim()) {
+      return res.status(400).json({ error: 'modelId and name are required' });
+    }
+    const model = await prisma.model.findUnique({ where: { id: String(modelId) } });
+    if (!model) {
+      return res.status(404).json({ error: 'Model not found' });
+    }
+    const trimmed = String(name).trim();
+    const existing = await prisma.variant.findFirst({
+      where: { modelId: String(modelId), name: { equals: trimmed, mode: 'insensitive' } },
+    });
+    if (existing) {
+      return res.status(200).json(existing);
+    }
+    const variant = await prisma.variant.create({ data: { modelId: String(modelId), name: trimmed } });
+    res.status(201).json(variant);
+  } catch (error) {
+    console.error('Error creating variant:', error);
+    res.status(500).json({ error: 'Failed to create variant' });
+  }
+};
+
+export const createFuelType = async (req: Request, res: Response) => {
+  try {
+    const { name } = req.body;
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ error: 'name is required' });
+    }
+    const trimmed = String(name).trim();
+    const fuelType = await prisma.fuelType.upsert({
+      where: { name: trimmed },
+      update: {},
+      create: { name: trimmed },
+    });
+    res.status(201).json(fuelType);
+  } catch (error) {
+    console.error('Error creating fuel type:', error);
+    res.status(500).json({ error: 'Failed to create fuel type' });
+  }
+};
+
+const parseVehiclePayload = (body: any) => {
+  const { manufacturerId, modelId, variantId, fuelTypeId, year } = body;
+  if (!manufacturerId || !modelId || !fuelTypeId || !year) {
+    return { error: 'manufacturerId, modelId, fuelTypeId and year are required' };
+  }
+  const yearNum = Number(year);
+  if (!Number.isInteger(yearNum) || yearNum < 1980 || yearNum > new Date().getFullYear() + 1) {
+    return { error: 'year is invalid' };
+  }
+  return {
+    data: {
+      manufacturerId: String(manufacturerId),
+      modelId: String(modelId),
+      variantId: variantId ? String(variantId) : null,
+      fuelTypeId: String(fuelTypeId),
+      year: yearNum,
+    },
+  };
+};
+
+export const createVehicleAdmin = async (req: Request, res: Response) => {
+  try {
+    const parsed = parseVehiclePayload(req.body);
+    if (parsed.error || !parsed.data) {
+      return res.status(400).json({ error: parsed.error });
+    }
+    const vehicle = await prisma.vehicle.create({
+      data: parsed.data,
+      include: { manufacturer: true, model: true, variant: true, fuelType: true },
+    });
+    res.status(201).json(vehicle);
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      return res.status(409).json({ error: 'This exact vehicle (make/model/variant/fuel/year) already exists' });
+    }
+    console.error('Error creating vehicle:', error);
+    res.status(500).json({ error: 'Failed to create vehicle' });
+  }
+};
+
+export const updateVehicleAdmin = async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const existing = await prisma.vehicle.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Vehicle not found' });
+    }
+    const parsed = parseVehiclePayload(req.body);
+    if (parsed.error || !parsed.data) {
+      return res.status(400).json({ error: parsed.error });
+    }
+    const vehicle = await prisma.vehicle.update({
+      where: { id },
+      data: parsed.data,
+      include: { manufacturer: true, model: true, variant: true, fuelType: true },
+    });
+    res.json(vehicle);
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      return res.status(409).json({ error: 'This exact vehicle (make/model/variant/fuel/year) already exists' });
+    }
+    console.error('Error updating vehicle:', error);
+    res.status(500).json({ error: 'Failed to update vehicle' });
+  }
+};
+
+export const deleteVehicleAdmin = async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const vehicle = await prisma.vehicle.findUnique({ where: { id } });
+    if (!vehicle) {
+      return res.status(404).json({ error: 'Vehicle not found' });
+    }
+    const [compatCount, garageCount] = await Promise.all([
+      prisma.productCompatibility.count({ where: { vehicleId: id } }),
+      prisma.userVehicle.count({ where: { vehicleId: id } }),
+    ]);
+    if (compatCount > 0 || garageCount > 0) {
+      return res.status(400).json({
+        error: `Cannot delete: linked to ${compatCount} product(s) and ${garageCount} customer garage entr${garageCount === 1 ? 'y' : 'ies'}.`,
+      });
+    }
+    await prisma.vehicle.delete({ where: { id } });
+    res.status(200).json({ message: 'Vehicle deleted' });
+  } catch (error) {
+    console.error('Error deleting vehicle:', error);
+    res.status(500).json({ error: 'Failed to delete vehicle' });
+  }
+};
