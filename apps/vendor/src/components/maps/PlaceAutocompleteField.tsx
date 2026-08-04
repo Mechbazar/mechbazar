@@ -56,25 +56,25 @@ export default function PlaceAutocompleteField({ onSelect, placeholder }: PlaceA
   return (
     <div className="relative">
       <div className="relative">
-        <Search className="w-4 h-4 text-neutral-500 absolute left-4 top-1/2 -translate-y-1/2" />
+        <Search className="w-4 h-4 text-content-muted absolute left-4 top-1/2 -translate-y-1/2" />
         <input
           value={query}
           onChange={(e) => search(e.target.value)}
           placeholder={placeholder || 'Search for your store address'}
-          className="w-full pl-10 pr-10 py-2.5 rounded-lg border-2 border-neutral-800 bg-neutral-950 text-white placeholder-neutral-500 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+          className="w-full pl-10 pr-10 py-2.5 rounded-lg border-2 border-border-default bg-surface-sunken text-content-primary placeholder-content-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
         />
         {(loading || resolving) && (
-          <Loader2 className="w-4 h-4 text-neutral-500 absolute right-4 top-1/2 -translate-y-1/2 animate-spin" />
+          <Loader2 className="w-4 h-4 text-content-muted absolute right-4 top-1/2 -translate-y-1/2 animate-spin" />
         )}
       </div>
       {predictions.length > 0 && (
-        <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-neutral-950 border border-neutral-800 rounded-lg max-h-52 overflow-y-auto shadow-2xl">
+        <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-surface-overlay border border-border-default rounded-lg max-h-52 overflow-y-auto shadow-2xl">
           {predictions.map((p) => (
             <button
               key={p.placeId}
               type="button"
               onClick={() => handleSelect(p)}
-              className="w-full text-left px-4 py-2.5 text-sm text-neutral-300 hover:bg-neutral-900 border-b border-neutral-900 last:border-b-0"
+              className="w-full text-left px-4 py-2.5 text-sm text-content-secondary hover:bg-surface-hover hover:text-content-primary border-b border-border-default last:border-b-0"
             >
               {p.description}
             </button>

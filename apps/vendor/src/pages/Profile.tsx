@@ -150,10 +150,10 @@ export default function Profile() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+          <h1 className="text-3xl font-bold text-content-primary flex items-center gap-3">
             <User className="w-8 h-8 text-brand-secondary" /> Profile & Settings
           </h1>
-          <p className="text-gray-400 mt-1">Manage your personal and store information</p>
+          <p className="text-content-secondary mt-1">Manage your personal and store information</p>
         </div>
         <Button onClick={handleSave} isLoading={saving}>
           {saved ? <><CheckCircle className="w-4 h-4" /> Saved!</> : saving ? 'Saving...' : <><Save className="w-4 h-4" /> Save Changes</>}
@@ -161,8 +161,8 @@ export default function Profile() {
       </div>
 
       {/* Personal Info */}
-      <div className="bg-brand-primary border border-brand-muted rounded-xl p-6">
-        <h2 className="text-white font-bold text-lg flex items-center gap-2 mb-5">
+      <div className="bg-surface-card border border-border-default rounded-xl p-6">
+        <h2 className="text-content-primary font-bold text-lg flex items-center gap-2 mb-5">
           <User className="w-5 h-5 text-brand-secondary" /> Personal Information
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -175,8 +175,8 @@ export default function Profile() {
       </div>
 
       {/* Store Info */}
-      <div className="bg-brand-primary border border-brand-muted rounded-xl p-6">
-        <h2 className="text-white font-bold text-lg flex items-center gap-2 mb-5">
+      <div className="bg-surface-card border border-border-default rounded-xl p-6">
+        <h2 className="text-content-primary font-bold text-lg flex items-center gap-2 mb-5">
           <Store className="w-5 h-5 text-brand-secondary" /> Store Information
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -184,11 +184,11 @@ export default function Profile() {
           <Input label="GST Number" icon={<Shield className="w-4 h-4" />} value={form.gstNumber} onChange={f('gstNumber')} />
           <Input label="PAN Number" icon={<FileText className="w-4 h-4" />} value={form.panNumber} onChange={f('panNumber')} />
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Business Type</label>
+            <label className="block text-sm font-medium text-content-secondary mb-1">Business Type</label>
             <select
               value={form.businessType}
               onChange={f('businessType')}
-              className="w-full pl-4 pr-4 py-2.5 rounded-lg border bg-brand-dark border-brand-muted text-white focus:border-brand-secondary focus:outline-none text-sm"
+              className="w-full pl-4 pr-4 py-2.5 rounded-lg border bg-surface-sunken border-border-default text-content-primary focus:border-brand-secondary focus:outline-none text-sm"
             >
               <option value="">Select type...</option>
               <option value="MANUFACTURER">Manufacturer</option>
@@ -200,8 +200,8 @@ export default function Profile() {
           </div>
         </div>
 
-        <div className="mt-5 pt-5 border-t border-brand-muted">
-          <label className="block text-sm font-medium text-gray-300 mb-1">Store Location</label>
+        <div className="mt-5 pt-5 border-t border-border-default">
+          <label className="block text-sm font-medium text-content-secondary mb-1">Store Location</label>
           <button
             type="button"
             onClick={handleUseCurrentLocation}
@@ -223,8 +223,8 @@ export default function Profile() {
         </div>
 
         {/* Vendor Status Badge */}
-        <div className="mt-5 pt-5 border-t border-brand-muted flex items-center gap-3">
-          <p className="text-sm text-gray-400">Account Status:</p>
+        <div className="mt-5 pt-5 border-t border-border-default flex items-center gap-3">
+          <p className="text-sm text-content-secondary">Account Status:</p>
           <Badge
             variant={vendorProfile?.status === 'APPROVED' ? 'success' : vendorProfile?.status === 'REJECTED' ? 'danger' : 'warning'}
             className="!rounded-full"
@@ -235,21 +235,21 @@ export default function Profile() {
       </div>
 
       {/* Bank Accounts */}
-      <div className="bg-brand-primary border border-brand-muted rounded-xl p-6">
-        <h2 className="text-white font-bold text-lg flex items-center gap-2 mb-5">
+      <div className="bg-surface-card border border-border-default rounded-xl p-6">
+        <h2 className="text-content-primary font-bold text-lg flex items-center gap-2 mb-5">
           <CreditCard className="w-5 h-5 text-brand-secondary" /> Bank Accounts
         </h2>
         {bankAccounts.length === 0 ? (
-          <p className="text-gray-500 text-sm">No bank accounts linked yet.</p>
+          <p className="text-content-muted text-sm">No bank accounts linked yet.</p>
         ) : (
           <div className="space-y-3">
             {bankAccounts.map((acc: any) => (
-              <div key={acc.id} className="flex items-center gap-4 bg-brand-dark rounded-lg p-4 border border-brand-muted">
+              <div key={acc.id} className="flex items-center gap-4 bg-surface-sunken rounded-lg p-4 border border-border-default">
                 <Building2 className="w-8 h-8 text-brand-secondary flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-white font-semibold text-sm">{acc.bankName}</p>
-                  <p className="text-gray-400 text-xs">A/C: ****{acc.accountNumber?.slice(-4)} • IFSC: {acc.ifscCode}</p>
-                  <p className="text-gray-500 text-xs">{acc.accountHolder}</p>
+                  <p className="text-content-primary font-semibold text-sm">{acc.bankName}</p>
+                  <p className="text-content-secondary text-xs">A/C: ****{acc.accountNumber?.slice(-4)} • IFSC: {acc.ifscCode}</p>
+                  <p className="text-content-muted text-xs">{acc.accountHolder}</p>
                 </div>
                 {acc.isPrimary && (
                   <Badge variant="secondary" className="!rounded-lg">Primary</Badge>
@@ -261,20 +261,20 @@ export default function Profile() {
       </div>
 
       {/* Documents */}
-      <div className="bg-brand-primary border border-brand-muted rounded-xl p-6">
-        <h2 className="text-white font-bold text-lg flex items-center gap-2 mb-5">
+      <div className="bg-surface-card border border-border-default rounded-xl p-6">
+        <h2 className="text-content-primary font-bold text-lg flex items-center gap-2 mb-5">
           <FileText className="w-5 h-5 text-brand-secondary" /> Submitted Documents
         </h2>
         {documents.length === 0 ? (
-          <p className="text-gray-500 text-sm">No documents submitted.</p>
+          <p className="text-content-muted text-sm">No documents submitted.</p>
         ) : (
           <div className="space-y-3">
             {documents.map((doc: any) => (
-              <div key={doc.id} className="flex items-center gap-4 bg-brand-dark rounded-lg p-4 border border-brand-muted">
-                <FileText className="w-6 h-6 text-gray-400 flex-shrink-0" />
+              <div key={doc.id} className="flex items-center gap-4 bg-surface-sunken rounded-lg p-4 border border-border-default">
+                <FileText className="w-6 h-6 text-content-secondary flex-shrink-0" />
                 <div className="flex-1">
-                  <p className="text-white font-semibold text-sm capitalize">{doc.type?.replace(/_/g, ' ')}</p>
-                  <p className="text-gray-500 text-xs">Uploaded {new Date(doc.createdAt).toLocaleDateString('en-IN')}</p>
+                  <p className="text-content-primary font-semibold text-sm capitalize">{doc.type?.replace(/_/g, ' ')}</p>
+                  <p className="text-content-muted text-xs">Uploaded {new Date(doc.createdAt).toLocaleDateString('en-IN')}</p>
                 </div>
                 <Badge variant={doc.status === 'APPROVED' ? 'success' : doc.status === 'REJECTED' ? 'danger' : 'warning'} className="!rounded-lg">
                   {doc.status}

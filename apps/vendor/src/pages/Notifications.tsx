@@ -55,19 +55,19 @@ export default function Notifications() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center gap-2">
+          <h1 className="text-3xl font-bold text-content-primary flex items-center gap-2">
             <Bell className="w-7 h-7 text-primary" /> Notifications
             {unreadCount > 0 && <span className="text-sm bg-primary text-white rounded-full px-2.5 py-0.5">{unreadCount}</span>}
           </h1>
-          <p className="text-neutral-400 mt-1">Approval updates, order alerts and other account activity.</p>
+          <p className="text-content-secondary mt-1">Approval updates, order alerts and other account activity.</p>
         </div>
       </div>
 
       {notifications.length === 0 ? (
         <Card variant="dark" className="!rounded-3xl">
           <div className="text-center py-12">
-            <Bell className="w-12 h-12 text-neutral-500 mx-auto mb-3" />
-            <p className="text-neutral-300 font-medium">No notifications yet</p>
+            <Bell className="w-12 h-12 text-content-muted mx-auto mb-3" />
+            <p className="text-content-secondary font-medium">No notifications yet</p>
           </div>
         </Card>
       ) : (
@@ -77,18 +77,18 @@ export default function Notifications() {
               <div className="flex items-start gap-3">
                 {!n.isRead && <span className="w-2 h-2 mt-1.5 rounded-full bg-primary flex-shrink-0" />}
                 <div>
-                  <p className={`font-semibold ${n.isRead ? 'text-neutral-300' : 'text-white'}`}>{n.title}</p>
-                  <p className="text-sm text-neutral-400 mt-0.5">{n.body}</p>
-                  <p className="text-xs text-neutral-600 mt-1">{new Date(n.createdAt).toLocaleString('en-IN')}</p>
+                  <p className={`font-semibold ${n.isRead ? 'text-content-secondary' : 'text-content-primary'}`}>{n.title}</p>
+                  <p className="text-sm text-content-secondary mt-0.5">{n.body}</p>
+                  <p className="text-xs text-content-muted mt-1">{new Date(n.createdAt).toLocaleString('en-IN')}</p>
                 </div>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 {!n.isRead && (
-                  <button onClick={() => markRead(n.id)} title="Mark as read" className="p-2 text-neutral-500 hover:text-success-400 transition-colors">
+                  <button onClick={() => markRead(n.id)} title="Mark as read" className="p-2 text-content-muted hover:text-success-400 transition-colors">
                     <Check className="w-4 h-4" />
                   </button>
                 )}
-                <button onClick={() => remove(n.id)} title="Delete" className="p-2 text-neutral-500 hover:text-danger-400 transition-colors">
+                <button onClick={() => remove(n.id)} title="Delete" className="p-2 text-content-muted hover:text-danger-400 transition-colors">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>

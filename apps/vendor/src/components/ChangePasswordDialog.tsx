@@ -29,7 +29,7 @@ function PasswordInput({
   // same structure as the sign-in form.
   return (
     <div>
-      <label className="mb-2 block text-sm font-semibold text-neutral-300">{label}</label>
+      <label className="mb-2 block text-sm font-semibold text-content-secondary">{label}</label>
       <div className="relative">
         <Input
           type={reveal ? 'text' : 'password'}
@@ -44,7 +44,7 @@ function PasswordInput({
         <button
           type="button"
           onClick={() => setReveal((v) => !v)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-secondary"
           aria-label={reveal ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
           tabIndex={-1}
         >
@@ -158,7 +158,7 @@ export default function ChangePasswordDialog({ isOpen, onClose }: { isOpen: bool
             autoComplete="new-password"
           />
 
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-content-muted">
             Must be at least {MIN_PASSWORD_LENGTH} characters.
           </p>
 

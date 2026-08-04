@@ -2,19 +2,90 @@
 @source "../../../packages/shared/src";
 @config "../../../packages/shared/src/tailwind.config.ts";
 
+/* Tailwind v4 class-based dark mode, scoped to this app's own build --
+   does not touch the shared tailwind.config.ts (also used by apps/admin). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --surface-page: #f6f7fb;
+  --surface-card: #ffffff;
+  --surface-hover: #f1f2f6;
+  --surface-sunken: #eef0f5;
+  --surface-overlay: #ffffff;
+  --content-primary: #12141c;
+  --content-secondary: #4b4f5c;
+  --content-muted: #8a8e9c;
+  --border-default: #e7e8ee;
+  --border-strong: #d6d8e2;
+  --shadow-card: 0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.06);
+  --shadow-elevated: 0 4px 12px -2px rgb(16 24 40 / 0.08), 0 2px 6px -2px rgb(16 24 40 / 0.06);
+  --shadow-popover: 0 12px 32px -8px rgb(16 24 40 / 0.18), 0 4px 12px -4px rgb(16 24 40 / 0.08);
+}
+
+/* Dark is this app's original/default look (bg-neutral-950 shell) --
+   .dark is applied on <html> before first paint (see getInitialTheme in
+   useTheme.ts) so :root above only matters for users who opt into light mode. */
+.dark {
+  --surface-page: #0a0a0a;
+  --surface-card: #111214;
+  --surface-hover: #1c1d20;
+  --surface-sunken: #0d0e10;
+  --surface-overlay: #16171a;
+  --content-primary: #ffffff;
+  --content-secondary: #a3a3a8;
+  --content-muted: #71717a;
+  --border-default: rgb(255 255 255 / 0.08);
+  --border-strong: rgb(255 255 255 / 0.16);
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4), 0 2px 8px -2px rgb(0 0 0 / 0.5);
+  --shadow-elevated: 0 8px 24px -4px rgb(0 0 0 / 0.6), 0 2px 8px -2px rgb(0 0 0 / 0.5);
+  --shadow-popover: 0 20px 48px -8px rgb(0 0 0 / 0.7), 0 4px 16px -4px rgb(0 0 0 / 0.6);
+}
+
 @theme {
-  /* Brand accent matches the real customer app (apps/mobile) palette;
-     the dashboard keeps its dark shell, aligned to Tailwind's own neutral scale. */
+  /* Brand accent matches the real customer app (apps/mobile) palette. */
   --color-brand-primary: #171717;
   --color-brand-secondary: #DA3830;
   --color-brand-accent: #C6301B;
   --color-brand-dark: #0a0a0a;
   --color-brand-light: #F8F8F8;
   --color-brand-muted: #404040;
+
+  --color-surface-page: var(--surface-page);
+  --color-surface-card: var(--surface-card);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-content-primary: var(--content-primary);
+  --color-content-secondary: var(--content-secondary);
+  --color-content-muted: var(--content-muted);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
 }
 
 @layer base {
   body {
-    @apply bg-neutral-950 text-neutral-100 font-sans antialiased;
+    @apply bg-surface-page text-content-primary font-sans antialiased;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--surface-sunken);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #DA3830;
+  }
+}
+
+@layer utilities {
+  .shadow-card { box-shadow: var(--shadow-card); }
+  .shadow-elevated { box-shadow: var(--shadow-elevated); }
+  .shadow-popover { box-shadow: var(--shadow-popover); }
 }

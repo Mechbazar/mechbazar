@@ -100,7 +100,7 @@ export default function Wallet() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-white flex items-center">
+        <h1 className="text-3xl font-bold text-content-primary flex items-center">
           <WalletIcon className="w-8 h-8 mr-3 text-brand-secondary" />
           Wallet & Payouts
         </h1>
@@ -127,25 +127,25 @@ export default function Wallet() {
         </div>
 
         {/* Bank Accounts */}
-        <div className="bg-brand-primary border border-brand-muted rounded-2xl p-6 md:col-span-2">
-          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <Building className="w-5 h-5 text-gray-400" />
+        <div className="bg-surface-card border border-border-default rounded-2xl p-6 md:col-span-2">
+          <h3 className="text-xl font-bold text-content-primary mb-4 flex items-center gap-2">
+            <Building className="w-5 h-5 text-content-secondary" />
             Connected Bank Accounts
           </h3>
-          
+
           {bankAccounts.length === 0 ? (
-            <div className="text-gray-400 py-4 text-sm">No bank accounts linked. Update your profile to add one.</div>
+            <div className="text-content-secondary py-4 text-sm">No bank accounts linked. Update your profile to add one.</div>
           ) : (
             <div className="space-y-3">
               {bankAccounts.map((acc: any) => (
-                <div key={acc.id} className="bg-brand-dark border border-brand-muted rounded-xl p-4 flex items-center justify-between">
+                <div key={acc.id} className="bg-surface-sunken border border-border-default rounded-xl p-4 flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <div className="bg-brand-primary p-3 rounded-lg">
+                    <div className="bg-surface-card p-3 rounded-lg">
                       <Building className="w-6 h-6 text-brand-secondary" />
                     </div>
                     <div>
-                      <p className="text-white font-bold">{acc.bankName}</p>
-                      <p className="text-gray-400 text-sm">{acc.accountHolderName} • •••• {acc.accountNumber.slice(-4)}</p>
+                      <p className="text-content-primary font-bold">{acc.bankName}</p>
+                      <p className="text-content-secondary text-sm">{acc.accountHolderName} • •••• {acc.accountNumber.slice(-4)}</p>
                     </div>
                   </div>
                   <div>
@@ -167,39 +167,39 @@ export default function Wallet() {
       </div>
 
       {/* Transaction History */}
-      <div className="bg-brand-primary border border-brand-muted rounded-2xl overflow-hidden">
-        <div className="p-6 border-b border-brand-muted bg-brand-dark/50">
-          <h3 className="text-xl font-bold text-white">Payout History</h3>
+      <div className="bg-surface-card border border-border-default rounded-2xl overflow-hidden">
+        <div className="p-6 border-b border-border-default bg-surface-sunken/50">
+          <h3 className="text-xl font-bold text-content-primary">Payout History</h3>
         </div>
-        
+
         <div className="overflow-x-auto min-h-[300px]">
           {settlements.length === 0 ? (
             <div className="text-center py-12">
-              <WalletIcon className="w-12 h-12 text-gray-500 mx-auto mb-3" />
-              <p className="text-gray-400 font-medium">No past payouts found.</p>
+              <WalletIcon className="w-12 h-12 text-content-muted mx-auto mb-3" />
+              <p className="text-content-secondary font-medium">No past payouts found.</p>
             </div>
           ) : (
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-brand-dark text-gray-400 text-xs uppercase tracking-wider">
+                <tr className="bg-surface-sunken text-content-secondary text-xs uppercase tracking-wider">
                   <th className="p-4 font-semibold">Date</th>
                   <th className="p-4 font-semibold">Transaction ID</th>
                   <th className="p-4 font-semibold">Amount</th>
                   <th className="p-4 font-semibold">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-brand-muted">
+              <tbody className="divide-y divide-border-default">
                 {settlements.map((s: any) => (
-                  <tr key={s.id} className="hover:bg-brand-dark/30 transition-colors">
+                  <tr key={s.id} className="hover:bg-surface-hover transition-colors">
                     <td className="p-4">
-                      <div className="text-white font-medium">{new Date(s.date).toLocaleDateString()}</div>
-                      <div className="text-xs text-gray-500">{new Date(s.date).toLocaleTimeString()}</div>
+                      <div className="text-content-primary font-medium">{new Date(s.date).toLocaleDateString()}</div>
+                      <div className="text-xs text-content-muted">{new Date(s.date).toLocaleTimeString()}</div>
                     </td>
                     <td className="p-4">
-                      <span className="text-gray-400 text-sm font-mono">{s.transactionId || '—'}</span>
+                      <span className="text-content-secondary text-sm font-mono">{s.transactionId || '—'}</span>
                     </td>
                     <td className="p-4">
-                      <span className="text-white font-bold flex items-center gap-1">
+                      <span className="text-content-primary font-bold flex items-center gap-1">
                         <ArrowDownLeft className="w-4 h-4 text-brand-secondary" />
                         ₹{s.amount.toLocaleString()}
                       </span>
@@ -218,18 +218,18 @@ export default function Wallet() {
       {/* Withdrawal Modal */}
       <Dialog isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Request Payout">
         <form onSubmit={handleWithdraw}>
-          <p className="text-gray-400 mb-6">Enter the amount you wish to withdraw to your primary bank account.</p>
+          <p className="text-content-secondary mb-6">Enter the amount you wish to withdraw to your primary bank account.</p>
 
           <div className="mb-4">
-            <label className="block text-gray-400 text-sm font-semibold mb-2">Available Balance: ₹{balance}</label>
+            <label className="block text-content-secondary text-sm font-semibold mb-2">Available Balance: ₹{balance}</label>
             <div className="relative">
-              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 text-xl font-bold">₹</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-content-muted text-xl font-bold">₹</span>
               <input
                 type="number"
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
                 placeholder="0.00"
-                className="w-full bg-brand-dark border border-brand-muted rounded-xl pl-10 pr-4 py-3 text-white text-xl font-bold focus:border-brand-secondary outline-none transition-colors"
+                className="w-full bg-surface-sunken border border-border-default rounded-xl pl-10 pr-4 py-3 text-content-primary text-xl font-bold focus:border-brand-secondary outline-none transition-colors"
               />
             </div>
           </div>
@@ -240,7 +240,7 @@ export default function Wallet() {
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="flex-1 px-4 py-3 bg-brand-dark text-white rounded-xl font-bold hover:bg-gray-800 transition-colors"
+              className="flex-1 px-4 py-3 bg-surface-sunken text-content-primary border border-border-default rounded-xl font-bold hover:bg-surface-hover transition-colors"
             >
               Cancel
             </button>

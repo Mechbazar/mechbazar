@@ -9,6 +9,7 @@ import { Button, Card, Alert, Input, Logo } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
 import { auth } from '../config/firebase';
 import { mapFirebaseAuthError } from '../utils/firebaseErrors';
+import { useTheme } from '../hooks/useTheme';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -19,6 +20,7 @@ export default function Login() {
 
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { theme } = useTheme();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,16 +65,15 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-neutral-950 px-4 text-neutral-100">
+    <div className="min-h-screen flex flex-col justify-center items-center bg-surface-page px-4 text-content-primary">
       <Card variant="dark" className="w-full max-w-md !rounded-2xl !p-8 shadow-2xl">
         <div className="flex flex-col items-center mb-8">
-          {/* Dark tone: the login card sits on bg-neutral-950. */}
-          <Logo tone="dark" width={280} className="mb-5" />
+          <Logo tone={theme === 'dark' ? 'dark' : 'light'} width={280} className="mb-5" />
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-500/15 text-primary-500 border border-primary-500/30 mb-4">
             <Store className="w-8 h-8" />
           </div>
-          <h1 className="text-3xl font-bold text-white">Seller Central</h1>
-          <p className="text-neutral-400 mt-2 text-center text-sm">
+          <h1 className="text-3xl font-bold text-content-primary">Seller Central</h1>
+          <p className="text-content-secondary mt-2 text-center text-sm">
             Manage your store, products, and inventory in one place.
           </p>
         </div>
@@ -95,7 +96,7 @@ export default function Login() {
 
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <label className="block text-sm font-semibold text-neutral-300">Password</label>
+              <label className="block text-sm font-semibold text-content-secondary">Password</label>
               <Link to="/forgot-password" className="text-xs text-primary-500 hover:text-primary-400 transition-colors">Forgot password?</Link>
             </div>
             <div className="relative">
@@ -112,7 +113,7 @@ export default function Login() {
               <button
                 type="button"
                 onClick={() => setShowPassword(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-secondary"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                 tabIndex={-1}
               >
@@ -127,8 +128,8 @@ export default function Login() {
           </Button>
         </form>
 
-        <div className="mt-8 border-t border-neutral-800 pt-6 text-center">
-          <p className="text-sm text-neutral-400">
+        <div className="mt-8 border-t border-border-default pt-6 text-center">
+          <p className="text-sm text-content-secondary">
             Don't have a seller account?{' '}
             <Link to="/register" className="text-primary-500 font-medium hover:text-primary-400 transition-colors">
               Register now

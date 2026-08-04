@@ -29,9 +29,9 @@ const StatCard = ({ icon: Icon, label, value, sub, color, bg }: any) => (
       <Icon className={`w-6 h-6 ${color}`} />
     </div>
     <div>
-      <p className="text-sm text-neutral-400 font-medium">{label}</p>
-      <p className="text-2xl font-bold text-white mt-0.5">{value}</p>
-      {sub && <p className="text-xs text-neutral-500 mt-1">{sub}</p>}
+      <p className="text-sm text-content-secondary font-medium">{label}</p>
+      <p className="text-2xl font-bold text-content-primary mt-0.5">{value}</p>
+      {sub && <p className="text-xs text-content-muted mt-1">{sub}</p>}
     </div>
   </Card>
 );
@@ -84,10 +84,10 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Dashboard</h1>
-          <p className="text-neutral-400 mt-1">Welcome back, <span className="text-primary font-semibold">{vendorProfile?.storeName || 'Seller'}</span></p>
+          <h1 className="text-3xl font-bold text-content-primary">Dashboard</h1>
+          <p className="text-content-secondary mt-1">Welcome back, <span className="text-primary font-semibold">{vendorProfile?.storeName || 'Seller'}</span></p>
         </div>
-        <button onClick={fetchStats} className="flex items-center gap-2 text-neutral-400 hover:text-white border border-neutral-800 hover:border-primary px-3 py-2 rounded-2xl transition-all text-sm">
+        <button onClick={fetchStats} className="flex items-center gap-2 text-content-secondary hover:text-content-primary border border-border-default hover:border-primary px-3 py-2 rounded-2xl transition-all text-sm">
           <RefreshCw className="w-4 h-4" /> Refresh
         </button>
       </div>
@@ -109,8 +109,8 @@ export default function Dashboard() {
       <SalesChart />
 
       <Card variant="dark" className="!rounded-3xl !p-0 overflow-hidden">
-        <div className="p-4 border-b border-neutral-800 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <h2 className="text-white font-bold flex items-center gap-2">
+        <div className="p-4 border-b border-border-default flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <h2 className="text-content-primary font-bold flex items-center gap-2">
             <Clock className="w-5 h-5 text-primary" /> Recent Orders
           </h2>
           <Link to="/orders" className="text-xs text-primary hover:text-primary/90 font-semibold flex items-center gap-1">View All <ArrowUpRight className="w-3 h-3" /></Link>
@@ -118,14 +118,14 @@ export default function Dashboard() {
 
         {!stats?.recentOrders?.length ? (
           <div className="p-12 text-center">
-            <ShoppingCart className="w-12 h-12 text-neutral-500 mx-auto mb-3" />
-            <p className="text-neutral-300 font-medium">No orders yet</p>
-            <p className="text-neutral-500 text-sm">Orders from your products will appear here</p>
+            <ShoppingCart className="w-12 h-12 text-content-muted mx-auto mb-3" />
+            <p className="text-content-secondary font-medium">No orders yet</p>
+            <p className="text-content-muted text-sm">Orders from your products will appear here</p>
           </div>
         ) : (
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-neutral-900 text-xs text-neutral-400 font-semibold uppercase">
+              <tr className="bg-surface-sunken text-xs text-content-secondary font-semibold uppercase">
                 <th className="p-4">Order ID</th>
                 <th className="p-4">Customer</th>
                 <th className="p-4">Items</th>
@@ -134,20 +134,20 @@ export default function Dashboard() {
                 <th className="p-4">Date</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-800">
+            <tbody className="divide-y divide-border-default">
               {stats.recentOrders.map((order: any) => {
                 const orderTotal = order.items.reduce((sum: number, item: any) => sum + Number(item.price) * item.quantity, 0);
                 return (
-                  <tr key={order.id} className="hover:bg-neutral-900/50 transition-colors">
+                  <tr key={order.id} className="hover:bg-surface-hover transition-colors">
                     <td className="p-4 text-primary text-sm font-mono">#{order.id.slice(-8).toUpperCase()}</td>
                     <td className="p-4">
-                      <p className="text-white text-sm font-medium">{order.user?.name || 'Customer'}</p>
-                      <p className="text-neutral-500 text-xs">{order.user?.phone}</p>
+                      <p className="text-content-primary text-sm font-medium">{order.user?.name || 'Customer'}</p>
+                      <p className="text-content-muted text-xs">{order.user?.phone}</p>
                     </td>
-                    <td className="p-4 text-sm text-neutral-300">{order.items.length} item(s)</td>
-                    <td className="p-4 text-sm font-bold text-white">₹{orderTotal.toLocaleString('en-IN')}</td>
+                    <td className="p-4 text-sm text-content-secondary">{order.items.length} item(s)</td>
+                    <td className="p-4 text-sm font-bold text-content-primary">₹{orderTotal.toLocaleString('en-IN')}</td>
                     <td className="p-4">{statusBadge(order.status)}</td>
-                    <td className="p-4 text-xs text-neutral-500">{new Date(order.createdAt).toLocaleDateString('en-IN')}</td>
+                    <td className="p-4 text-xs text-content-muted">{new Date(order.createdAt).toLocaleDateString('en-IN')}</td>
                   </tr>
                 );
               })}
@@ -162,15 +162,15 @@ export default function Dashboard() {
           { href: '/orders', icon: CheckCircle, title: 'Manage Orders', desc: 'View and update order statuses', color: 'text-success-300', bg: 'bg-success-500/10' },
           { href: '/wallet', icon: Wallet, title: 'Request Payout', desc: 'Withdraw your wallet balance', color: 'text-purple-300', bg: 'bg-purple-400/10' },
         ].map(({ href, icon: Icon, title, desc, color, bg }) => (
-          <Link key={href} to={href} className="bg-neutral-950 border border-neutral-800 rounded-3xl p-5 flex items-start gap-4 hover:border-primary/50 group transition-all cursor-pointer">
+          <Link key={href} to={href} className="bg-surface-card border border-border-default rounded-3xl p-5 flex items-start gap-4 hover:border-primary/50 group transition-all cursor-pointer">
             <div className={`p-3 rounded-2xl ${bg} group-hover:scale-110 transition-transform`}>
               <Icon className={`w-6 h-6 ${color}`} />
             </div>
             <div>
-              <p className="text-white font-semibold">{title}</p>
-              <p className="text-neutral-400 text-xs mt-1">{desc}</p>
+              <p className="text-content-primary font-semibold">{title}</p>
+              <p className="text-content-secondary text-xs mt-1">{desc}</p>
             </div>
-            <ArrowUpRight className="w-4 h-4 text-neutral-500 group-hover:text-primary ml-auto transition-colors" />
+            <ArrowUpRight className="w-4 h-4 text-content-muted group-hover:text-primary ml-auto transition-colors" />
           </Link>
         ))}
       </div>

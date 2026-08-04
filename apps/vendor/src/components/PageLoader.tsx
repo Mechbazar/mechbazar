@@ -3,7 +3,7 @@
 export default function PageLoader() {
   return (
     <div className="flex h-[60vh] w-full items-center justify-center">
-      <div className="h-10 w-10 animate-spin rounded-full border-4 border-neutral-700 border-t-brand-primary" />
+      <div className="h-10 w-10 animate-spin rounded-full border-4 border-border-default border-t-brand-secondary" />
     </div>
   );
 }

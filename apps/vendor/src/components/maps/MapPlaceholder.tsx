@@ -12,11 +12,11 @@ export default function MapPlaceholder({ label, height = 220 }: MapPlaceholderPr
   return (
     <div
       style={{ height }}
-      className="rounded-xl border border-dashed border-neutral-700 bg-neutral-950 flex flex-col items-center justify-center gap-1"
+      className="rounded-xl border border-dashed border-border-default bg-surface-sunken flex flex-col items-center justify-center gap-1"
     >
-      <MapPin className="w-6 h-6 text-neutral-600" />
-      <p className="text-sm font-semibold text-neutral-400">{label}</p>
-      <p className="text-xs text-neutral-600">Map view unavailable</p>
+      <MapPin className="w-6 h-6 text-content-muted" />
+      <p className="text-sm font-semibold text-content-secondary">{label}</p>
+      <p className="text-xs text-content-muted">Map view unavailable</p>
     </div>
   );
 }

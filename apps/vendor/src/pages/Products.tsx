@@ -165,7 +165,7 @@ export default function Products() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+        <h1 className="text-3xl font-bold text-content-primary flex items-center gap-3">
           <Package className="w-8 h-8 text-brand-secondary" /> My Products
         </h1>
         <div className="flex gap-3">
@@ -179,27 +179,27 @@ export default function Products() {
       </div>
 
       {/* Search */}
-      <div className="bg-brand-primary border border-brand-muted rounded-xl p-4 flex items-center gap-3">
-        <Search className="w-5 h-5 text-gray-400" />
-        <input type="text" placeholder="Search by product name, OEM, or part number..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="bg-transparent border-none focus:outline-none text-white w-full placeholder-gray-500" />
+      <div className="bg-surface-card border border-border-default rounded-xl p-4 flex items-center gap-3">
+        <Search className="w-5 h-5 text-content-secondary" />
+        <input type="text" placeholder="Search by product name, OEM, or part number..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="bg-transparent border-none focus:outline-none text-content-primary w-full placeholder-content-muted" />
       </div>
 
       {/* Table */}
       {loading ? (
         <Loader fullScreen />
       ) : filtered.length === 0 ? (
-        <div className="bg-brand-primary border border-brand-muted rounded-xl p-12 text-center">
-          <Package className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-white mb-2">{searchQuery ? 'No results found' : 'No Products Yet'}</h3>
-          <p className="text-gray-400 mb-6">{searchQuery ? 'Try a different search term.' : "You haven't listed any products. Add your first product to start selling!"}</p>
+        <div className="bg-surface-card border border-border-default rounded-xl p-12 text-center">
+          <Package className="w-16 h-16 text-content-muted mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-content-primary mb-2">{searchQuery ? 'No results found' : 'No Products Yet'}</h3>
+          <p className="text-content-secondary mb-6">{searchQuery ? 'Try a different search term.' : "You haven't listed any products. Add your first product to start selling!"}</p>
           {!searchQuery && <Button onClick={openAdd}>Add Product</Button>}
         </div>
       ) : (
-        <div className="bg-brand-primary border border-brand-muted rounded-xl overflow-hidden">
+        <div className="bg-surface-card border border-border-default rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-brand-dark border-b border-brand-muted text-xs text-gray-400 font-semibold uppercase">
+              <tr className="bg-surface-sunken border-b border-border-default text-xs text-content-secondary font-semibold uppercase">
                 <th className="p-4">Product Details</th>
                 <th className="p-4">Pricing</th>
                 <th className="p-4">Stock</th>
@@ -207,28 +207,28 @@ export default function Products() {
                 <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-brand-muted">
+            <tbody className="divide-y divide-border-default">
               {filtered.map(product => (
-                <tr key={product.id} className="hover:bg-brand-dark/50 transition-colors">
+                <tr key={product.id} className="hover:bg-surface-hover transition-colors">
                   <td className="p-4">
                     <div className="flex items-start gap-3">
                       {/* Shows the vendor exactly what the customer app shows.
                           Listings with no image were previously indistinguishable
                           here from ones with a good photo. */}
                       {product.images?.[0] ? (
-                        <img src={resolveUploadUrl(product.images[0])} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover border border-brand-muted" />
+                        <img src={resolveUploadUrl(product.images[0])} alt="" className="h-12 w-12 shrink-0 rounded-lg object-cover border border-border-default" />
                       ) : (
-                        <div className="h-12 w-12 shrink-0 rounded-lg border border-dashed border-brand-muted flex items-center justify-center" title="No image — customers see a placeholder">
-                          <ImagePlus className="w-4 h-4 text-gray-600" />
+                        <div className="h-12 w-12 shrink-0 rounded-lg border border-dashed border-border-default flex items-center justify-center" title="No image — customers see a placeholder">
+                          <ImagePlus className="w-4 h-4 text-content-muted" />
                         </div>
                       )}
                       <div>
-                        <div className="text-sm font-bold text-white">{product.name}</div>
-                        <div className="text-xs text-gray-400 mt-1">
+                        <div className="text-sm font-bold text-content-primary">{product.name}</div>
+                        <div className="text-xs text-content-secondary mt-1">
                           {product.oemNumber && <span className="mr-3">OEM: {product.oemNumber}</span>}
                           {product.partNumber && <span>Part: {product.partNumber}</span>}
                         </div>
-                        <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
+                        <div className="text-xs text-content-muted mt-0.5 flex items-center gap-1.5">
                           <span>{product.category?.name}</span>
                           <span>{product.vehicleType === 'BIKE' ? '🏍️' : '🚗'}</span>
                         </div>
@@ -236,8 +236,8 @@ export default function Products() {
                     </div>
                   </td>
                   <td className="p-4">
-                    <div className="text-sm font-bold text-white">₹{Number(product.price).toLocaleString('en-IN')}</div>
-                    <div className="text-xs text-gray-400 line-through">MRP: ₹{Number(product.mrp).toLocaleString('en-IN')}</div>
+                    <div className="text-sm font-bold text-content-primary">₹{Number(product.price).toLocaleString('en-IN')}</div>
+                    <div className="text-xs text-content-secondary line-through">MRP: ₹{Number(product.mrp).toLocaleString('en-IN')}</div>
                     {product.b2bPrice != null && (
                       <div className="text-xs text-brand-secondary font-semibold mt-0.5">B2B: ₹{Number(product.b2bPrice).toLocaleString('en-IN')}</div>
                     )}
@@ -269,8 +269,8 @@ export default function Products() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <Input label="Product Name" type="text" required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} placeholder="e.g. Bosch Spark Plug" />
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Description</label>
-                <textarea required value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full bg-brand-dark border border-brand-muted rounded-lg px-4 py-2.5 text-white focus:border-brand-secondary focus:outline-none h-20 text-sm" />
+                <label className="block text-sm font-medium text-content-secondary mb-1">Description</label>
+                <textarea required value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full bg-surface-sunken border border-border-default rounded-lg px-4 py-2.5 text-content-primary focus:border-brand-secondary focus:outline-none h-20 text-sm" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Input label="MRP (₹)" type="number" min="0" required value={formData.mrp} onChange={(e) => setFormData({...formData, mrp: e.target.value})} />
@@ -287,8 +287,8 @@ export default function Products() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Category</label>
-                  <select required value={formData.categoryId} onChange={e => setFormData({...formData, categoryId: e.target.value})} className="w-full bg-brand-dark border border-brand-muted rounded-lg px-4 py-2.5 text-white focus:border-brand-secondary focus:outline-none text-sm">
+                  <label className="block text-sm font-medium text-content-secondary mb-1">Category</label>
+                  <select required value={formData.categoryId} onChange={e => setFormData({...formData, categoryId: e.target.value})} className="w-full bg-surface-sunken border border-border-default rounded-lg px-4 py-2.5 text-content-primary focus:border-brand-secondary focus:outline-none text-sm">
                     <option value="">Select Category...</option>
                     {categories.map((c: any) => <option key={c.id} value={c.id}>{c.name} ({c.vehicleType === 'BIKE' ? 'Bike' : 'Car'})</option>)}
                   </select>
@@ -296,27 +296,27 @@ export default function Products() {
                       a separately-editable field -- shown here read-only so the vendor
                       can confirm they picked the right one before submitting. */}
                   {selectedCategory && (
-                    <p className="text-xs text-gray-400 mt-1">
+                    <p className="text-xs text-content-secondary mt-1">
                       Vehicle Type: <span className="font-semibold text-brand-secondary">{selectedCategory.vehicleType === 'BIKE' ? '🏍️ Bike' : '🚗 Car'}</span>
                     </p>
                   )}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Brand</label>
-                  <select required value={formData.brandId} onChange={e => setFormData({...formData, brandId: e.target.value})} className="w-full bg-brand-dark border border-brand-muted rounded-lg px-4 py-2.5 text-white focus:border-brand-secondary focus:outline-none text-sm">
+                  <label className="block text-sm font-medium text-content-secondary mb-1">Brand</label>
+                  <select required value={formData.brandId} onChange={e => setFormData({...formData, brandId: e.target.value})} className="w-full bg-surface-sunken border border-border-default rounded-lg px-4 py-2.5 text-content-primary focus:border-brand-secondary focus:outline-none text-sm">
                     <option value="">Select Brand...</option>
                     {brands.map((b: any) => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Product Images</label>
+                <label className="block text-sm font-medium text-content-secondary mb-1">Product Images</label>
 
                 {formData.images.length > 0 && (
                   <div className="flex flex-wrap gap-3 mb-3">
                     {formData.images.map(url => (
                       <div key={url} className="relative">
-                        <img src={resolveUploadUrl(url)} alt="Product" className="h-20 w-20 rounded-lg object-cover border border-brand-muted" />
+                        <img src={resolveUploadUrl(url)} alt="Product" className="h-20 w-20 rounded-lg object-cover border border-border-default" />
                         <button
                           type="button"
                           onClick={() => handleRemoveImage(url)}
@@ -330,7 +330,7 @@ export default function Products() {
                   </div>
                 )}
 
-                <label className="flex items-center justify-center gap-2 border-2 border-dashed border-brand-muted rounded-lg py-4 text-sm text-gray-400 cursor-pointer hover:border-brand-secondary hover:text-white transition-colors">
+                <label className="flex items-center justify-center gap-2 border-2 border-dashed border-border-default rounded-lg py-4 text-sm text-content-secondary cursor-pointer hover:border-brand-secondary hover:text-content-primary transition-colors">
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
@@ -349,11 +349,11 @@ export default function Products() {
                   {uploadingImage ? 'Uploading...' : 'Add image (PNG, JPG or WebP)'}
                 </label>
                 {imageError && <p className="text-xs text-red-400 mt-1">{imageError}</p>}
-                <p className="text-xs text-gray-500 mt-1">Products with no image show a grey placeholder to customers.</p>
+                <p className="text-xs text-content-muted mt-1">Products with no image show a grey placeholder to customers.</p>
               </div>
 
-              <div className="flex gap-4 pt-4 border-t border-brand-muted">
-                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 bg-brand-dark text-white border border-brand-muted px-4 py-2.5 rounded-lg font-bold hover:bg-gray-800 transition-colors">Cancel</button>
+              <div className="flex gap-4 pt-4 border-t border-border-default">
+                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 bg-surface-sunken text-content-primary border border-border-default px-4 py-2.5 rounded-lg font-bold hover:bg-surface-hover transition-colors">Cancel</button>
                 <Button type="submit" isLoading={submitting} className="flex-1">
                   <Save className="w-4 h-4" /> {submitting ? 'Saving...' : editingProduct ? 'Update Product' : 'Submit Product'}
                 </Button>
@@ -363,24 +363,24 @@ export default function Products() {
 
       {/* Bulk Upload Modal */}
       <Dialog isOpen={showBulkModal} onClose={() => { setShowBulkModal(false); setCsvProducts([]); }} title="Bulk Upload Products" size="xl">
-            <div className="border-2 border-dashed border-brand-muted rounded-xl p-8 text-center hover:border-brand-secondary transition-colors cursor-pointer relative mb-4">
+            <div className="border-2 border-dashed border-border-default rounded-xl p-8 text-center hover:border-brand-secondary transition-colors cursor-pointer relative mb-4">
               <input type="file" accept=".csv" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
               <Upload className="w-12 h-12 text-brand-secondary mx-auto mb-3" />
-              <h4 className="text-lg font-bold text-white mb-1">Upload CSV File</h4>
-              <p className="text-gray-400 text-sm">Required columns: <code className="bg-brand-dark px-1 rounded">name</code>, <code className="bg-brand-dark px-1 rounded">price</code>, <code className="bg-brand-dark px-1 rounded">stock</code></p>
+              <h4 className="text-lg font-bold text-content-primary mb-1">Upload CSV File</h4>
+              <p className="text-content-secondary text-sm">Required columns: <code className="bg-surface-sunken px-1 rounded">name</code>, <code className="bg-surface-sunken px-1 rounded">price</code>, <code className="bg-surface-sunken px-1 rounded">stock</code></p>
             </div>
             {csvProducts.length > 0 && (
-              <div className="max-h-64 overflow-auto border border-brand-muted rounded-lg mb-4">
+              <div className="max-h-64 overflow-auto border border-border-default rounded-lg mb-4">
                 <table className="w-full text-left text-sm">
-                  <thead className="bg-brand-dark sticky top-0">
-                    <tr><th className="p-3 text-gray-400">Name</th><th className="p-3 text-gray-400">Price</th><th className="p-3 text-gray-400">Stock</th></tr>
+                  <thead className="bg-surface-sunken sticky top-0">
+                    <tr><th className="p-3 text-content-secondary">Name</th><th className="p-3 text-content-secondary">Price</th><th className="p-3 text-content-secondary">Stock</th></tr>
                   </thead>
-                  <tbody className="divide-y divide-brand-muted">
+                  <tbody className="divide-y divide-border-default">
                     {csvProducts.slice(0, 50).map((p, i) => (
-                      <tr key={i} className="hover:bg-brand-dark/50">
-                        <td className="p-3 text-white">{p.name}</td>
+                      <tr key={i} className="hover:bg-surface-hover">
+                        <td className="p-3 text-content-primary">{p.name}</td>
                         <td className="p-3 text-green-400">₹{p.price || p.basePrice || 0}</td>
-                        <td className="p-3 text-gray-300">{p.stock || 0}</td>
+                        <td className="p-3 text-content-secondary">{p.stock || 0}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -388,7 +388,7 @@ export default function Products() {
               </div>
             )}
             <div className="flex gap-4">
-              <button onClick={() => { setShowBulkModal(false); setCsvProducts([]); }} className="flex-1 bg-brand-dark text-white border border-brand-muted px-4 py-2.5 rounded-lg font-bold">Cancel</button>
+              <button onClick={() => { setShowBulkModal(false); setCsvProducts([]); }} className="flex-1 bg-surface-sunken text-content-primary border border-border-default px-4 py-2.5 rounded-lg font-bold">Cancel</button>
               <Button onClick={handleBulkSubmit} disabled={!csvProducts.length} isLoading={uploadingBulk} className="flex-1">
                 {uploadingBulk ? 'Uploading...' : `Upload ${csvProducts.length} Products`}
               </Button>

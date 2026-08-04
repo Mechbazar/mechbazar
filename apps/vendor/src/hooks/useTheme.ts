@@ -2,12 +2,10 @@ import { useCallback, useSyncExternalStore } from 'react';
 
 export type Theme = 'light' | 'dark';
 
-const STORAGE_KEY = 'admin-theme';
+const STORAGE_KEY = 'vendor-theme';
 
 function readStoredTheme(): Theme {
   const stored = localStorage.getItem(STORAGE_KEY);
-  // Luxury dark is the admin panel's primary design -- default here even for
-  // first-time visitors whose OS prefers light, rather than following system.
   return stored === 'light' || stored === 'dark' ? stored : 'dark';
 }
 
@@ -16,10 +14,10 @@ function applyTheme(theme: Theme) {
 }
 
 // Module-level store shared by every useTheme() call in the app. A plain
-// per-component useState here gives each caller (Sidebar's Logo, Topbar's
-// ThemeToggle, ...) its own independent copy -- toggling in one never
-// notifies the others, leaving e.g. Sidebar's Logo stuck on the old theme
-// (invisible "MECH" text) after a live toggle click. useSyncExternalStore
+// per-component useState here would give each caller (Sidebar's Logo, its
+// ThemeToggle, Layout's mobile Logo, ...) its own independent copy -- toggling
+// in one would never notify the others, leaving e.g. the Logo's tone stuck on
+// the old theme (invisible "MECH" text) after a live toggle. useSyncExternalStore
 // keeps every instance reading the same value and re-renders them all on change.
 let currentTheme: Theme = readStoredTheme();
 const listeners = new Set<() => void>();

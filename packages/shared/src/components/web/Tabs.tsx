@@ -22,7 +22,7 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, defaultTab, onChange }) => {
 
   return (
     <div>
-      <div className="flex gap-1 border-b border-neutral-800 bg-neutral-950 rounded-t-lg">
+      <div className="flex gap-1 border-b border-border-default bg-surface-page rounded-t-lg">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -30,14 +30,14 @@ export const Tabs: React.FC<TabsProps> = ({ tabs, defaultTab, onChange }) => {
             className={`px-6 py-3 font-semibold transition-all border-b-2 ${
               activeTab === tab.id
                 ? 'text-primary-500 border-primary-500'
-                : 'text-neutral-400 border-transparent hover:text-white'
+                : 'text-content-secondary border-transparent hover:text-content-primary'
             }`}
           >
             {tab.label}
           </button>
         ))}
       </div>
-      <div className="p-6 bg-neutral-900 rounded-b-lg">
+      <div className="p-6 bg-surface-card rounded-b-lg">
         {tabs.find((tab) => tab.id === activeTab)?.content}
       </div>
     </div>

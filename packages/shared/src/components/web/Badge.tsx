@@ -29,13 +29,13 @@ export const Badge: React.FC<BadgeProps> = ({
   };
 
   const darkVariants = {
-    primary: 'bg-primary-500/10 text-primary-400',
-    secondary: 'bg-navy-500/10 text-navy-400',
-    success: 'bg-success-500/10 text-success-400',
-    warning: 'bg-warning-500/10 text-warning-400',
-    danger: 'bg-danger-500/10 text-danger-400',
-    info: 'bg-info-500/10 text-info-400',
-    neutral: 'bg-neutral-800 text-neutral-300',
+    primary: 'bg-primary-500/10 text-primary-700 dark:text-primary-400',
+    secondary: 'bg-navy-500/10 text-navy-700 dark:text-navy-400',
+    success: 'bg-success-500/10 text-success-700 dark:text-success-400',
+    warning: 'bg-warning-500/10 text-warning-700 dark:text-warning-400',
+    danger: 'bg-danger-500/10 text-danger-700 dark:text-danger-400',
+    info: 'bg-info-500/10 text-info-700 dark:text-info-400',
+    neutral: 'bg-surface-hover text-content-secondary',
   };
 
   const sizes = {

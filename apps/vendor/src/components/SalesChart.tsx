@@ -22,10 +22,10 @@ const RANGE_OPTIONS = [
 function CustomTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-xs shadow-lg">
-      <p className="text-neutral-400 mb-1">{new Date(label).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
-      <p className="text-white font-semibold">₹{Number(payload[0].value).toLocaleString('en-IN')}</p>
-      <p className="text-neutral-500">{payload[0].payload.orders} order(s)</p>
+    <div className="bg-surface-overlay border border-border-default rounded-xl px-3 py-2 text-xs shadow-lg">
+      <p className="text-content-secondary mb-1">{new Date(label).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
+      <p className="text-content-primary font-semibold">₹{Number(payload[0].value).toLocaleString('en-IN')}</p>
+      <p className="text-content-muted">{payload[0].payload.orders} order(s)</p>
     </div>
   );
 }
@@ -53,17 +53,17 @@ export default function SalesChart() {
     <Card variant="dark" className="!rounded-3xl !p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
         <div>
-          <h2 className="text-white font-bold flex items-center gap-2">
+          <h2 className="text-content-primary font-bold flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-primary" /> Sales
           </h2>
-          <p className="text-neutral-500 text-xs mt-0.5">₹{totalRevenue.toLocaleString('en-IN')} in the last {days} days</p>
+          <p className="text-content-muted text-xs mt-0.5">₹{totalRevenue.toLocaleString('en-IN')} in the last {days} days</p>
         </div>
-        <div className="flex gap-1 bg-neutral-950 border border-neutral-800 rounded-xl p-1">
+        <div className="flex gap-1 bg-surface-sunken border border-border-default rounded-xl p-1">
           {RANGE_OPTIONS.map((opt) => (
             <button
               key={opt.days}
               onClick={() => setDays(opt.days)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${days === opt.days ? 'bg-primary text-white' : 'text-neutral-400 hover:text-white'}`}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${days === opt.days ? 'bg-primary text-white' : 'text-content-secondary hover:text-content-primary'}`}
             >
               {opt.label}
             </button>
@@ -72,9 +72,9 @@ export default function SalesChart() {
       </div>
 
       {loading ? (
-        <div className="h-64 flex items-center justify-center text-neutral-500 text-sm">Loading chart...</div>
+        <div className="h-64 flex items-center justify-center text-content-muted text-sm">Loading chart...</div>
       ) : data.length === 0 ? (
-        <div className="h-64 flex items-center justify-center text-neutral-500 text-sm">No sales in this period yet</div>
+        <div className="h-64 flex items-center justify-center text-content-muted text-sm">No sales in this period yet</div>
       ) : (
         <ResponsiveContainer width="100%" height={260}>
           <AreaChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>

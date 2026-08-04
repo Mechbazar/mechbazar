@@ -8,6 +8,7 @@ import type { RootState } from '../store';
 import { Store, User, Building, Landmark, FileText, ArrowRight, CheckCircle, MapPin, Loader2 } from 'lucide-react';
 import { Button, Alert, Input, Logo } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
+import { useTheme } from '../hooks/useTheme';
 import { auth as firebaseAuth } from '../config/firebase';
 import { mapFirebaseAuthError } from '../utils/firebaseErrors';
 import { reverseGeocode } from '../services/geocode.service';
@@ -25,6 +26,7 @@ export default function Register() {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const auth = useSelector((state: RootState) => state.auth);
+  const { theme } = useTheme();
 
   // Form States
   const [personal, setPersonal] = useState({ name: '', phone: '', email: '', password: '' });
@@ -295,37 +297,36 @@ export default function Register() {
   ];
 
   return (
-    <div className="min-h-screen bg-brand-dark text-white py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-surface-page text-content-primary py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
-        
+
         <div className="text-center mb-10">
-          {/* Dark tone: this page is bg-brand-dark. */}
-          <Logo tone="dark" width={240} className="mx-auto mb-6" />
+          <Logo tone={theme === 'dark' ? 'dark' : 'light'} width={240} className="mx-auto mb-6" />
           <Store className="w-12 h-12 text-brand-secondary mx-auto mb-4" />
-          <h2 className="text-3xl font-extrabold text-white">Become a MechBazar Seller</h2>
-          <p className="mt-2 text-gray-400">Complete your profile to start selling products to thousands of customers.</p>
+          <h2 className="text-3xl font-extrabold text-content-primary">Become a MechBazar Seller</h2>
+          <p className="mt-2 text-content-secondary">Complete your profile to start selling products to thousands of customers.</p>
         </div>
 
         {/* Stepper */}
         <div className="mb-8">
           <div className="flex items-center justify-between relative">
-            <div className="absolute left-0 top-1/2 w-full h-0.5 bg-brand-muted -z-10 transform -translate-y-1/2"></div>
+            <div className="absolute left-0 top-1/2 w-full h-0.5 bg-border-default -z-10 transform -translate-y-1/2"></div>
             {steps.map((s, i) => {
               const isActive = s.id === step;
               const isPast = steps.findIndex(x => x.id === step) > i;
               return (
-                <div key={s.id} className="flex flex-col items-center bg-brand-dark px-2">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${isActive ? 'border-brand-secondary bg-brand-secondary/20 text-brand-secondary' : isPast ? 'border-green-500 bg-green-500/20 text-green-500' : 'border-brand-muted bg-brand-primary text-gray-500'}`}>
+                <div key={s.id} className="flex flex-col items-center bg-surface-page px-2">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${isActive ? 'border-brand-secondary bg-brand-secondary/20 text-brand-secondary' : isPast ? 'border-green-500 bg-green-500/20 text-green-500' : 'border-border-default bg-surface-card text-content-muted'}`}>
                     {isPast ? <CheckCircle className="w-5 h-5" /> : <s.icon className="w-5 h-5" />}
                   </div>
-                  <span className={`text-xs mt-2 ${isActive ? 'text-brand-secondary font-medium' : 'text-gray-500'}`}>{s.title}</span>
+                  <span className={`text-xs mt-2 ${isActive ? 'text-brand-secondary font-medium' : 'text-content-muted'}`}>{s.title}</span>
                 </div>
               );
             })}
           </div>
         </div>
 
-        <div className="bg-brand-primary rounded-2xl border border-brand-muted shadow-2xl p-8">
+        <div className="bg-surface-card rounded-2xl border border-border-default shadow-2xl p-8">
           {error && (
             <Alert type="error" message={error} className="mb-6" />
           )}
@@ -352,14 +353,14 @@ export default function Register() {
                     helperText={`OTP sent to ${personal.phone}`}
                   />
                   <div className="flex items-center justify-between mt-2 text-sm">
-                    <button type="button" onClick={handleChangeNumber} className="text-gray-400 hover:text-white">
+                    <button type="button" onClick={handleChangeNumber} className="text-content-secondary hover:text-content-primary">
                       Change number
                     </button>
                     <button
                       type="button"
                       onClick={handleSendOtp}
                       disabled={resendCooldown > 0 || loading}
-                      className="text-brand-secondary disabled:text-gray-500 disabled:cursor-not-allowed"
+                      className="text-brand-secondary disabled:text-content-muted disabled:cursor-not-allowed"
                     >
                       {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
                     </button>
@@ -375,7 +376,7 @@ export default function Register() {
               <Button type="submit" isLoading={loading} className="w-full">
                 {otpSent ? <>Continue to Business Details <ArrowRight className="ml-2 w-5 h-5" /></> : 'Send OTP'}
               </Button>
-              <p className="text-center text-sm text-gray-400 mt-4">Already have an account? <Link to="/login" className="text-brand-secondary">Login</Link></p>
+              <p className="text-center text-sm text-content-secondary mt-4">Already have an account? <Link to="/login" className="text-brand-secondary">Login</Link></p>
             </form>
           )}
 
@@ -384,8 +385,8 @@ export default function Register() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input label="Store / Company Name" type="text" required value={business.storeName} onChange={e => setBusiness({...business, storeName: e.target.value})} />
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">Business Type</label>
-                  <select value={business.businessType} onChange={e => setBusiness({...business, businessType: e.target.value})} className="w-full bg-brand-dark border border-brand-muted rounded-xl py-3 px-4 text-white focus:outline-none focus:border-brand-secondary">
+                  <label className="block text-sm font-medium text-content-secondary mb-1">Business Type</label>
+                  <select value={business.businessType} onChange={e => setBusiness({...business, businessType: e.target.value})} className="w-full bg-surface-sunken border border-border-default rounded-xl py-3 px-4 text-content-primary focus:outline-none focus:border-brand-secondary">
                     <option value="RETAIL">Retailer</option>
                     <option value="WHOLESALE">Wholesaler</option>
                     <option value="MANUFACTURER">Manufacturer</option>
@@ -396,7 +397,7 @@ export default function Register() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Store Location</label>
+                <label className="block text-sm font-medium text-content-secondary mb-1">Store Location</label>
                 <button
                   type="button"
                   onClick={handleUseCurrentLocation}
@@ -443,17 +444,17 @@ export default function Register() {
           {step === 'documents' && (
             <form onSubmit={handleDocumentsSubmit} className="space-y-6">
               <div className="space-y-4">
-                <div className="border border-brand-muted rounded-xl p-4 bg-brand-dark">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">PAN Card Copy *</label>
-                  <input type="file" required accept="image/*,.pdf" onChange={e => setPanFile(e.target.files?.[0] || null)} className="text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-secondary/10 file:text-brand-secondary hover:file:bg-brand-secondary/20 cursor-pointer" />
+                <div className="border border-border-default rounded-xl p-4 bg-surface-sunken">
+                  <label className="block text-sm font-medium text-content-secondary mb-2">PAN Card Copy *</label>
+                  <input type="file" required accept="image/*,.pdf" onChange={e => setPanFile(e.target.files?.[0] || null)} className="text-sm text-content-secondary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-secondary/10 file:text-brand-secondary hover:file:bg-brand-secondary/20 cursor-pointer" />
                 </div>
-                <div className="border border-brand-muted rounded-xl p-4 bg-brand-dark">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Cancelled Cheque *</label>
-                  <input type="file" required accept="image/*,.pdf" onChange={e => setChequeFile(e.target.files?.[0] || null)} className="text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-secondary/10 file:text-brand-secondary hover:file:bg-brand-secondary/20 cursor-pointer" />
+                <div className="border border-border-default rounded-xl p-4 bg-surface-sunken">
+                  <label className="block text-sm font-medium text-content-secondary mb-2">Cancelled Cheque *</label>
+                  <input type="file" required accept="image/*,.pdf" onChange={e => setChequeFile(e.target.files?.[0] || null)} className="text-sm text-content-secondary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-secondary/10 file:text-brand-secondary hover:file:bg-brand-secondary/20 cursor-pointer" />
                 </div>
-                <div className="border border-brand-muted rounded-xl p-4 bg-brand-dark">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">GST Certificate (Optional)</label>
-                  <input type="file" accept="image/*,.pdf" onChange={e => setGstFile(e.target.files?.[0] || null)} className="text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-secondary/10 file:text-brand-secondary hover:file:bg-brand-secondary/20 cursor-pointer" />
+                <div className="border border-border-default rounded-xl p-4 bg-surface-sunken">
+                  <label className="block text-sm font-medium text-content-secondary mb-2">GST Certificate (Optional)</label>
+                  <input type="file" accept="image/*,.pdf" onChange={e => setGstFile(e.target.files?.[0] || null)} className="text-sm text-content-secondary file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-brand-secondary/10 file:text-brand-secondary hover:file:bg-brand-secondary/20 cursor-pointer" />
                 </div>
               </div>
               

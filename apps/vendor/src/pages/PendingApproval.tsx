@@ -46,32 +46,32 @@ export default function PendingApproval() {
   };
 
   return (
-    <div className="min-h-screen bg-brand-dark flex items-center justify-center p-4">
+    <div className="min-h-screen bg-surface-page flex items-center justify-center p-4">
       <Card variant="dark" className="max-w-md w-full !rounded-2xl !p-8 text-center shadow-2xl">
         <div className="w-20 h-20 bg-brand-secondary/20 rounded-full flex items-center justify-center mx-auto mb-6">
           <ShieldAlert className="w-10 h-10 text-brand-secondary" />
         </div>
 
-        <h1 className="text-2xl font-bold text-white mb-4">Under Verification</h1>
+        <h1 className="text-2xl font-bold text-content-primary mb-4">Under Verification</h1>
 
-        <p className="text-gray-400 mb-6 leading-relaxed">
+        <p className="text-content-secondary mb-6 leading-relaxed">
           Your seller account and submitted documents are currently being verified by our team.
           This process typically takes 1-2 business days.
         </p>
 
-        <div className="bg-brand-dark border border-brand-muted rounded-xl p-4 mb-8">
+        <div className="bg-surface-sunken border border-border-default rounded-xl p-4 mb-8">
           <div className="flex items-center text-sm text-brand-secondary mb-2">
             <Loader2 className="w-4 h-4 animate-spin mr-2" />
             <span className="font-medium">Verification in progress</span>
           </div>
-          <p className="text-xs text-gray-500 text-left">
+          <p className="text-xs text-content-muted text-left">
             This page refreshes your approval status automatically every 10 seconds.
           </p>
         </div>
 
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center space-x-2 bg-brand-dark hover:bg-brand-muted border border-brand-muted text-white font-medium py-3 px-4 rounded-xl transition-all"
+          className="w-full flex items-center justify-center space-x-2 bg-surface-sunken hover:bg-surface-hover border border-border-default text-content-primary font-medium py-3 px-4 rounded-xl transition-all"
         >
           <LogOut className="w-4 h-4" />
           <span>Sign Out</span>

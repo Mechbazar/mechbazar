@@ -29,31 +29,33 @@ export const Alert: React.FC<AlertProps> = ({
     onDismiss?.();
   };
 
-  // Tinted-on-dark look — matches the dark shell both Admin and Vendor use.
+  // Tinted look, tuned per theme -- the dark-only text-*-300 shades this used
+  // to hard-code read fine on Admin/Vendor's dark shell but were near-invisible
+  // once Vendor gained a light theme (light text on a near-white tint).
   const typeConfig = {
     success: {
-      bg: 'bg-success-500/10',
-      border: 'border-success-500/30',
-      text: 'text-success-300',
-      icon: <CheckCircle2 size={20} className="text-success-400" />,
+      bg: 'bg-success-50 dark:bg-success-500/10',
+      border: 'border-success-200 dark:border-success-500/30',
+      text: 'text-success-700 dark:text-success-300',
+      icon: <CheckCircle2 size={20} className="text-success-600 dark:text-success-400" />,
     },
     error: {
-      bg: 'bg-danger-500/10',
-      border: 'border-danger-500/30',
-      text: 'text-danger-300',
-      icon: <AlertCircle size={20} className="text-danger-400" />,
+      bg: 'bg-danger-50 dark:bg-danger-500/10',
+      border: 'border-danger-200 dark:border-danger-500/30',
+      text: 'text-danger-700 dark:text-danger-300',
+      icon: <AlertCircle size={20} className="text-danger-600 dark:text-danger-400" />,
     },
     warning: {
-      bg: 'bg-warning-500/10',
-      border: 'border-warning-500/30',
-      text: 'text-warning-300',
-      icon: <AlertTriangle size={20} className="text-warning-400" />,
+      bg: 'bg-warning-50 dark:bg-warning-500/10',
+      border: 'border-warning-200 dark:border-warning-500/30',
+      text: 'text-warning-700 dark:text-warning-300',
+      icon: <AlertTriangle size={20} className="text-warning-600 dark:text-warning-400" />,
     },
     info: {
-      bg: 'bg-info-500/10',
-      border: 'border-info-500/30',
-      text: 'text-info-300',
-      icon: <Info size={20} className="text-info-400" />,
+      bg: 'bg-info-50 dark:bg-info-500/10',
+      border: 'border-info-200 dark:border-info-500/30',
+      text: 'text-info-700 dark:text-info-300',
+      icon: <Info size={20} className="text-info-600 dark:text-info-400" />,
     },
   };
 

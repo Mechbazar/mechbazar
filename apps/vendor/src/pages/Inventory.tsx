@@ -51,14 +51,14 @@ export default function Inventory() {
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="flex items-center gap-3 text-3xl font-bold text-white">
+          <h1 className="flex items-center gap-3 text-3xl font-bold text-content-primary">
             <Warehouse className="w-8 h-8 text-primary-500" /> Inventory
           </h1>
-          <p className="text-neutral-400 mt-1">Live stock levels for all your products across warehouses</p>
+          <p className="text-content-secondary mt-1">Live stock levels for all your products across warehouses</p>
         </div>
         <button
           onClick={fetch}
-          className="inline-flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-300 transition hover:border-primary-500 hover:text-white"
+          className="inline-flex items-center gap-2 rounded-lg border border-border-default bg-surface-card px-3 py-2 text-sm text-content-secondary transition hover:border-primary-500 hover:text-content-primary"
         >
           <RefreshCw className="w-4 h-4" /> Refresh
         </button>
@@ -84,7 +84,7 @@ export default function Inventory() {
           <button
             key={key}
             onClick={() => setFilter(key as any)}
-            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${filter === key ? 'bg-primary-500 text-white' : 'border border-neutral-700 bg-neutral-900 text-neutral-300 hover:text-white'}`}
+            className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${filter === key ? 'bg-primary-500 text-white' : 'border border-border-default bg-surface-card text-content-secondary hover:text-content-primary'}`}
           >
             {label}
           </button>
@@ -94,17 +94,17 @@ export default function Inventory() {
       {error ? (
         <Alert type="error" message={error} className="text-center" />
       ) : filtered.length === 0 ? (
-        <div className="rounded-xl border border-neutral-800 bg-neutral-900 p-12 text-center">
-          <Warehouse className="mx-auto mb-4 h-16 w-16 text-neutral-400" />
-          <h3 className="mb-2 text-xl font-bold text-white">No Inventory Records</h3>
-          <p className="text-sm text-neutral-400">Once products are added to warehouses, stock levels will appear here.</p>
+        <div className="rounded-xl border border-border-default bg-surface-card p-12 text-center">
+          <Warehouse className="mx-auto mb-4 h-16 w-16 text-content-secondary" />
+          <h3 className="mb-2 text-xl font-bold text-content-primary">No Inventory Records</h3>
+          <p className="text-sm text-content-secondary">Once products are added to warehouses, stock levels will appear here.</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900">
+        <div className="overflow-hidden rounded-xl border border-border-default bg-surface-card">
           <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-neutral-950 text-xs font-semibold uppercase tracking-wide text-neutral-400 border-b border-neutral-800">
+              <tr className="bg-surface-sunken text-xs font-semibold uppercase tracking-wide text-content-secondary border-b border-border-default">
                 <th className="p-4">Product</th>
                 <th className="p-4">Warehouse</th>
                 <th className="p-4">Available</th>
@@ -114,34 +114,34 @@ export default function Inventory() {
                 <th className="p-4">Last Updated</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-800">
+            <tbody className="divide-y divide-border-default">
               {filtered.map((inv: any) => {
                 const status = getStockStatus(inv);
                 const StatusIcon = status.icon;
                 return (
-                  <tr key={inv.id} className="hover:bg-neutral-950/60 transition-colors">
+                  <tr key={inv.id} className="hover:bg-surface-hover transition-colors">
                     <td className="p-4">
-                      <p className="text-sm font-semibold text-white">{inv.product?.name}</p>
-                      <p className="text-xs text-neutral-500">{inv.product?.category?.name} • {inv.product?.brand?.name}</p>
+                      <p className="text-sm font-semibold text-content-primary">{inv.product?.name}</p>
+                      <p className="text-xs text-content-muted">{inv.product?.category?.name} • {inv.product?.brand?.name}</p>
                     </td>
                     <td className="p-4">
-                      <p className="text-sm text-neutral-300">{inv.warehouse?.name || 'N/A'}</p>
-                      <p className="text-xs text-neutral-500">{inv.warehouse?.city}</p>
+                      <p className="text-sm text-content-secondary">{inv.warehouse?.name || 'N/A'}</p>
+                      <p className="text-xs text-content-muted">{inv.warehouse?.city}</p>
                     </td>
                     <td className="p-4">
-                      <span className={`text-lg font-bold ${inv.availableQty < inv.reorderLevel ? 'text-red-400' : 'text-white'}`}>
+                      <span className={`text-lg font-bold ${inv.availableQty < inv.reorderLevel ? 'text-red-400' : 'text-content-primary'}`}>
                         {inv.availableQty}
                       </span>
-                      <span className="ml-1 text-xs text-neutral-500">units</span>
+                      <span className="ml-1 text-xs text-content-muted">units</span>
                     </td>
-                    <td className="p-4 text-sm text-neutral-400">{inv.reservedQty ?? 0} units</td>
-                    <td className="p-4 text-sm text-neutral-400">{inv.reorderLevel ?? 10} units</td>
+                    <td className="p-4 text-sm text-content-secondary">{inv.reservedQty ?? 0} units</td>
+                    <td className="p-4 text-sm text-content-secondary">{inv.reorderLevel ?? 10} units</td>
                     <td className="p-4">
                       <Badge variant={status.variant} className="!rounded-lg flex items-center gap-1 w-fit">
                         <StatusIcon className="h-3 w-3" /> {status.label}
                       </Badge>
                     </td>
-                    <td className="p-4 text-xs text-neutral-500">
+                    <td className="p-4 text-xs text-content-muted">
                       {new Date(inv.updatedAt).toLocaleDateString('en-IN')}
                     </td>
                   </tr>

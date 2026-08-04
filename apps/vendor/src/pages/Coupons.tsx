@@ -34,8 +34,8 @@ export default function Coupons() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-white flex items-center gap-2"><Tag className="w-7 h-7 text-primary" /> Coupons</h1>
-        <p className="text-neutral-400 mt-1">Platform-wide promo codes currently live -- these can apply to orders containing your products.</p>
+        <h1 className="text-3xl font-bold text-content-primary flex items-center gap-2"><Tag className="w-7 h-7 text-primary" /> Coupons</h1>
+        <p className="text-content-secondary mt-1">Platform-wide promo codes currently live -- these can apply to orders containing your products.</p>
       </div>
 
       <Alert type="info" className="!rounded-3xl">
@@ -47,8 +47,8 @@ export default function Coupons() {
       ) : coupons.length === 0 ? (
         <Card variant="dark" className="!rounded-3xl">
           <div className="text-center py-8">
-            <Tag className="w-12 h-12 text-neutral-500 mx-auto mb-3" />
-            <p className="text-neutral-300 font-medium">No active coupons right now</p>
+            <Tag className="w-12 h-12 text-content-muted mx-auto mb-3" />
+            <p className="text-content-secondary font-medium">No active coupons right now</p>
           </div>
         </Card>
       ) : (
@@ -58,10 +58,10 @@ export default function Coupons() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-lg font-bold text-primary font-mono">{c.code}</p>
-                  <p className="text-white font-semibold mt-1">
+                  <p className="text-content-primary font-semibold mt-1">
                     {c.discountType === 'PERCENTAGE' ? `${c.discountValue}% off` : `₹${c.discountValue} off`}
                   </p>
-                  <p className="text-neutral-500 text-xs mt-1">Min order ₹{c.minOrderValue}</p>
+                  <p className="text-content-muted text-xs mt-1">Min order ₹{c.minOrderValue}</p>
                 </div>
                 <Badge variant="neutral" className="!rounded-lg">{c.vehicleType ? (c.vehicleType === 'CAR' ? 'Car' : 'Bike') : 'All'}</Badge>
               </div>

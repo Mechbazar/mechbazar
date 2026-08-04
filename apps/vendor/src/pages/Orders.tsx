@@ -118,7 +118,7 @@ export default function Orders() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-white flex items-center">
+        <h1 className="text-3xl font-bold text-content-primary flex items-center">
           <Package className="w-8 h-8 mr-3 text-brand-secondary" />
           Order Management
         </h1>
@@ -127,34 +127,34 @@ export default function Orders() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card variant="dark">
-          <h3 className="text-gray-400 font-medium mb-2 flex items-center gap-2"><Clock className="w-4 h-4 text-navy-400" /> New Orders</h3>
-          <p className="text-3xl font-bold text-white">{orders.filter(o => o.status === 'PLACED').length}</p>
+          <h3 className="text-content-secondary font-medium mb-2 flex items-center gap-2"><Clock className="w-4 h-4 text-navy-400" /> New Orders</h3>
+          <p className="text-3xl font-bold text-content-primary">{orders.filter(o => o.status === 'PLACED').length}</p>
         </Card>
         <Card variant="dark">
-          <h3 className="text-gray-400 font-medium mb-2 flex items-center gap-2"><Package className="w-4 h-4 text-warning-400" /> Packing</h3>
-          <p className="text-3xl font-bold text-white">{orders.filter(o => o.status === 'ACCEPTED' || o.status === 'PACKING').length}</p>
+          <h3 className="text-content-secondary font-medium mb-2 flex items-center gap-2"><Package className="w-4 h-4 text-warning-400" /> Packing</h3>
+          <p className="text-3xl font-bold text-content-primary">{orders.filter(o => o.status === 'ACCEPTED' || o.status === 'PACKING').length}</p>
         </Card>
         <Card variant="dark">
-          <h3 className="text-gray-400 font-medium mb-2 flex items-center gap-2"><Truck className="w-4 h-4 text-primary-500" /> Out for Delivery</h3>
-          <p className="text-3xl font-bold text-white">{orders.filter(o => o.status === 'PICKUP' || o.status === 'ON_THE_WAY').length}</p>
+          <h3 className="text-content-secondary font-medium mb-2 flex items-center gap-2"><Truck className="w-4 h-4 text-primary-500" /> Out for Delivery</h3>
+          <p className="text-3xl font-bold text-content-primary">{orders.filter(o => o.status === 'PICKUP' || o.status === 'ON_THE_WAY').length}</p>
         </Card>
         <Card variant="dark">
-          <h3 className="text-gray-400 font-medium mb-2 flex items-center gap-2"><CheckCircle className="w-4 h-4 text-success-400" /> Delivered Today</h3>
-          <p className="text-3xl font-bold text-white">
+          <h3 className="text-content-secondary font-medium mb-2 flex items-center gap-2"><CheckCircle className="w-4 h-4 text-success-400" /> Delivered Today</h3>
+          <p className="text-3xl font-bold text-content-primary">
             {orders.filter(o => o.status === 'DELIVERED' && new Date(o.updatedAt).toDateString() === new Date().toDateString()).length}
           </p>
         </Card>
       </div>
 
-      <div className="bg-brand-primary border border-brand-muted rounded-xl overflow-visible">
+      <div className="bg-surface-card border border-border-default rounded-xl overflow-visible">
         {/* Toolbar */}
-        <div className="p-4 border-b border-brand-muted flex justify-between items-center bg-brand-dark/50">
+        <div className="p-4 border-b border-border-default flex justify-between items-center bg-surface-sunken/50">
           <div className="flex gap-2">
             {['All', 'New', 'Packing', 'Shipped', 'Completed'].map(tab => (
               <button 
                 key={tab}
                 onClick={() => setActiveTab(tab)}
-                className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${activeTab === tab ? 'bg-brand-secondary text-black' : 'text-gray-400 hover:bg-brand-muted'}`}
+                className={`px-4 py-2 rounded-lg font-bold text-sm transition-colors ${activeTab === tab ? 'bg-brand-secondary text-black' : 'text-content-secondary hover:bg-surface-hover'}`}
               >
                 {tab}
               </button>
@@ -162,13 +162,13 @@ export default function Orders() {
           </div>
           
           <div className="relative">
-            <Search className="absolute left-3 top-2.5 text-gray-500 w-4 h-4" />
+            <Search className="absolute left-3 top-2.5 text-content-muted w-4 h-4" />
             <input 
               type="text" 
               placeholder="Search Order ID or Customer..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-brand-dark border border-brand-muted rounded-lg pl-9 pr-4 py-2 text-sm text-white outline-none focus:border-brand-secondary w-64"
+              className="bg-surface-sunken border border-border-default rounded-lg pl-9 pr-4 py-2 text-sm text-content-primary outline-none focus:border-brand-secondary w-64"
             />
           </div>
         </div>
@@ -179,13 +179,13 @@ export default function Orders() {
             <Loader fullScreen />
           ) : filteredOrders.length === 0 ? (
             <div className="text-center py-12">
-              <Package className="w-12 h-12 text-gray-500 mx-auto mb-3" />
-              <p className="text-gray-400 font-medium">No orders found.</p>
+              <Package className="w-12 h-12 text-content-muted mx-auto mb-3" />
+              <p className="text-content-secondary font-medium">No orders found.</p>
             </div>
           ) : (
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-brand-dark text-gray-400 text-xs uppercase tracking-wider">
+                <tr className="bg-surface-sunken text-content-secondary text-xs uppercase tracking-wider">
                   <th className="p-4 font-semibold">Order ID & Time</th>
                   <th className="p-4 font-semibold">Customer</th>
                   <th className="p-4 font-semibold">My Items</th>
@@ -193,28 +193,28 @@ export default function Orders() {
                   <th className="p-4 font-semibold text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-brand-muted">
+              <tbody className="divide-y divide-border-default">
                 {filteredOrders.map((order) => {
                   // Calculate total price of ONLY the vendor's items in this order
                   const vendorItemsTotal = order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
                   const actions = getAvailableActions(order.status);
                   
                   return (
-                    <tr key={order.id} className="hover:bg-brand-dark/30 transition-colors group">
+                    <tr key={order.id} className="hover:bg-surface-hover transition-colors group">
                       <td className="p-4">
-                        <div className="font-bold text-white">{order.id.substring(0, 13)}...</div>
-                        <div className="text-xs text-gray-400 mt-1">{new Date(order.createdAt).toLocaleString()}</div>
+                        <div className="font-bold text-content-primary">{order.id.substring(0, 13)}...</div>
+                        <div className="text-xs text-content-secondary mt-1">{new Date(order.createdAt).toLocaleString()}</div>
                       </td>
                       <td className="p-4">
-                        <div className="font-medium text-white">{order.user?.name || 'Customer'}</div>
-                        <div className="text-xs text-gray-400">{order.address?.city || ''}</div>
+                        <div className="font-medium text-content-primary">{order.user?.name || 'Customer'}</div>
+                        <div className="text-xs text-content-secondary">{order.address?.city || ''}</div>
                       </td>
                       <td className="p-4">
-                        <div className="font-medium text-white">{order.items.length} items</div>
+                        <div className="font-medium text-content-primary">{order.items.length} items</div>
                         <div className="text-xs text-brand-secondary font-bold">₹{vendorItemsTotal}</div>
                         <div className="mt-1">
                           {order.items.map((item: any) => (
-                            <div key={item.id} className="text-xs text-gray-400 truncate max-w-[200px]">
+                            <div key={item.id} className="text-xs text-content-secondary truncate max-w-[200px]">
                               {item.quantity}x {item.product.name}
                             </div>
                           ))}
@@ -227,25 +227,25 @@ export default function Orders() {
                         <div className="relative inline-block text-left">
                           <button 
                             onClick={() => setActionMenuOpen(actionMenuOpen === order.id ? null : order.id)}
-                            className="text-gray-400 hover:text-brand-secondary p-2 transition-colors"
+                            className="text-content-secondary hover:text-brand-secondary p-2 transition-colors"
                           >
                             <MoreVertical className="w-5 h-5" />
                           </button>
 
                           {actionMenuOpen === order.id && (
-                            <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-brand-dark border border-brand-muted ring-1 ring-black ring-opacity-5 z-20">
+                            <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-surface-sunken border border-border-default ring-1 ring-black ring-opacity-5 z-20">
                               <div className="py-1">
                                 {actions.map(action => (
                                   <button
                                     key={action.nextStatus}
                                     onClick={() => updateOrderStatus(order.id, action.nextStatus)}
-                                    className="w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-brand-muted hover:text-white"
+                                    className="w-full text-left px-4 py-2 text-sm text-content-secondary hover:bg-surface-hover hover:text-content-primary"
                                   >
                                     {action.label}
                                   </button>
                                 ))}
                                 {actions.length === 0 && (
-                                  <div className="px-4 py-2 text-sm text-gray-500 italic">No actions available</div>
+                                  <div className="px-4 py-2 text-sm text-content-muted italic">No actions available</div>
                                 )}
                               </div>
                             </div>

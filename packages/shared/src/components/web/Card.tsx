@@ -15,8 +15,10 @@ export const Card: React.FC<CardProps> = ({
     elevated: 'bg-white rounded-lg shadow-md border border-neutral-200',
     outlined: 'bg-white rounded-lg border-2 border-neutral-300',
     filled: 'bg-neutral-50 rounded-lg border border-neutral-200',
-    // Matches the Admin/Vendor dashboards' dark shell.
-    dark: 'bg-neutral-900 rounded-xl border border-neutral-800 hover:border-primary-500/40 transition-colors',
+    // "dark" is a legacy name (kept so existing call sites don't need to
+    // change) -- it's actually theme-aware via the consuming app's
+    // surface-*/border-* tokens (see apps/admin and apps/vendor index.css).
+    dark: 'bg-surface-card rounded-xl border border-border-default hover:border-primary-500/40 transition-colors',
   };
 
   return (

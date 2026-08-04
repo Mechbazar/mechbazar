@@ -47,7 +47,7 @@ export default function AuthAction() {
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen flex flex-col justify-center items-center bg-neutral-950 px-4 text-neutral-100">
+    <div className="min-h-screen flex flex-col justify-center items-center bg-surface-page px-4 text-content-primary">
       <Card variant="dark" className="w-full max-w-md !rounded-2xl !p-8 shadow-2xl text-center">
         {children}
       </Card>
@@ -58,7 +58,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 function BackToSignIn() {
   return (
     <div className="text-center mt-6">
-      <Link to="/login" className="text-sm text-neutral-400 hover:text-primary-500 transition-colors">
+      <Link to="/login" className="text-sm text-content-secondary hover:text-primary-500 transition-colors">
         Back to Sign In
       </Link>
     </div>
@@ -83,7 +83,7 @@ function VerifyEmailAction({ oobCode, continueUrl }: { oobCode: string; continue
 
   return (
     <Shell>
-      <h1 className="text-2xl font-bold text-white mb-2">Confirm your email</h1>
+      <h1 className="text-2xl font-bold text-content-primary mb-2">Confirm your email</h1>
 
       {status === 'success' ? (
         <>
@@ -92,7 +92,7 @@ function VerifyEmailAction({ oobCode, continueUrl }: { oobCode: string; continue
         </>
       ) : (
         <>
-          <p className="text-neutral-400 text-sm mb-6">Click below to finish verifying your email address.</p>
+          <p className="text-content-secondary text-sm mb-6">Click below to finish verifying your email address.</p>
           {status === 'error' && <Alert type="error" message={error} className="mb-6" />}
           <Button onClick={handleConfirm} isLoading={status === 'loading'} disabled={status === 'loading'} className="w-full">
             Confirm email address
@@ -118,7 +118,7 @@ function PasswordField({
   const [reveal, setReveal] = useState(false);
   return (
     <div className="text-left">
-      <label className="mb-2 block text-sm font-semibold text-neutral-300">{label}</label>
+      <label className="mb-2 block text-sm font-semibold text-content-secondary">{label}</label>
       <div className="relative">
         <Input
           type={reveal ? 'text' : 'password'}
@@ -133,7 +133,7 @@ function PasswordField({
         <button
           type="button"
           onClick={() => setReveal((v) => !v)}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-700"
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-content-muted hover:text-content-secondary"
           aria-label={reveal ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
           tabIndex={-1}
         >
@@ -194,8 +194,8 @@ function ResetPasswordAction({ oobCode, continueUrl }: { oobCode: string; contin
   if (status === 'checking') {
     return (
       <Shell>
-        <h1 className="text-2xl font-bold text-white mb-2">Reset your password</h1>
-        <p className="text-neutral-400 text-sm">Checking your link…</p>
+        <h1 className="text-2xl font-bold text-content-primary mb-2">Reset your password</h1>
+        <p className="text-content-secondary text-sm">Checking your link…</p>
       </Shell>
     );
   }
@@ -220,8 +220,8 @@ function ResetPasswordAction({ oobCode, continueUrl }: { oobCode: string; contin
 
   return (
     <Shell>
-      <h1 className="text-2xl font-bold text-white mb-2">Reset your password</h1>
-      <p className="text-neutral-400 text-sm mb-6">Choose a new password for {email}.</p>
+      <h1 className="text-2xl font-bold text-content-primary mb-2">Reset your password</h1>
+      <p className="text-content-secondary text-sm mb-6">Choose a new password for {email}.</p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && <Alert type="error" message={error} />}
@@ -229,7 +229,7 @@ function ResetPasswordAction({ oobCode, continueUrl }: { oobCode: string; contin
         <PasswordField label="New Password" value={newPassword} onChange={setNewPassword} disabled={status === 'submitting'} />
         <PasswordField label="Confirm New Password" value={confirmPassword} onChange={setConfirmPassword} disabled={status === 'submitting'} />
 
-        <p className="text-sm text-neutral-500">Must be at least {MIN_PASSWORD_LENGTH} characters.</p>
+        <p className="text-sm text-content-muted">Must be at least {MIN_PASSWORD_LENGTH} characters.</p>
 
         <Button type="submit" isLoading={status === 'submitting'} disabled={status === 'submitting'} className="w-full">
           Reset Password
