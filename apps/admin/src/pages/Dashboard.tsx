@@ -243,6 +243,11 @@ export default function Dashboard() {
   const ordersTrend = dayOverDayTrend(ordersRows);
   const bookingsTrend = dayOverDayTrend(bookingsRows);
 
+  // Same source as the trend/sparkline above (not the separate stats.revenue
+  // field, which uses a different day-boundary convention server-side) so
+  // the headline number and its "vs yesterday" badge never contradict each
+  // other -- e.g. showing "₹0" next to "+382.9%".
+  const revenueToday = revenueRows.length ? revenueRows[revenueRows.length - 1].v : 0;
   const ordersToday = ordersRows.length ? ordersRows[ordersRows.length - 1].v : 0;
   const bookingsToday = bookingsRows.length ? bookingsRows[bookingsRows.length - 1].v : 0;
 
@@ -343,7 +348,7 @@ export default function Dashboard() {
       {/* KPI Grid */}
       <motion.div variants={staggerItem} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <StatCard
-          loading={loading} title="Total Revenue" value={stats.revenue} valuePrefix="₹" icon="revenue"
+          loading={loading} title="Total Revenue" value={revenueToday} valuePrefix="₹" icon="revenue"
           trend={revenueTrend} trendLabel="vs yesterday" sparkline={revenueSparkline}
           onClick={() => navigate('/reports')}
         />

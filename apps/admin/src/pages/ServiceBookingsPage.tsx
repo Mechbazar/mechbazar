@@ -255,7 +255,7 @@ export default function ServiceBookingsPage() {
     { key: 'phone', header: 'Phone', render: (b) => <span className="text-sm text-content-secondary">{b.user?.phone}</span> },
     { key: 'vehicle', header: 'Vehicle', render: (b) => <span className="text-sm text-content-secondary">{b.vehicleBrand} {b.vehicleModel} ({b.vehicleType})</span> },
     { key: 'service', header: 'Service', render: (b) => <span className="text-sm text-content-secondary">{b.package?.name}</span> },
-    { key: 'date', header: 'Booking Date', render: (b) => <span className="text-sm text-content-secondary">{new Date(b.scheduledDate).toLocaleDateString()}</span> },
+    { key: 'date', header: 'Booking Date', render: (b) => <span className="text-sm text-content-secondary">{b.scheduledDate ? new Date(b.scheduledDate).toLocaleDateString() : 'Not scheduled'}</span> },
     {
       key: 'address',
       header: 'Address',
