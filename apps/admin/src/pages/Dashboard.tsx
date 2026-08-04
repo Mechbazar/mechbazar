@@ -182,10 +182,20 @@ export default function Dashboard() {
                   <div className="flex items-center gap-4 overflow-hidden">
                     <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-lg bg-neutral-800 border border-neutral-800">
                       {product.images && product.images[0] ? (
-                        <img src={resolveUploadUrl(product.images[0])} alt={product.name} className="h-full w-full object-cover" />
-                      ) : (
-                        <ShoppingBag className="w-6 h-6 text-neutral-400" />
-                      )}
+                        <img
+                          src={resolveUploadUrl(product.images[0])}
+                          alt={product.name}
+                          className="h-full w-full object-cover"
+                          // A stored path that 404s or gets CSP-blocked (e.g.
+                          // an img-src allowlist gap) would otherwise render
+                          // the browser's native broken-image glyph forever --
+                          // fall back to the same placeholder used for
+                          // products with no image at all instead of leaving
+                          // a dead <img> in the DOM.
+                          onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }}
+                        />
+                      ) : null}
+                      <ShoppingBag className={`w-6 h-6 text-neutral-400 ${product.images && product.images[0] ? 'hidden' : ''}`} />
                     </div>
                     <div className="min-w-0 overflow-hidden">
                       <p className="truncate text-white font-bold">{product.name}</p>

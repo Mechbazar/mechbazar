@@ -12,8 +12,16 @@ export const getDashboardStats = async (req: Request, res: Response) => {
       prisma.inventory.count({ where: { availableStock: { lt: 10 } } })
     ]);
 
+    // The Dashboard card labels this "Today's Sales" -- it was previously an
+    // unfiltered all-time sum (and included cancelled orders), so it never
+    // actually reflected today. Scoped to orders created since local midnight,
+    // excluding CANCELLED, matching the convention getRevenueChart/
+    // getSalesReport below already use for "revenue".
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
     const revenueRes = await prisma.order.aggregate({
-      _sum: { finalAmount: true }
+      _sum: { finalAmount: true },
+      where: { createdAt: { gte: todayStart }, status: { not: 'CANCELLED' } },
     });
     const revenue = revenueRes._sum.finalAmount || 0;
 
