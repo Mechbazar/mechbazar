@@ -1169,6 +1169,61 @@ export const updateVendor = async (req: Request, res: Response): Promise<void> =
   }
 };
 
+// :id is the Vendor (profile) id, matching updateVendorStatus's convention --
+// NOT the User id updateVendor above uses. There was previously no delete
+// endpoint for a vendor at all.
+export const deleteVendor = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = String(req.params.id);
+    const vendor = await prisma.vendor.findUnique({ where: { id } });
+    if (!vendor) {
+      res.status(404).json({ error: 'Vendor not found' });
+      return;
+    }
+
+    const soldCount = await prisma.orderItem.count({ where: { product: { vendorId: id } } });
+    if (soldCount > 0) {
+      res.status(400).json({ error: 'Cannot delete a vendor with existing sales. Disable them instead.' });
+      return;
+    }
+
+    // No onDelete cascade exists in the schema. The sales guard above means
+    // none of this vendor's products have ever been ordered, but they can
+    // still carry unsold-product footprint -- wishlists, warehouse
+    // inventory (and that inventory's own stock-movement ledger), stock
+    // transfers, purchase order lines -- every one of which has to be
+    // cleared before the products (and then the vendor, then the user) can
+    // be deleted, or the final delete throws an opaque FK-violation 500.
+    // Mirrors deleteTechnician's identical reasoning for its own userId
+    // cleanup below.
+    await prisma.$transaction([
+      prisma.stockMovement.deleteMany({ where: { inventory: { product: { vendorId: id } } } }),
+      prisma.inventory.deleteMany({ where: { product: { vendorId: id } } }),
+      prisma.stockTransfer.deleteMany({ where: { product: { vendorId: id } } }),
+      prisma.purchaseOrderItem.deleteMany({ where: { product: { vendorId: id } } }),
+      prisma.productCompatibility.deleteMany({ where: { product: { vendorId: id } } }),
+      prisma.wishlist.deleteMany({ where: { product: { vendorId: id } } }),
+      prisma.review.deleteMany({ where: { product: { vendorId: id } } }),
+      prisma.product.deleteMany({ where: { vendorId: id } }),
+      prisma.vendorDocument.deleteMany({ where: { vendorId: id } }),
+      prisma.vendorBankAccount.deleteMany({ where: { vendorId: id } }),
+      prisma.vendorSettlement.deleteMany({ where: { vendorId: id } }),
+      prisma.vendor.delete({ where: { id } }),
+      prisma.notification.deleteMany({ where: { userId: vendor.userId } }),
+      prisma.address.deleteMany({ where: { userId: vendor.userId } }),
+      prisma.supportTicket.deleteMany({ where: { userId: vendor.userId } }),
+      prisma.auditLog.deleteMany({ where: { userId: vendor.userId } }),
+      prisma.stockMovement.deleteMany({ where: { userId: vendor.userId } }),
+      prisma.user.delete({ where: { id: vendor.userId } }),
+    ]);
+
+    res.status(200).json({ message: 'Vendor deleted' });
+  } catch (error) {
+    console.error('Error deleting vendor:', error);
+    res.status(500).json({ error: 'Failed to delete vendor' });
+  }
+};
+
 // ----------------------------------------------------
 // NEW VENDOR PORTAL APIs (Dashboard, Inventory, Profile, Edit/Delete Product)
 // ----------------------------------------------------

@@ -263,7 +263,12 @@ export default function MechanicsPage() {
   const handleDelete = async (technician: any) => {
     if (!confirm(`Delete ${technician.name}? This cannot be undone.`)) return;
     try {
-      await axios.delete(`${API_URL}/technicians/${technician.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      // technician.id is the User id -- DELETE /technicians/:id expects the
+      // ServiceTechnician (profile) id, same as every other technicianProfile-
+      // scoped call on this page (suspend/activate/earnings). Passing the
+      // wrong id here made every delete 404 with "Technician not found"
+      // before it could even reach the technician's own data.
+      await axios.delete(`${API_URL}/technicians/${technician.technicianProfile.id}`, { headers: { Authorization: `Bearer ${token}` } });
       fetchTechnicians();
     } catch (error: any) {
       alert(error.response?.data?.error || 'Failed to delete technician');

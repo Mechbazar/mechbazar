@@ -3,8 +3,9 @@ import {
   getVendors,
   getTopVendors,
   createVendor,
-  updateVendor, 
+  updateVendor,
   updateVendorStatus,
+  deleteVendor,
   loginVendor,
   registerPersonal,
   updateBusinessDetails,
@@ -85,6 +86,9 @@ router.get('/', authenticate, authorize(admins), getVendors);
 router.post('/', authenticate, authorize(admins), createVendor);
 router.put('/:id', authenticate, authorize(admins), updateVendor);
 router.patch('/:id/status', authenticate, authorize(admins), updateVendorStatus);
+// :id here is the Vendor (profile) id, same convention as the status route
+// above -- not the User id PUT /:id uses.
+router.delete('/:id', authenticate, authorize(admins), deleteVendor);
 router.get('/settlements', authenticate, authorize(admins), getAllSettlements);
 router.patch('/settlements/:id/status', authenticate, authorize(admins), updateSettlementStatus);
 

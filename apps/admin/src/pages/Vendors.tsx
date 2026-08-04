@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import type { RootState } from '../store';
-import { Store, Phone, Search, Plus, Eye, FileText, Landmark, Building, FileCheck, MapPin, Package } from 'lucide-react';
+import { Store, Phone, Search, Plus, Eye, FileText, Landmark, Building, FileCheck, MapPin, Package, Trash2 } from 'lucide-react';
 import { Button, Badge, Dialog, Input, Loader } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
 import AddressMapPicker from '../components/maps/AddressMapPicker';
@@ -151,6 +151,18 @@ export default function Vendors() {
     }
   };
 
+  const handleDelete = async (vendor: any) => {
+    if (!confirm(`Delete ${vendor.vendorProfile?.storeName || vendor.name}? This cannot be undone.`)) return;
+    try {
+      // vendor.id is the User id -- DELETE /vendors/:id expects the Vendor
+      // (profile) id, same convention as the status route above.
+      await axios.delete(`${API_URL}/vendors/${vendor.vendorProfile.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      fetchVendors();
+    } catch (error: any) {
+      alert(error.response?.data?.error || 'Failed to delete vendor');
+    }
+  };
+
   const filteredVendors = vendors.filter(v => {
     if (searchQuery) {
       const search = searchQuery.toLowerCase();
@@ -256,11 +268,17 @@ export default function Vendors() {
                         <FileCheck className="w-4 h-4 mr-1" /> Review KYC
                       </button>
                     )}
-                    <button 
+                    <button
                       onClick={() => handleOpenEditModal(vendor)}
                       className="text-brand-primary hover:text-brand-secondary text-sm font-medium transition-colors"
                     >
                       Edit
+                    </button>
+                    <button
+                      onClick={() => handleDelete(vendor)}
+                      className="text-danger-500 hover:text-danger-400 text-sm font-medium transition-colors inline-flex items-center"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </td>
                 </tr>

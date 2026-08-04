@@ -1009,10 +1009,21 @@ export const deleteTechnician = async (req: Request, res: Response): Promise<voi
     // FK-violation 500 -- reachable the moment a technician's user account
     // has ever filed a support ticket, added an address, or triggered an
     // audit log entry.
+    //
+    // jobDispatchOffer/jobLocationPing/serviceReview were previously missing
+    // here -- the bookingCount guard above only catches technicians who were
+    // actually ASSIGNED a booking, not ones who were merely offered one by the
+    // old auto-dispatch fan-out and declined/expired/lost it to someone else.
+    // Any technician with dispatch-offer history (which is most of them, from
+    // before the switch to admin-controlled assignment) hit an opaque FK
+    // violation on serviceTechnician.delete with zero bookings on record.
     await prisma.$transaction([
       prisma.technicianDocument.deleteMany({ where: { technicianId: id } }),
       prisma.technicianBankAccount.deleteMany({ where: { technicianId: id } }),
       prisma.technicianSettlement.deleteMany({ where: { technicianId: id } }),
+      prisma.jobDispatchOffer.deleteMany({ where: { technicianId: id } }),
+      prisma.jobLocationPing.deleteMany({ where: { technicianId: id } }),
+      prisma.serviceReview.deleteMany({ where: { technicianId: id } }),
       prisma.serviceTechnician.delete({ where: { id } }),
       prisma.notification.deleteMany({ where: { userId: technician.userId } }),
       prisma.address.deleteMany({ where: { userId: technician.userId } }),
