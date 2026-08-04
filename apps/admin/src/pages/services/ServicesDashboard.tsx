@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
+import { motion } from 'framer-motion';
 import type { RootState } from '../../store';
-import { ClipboardList, CalendarCheck, IndianRupee, Clock, CheckCircle, XCircle, Wrench, Users, Ban, Star, TrendingUp } from 'lucide-react';
-import { Card, Badge, Loader } from '@mechbazar/shared/web';
+import { ClipboardList, TrendingUp, Wrench, Star } from 'lucide-react';
+import { Card, Badge, Loader, StatCard, Icon3D } from '../../components/ui';
 import { API_URL } from '../../config/api';
+import { fadeInUp } from '../../utils/motion';
 
 interface DashboardStats {
   totalBookings: number;
@@ -52,61 +54,68 @@ export default function ServicesDashboard() {
     return <Loader fullScreen />;
   }
 
-  const statCards = [
-    { title: "Today's Bookings", value: stats.todayBookings, icon: CalendarCheck, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { title: 'Pending Jobs', value: stats.pendingBookings, icon: Clock, color: 'text-warning-500', bg: 'bg-warning-500/10' },
-    { title: 'Active Jobs', value: stats.activeBookings, icon: Wrench, color: 'text-primary-500', bg: 'bg-primary-500/10' },
-    { title: 'Completed Jobs', value: stats.completedBookings, icon: CheckCircle, color: 'text-success-500', bg: 'bg-success-500/10' },
-    { title: 'Cancelled Jobs', value: stats.cancelledBookings, icon: XCircle, color: 'text-danger-500', bg: 'bg-danger-500/10' },
-    { title: 'Rejected Jobs', value: stats.rejectedBookings, icon: Ban, color: 'text-danger-400', bg: 'bg-danger-500/10' },
-    { title: "Today's Revenue", value: `₹${stats.todayRevenue.toLocaleString()}`, icon: IndianRupee, color: 'text-green-500', bg: 'bg-green-500/10' },
-    { title: 'Total Revenue', value: `₹${stats.revenue.toLocaleString()}`, icon: IndianRupee, color: 'text-green-500', bg: 'bg-green-500/10' },
-    { title: 'Average Rating', value: stats.averageRating.toFixed(1), icon: Star, color: 'text-warning-400', bg: 'bg-warning-500/10' },
-    { title: 'Technicians Online', value: stats.techniciansOnline, icon: Wrench, color: 'text-success-500', bg: 'bg-success-500/10' },
-    { title: 'Technicians Offline', value: stats.techniciansOffline, icon: Wrench, color: 'text-neutral-400', bg: 'bg-neutral-500/10' },
-    { title: 'Total Customers', value: stats.totalCustomers, icon: Users, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-  ];
-
-  const statusBadgeVariant = (status: string) => {
+  const statusBadgeVariant = (status: string): 'success' | 'danger' | 'secondary' => {
     if (status === 'COMPLETED') return 'success';
     if (status === 'CANCELLED' || status === 'REJECTED') return 'danger';
-    if (status === 'PENDING' || status === 'CONFIRMED') return 'secondary';
     return 'secondary';
   };
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        {statCards.map((stat, idx) => (
-          <Card key={idx} variant="dark">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-neutral-400 text-sm font-medium mb-1">{stat.title}</p>
-                <h3 className="text-3xl font-bold text-white">{stat.value}</h3>
-              </div>
-              <div className={`p-4 rounded-full ${stat.bg}`}>
-                <stat.icon className={`w-8 h-8 ${stat.color}`} />
-              </div>
-            </div>
-          </Card>
-        ))}
+    <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="space-y-6">
+      <div>
+        <h2 className="text-xl font-bold text-content-primary tracking-tight flex items-center gap-3">
+          <Icon3D name="service_catalog" size={28} eager /> Services Overview
+        </h2>
+        <p className="text-content-secondary mt-1 text-sm">Live snapshot of bookings, revenue, and mechanic performance</p>
       </div>
 
-      <Card variant="dark">
-        <h3 className="text-xl font-bold text-white mb-4">Recent Bookings</h3>
-        <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <StatCard title="Today's Bookings" value={stats.todayBookings} icon="bookings" gradient="blue" />
+        <StatCard title="Pending Jobs" value={stats.pendingBookings} icon="bell" gradient="amber" />
+        <StatCard title="Active Jobs" value={stats.activeBookings} icon="mechanics" gradient="indigo" />
+        <StatCard title="Completed Jobs" value={stats.completedBookings} icon="check" gradient="green" />
+        <StatCard title="Cancelled Jobs" value={stats.cancelledBookings} icon="shield" gradient="red" />
+        <StatCard title="Rejected Jobs" value={stats.rejectedBookings} icon="audit" gradient="red" />
+        <StatCard title="Today's Revenue" value={stats.todayRevenue} valuePrefix="₹" icon="revenue" gradient="green" />
+        <StatCard title="Total Revenue" value={stats.revenue} valuePrefix="₹" icon="payouts" gradient="green" />
+
+        <Card className="relative overflow-hidden">
+          <div className="flex items-start justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-content-secondary truncate">Average Rating</p>
+              <p className="mt-2 text-2xl font-bold text-content-primary tabular-nums flex items-center gap-1.5">
+                {stats.averageRating.toFixed(1)}
+                <Star size={16} className="text-warning-400 fill-warning-400" />
+              </p>
+            </div>
+            <div className="shrink-0 h-12 w-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-400 flex items-center justify-center shadow-card">
+              <Icon3D name="star" size={28} eager />
+            </div>
+          </div>
+        </Card>
+
+        <StatCard title="Technicians Online" value={stats.techniciansOnline} icon="mechanics" gradient="green" />
+        <StatCard title="Technicians Offline" value={stats.techniciansOffline} icon="mechanics" gradient="indigo" />
+        <StatCard title="Total Customers" value={stats.totalCustomers} icon="customers" gradient="purple" />
+      </div>
+
+      <Card>
+        <h3 className="text-lg font-bold text-content-primary mb-4 flex items-center gap-2">
+          <ClipboardList size={18} className="text-brand-primary" /> Recent Bookings
+        </h3>
+        <div className="space-y-3">
           {recentBookings.length === 0 ? (
-            <p className="text-neutral-400 text-sm">No service bookings yet.</p>
+            <p className="text-content-muted text-sm">No service bookings yet.</p>
           ) : (
             recentBookings.map((b) => (
-              <div key={b.id} className="flex items-center justify-between gap-4 rounded-2xl border border-neutral-800 bg-neutral-950 p-4">
+              <div key={b.id} className="flex items-center justify-between gap-4 rounded-xl border border-border-default bg-surface-sunken p-4">
                 <div className="flex items-center gap-4">
-                  <div className="rounded-lg bg-primary-500/10 p-2 text-primary-500">
+                  <div className="rounded-lg bg-brand-primary/10 p-2 text-brand-primary">
                     <ClipboardList className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="font-bold text-white">#{b.bookingNumber}</p>
-                    <p className="text-sm text-neutral-400">{b.package?.name} • {b.user?.name || 'Unknown'} • ₹{b.finalAmount}</p>
+                    <p className="font-bold text-content-primary">#{b.bookingNumber}</p>
+                    <p className="text-sm text-content-muted">{b.package?.name} · {b.user?.name || 'Unknown'} · ₹{b.finalAmount}</p>
                   </div>
                 </div>
                 <Badge variant={statusBadgeVariant(b.status)}>{b.status.replace(/_/g, ' ')}</Badge>
@@ -117,44 +126,50 @@ export default function ServicesDashboard() {
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Card variant="dark">
-          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary-500" /> Top Services</h3>
+        <Card>
+          <h3 className="text-lg font-bold text-content-primary mb-4 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-brand-primary" /> Top Services
+          </h3>
           <div className="space-y-3">
             {stats.topServices.length === 0 ? (
-              <p className="text-neutral-400 text-sm">No completed bookings yet.</p>
+              <p className="text-content-muted text-sm">No completed bookings yet.</p>
             ) : (
               stats.topServices.map((s) => (
-                <div key={s.packageId} className="flex items-center justify-between gap-4 rounded-2xl border border-neutral-800 bg-neutral-950 p-4">
+                <div key={s.packageId} className="flex items-center justify-between gap-4 rounded-xl border border-border-default bg-surface-sunken p-4">
                   <div>
-                    <p className="font-bold text-white">{s.name}</p>
-                    <p className="text-sm text-neutral-400">{s.bookings} booking{s.bookings === 1 ? '' : 's'}</p>
+                    <p className="font-bold text-content-primary">{s.name}</p>
+                    <p className="text-sm text-content-muted">{s.bookings} booking{s.bookings === 1 ? '' : 's'}</p>
                   </div>
-                  <p className="text-primary-500 font-bold">₹{s.revenue.toLocaleString()}</p>
+                  <p className="text-brand-primary font-bold">₹{s.revenue.toLocaleString()}</p>
                 </div>
               ))
             )}
           </div>
         </Card>
 
-        <Card variant="dark">
-          <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2"><Wrench className="w-5 h-5 text-primary-500" /> Top Mechanics</h3>
+        <Card>
+          <h3 className="text-lg font-bold text-content-primary mb-4 flex items-center gap-2">
+            <Wrench className="w-5 h-5 text-brand-primary" /> Top Mechanics
+          </h3>
           <div className="space-y-3">
             {stats.topMechanics.length === 0 ? (
-              <p className="text-neutral-400 text-sm">No completed jobs yet.</p>
+              <p className="text-content-muted text-sm">No completed jobs yet.</p>
             ) : (
               stats.topMechanics.map((m) => (
-                <div key={m.technicianId} className="flex items-center justify-between gap-4 rounded-2xl border border-neutral-800 bg-neutral-950 p-4">
+                <div key={m.technicianId} className="flex items-center justify-between gap-4 rounded-xl border border-border-default bg-surface-sunken p-4">
                   <div>
-                    <p className="font-bold text-white">{m.name}</p>
-                    <p className="text-sm text-neutral-400 flex items-center gap-1"><Star className="w-3 h-3 text-warning-400" /> {m.rating.toFixed(1)}</p>
+                    <p className="font-bold text-content-primary">{m.name}</p>
+                    <p className="text-sm text-content-muted flex items-center gap-1">
+                      <Star className="w-3 h-3 text-warning-400" /> {m.rating.toFixed(1)}
+                    </p>
                   </div>
-                  <p className="text-white font-bold">{m.completedJobs} job{m.completedJobs === 1 ? '' : 's'}</p>
+                  <p className="text-content-primary font-bold">{m.completedJobs} job{m.completedJobs === 1 ? '' : 's'}</p>
                 </div>
               ))
             )}
           </div>
         </Card>
       </div>
-    </div>
+    </motion.div>
   );
 }

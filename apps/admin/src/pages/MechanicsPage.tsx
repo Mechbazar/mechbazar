@@ -1,18 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
 import type { RootState } from '../store';
 import {
-  Wrench, Search, Phone, CheckCircle, XCircle, Plus, FileText, Landmark, Eye, FileCheck, MapPin, Star,
-  Users, Wifi, WifiOff, ShieldCheck, ShieldAlert, PauseCircle, PlayCircle, Trash2, ClipboardList, Wallet,
+  Search, Phone, CheckCircle, XCircle, Plus, FileText, Landmark, Eye, FileCheck, MapPin, Star,
+  PauseCircle, PlayCircle, Trash2, ClipboardList, Wallet,
 } from 'lucide-react';
-import { Button, Card, Badge, Dialog, Input, Loader } from '@mechbazar/shared/web';
+import { Button, Card, Badge, Modal, Input, Checkbox, Loader, StatCard, EmptyState, Icon3D } from '../components/ui';
 import { API_URL } from '../config/api';
 import AddressMapPicker from '../components/maps/AddressMapPicker';
 import PlaceAutocompleteField from '../components/maps/PlaceAutocompleteField';
 import LocationMapView from '../components/maps/LocationMapView';
 import type { GeocodeSuccess } from '../services/geocode.service';
+import { fadeInUp } from '../utils/motion';
 
 const KYC_REVIEWABLE = new Set(['PENDING', 'UNDER_VERIFICATION', 'RESUBMISSION_REQUIRED']);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -20,14 +23,14 @@ const PHONE_REGEX = /^\d{10}$/;
 
 const getKycStatusBadge = (status: string) => {
   switch (status) {
-    case 'APPROVED': return <Badge variant="success" className="!rounded-full">Approved</Badge>;
-    case 'PENDING': return <Badge variant="neutral" className="!rounded-full">Not Submitted</Badge>;
-    case 'UNDER_VERIFICATION': return <Badge variant="warning" className="!rounded-full animate-pulse">Needs Review</Badge>;
-    case 'RESUBMISSION_REQUIRED': return <Badge variant="warning" className="!rounded-full">Resubmission Requested</Badge>;
-    case 'REJECTED': return <Badge variant="danger" className="!rounded-full">Rejected</Badge>;
-    case 'SUSPENDED': return <Badge variant="danger" className="!rounded-full">Suspended</Badge>;
-    case 'BLOCKED': return <Badge variant="danger" className="!rounded-full">Blocked</Badge>;
-    default: return <Badge variant="neutral" className="!rounded-full">{status || 'N/A'}</Badge>;
+    case 'APPROVED': return <Badge variant="success" size="sm">Approved</Badge>;
+    case 'PENDING': return <Badge variant="neutral" size="sm">Not Submitted</Badge>;
+    case 'UNDER_VERIFICATION': return <Badge variant="warning" size="sm" className="animate-pulse">Needs Review</Badge>;
+    case 'RESUBMISSION_REQUIRED': return <Badge variant="warning" size="sm">Resubmission Requested</Badge>;
+    case 'REJECTED': return <Badge variant="danger" size="sm">Rejected</Badge>;
+    case 'SUSPENDED': return <Badge variant="danger" size="sm">Suspended</Badge>;
+    case 'BLOCKED': return <Badge variant="danger" size="sm">Blocked</Badge>;
+    default: return <Badge variant="neutral" size="sm">{status || 'N/A'}</Badge>;
   }
 };
 
@@ -85,6 +88,7 @@ export default function MechanicsPage() {
   useEffect(() => {
     if (!token) return;
     fetchTechnicians();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   const fetchTechnicians = async () => {
@@ -163,6 +167,15 @@ export default function MechanicsPage() {
     }
     setShowModal(true);
   };
+
+  // Lets the Dashboard's "Add Mechanic" quick action (?action=create) jump
+  // straight into this page's existing create flow instead of duplicating
+  // the mechanic-creation form there.
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('action') === 'create') handleOpenModal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const toggleSpecialization = (type: string) => {
     setFormData((prev) => ({
@@ -247,7 +260,7 @@ export default function MechanicsPage() {
       await axios.patch(`${API_URL}/technicians/${technician.technicianProfile.id}/status`, { status: 'SUSPENDED' }, { headers: { Authorization: `Bearer ${token}` } });
       fetchTechnicians();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to suspend technician');
+      toast.error(error.response?.data?.error || 'Failed to suspend technician');
     }
   };
 
@@ -256,7 +269,7 @@ export default function MechanicsPage() {
       await axios.patch(`${API_URL}/technicians/${technician.technicianProfile.id}/status`, { status: 'APPROVED' }, { headers: { Authorization: `Bearer ${token}` } });
       fetchTechnicians();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to activate technician');
+      toast.error(error.response?.data?.error || 'Failed to activate technician');
     }
   };
 
@@ -271,7 +284,7 @@ export default function MechanicsPage() {
       await axios.delete(`${API_URL}/technicians/${technician.technicianProfile.id}`, { headers: { Authorization: `Bearer ${token}` } });
       fetchTechnicians();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to delete technician');
+      toast.error(error.response?.data?.error || 'Failed to delete technician');
     }
   };
 
@@ -289,7 +302,7 @@ export default function MechanicsPage() {
       setShowReviewModal(false);
       fetchTechnicians();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to update technician status');
+      toast.error(error.response?.data?.error || 'Failed to update technician status');
     } finally {
       setReviewSubmitting(false);
     }
@@ -305,7 +318,7 @@ export default function MechanicsPage() {
       window.open(url, '_blank');
     } catch (error) {
       console.error('Failed to load document', error);
-      alert('Failed to load document.');
+      toast.error('Failed to load document.');
     }
   };
 
@@ -338,103 +351,91 @@ export default function MechanicsPage() {
     }
   };
 
+  const statCards = [
+    { key: 'ALL' as const, label: 'Total', value: stats.total, icon: 'mechanics' as const, gradient: 'red' as const },
+    { key: 'ONLINE' as const, label: 'Online', value: stats.online, icon: 'check' as const, gradient: 'green' as const },
+    { key: 'BUSY' as const, label: 'Busy', value: stats.busy, icon: 'gear' as const, gradient: 'amber' as const },
+    { key: 'OFFLINE' as const, label: 'Offline', value: stats.offline, icon: 'mechanics' as const, gradient: 'indigo' as const },
+    { key: 'PENDING' as const, label: 'Pending Approval', value: stats.pendingApproval, icon: 'shield' as const, gradient: 'amber' as const },
+    { key: 'ALL' as const, label: 'Verified', value: stats.verified, icon: 'check' as const, gradient: 'green' as const },
+    { key: 'SUSPENDED' as const, label: 'Suspended', value: stats.suspended, icon: 'shield' as const, gradient: 'red' as const },
+  ];
+
   return (
-    <div className="space-y-6 pb-12">
+    <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="space-y-6 pb-12">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-brand-light flex items-center">
-          <Wrench className="w-8 h-8 mr-3 text-brand-primary" />
-          Mechanics
+        <h1 className="text-2xl font-bold text-content-primary flex items-center gap-3">
+          <Icon3D name="mechanics" size={30} eager /> Mechanics
         </h1>
-        <Button onClick={() => handleOpenModal()}>
-          <Plus className="w-5 h-5 mr-1" /> Add Mechanic
-        </Button>
+        <Button icon={<Plus className="w-4 h-4" />} onClick={() => handleOpenModal()}>Add Mechanic</Button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        {[
-          { key: 'ALL', label: 'Total', value: stats.total, icon: Users, color: 'text-brand-primary' },
-          { key: 'ONLINE', label: 'Online', value: stats.online, icon: Wifi, color: 'text-success-500' },
-          { key: 'BUSY', label: 'Busy', value: stats.busy, icon: Wrench, color: 'text-warning-500' },
-          { key: 'OFFLINE', label: 'Offline', value: stats.offline, icon: WifiOff, color: 'text-neutral-400' },
-          { key: 'PENDING', label: 'Pending Approval', value: stats.pendingApproval, icon: ShieldAlert, color: 'text-warning-500' },
-          { key: 'ALL', label: 'Verified', value: stats.verified, icon: ShieldCheck, color: 'text-success-500' },
-          { key: 'SUSPENDED', label: 'Suspended', value: stats.suspended, icon: PauseCircle, color: 'text-danger-500' },
-        ].map((s, idx) => (
-          <Card key={idx} variant="dark" className="cursor-pointer" onClick={() => setFilter(s.key as any)}>
-            <div className="flex items-center gap-3">
-              <s.icon className={`w-6 h-6 ${s.color}`} />
-              <div>
-                <p className="text-neutral-400 text-xs font-medium">{s.label}</p>
-                <p className="text-xl font-bold text-white">{s.value}</p>
-              </div>
-            </div>
-          </Card>
+        {statCards.map((s, idx) => (
+          <StatCard key={idx} title={s.label} value={s.value} icon={s.icon} gradient={s.gradient} onClick={() => setFilter(s.key)} />
         ))}
       </div>
 
-      <div className="bg-brand-panel border border-brand-border rounded-xl p-4 flex items-center">
-        <Search className="w-5 h-5 text-brand-muted mr-3" />
+      <Card padding="sm" className="flex items-center gap-3">
+        <Search className="w-5 h-5 text-content-muted shrink-0" />
         <input
           type="text"
           placeholder="Search by name, phone, or skill..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="bg-transparent border-none focus:outline-none text-brand-light w-full"
+          className="bg-transparent border-none focus:outline-none text-content-primary w-full text-sm"
         />
-      </div>
+      </Card>
 
       {loading ? (
         <Loader fullScreen />
       ) : filteredTechnicians.length === 0 ? (
-        <div className="bg-brand-panel border border-brand-border rounded-xl p-12 text-center">
-          <Wrench className="w-12 h-12 text-brand-muted mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-brand-light mb-2">No Mechanics Found</h3>
-          <p className="text-brand-muted mb-6">No mechanics match your criteria.</p>
-          <Button onClick={() => handleOpenModal()}>Add Your First Mechanic</Button>
-        </div>
+        <Card>
+          <EmptyState icon="mechanics" title="No Mechanics Found" description="No mechanics match your criteria." action={<Button onClick={() => handleOpenModal()}>Add Your First Mechanic</Button>} />
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTechnicians.map((technician) => (
-            <Card key={technician.id} variant="dark" className="relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4">
+            <Card key={technician.id} className="relative overflow-hidden">
+              <div className="absolute top-4 right-4">
                 {technician.technicianProfile?.isOnline ? (
-                  <Badge variant="success" className="!rounded-full flex items-center">
-                    <span className="w-2 h-2 rounded-full bg-success-500 mr-2 animate-pulse"></span> Online
+                  <Badge variant="success" size="sm" className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-success-500 animate-pulse"></span> Online
                   </Badge>
                 ) : (
-                  <Badge variant="neutral" className="!rounded-full flex items-center">
-                    <span className="w-2 h-2 rounded-full bg-neutral-400 mr-2"></span> Offline
+                  <Badge variant="neutral" size="sm" className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-content-muted"></span> Offline
                   </Badge>
                 )}
               </div>
 
-              <div className="flex items-center mb-4 mt-2">
-                <div className="w-12 h-12 rounded-full bg-brand-dark flex items-center justify-center text-xl font-bold text-brand-primary border border-brand-border">
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 rounded-full bg-surface-sunken flex items-center justify-center text-xl font-bold text-brand-primary border border-border-default">
                   {technician.name ? technician.name.charAt(0).toUpperCase() : 'T'}
                 </div>
                 <div className="ml-4">
-                  <h3 className="text-lg font-bold text-brand-light">{technician.name || 'Unnamed Mechanic'}</h3>
-                  <div className="flex items-center text-xs text-brand-muted mt-1">
+                  <h3 className="text-base font-bold text-content-primary">{technician.name || 'Unnamed Mechanic'}</h3>
+                  <div className="flex items-center text-xs text-content-muted mt-1">
                     <Phone className="w-3 h-3 mr-1" /> {technician.phone}
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-3 mb-6 bg-brand-dark p-3 rounded-lg border border-brand-border">
+              <div className="space-y-3 mb-4 bg-surface-sunken p-3 rounded-xl border border-border-default">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-brand-muted">Specializations</span>
-                  <span className="text-sm font-bold text-brand-light">{(technician.technicianProfile?.specializations || []).join(', ') || 'N/A'}</span>
+                  <span className="text-xs text-content-muted">Specializations</span>
+                  <span className="text-sm font-semibold text-content-primary">{(technician.technicianProfile?.specializations || []).join(', ') || 'N/A'}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-brand-muted">Rating</span>
-                  <span className="text-sm font-bold text-brand-light flex items-center gap-1"><Star className="w-3 h-3 text-warning-400" /> {(technician.technicianProfile?.rating || 0).toFixed(1)} ({technician.technicianProfile?.totalJobs || 0} jobs)</span>
+                  <span className="text-xs text-content-muted">Rating</span>
+                  <span className="text-sm font-semibold text-content-primary flex items-center gap-1"><Star className="w-3 h-3 text-warning-400" /> {(technician.technicianProfile?.rating || 0).toFixed(1)} ({technician.technicianProfile?.totalJobs || 0} jobs)</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-brand-muted">Current Jobs</span>
-                  <span className="text-sm font-bold text-brand-light">{technician.technicianProfile?.currentJobs || 0}</span>
+                  <span className="text-xs text-content-muted">Current Jobs</span>
+                  <span className="text-sm font-semibold text-content-primary">{technician.technicianProfile?.currentJobs || 0}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-brand-muted">KYC Status</span>
+                  <span className="text-xs text-content-muted">KYC Status</span>
                   {getKycStatusBadge(technician.technicianProfile?.status)}
                 </div>
                 {technician.technicianProfile?.currentLat != null && technician.technicianProfile?.currentLng != null && (
@@ -446,7 +447,7 @@ export default function MechanicsPage() {
                     <a
                       href={`https://www.google.com/maps?q=${technician.technicianProfile.currentLat},${technician.technicianProfile.currentLng}`}
                       target="_blank" rel="noreferrer"
-                      className="flex items-center justify-between text-brand-primary hover:text-brand-secondary text-xs font-bold"
+                      className="flex items-center justify-between text-brand-primary hover:text-brand-accent text-xs font-bold"
                     >
                       <span className="flex items-center gap-1"><MapPin className="w-3 h-3" /> Open in Google Maps</span>
                     </a>
@@ -457,53 +458,53 @@ export default function MechanicsPage() {
               {KYC_REVIEWABLE.has(technician.technicianProfile?.status) && (
                 <button
                   onClick={() => handleOpenReviewModal(technician)}
-                  className="w-full mb-3 flex items-center justify-center text-yellow-500 hover:text-yellow-400 text-sm font-bold transition-colors border border-brand-border rounded-lg py-2"
+                  className="w-full mb-3 flex items-center justify-center text-warning-600 dark:text-warning-400 hover:text-warning-500 text-sm font-bold transition-colors border border-border-default rounded-xl py-2"
                 >
                   <FileCheck className="w-4 h-4 mr-1" /> Review KYC Application
                 </button>
               )}
 
               <div className="grid grid-cols-2 gap-2 mb-3">
-                <button onClick={() => navigate('/service-bookings?filter=pending')} className="flex items-center justify-center gap-1 text-xs font-bold text-brand-primary hover:text-brand-secondary border border-brand-border rounded-lg py-2">
+                <button onClick={() => navigate('/service-bookings?filter=pending')} className="flex items-center justify-center gap-1 text-xs font-bold text-brand-primary hover:text-brand-accent border border-border-default rounded-xl py-2">
                   <ClipboardList className="w-3.5 h-3.5" /> Assign Jobs
                 </button>
-                <button onClick={() => openJobsModal(technician)} className="flex items-center justify-center gap-1 text-xs font-bold text-brand-light hover:text-brand-primary border border-brand-border rounded-lg py-2">
+                <button onClick={() => openJobsModal(technician)} className="flex items-center justify-center gap-1 text-xs font-bold text-content-primary hover:text-brand-primary border border-border-default rounded-xl py-2">
                   <CheckCircle className="w-3.5 h-3.5" /> Completed Jobs
                 </button>
-                <button onClick={() => openEarningsModal(technician)} className="flex items-center justify-center gap-1 text-xs font-bold text-brand-light hover:text-brand-primary border border-brand-border rounded-lg py-2">
+                <button onClick={() => openEarningsModal(technician)} className="flex items-center justify-center gap-1 text-xs font-bold text-content-primary hover:text-brand-primary border border-border-default rounded-xl py-2">
                   <Wallet className="w-3.5 h-3.5" /> Earnings
                 </button>
                 {technician.technicianProfile?.status === 'SUSPENDED' ? (
-                  <button onClick={() => handleActivate(technician)} className="flex items-center justify-center gap-1 text-xs font-bold text-success-500 hover:text-success-400 border border-brand-border rounded-lg py-2">
+                  <button onClick={() => handleActivate(technician)} className="flex items-center justify-center gap-1 text-xs font-bold text-success-600 dark:text-success-400 hover:text-success-500 border border-border-default rounded-xl py-2">
                     <PlayCircle className="w-3.5 h-3.5" /> Activate
                   </button>
                 ) : (
-                  <button onClick={() => handleSuspend(technician)} className="flex items-center justify-center gap-1 text-xs font-bold text-warning-500 hover:text-warning-400 border border-brand-border rounded-lg py-2">
+                  <button onClick={() => handleSuspend(technician)} className="flex items-center justify-center gap-1 text-xs font-bold text-warning-600 dark:text-warning-400 hover:text-warning-500 border border-border-default rounded-xl py-2">
                     <PauseCircle className="w-3.5 h-3.5" /> Suspend
                   </button>
                 )}
               </div>
 
-              <div className="flex items-center justify-between border-t border-brand-border pt-4">
-                <div className="flex space-x-2">
-                  <button onClick={() => handleOpenModal(technician)} className="text-brand-primary hover:text-brand-secondary text-sm font-bold transition-colors">Edit</button>
-                  <span className="text-brand-border">|</span>
+              <div className="flex items-center justify-between border-t border-border-default pt-4">
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleOpenModal(technician)} className="text-brand-primary hover:text-brand-accent text-sm font-bold transition-colors">Edit</button>
+                  <span className="text-border-default">|</span>
                   <button
                     onClick={() => handleToggleStatus(technician)}
-                    className={`text-sm font-bold transition-colors ${technician.technicianProfile?.isActive ? 'text-brand-muted hover:text-red-400' : 'text-green-500 hover:text-green-400'}`}
+                    className={`text-sm font-bold transition-colors ${technician.technicianProfile?.isActive ? 'text-content-muted hover:text-danger-500' : 'text-success-500 hover:text-success-400'}`}
                   >
                     {technician.technicianProfile?.isActive ? 'Disable' : 'Enable'}
                   </button>
-                  <span className="text-brand-border">|</span>
-                  <button onClick={() => handleDelete(technician)} className="text-brand-muted hover:text-red-400 transition-colors" title="Delete">
+                  <span className="text-border-default">|</span>
+                  <button onClick={() => handleDelete(technician)} className="text-content-muted hover:text-danger-500 transition-colors" title="Delete">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
                 <div>
                   {technician.technicianProfile?.isActive ? (
-                    <span className="flex items-center text-xs font-medium text-brand-muted"><CheckCircle className="w-4 h-4 mr-1 text-green-500" /> Active</span>
+                    <span className="flex items-center text-xs font-medium text-content-muted"><CheckCircle className="w-4 h-4 mr-1 text-success-500" /> Active</span>
                   ) : (
-                    <span className="flex items-center text-xs font-medium text-brand-muted"><XCircle className="w-4 h-4 mr-1 text-red-500" /> Inactive</span>
+                    <span className="flex items-center text-xs font-medium text-content-muted"><XCircle className="w-4 h-4 mr-1 text-danger-500" /> Inactive</span>
                   )}
                 </div>
               </div>
@@ -513,7 +514,7 @@ export default function MechanicsPage() {
       )}
 
       {showReviewModal && activeTechnician && (
-        <Dialog
+        <Modal
           isOpen={showReviewModal}
           onClose={() => setShowReviewModal(false)}
           title="Review Mechanic Application"
@@ -528,23 +529,23 @@ export default function MechanicsPage() {
         >
           <div className="space-y-8 flex-1">
             <div>
-              <h4 className="text-lg font-bold text-brand-primary mb-4 flex items-center border-b border-brand-border pb-2">
-                <Wrench className="w-5 h-5 mr-2" /> Personal & Skill Details
+              <h4 className="text-base font-bold text-brand-primary mb-4 flex items-center border-b border-border-default pb-2">
+                <Icon3D name="mechanics" size={20} className="mr-2" /> Personal & Skill Details
               </h4>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                <div><p className="text-sm text-brand-muted">Full Name</p><p className="font-medium text-brand-light">{activeTechnician.name}</p></div>
-                <div><p className="text-sm text-brand-muted">Phone</p><p className="font-medium text-brand-light">{activeTechnician.phone}</p></div>
-                <div><p className="text-sm text-brand-muted">Email</p><p className="font-medium text-brand-light">{activeTechnician.email || 'N/A'}</p></div>
-                <div><p className="text-sm text-brand-muted">Address / Service Area</p><p className="font-medium text-brand-light">{activeTechnician.technicianProfile?.addressLine || 'N/A'}, {activeTechnician.technicianProfile?.city} {activeTechnician.technicianProfile?.pincode}</p></div>
-                <div><p className="text-sm text-brand-muted">Aadhaar Number</p><p className="font-medium text-brand-light">{activeTechnician.technicianProfile?.aadhaarNumber || 'N/A'}</p></div>
-                <div><p className="text-sm text-brand-muted">Specializations</p><p className="font-medium text-brand-light">{(activeTechnician.technicianProfile?.specializations || []).join(', ') || 'N/A'}</p></div>
-                <div><p className="text-sm text-brand-muted">Skills</p><p className="font-medium text-brand-light">{(activeTechnician.technicianProfile?.skills || []).join(', ') || 'N/A'}</p></div>
-                <div><p className="text-sm text-brand-muted">Experience</p><p className="font-medium text-brand-light">{activeTechnician.technicianProfile?.experienceYears != null ? `${activeTechnician.technicianProfile.experienceYears} years` : 'N/A'}</p></div>
-                <div><p className="text-sm text-brand-muted">Emergency Contact</p><p className="font-medium text-brand-light">{activeTechnician.technicianProfile?.emergencyContactName || 'N/A'} — {activeTechnician.technicianProfile?.emergencyContactPhone || ''}</p></div>
+                <div><p className="text-sm text-content-muted">Full Name</p><p className="font-medium text-content-primary">{activeTechnician.name}</p></div>
+                <div><p className="text-sm text-content-muted">Phone</p><p className="font-medium text-content-primary">{activeTechnician.phone}</p></div>
+                <div><p className="text-sm text-content-muted">Email</p><p className="font-medium text-content-primary">{activeTechnician.email || 'N/A'}</p></div>
+                <div><p className="text-sm text-content-muted">Address / Service Area</p><p className="font-medium text-content-primary">{activeTechnician.technicianProfile?.addressLine || 'N/A'}, {activeTechnician.technicianProfile?.city} {activeTechnician.technicianProfile?.pincode}</p></div>
+                <div><p className="text-sm text-content-muted">Aadhaar Number</p><p className="font-medium text-content-primary">{activeTechnician.technicianProfile?.aadhaarNumber || 'N/A'}</p></div>
+                <div><p className="text-sm text-content-muted">Specializations</p><p className="font-medium text-content-primary">{(activeTechnician.technicianProfile?.specializations || []).join(', ') || 'N/A'}</p></div>
+                <div><p className="text-sm text-content-muted">Skills</p><p className="font-medium text-content-primary">{(activeTechnician.technicianProfile?.skills || []).join(', ') || 'N/A'}</p></div>
+                <div><p className="text-sm text-content-muted">Experience</p><p className="font-medium text-content-primary">{activeTechnician.technicianProfile?.experienceYears != null ? `${activeTechnician.technicianProfile.experienceYears} years` : 'N/A'}</p></div>
+                <div><p className="text-sm text-content-muted">Emergency Contact</p><p className="font-medium text-content-primary">{activeTechnician.technicianProfile?.emergencyContactName || 'N/A'} — {activeTechnician.technicianProfile?.emergencyContactPhone || ''}</p></div>
               </div>
               {(activeTechnician.technicianProfile?.formattedAddress || activeTechnician.technicianProfile?.lat != null) && (
                 <div className="mt-4 space-y-2">
-                  <p className="text-sm text-brand-muted flex items-center"><MapPin className="w-4 h-4 mr-1" /> {activeTechnician.technicianProfile.formattedAddress || 'KYC address location'}</p>
+                  <p className="text-sm text-content-muted flex items-center"><MapPin className="w-4 h-4 mr-1" /> {activeTechnician.technicianProfile.formattedAddress || 'KYC address location'}</p>
                   <LocationMapView
                     markers={activeTechnician.technicianProfile.lat != null ? [{ id: 'kyc-address', lat: activeTechnician.technicianProfile.lat, lng: activeTechnician.technicianProfile.lng }] : []}
                     height={200}
@@ -555,23 +556,23 @@ export default function MechanicsPage() {
             </div>
 
             <div>
-              <h4 className="text-lg font-bold text-brand-primary mb-4 flex items-center border-b border-brand-border pb-2">
+              <h4 className="text-base font-bold text-brand-primary mb-4 flex items-center border-b border-border-default pb-2">
                 <Landmark className="w-5 h-5 mr-2" /> Bank Details
               </h4>
               {activeTechnician.technicianProfile?.bankAccounts && activeTechnician.technicianProfile.bankAccounts.length > 0 ? (
-                <div className="bg-brand-dark/50 p-4 rounded-xl border border-brand-border grid grid-cols-2 gap-4">
-                  <div><p className="text-sm text-brand-muted">Bank Name</p><p className="font-medium text-brand-light">{activeTechnician.technicianProfile.bankAccounts[0].bankName}</p></div>
-                  <div><p className="text-sm text-brand-muted">Account Holder</p><p className="font-medium text-brand-light">{activeTechnician.technicianProfile.bankAccounts[0].accountHolderName}</p></div>
-                  <div><p className="text-sm text-brand-muted">Account Number</p><p className="font-medium text-brand-light">{activeTechnician.technicianProfile.bankAccounts[0].accountNumber}</p></div>
-                  <div><p className="text-sm text-brand-muted">IFSC Code</p><p className="font-medium text-brand-light">{activeTechnician.technicianProfile.bankAccounts[0].ifscCode}</p></div>
+                <div className="bg-surface-sunken p-4 rounded-xl border border-border-default grid grid-cols-2 gap-4">
+                  <div><p className="text-sm text-content-muted">Bank Name</p><p className="font-medium text-content-primary">{activeTechnician.technicianProfile.bankAccounts[0].bankName}</p></div>
+                  <div><p className="text-sm text-content-muted">Account Holder</p><p className="font-medium text-content-primary">{activeTechnician.technicianProfile.bankAccounts[0].accountHolderName}</p></div>
+                  <div><p className="text-sm text-content-muted">Account Number</p><p className="font-medium text-content-primary">{activeTechnician.technicianProfile.bankAccounts[0].accountNumber}</p></div>
+                  <div><p className="text-sm text-content-muted">IFSC Code</p><p className="font-medium text-content-primary">{activeTechnician.technicianProfile.bankAccounts[0].ifscCode}</p></div>
                 </div>
               ) : (
-                <p className="text-brand-muted text-sm italic">No bank details provided.</p>
+                <p className="text-content-muted text-sm italic">No bank details provided.</p>
               )}
             </div>
 
             <div>
-              <h4 className="text-lg font-bold text-brand-primary mb-4 flex items-center border-b border-brand-border pb-2">
+              <h4 className="text-base font-bold text-brand-primary mb-4 flex items-center border-b border-border-default pb-2">
                 <FileText className="w-5 h-5 mr-2" /> Uploaded Documents (Profile Photo, Aadhaar/ID, Driving License)
               </h4>
               {activeTechnician.technicianProfile?.documents && activeTechnician.technicianProfile.documents.length > 0 ? (
@@ -580,87 +581,84 @@ export default function MechanicsPage() {
                     <button
                       key={doc.id}
                       onClick={() => viewDocument(activeTechnician.technicianProfile.id, doc.id)}
-                      className="flex flex-col items-center justify-center p-6 bg-brand-dark hover:bg-brand-primary/10 border border-brand-border hover:border-brand-primary rounded-xl transition-all group"
+                      className="flex flex-col items-center justify-center p-6 bg-surface-sunken hover:bg-brand-primary/10 border border-border-default hover:border-brand-primary rounded-xl transition-all group"
                     >
-                      <FileText className="w-10 h-10 text-brand-muted group-hover:text-brand-primary mb-2 transition-colors" />
-                      <span className="text-sm font-bold text-brand-light group-hover:text-brand-primary transition-colors">{doc.type.replace(/_/g, ' ')}</span>
-                      <span className="text-xs text-brand-muted mt-1">{doc.status}</span>
-                      <span className="text-xs text-brand-muted mt-1 flex items-center"><Eye className="w-3 h-3 mr-1" /> View Document</span>
+                      <FileText className="w-10 h-10 text-content-muted group-hover:text-brand-primary mb-2 transition-colors" />
+                      <span className="text-sm font-bold text-content-primary group-hover:text-brand-primary transition-colors">{doc.type.replace(/_/g, ' ')}</span>
+                      <span className="text-xs text-content-muted mt-1">{doc.status}</span>
+                      <span className="text-xs text-content-muted mt-1 flex items-center"><Eye className="w-3 h-3 mr-1" /> View Document</span>
                     </button>
                   ))}
                 </div>
               ) : (
-                <p className="text-brand-muted text-sm italic">No documents uploaded.</p>
+                <p className="text-content-muted text-sm italic">No documents uploaded.</p>
               )}
             </div>
 
             <div>
-              <h4 className="text-lg font-bold text-brand-primary mb-2">Remarks</h4>
+              <h4 className="text-base font-bold text-brand-primary mb-2">Remarks</h4>
               <textarea
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
                 placeholder="Add a note for the mechanic (e.g. which document to resubmit and why)..."
-                className="w-full bg-brand-dark border border-brand-border rounded-lg px-4 py-2 text-brand-light focus:outline-none focus:border-brand-primary"
+                className="w-full bg-surface-card border border-border-default rounded-xl px-4 py-2 text-content-primary focus:outline-none focus:ring-4 focus:ring-brand-primary/30 focus:border-brand-primary"
                 rows={3}
               />
             </div>
           </div>
-        </Dialog>
+        </Modal>
       )}
 
-      <Dialog isOpen={!!jobsModalTechnician} onClose={() => setJobsModalTechnician(null)} title={`Completed Jobs — ${jobsModalTechnician?.name || ''}`} size="lg">
+      <Modal isOpen={!!jobsModalTechnician} onClose={() => setJobsModalTechnician(null)} title={`Completed Jobs — ${jobsModalTechnician?.name || ''}`} size="lg">
         {jobsLoading ? <Loader /> : completedJobs.length === 0 ? (
-          <p className="text-brand-muted text-sm py-8 text-center">No completed jobs yet.</p>
+          <EmptyState icon="check" title="No completed jobs yet" />
         ) : (
           <div className="space-y-2">
             {completedJobs.map((j) => (
-              <div key={j.id} className="flex justify-between items-center bg-brand-dark p-3 rounded-lg border border-brand-border">
+              <div key={j.id} className="flex justify-between items-center bg-surface-sunken p-3 rounded-xl border border-border-default">
                 <div>
-                  <p className="font-medium text-brand-light text-sm">#{j.bookingNumber} — {j.package?.name}</p>
-                  <p className="text-xs text-brand-muted">{j.user?.name}</p>
+                  <p className="font-medium text-content-primary text-sm">#{j.bookingNumber} — {j.package?.name}</p>
+                  <p className="text-xs text-content-muted">{j.user?.name}</p>
                 </div>
-                <p className="text-sm font-bold text-brand-light">₹{j.finalAmount}</p>
+                <p className="text-sm font-bold text-content-primary">₹{j.finalAmount}</p>
               </div>
             ))}
           </div>
         )}
-      </Dialog>
+      </Modal>
 
-      <Dialog isOpen={!!earningsModalTechnician} onClose={() => setEarningsModalTechnician(null)} title={`Earnings — ${earningsModalTechnician?.name || ''}`}>
+      <Modal isOpen={!!earningsModalTechnician} onClose={() => setEarningsModalTechnician(null)} title={`Earnings — ${earningsModalTechnician?.name || ''}`}>
         {earningsLoading || !earnings ? <Loader /> : (
           <div className="space-y-3">
-            <div className="flex justify-between bg-brand-dark p-3 rounded-lg border border-brand-border"><span className="text-brand-muted text-sm">Wallet Balance</span><span className="font-bold text-brand-light">₹{earnings.walletBalance}</span></div>
-            <div className="flex justify-between bg-brand-dark p-3 rounded-lg border border-brand-border"><span className="text-brand-muted text-sm">Total Earned</span><span className="font-bold text-brand-light">₹{earnings.totalEarned}</span></div>
-            <div className="flex justify-between bg-brand-dark p-3 rounded-lg border border-brand-border"><span className="text-brand-muted text-sm">Today's Earnings</span><span className="font-bold text-brand-light">₹{earnings.todayEarned}</span></div>
+            <div className="flex justify-between bg-surface-sunken p-3 rounded-xl border border-border-default"><span className="text-content-muted text-sm">Wallet Balance</span><span className="font-bold text-content-primary">₹{earnings.walletBalance}</span></div>
+            <div className="flex justify-between bg-surface-sunken p-3 rounded-xl border border-border-default"><span className="text-content-muted text-sm">Total Earned</span><span className="font-bold text-content-primary">₹{earnings.totalEarned}</span></div>
+            <div className="flex justify-between bg-surface-sunken p-3 rounded-xl border border-border-default"><span className="text-content-muted text-sm">Today's Earnings</span><span className="font-bold text-content-primary">₹{earnings.todayEarned}</span></div>
           </div>
         )}
-      </Dialog>
+      </Modal>
 
-      <Dialog isOpen={showModal} onClose={() => setShowModal(false)} title={isEditing ? 'Edit Mechanic' : 'Add New Mechanic'}>
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={isEditing ? 'Edit Mechanic' : 'Add New Mechanic'}>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {formError ? <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</div> : null}
+          {formError ? <div className="rounded-xl border border-danger-500/30 bg-danger-500/10 px-3 py-2 text-sm text-danger-600 dark:text-danger-400">{formError}</div> : null}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Input label="Mechanic Name" type="text" required value={formData.name} onChange={(e) => { setFormData({ ...formData, name: e.target.value }); if (fieldErrors.name) setFieldErrors((p) => ({ ...p, name: '' })); }} />
-              {fieldErrors.name ? <p className="mt-1 text-xs text-red-500">{fieldErrors.name}</p> : null}
+              <Input label="Mechanic Name" type="text" required value={formData.name} onChange={(e) => { setFormData({ ...formData, name: e.target.value }); if (fieldErrors.name) setFieldErrors((p) => ({ ...p, name: '' })); }} error={fieldErrors.name} />
             </div>
             <div>
-              <Input label="Phone Number" type="tel" required value={formData.phone} onChange={(e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 10); setFormData({ ...formData, phone: d }); if (fieldErrors.phone) setFieldErrors((p) => ({ ...p, phone: '' })); }} disabled={isEditing} />
-              {fieldErrors.phone ? <p className="mt-1 text-xs text-red-500">{fieldErrors.phone}</p> : null}
+              <Input label="Phone Number" type="tel" required value={formData.phone} onChange={(e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 10); setFormData({ ...formData, phone: d }); if (fieldErrors.phone) setFieldErrors((p) => ({ ...p, phone: '' })); }} disabled={isEditing} error={fieldErrors.phone} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Input label="Email Address" type="email" value={formData.email} onChange={(e) => { setFormData({ ...formData, email: e.target.value.trim() }); if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: '' })); }} />
-              {fieldErrors.email ? <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p> : null}
+              <Input label="Email Address" type="email" value={formData.email} onChange={(e) => { setFormData({ ...formData, email: e.target.value.trim() }); if (fieldErrors.email) setFieldErrors((p) => ({ ...p, email: '' })); }} error={fieldErrors.email} />
             </div>
             <Input label="City" type="text" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} />
           </div>
 
           <div className="space-y-3 pt-2">
-            <p className="text-sm font-bold text-brand-light flex items-center"><MapPin className="w-4 h-4 mr-2" /> KYC Address / Service Location</p>
+            <p className="text-sm font-bold text-content-primary flex items-center"><MapPin className="w-4 h-4 mr-2" /> KYC Address / Service Location</p>
             <PlaceAutocompleteField onSelect={applyGeocodeResult} placeholder="Search for mechanic's address" />
             <AddressMapPicker
               latitude={formData.lat}
@@ -676,16 +674,13 @@ export default function MechanicsPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-brand-muted mb-1">Vehicle Specializations</label>
+            <label className="block text-sm font-medium text-content-secondary mb-1.5">Vehicle Specializations</label>
             <div className="flex gap-4">
               {['CAR', 'BIKE'].map((type) => (
-                <label key={type} className="flex items-center gap-2 text-brand-light text-sm">
-                  <input type="checkbox" checked={formData.specializations.includes(type)} onChange={() => toggleSpecialization(type)} className="w-4 h-4 text-brand-primary bg-brand-dark border-brand-border rounded" />
-                  {type}
-                </label>
+                <Checkbox key={type} label={type} checked={formData.specializations.includes(type)} onChange={() => toggleSpecialization(type)} />
               ))}
             </div>
-            {fieldErrors.specializations ? <p className="mt-1 text-xs text-red-500">{fieldErrors.specializations}</p> : null}
+            {fieldErrors.specializations ? <p className="mt-1 text-xs text-danger-500">{fieldErrors.specializations}</p> : null}
           </div>
 
           <Input label="Skills (comma separated)" type="text" value={formData.skills} onChange={(e) => setFormData({ ...formData, skills: e.target.value })} placeholder="e.g. Battery, Brakes, AC Repair" />
@@ -693,23 +688,17 @@ export default function MechanicsPage() {
 
           {isEditing && (
             <div className="flex flex-col space-y-3 pt-2">
-              <div className="flex items-center space-x-2">
-                <input type="checkbox" id="isActive" checked={formData.isActive} onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })} className="w-4 h-4 text-brand-primary bg-brand-dark border-brand-border rounded" />
-                <label htmlFor="isActive" className="text-sm font-medium text-brand-light">Account is Active</label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <input type="checkbox" id="isOnline" checked={formData.isOnline} onChange={(e) => setFormData({ ...formData, isOnline: e.target.checked })} className="w-4 h-4 text-green-500 bg-brand-dark border-brand-border rounded" />
-                <label htmlFor="isOnline" className="text-sm font-medium text-brand-light">Mark as Online</label>
-              </div>
+              <Checkbox label="Account is Active" checked={formData.isActive} onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })} />
+              <Checkbox label="Mark as Online" checked={formData.isOnline} onChange={(e) => setFormData({ ...formData, isOnline: e.target.checked })} />
             </div>
           )}
 
-          <div className="flex space-x-4 mt-6 pt-4">
-            <button type="button" onClick={() => setShowModal(false)} className="flex-1 bg-brand-dark text-brand-light px-4 py-2 rounded-lg font-bold hover:bg-gray-800 transition-colors">Cancel</button>
+          <div className="flex gap-4 mt-6 pt-4">
+            <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowModal(false)}>Cancel</Button>
             <Button type="submit" className="flex-1">{isEditing ? 'Save Changes' : 'Create Mechanic'}</Button>
           </div>
         </form>
-      </Dialog>
-    </div>
+      </Modal>
+    </motion.div>
   );
 }

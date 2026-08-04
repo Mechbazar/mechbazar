@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
 import type { RootState } from '../store';
 import {
-  Package,
   CheckCircle,
   AlertCircle,
   X,
@@ -16,8 +17,10 @@ import {
   ImagePlus,
   ArrowLeft
 } from 'lucide-react';
-import { Button, Card, Badge, Dialog, Input } from '@mechbazar/shared/web';
+import { Button, Card, Badge, Modal, Input, Select, DataTable, EmptyState, StatCard, Icon3D } from '../components/ui';
+import type { Column } from '../components/ui';
 import { API_URL, resolveUploadUrl } from '../config/api';
+import { fadeInUp } from '../utils/motion';
 
 export default function Products() {
   const { token } = useSelector((state: RootState) => state.auth);
@@ -156,7 +159,7 @@ export default function Products() {
       setIsModalOpen(false);
     } catch (err) {
       console.error(err);
-      alert('Failed to save product');
+      toast.error('Failed to save product');
     }
   };
 
@@ -169,7 +172,7 @@ export default function Products() {
       setActionMenuId(null);
     } catch (error) {
       console.error('Failed to update status', error);
-      alert('Failed to update status. Check permissions.');
+      toast.error('Failed to update status. Check permissions.');
     }
   };
 
@@ -183,7 +186,7 @@ export default function Products() {
       setActionMenuId(null);
     } catch (error: any) {
       console.error('Failed to delete', error);
-      alert(error.response?.data?.error || 'Failed to delete product');
+      toast.error(error.response?.data?.error || 'Failed to delete product');
     }
   };
 
@@ -213,7 +216,7 @@ export default function Products() {
       setActionMenuId(null);
     } catch (error) {
       console.error('Failed to duplicate', error);
-      alert('Failed to duplicate product');
+      toast.error('Failed to duplicate product');
     }
   };
 
@@ -222,7 +225,7 @@ export default function Products() {
       p.oemNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.partNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.vendor?.storeName?.toLowerCase().includes(searchQuery.toLowerCase());
-      
+
     if (statusFilter && statusFilter === 'PENDING') return matchesSearch && p.status === 'PENDING';
     if (statusFilter && statusFilter === 'LOW_STOCK') return matchesSearch && p.stock < (p.lowStockThreshold || 10);
     return matchesSearch;
@@ -231,353 +234,338 @@ export default function Products() {
   const getStatusBadge = (status: string) => {
     switch(status) {
       case 'APPROVED':
-        return <Badge variant="success" className="!rounded-full flex items-center w-fit"><CheckCircle className="w-3 h-3 mr-1" /> Live</Badge>;
+        return <Badge variant="success" className="flex items-center gap-1 w-fit"><CheckCircle className="w-3 h-3" /> Live</Badge>;
       case 'PENDING':
-        return <Badge variant="warning" className="!rounded-full flex items-center w-fit animate-pulse"><AlertCircle className="w-3 h-3 mr-1" /> Pending</Badge>;
+        return <Badge variant="warning" className="flex items-center gap-1 w-fit animate-pulse"><AlertCircle className="w-3 h-3" /> Pending</Badge>;
       case 'REJECTED':
-        return <Badge variant="danger" className="!rounded-full flex items-center w-fit"><X className="w-3 h-3 mr-1" /> Rejected</Badge>;
+        return <Badge variant="danger" className="flex items-center gap-1 w-fit"><X className="w-3 h-3" /> Rejected</Badge>;
       case 'INACTIVE':
-        return <Badge variant="neutral" className="!rounded-full flex items-center w-fit"><X className="w-3 h-3 mr-1" /> Draft/Inactive</Badge>;
+        return <Badge variant="neutral" className="flex items-center gap-1 w-fit"><X className="w-3 h-3" /> Draft/Inactive</Badge>;
       default:
-        return <Badge variant="neutral" className="!rounded-full">{status}</Badge>;
+        return <Badge variant="neutral" className="w-fit">{status}</Badge>;
     }
   };
 
-  return (
-    <div className="p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
+  const columns: Column<any>[] = [
+    {
+      key: 'name',
+      header: 'Product Name',
+      render: (p) => (
         <div>
-          <Link to="/vendors" className="text-sm text-neutral-400 hover:text-primary-500 flex items-center gap-1 mb-2">
+          <p className="text-content-primary font-bold">{p.name}</p>
+          {p.oemNumber && <p className="text-content-muted text-xs mt-1">OEM: {p.oemNumber}</p>}
+        </div>
+      ),
+    },
+    {
+      key: 'vendor',
+      header: 'Vendor / Source',
+      render: (p) => (
+        <div>
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="bg-surface-sunken px-3 py-1 rounded-full text-xs text-content-primary border border-border-default block w-fit">
+              {p.category?.name || 'Uncategorized'}
+            </span>
+            <Badge variant={p.vehicleType === 'BIKE' ? 'warning' : 'neutral'} size="sm">
+              {p.vehicleType === 'BIKE' ? '🏍️ Bike' : '🚗 Car'}
+            </Badge>
+          </div>
+          <span className="text-xs font-bold text-brand-primary">
+            {p.vendor?.storeName || 'Internal Warehouse'}
+          </span>
+        </div>
+      ),
+    },
+    {
+      key: 'price',
+      header: 'Prices (Retail/B2B)',
+      render: (p) => (
+        <div>
+          <div className="text-content-primary font-bold">₹{p.price}</div>
+          <div className="text-content-muted text-xs line-through">₹{p.mrp}</div>
+          {p.b2bPrice != null && (
+            <div className="text-brand-primary text-xs font-semibold mt-0.5">B2B: ₹{p.b2bPrice}</div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'stock',
+      header: 'Stock',
+      render: (p) => (
+        <Badge variant={p.stock > (p.lowStockThreshold || 10) ? 'success' : 'danger'} className="w-fit">
+          {p.stock} in stock
+        </Badge>
+      ),
+    },
+    { key: 'status', header: 'Status', render: (p) => getStatusBadge(p.status || 'APPROVED') },
+    {
+      key: 'actions',
+      header: 'Actions',
+      headerClassName: 'text-right',
+      className: 'text-right',
+      render: (p) => (
+        <div className="relative inline-block text-left">
+          <button
+            onClick={() => setActionMenuId(actionMenuId === p.id ? null : p.id)}
+            className="text-content-muted hover:text-brand-primary p-2 transition-colors"
+          >
+            <MoreVertical className="w-5 h-5" />
+          </button>
+
+          {actionMenuId === p.id && (
+            <div className="absolute right-0 mt-2 w-48 rounded-xl shadow-popover bg-surface-overlay ring-1 ring-border-default z-20">
+              <div className="py-1" role="menu" aria-orientation="vertical">
+                <button
+                  onClick={() => handleOpenForm(p)}
+                  className="w-full text-left px-4 py-2 text-sm text-content-secondary hover:bg-surface-hover flex items-center gap-2"
+                >
+                  <Edit className="w-4 h-4" /> Edit
+                </button>
+                <button
+                  onClick={() => handleDuplicate(p)}
+                  className="w-full text-left px-4 py-2 text-sm text-content-secondary hover:bg-surface-hover flex items-center gap-2"
+                >
+                  <Copy className="w-4 h-4" /> Duplicate
+                </button>
+                {p.status !== 'INACTIVE' ? (
+                  <button
+                    onClick={() => updateProductStatus(p.id, 'INACTIVE')}
+                    className="w-full text-left px-4 py-2 text-sm text-warning-600 dark:text-warning-400 hover:bg-surface-hover flex items-center gap-2"
+                  >
+                    <AlertCircle className="w-4 h-4" /> Mark Draft
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => updateProductStatus(p.id, 'APPROVED')}
+                    className="w-full text-left px-4 py-2 text-sm text-success-600 dark:text-success-400 hover:bg-surface-hover flex items-center gap-2"
+                  >
+                    <CheckCircle className="w-4 h-4" /> Set Live
+                  </button>
+                )}
+                {p.status === 'PENDING' && (
+                  <button
+                    onClick={() => updateProductStatus(p.id, 'APPROVED')}
+                    className="w-full text-left px-4 py-2 text-sm text-success-600 dark:text-success-400 hover:bg-surface-hover flex items-center gap-2"
+                  >
+                    <CheckCircle className="w-4 h-4" /> Approve
+                  </button>
+                )}
+                <button
+                  onClick={() => handleDelete(p.id)}
+                  className="w-full text-left px-4 py-2 text-sm text-danger-500 hover:bg-danger-500/10 flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" /> Delete
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <Link to="/vendors" className="text-sm text-content-muted hover:text-brand-primary flex items-center gap-1 mb-2 transition-colors">
             <ArrowLeft className="w-4 h-4" /> Back to Vendors
           </Link>
-          <h2 className="text-3xl font-bold text-neutral-100 tracking-tight flex items-center">
-            <Package className="w-8 h-8 mr-3 text-primary-500" />
-            Vendor Product Catalog
+          <h2 className="text-2xl font-bold text-content-primary tracking-tight flex items-center gap-3">
+            <Icon3D name="warehouses" size={30} eager /> Vendor Product Catalog
           </h2>
-          <p className="text-neutral-400 mt-1">Review vendor products, manage inventory, pricing, and B2B discounts</p>
+          <p className="text-content-secondary mt-1 text-sm">Review vendor products, manage inventory, pricing, and B2B discounts</p>
         </div>
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <Card
-          variant="dark"
-          className={`cursor-pointer ${statusFilter === null ? '!border-primary-500' : ''}`}
-          onClick={() => setStatusFilter(null)}
-        >
-          <p className="text-neutral-400 text-sm font-medium">Total Products</p>
-          <p className="text-3xl font-bold text-neutral-100 mt-2">{products.length}</p>
-        </Card>
-        <Card
-          variant="dark"
-          className={`cursor-pointer ${statusFilter === 'PENDING' ? '!border-warning-500' : ''}`}
-          onClick={() => setStatusFilter('PENDING')}
-        >
-          <p className="text-neutral-400 text-sm font-medium">Pending Review</p>
-          <p className="text-3xl font-bold text-warning-500 mt-2">{products.filter(p => p.status === 'PENDING').length}</p>
-        </Card>
-        <Card
-          variant="dark"
-          className={`cursor-pointer ${statusFilter === 'LOW_STOCK' ? '!border-danger-500' : ''}`}
-          onClick={() => setStatusFilter('LOW_STOCK')}
-        >
-          <p className="text-neutral-400 text-sm font-medium">Low Stock Alerts</p>
-          <p className="text-3xl font-bold text-danger-500 mt-2">{products.filter(p => p.stock < (p.lowStockThreshold || 10)).length}</p>
-        </Card>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <StatCard title="Total Products" value={products.length} icon="warehouses" gradient="blue" onClick={() => setStatusFilter(null)} />
+        <StatCard title="Pending Review" value={products.filter(p => p.status === 'PENDING').length} icon="gear" gradient="amber" onClick={() => setStatusFilter('PENDING')} />
+        <StatCard title="Low Stock Alerts" value={products.filter(p => p.stock < (p.lowStockThreshold || 10)).length} icon="megaphone" gradient="red" onClick={() => setStatusFilter('LOW_STOCK')} />
       </div>
 
-      <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex items-center mb-6">
-        <Search className="w-5 h-5 text-neutral-400 mr-3" />
-        <input
-          type="text"
-          placeholder="Search by product name, OEM, or vendor..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="bg-transparent border-none focus:outline-none text-neutral-100 w-full"
-        />
-      </div>
-
-      {/* Data Table */}
-      <div className="bg-neutral-900 shadow-sm rounded-2xl border border-neutral-800 overflow-visible">
-        <div className="overflow-x-auto min-h-[400px]">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-neutral-950 border-b border-neutral-800 text-neutral-400 text-sm uppercase tracking-wider">
-                <th className="p-5 font-semibold">Product Name</th>
-                <th className="p-5 font-semibold">Vendor / Source</th>
-                <th className="p-5 font-semibold">Prices (Retail/B2B)</th>
-                <th className="p-5 font-semibold">Stock</th>
-                <th className="p-5 font-semibold">Status</th>
-                <th className="p-5 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-800">
-              {filteredProducts.map((p) => (
-                <tr key={p.id} className="hover:bg-neutral-950/70 transition-colors">
-                  <td className="p-5">
-                    <p className="text-neutral-100 font-bold">{p.name}</p>
-                    <p className="text-neutral-400 text-xs mt-1">
-                      {p.oemNumber && <span>OEM: {p.oemNumber}</span>}
-                    </p>
-                  </td>
-                  <td className="p-5">
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="bg-neutral-950 px-3 py-1 rounded-full text-xs text-neutral-100 border border-neutral-800 block w-fit">
-                        {p.category?.name || 'Uncategorized'}
-                      </span>
-                      <Badge variant={p.vehicleType === 'BIKE' ? 'warning' : 'neutral'} className="!rounded-full !text-[10px]">
-                        {p.vehicleType === 'BIKE' ? '🏍️ Bike' : '🚗 Car'}
-                      </Badge>
-                    </div>
-                    <span className="text-xs font-bold text-primary-500">
-                      {p.vendor?.storeName || 'Internal Warehouse'}
-                    </span>
-                  </td>
-                  <td className="p-5">
-                    <div className="text-neutral-100 font-bold">₹{p.price}</div>
-                    <div className="text-neutral-400 text-xs line-through">₹{p.mrp}</div>
-                    {p.b2bPrice != null && (
-                      <div className="text-primary-500 text-xs font-semibold mt-0.5">B2B: ₹{p.b2bPrice}</div>
-                    )}
-                  </td>
-                  <td className="p-5">
-                    <Badge variant={p.stock > (p.lowStockThreshold || 10) ? 'success' : 'danger'} className="!rounded-full">
-                      {p.stock} in stock
-                    </Badge>
-                  </td>
-                  <td className="p-5">
-                    {getStatusBadge(p.status || 'APPROVED')}
-                  </td>
-                  <td className="p-5 text-right">
-                    <div className="relative inline-block text-left">
-                      <button 
-                        onClick={() => setActionMenuId(actionMenuId === p.id ? null : p.id)}
-                        className="text-neutral-400 hover:text-primary-500 p-2 transition-colors"
-                      >
-                        <MoreVertical className="w-5 h-5" />
-                      </button>
-
-                      {actionMenuId === p.id && (
-                        <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-neutral-950 border border-neutral-800 ring-1 ring-black ring-opacity-5 z-20">
-                          <div className="py-1" role="menu" aria-orientation="vertical">
-                            <button
-                              onClick={() => handleOpenForm(p)}
-                              className="w-full text-left px-4 py-2 text-sm text-neutral-100 hover:bg-neutral-900 flex items-center gap-2"
-                            >
-                              <Edit className="w-4 h-4" /> Edit
-                            </button>
-                            <button
-                              onClick={() => handleDuplicate(p)}
-                              className="w-full text-left px-4 py-2 text-sm text-neutral-100 hover:bg-neutral-900 flex items-center gap-2"
-                            >
-                              <Copy className="w-4 h-4" /> Duplicate
-                            </button>
-                            {p.status !== 'INACTIVE' ? (
-                              <button
-                                onClick={() => updateProductStatus(p.id, 'INACTIVE')}
-                                className="w-full text-left px-4 py-2 text-sm text-yellow-500 hover:bg-neutral-900 flex items-center gap-2"
-                              >
-                                <AlertCircle className="w-4 h-4" /> Mark Draft
-                              </button>
-                            ) : (
-                              <button
-                                onClick={() => updateProductStatus(p.id, 'APPROVED')}
-                                className="w-full text-left px-4 py-2 text-sm text-green-500 hover:bg-neutral-900 flex items-center gap-2"
-                              >
-                                <CheckCircle className="w-4 h-4" /> Set Live
-                              </button>
-                            )}
-                            {p.status === 'PENDING' && (
-                              <button
-                                onClick={() => updateProductStatus(p.id, 'APPROVED')}
-                                className="w-full text-left px-4 py-2 text-sm text-green-500 hover:bg-neutral-900 flex items-center gap-2"
-                              >
-                                <CheckCircle className="w-4 h-4" /> Approve
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleDelete(p.id)}
-                              className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-neutral-900 flex items-center gap-2"
-                            >
-                              <Trash2 className="w-4 h-4" /> Delete
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <Card padding="none" className="overflow-visible">
+        <div className="p-4 border-b border-border-default flex flex-wrap gap-3 justify-between items-center">
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-content-muted" />
+            <input
+              type="text"
+              placeholder="Search by product name, OEM, or vendor…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-surface-sunken border border-border-default rounded-xl pl-10 pr-4 py-2 text-sm text-content-primary outline-none focus:border-brand-primary w-72"
+            />
+          </div>
         </div>
-      </div>
+
+        <DataTable
+          columns={columns}
+          data={filteredProducts}
+          rowKey={(p) => p.id}
+          pageSize={10}
+          emptyState={<EmptyState icon="warehouses" title="No products found" description="Try a different search term." />}
+          className="rounded-none border-none shadow-none"
+        />
+      </Card>
 
       {/* Edit Product Modal -- edit-only, see handleOpenForm's note above */}
-      <Dialog
+      <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title="Edit Product"
         size="xl"
         footer={
           <>
-            <button onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 rounded-xl font-bold text-neutral-400 hover:text-neutral-100">Cancel</button>
+            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
             <Button onClick={handleSave}>Save Changes</Button>
           </>
         }
       >
-              <div className="grid grid-cols-2 gap-6">
-                <div className="col-span-2">
-                  <Input
-                    label="Product Name"
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                    placeholder="e.g. Castrol MAGNATEC 5W-30"
-                  />
-                </div>
+        <div className="grid grid-cols-2 gap-6">
+          <div className="col-span-2">
+            <Input
+              label="Product Name"
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({...formData, name: e.target.value})}
+              placeholder="e.g. Castrol MAGNATEC 5W-30"
+            />
+          </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-neutral-400 mb-2">Vehicle Type</label>
-                  <select
-                    value={formData.vehicleType}
-                    onChange={(e) => handleVehicleTypeChange(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-neutral-100 outline-none focus:border-primary-500"
-                  >
-                    <option value="CAR">Car</option>
-                    <option value="BIKE">Bike</option>
-                  </select>
-                </div>
+          <Select
+            label="Vehicle Type"
+            value={formData.vehicleType}
+            onChange={(e) => handleVehicleTypeChange(e.target.value)}
+          >
+            <option value="CAR">Car</option>
+            <option value="BIKE">Bike</option>
+          </Select>
 
-                <div>
-                  <label className="block text-sm font-semibold text-neutral-400 mb-2">Category</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value})}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-neutral-100 outline-none focus:border-primary-500"
-                  >
-                    {categoriesForVehicleType(formData.vehicleType).map((c) => (
-                      <option key={c.id} value={c.name}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
+          <Select
+            label="Category"
+            value={formData.category}
+            onChange={(e) => setFormData({...formData, category: e.target.value})}
+          >
+            {categoriesForVehicleType(formData.vehicleType).map((c) => (
+              <option key={c.id} value={c.name}>{c.name}</option>
+            ))}
+          </Select>
 
-                <Input
-                  label="OEM Part Number"
-                  type="text"
-                  value={formData.oem}
-                  onChange={(e) => setFormData({...formData, oem: e.target.value})}
-                />
+          <Input
+            label="OEM Part Number"
+            type="text"
+            value={formData.oem}
+            onChange={(e) => setFormData({...formData, oem: e.target.value})}
+          />
 
-                <Input
-                  label="Retail Price (₹)"
-                  type="number"
-                  value={formData.price}
-                  onChange={(e) => setFormData({...formData, price: e.target.value})}
-                />
+          <Input
+            label="Retail Price (₹)"
+            type="number"
+            value={formData.price}
+            onChange={(e) => setFormData({...formData, price: e.target.value})}
+          />
 
-                <Input
-                  label="MRP (₹)"
-                  type="number"
-                  value={formData.mrp}
-                  onChange={(e) => setFormData({...formData, mrp: e.target.value})}
-                />
+          <Input
+            label="MRP (₹)"
+            type="number"
+            value={formData.mrp}
+            onChange={(e) => setFormData({...formData, mrp: e.target.value})}
+          />
 
-                <div>
-                  <label className="block text-sm font-semibold text-primary-500 mb-2">B2B Wholesale Price (₹)</label>
-                  <input
-                    type="number"
-                    value={formData.b2bPrice}
-                    onChange={(e) => setFormData({...formData, b2bPrice: e.target.value})}
-                    className="w-full bg-primary-500/10 border border-primary-500/20 rounded-xl px-4 py-3 text-primary-500 outline-none focus:border-primary-500"
-                  />
-                </div>
+          <div>
+            <label className="block text-sm font-semibold text-brand-primary mb-1.5">B2B Wholesale Price (₹)</label>
+            <input
+              type="number"
+              value={formData.b2bPrice}
+              onChange={(e) => setFormData({...formData, b2bPrice: e.target.value})}
+              className="w-full bg-brand-primary/10 border border-brand-primary/20 rounded-xl px-3.5 py-2.5 text-sm text-brand-primary outline-none focus:border-brand-primary"
+            />
+          </div>
 
-                <Input
-                  label="Initial Stock"
-                  type="number"
-                  value={formData.stock}
-                  onChange={(e) => setFormData({...formData, stock: e.target.value})}
-                />
+          <Input
+            label="Initial Stock"
+            type="number"
+            value={formData.stock}
+            onChange={(e) => setFormData({...formData, stock: e.target.value})}
+          />
 
-                <Input
-                  label="Low Stock Threshold"
-                  type="number"
-                  value={formData.lowStockThreshold}
-                  onChange={(e) => setFormData({...formData, lowStockThreshold: e.target.value})}
-                />
+          <Input
+            label="Low Stock Threshold"
+            type="number"
+            value={formData.lowStockThreshold}
+            onChange={(e) => setFormData({...formData, lowStockThreshold: e.target.value})}
+          />
 
-                <div>
-                  <label className="block text-sm font-semibold text-neutral-400 mb-2">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) => setFormData({...formData, status: e.target.value})}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-neutral-100 outline-none focus:border-primary-500"
-                  >
-                    <option value="APPROVED">Live (Approved)</option>
-                    <option value="INACTIVE">Draft (Inactive)</option>
-                    <option value="PENDING">Pending Review</option>
-                  </select>
-                </div>
+          <Select
+            label="Status"
+            value={formData.status}
+            onChange={(e) => setFormData({...formData, status: e.target.value})}
+          >
+            <option value="APPROVED">Live (Approved)</option>
+            <option value="INACTIVE">Draft (Inactive)</option>
+            <option value="PENDING">Pending Review</option>
+          </Select>
 
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-neutral-400 mb-2">Product Images</label>
+          <div className="md:col-span-2">
+            <label className="block text-sm font-semibold text-content-secondary mb-2">Product Images</label>
 
-                  {formData.images.length > 0 && (
-                    <div className="flex flex-wrap gap-3 mb-3">
-                      {formData.images.map((url) => (
-                        <div key={url} className="relative">
-                          <img
-                            src={resolveUploadUrl(url)}
-                            alt="Product"
-                            className="h-20 w-20 rounded-xl object-cover border border-neutral-800"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveImage(url)}
-                            aria-label="Remove image"
-                            className="absolute -right-2 -top-2 rounded-full bg-danger-500 p-1 text-white hover:bg-danger-600"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  <input
-                    id="product-image-input"
-                    type="file"
-                    accept="image/*"
-                    disabled={uploadingImage}
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleImageUpload(file);
-                      // Reset so picking the same file twice still fires onChange.
-                      e.target.value = '';
-                    }}
-                  />
-                  <label
-                    htmlFor="product-image-input"
-                    className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border border-neutral-800 px-4 py-2 text-sm font-medium text-neutral-300 hover:border-primary-500 hover:text-primary-500 ${
-                      uploadingImage ? 'pointer-events-none opacity-60' : ''
-                    }`}
-                  >
-                    <ImagePlus className="h-4 w-4" />
-                    {uploadingImage ? 'Uploading…' : formData.images.length ? 'Add another image' : 'Upload image'}
-                  </label>
-
-                  {imageError && <p className="mt-2 text-sm text-danger-400">{imageError}</p>}
-                  {!formData.images.length && !imageError && (
-                    <p className="mt-2 text-sm text-neutral-500">
-                      Products saved without an image show a placeholder in the customer app.
-                    </p>
-                  )}
-                </div>
+            {formData.images.length > 0 && (
+              <div className="flex flex-wrap gap-3 mb-3">
+                {formData.images.map((url) => (
+                  <div key={url} className="relative">
+                    <img
+                      src={resolveUploadUrl(url)}
+                      alt="Product"
+                      className="h-20 w-20 rounded-xl object-cover border border-border-default"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(url)}
+                      aria-label="Remove image"
+                      className="absolute -right-2 -top-2 rounded-full bg-danger-500 p-1 text-white hover:bg-danger-600"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
               </div>
-      </Dialog>
-    </div>
+            )}
+
+            <input
+              id="product-image-input"
+              type="file"
+              accept="image/*"
+              disabled={uploadingImage}
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImageUpload(file);
+                // Reset so picking the same file twice still fires onChange.
+                e.target.value = '';
+              }}
+            />
+            <label
+              htmlFor="product-image-input"
+              className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border-default px-4 py-2 text-sm font-medium text-content-secondary hover:border-brand-primary hover:text-brand-primary transition-colors ${
+                uploadingImage ? 'pointer-events-none opacity-60' : ''
+              }`}
+            >
+              <ImagePlus className="h-4 w-4" />
+              {uploadingImage ? 'Uploading…' : formData.images.length ? 'Add another image' : 'Upload image'}
+            </label>
+
+            {imageError && <p className="mt-2 text-sm text-danger-500">{imageError}</p>}
+            {!formData.images.length && !imageError && (
+              <p className="mt-2 text-sm text-content-muted">
+                Products saved without an image show a placeholder in the customer app.
+              </p>
+            )}
+          </div>
+        </div>
+      </Modal>
+    </motion.div>
   );
 }

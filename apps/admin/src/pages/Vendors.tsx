@@ -1,19 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
 import type { RootState } from '../store';
-import { Store, Phone, Search, Plus, Eye, FileText, Landmark, Building, FileCheck, MapPin, Package, Trash2 } from 'lucide-react';
-import { Button, Badge, Dialog, Input, Loader } from '@mechbazar/shared/web';
+import { Phone, Plus, Eye, FileText, Landmark, Building, FileCheck, MapPin, Package, Trash2 } from 'lucide-react';
+import { Button, Badge, Card, Checkbox, DataTable, EmptyState, Input, Modal, Icon3D } from '../components/ui';
+import type { Column } from '../components/ui';
 import { API_URL } from '../config/api';
 import AddressMapPicker from '../components/maps/AddressMapPicker';
 import PlaceAutocompleteField from '../components/maps/PlaceAutocompleteField';
 import LocationMapView from '../components/maps/LocationMapView';
 import type { GeocodeSuccess } from '../services/geocode.service';
+import { fadeInUp } from '../utils/motion';
 
 const emptyAddress = {
   addressLine1: '', addressLine2: '', city: '', state: '', pincode: '', country: '',
   lat: null as number | null, lng: null as number | null, placeId: '', formattedAddress: '',
+};
+
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'APPROVED': return <Badge variant="success" size="sm" className="w-fit">Approved</Badge>;
+    case 'PENDING': return <Badge variant="warning" size="sm" className="w-fit animate-pulse">Needs Review</Badge>;
+    case 'UNDER_VERIFICATION': return <Badge variant="warning" size="sm" className="w-fit animate-pulse">Needs Review</Badge>;
+    case 'REJECTED': return <Badge variant="danger" size="sm" className="w-fit">Rejected</Badge>;
+    default: return <Badge variant="neutral" size="sm" className="w-fit">{status}</Badge>;
+  }
 };
 
 export default function Vendors() {
@@ -22,7 +36,7 @@ export default function Vendors() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [loadError, setLoadError] = useState('');
-  
+
   // Modals
   const [showEditModal, setShowEditModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -83,6 +97,15 @@ export default function Vendors() {
     setShowEditModal(true);
   };
 
+  // Lets the Dashboard's "Add Vendor" quick action (?action=create) jump
+  // straight into this page's existing create flow instead of duplicating
+  // the vendor-creation form there.
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('action') === 'create') handleOpenEditModal();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Unconditional overwrite from an autocomplete selection -- matches the
   // applyGeocodeResult pattern used in apps/vendor's Register/Profile pages.
   const applyGeocodeResult = (result: GeocodeSuccess) => {
@@ -134,7 +157,7 @@ export default function Vendors() {
       fetchVendors();
     } catch (error: any) {
       console.error('Failed to save vendor', error);
-      alert(error.response?.data?.error || 'Failed to save vendor.');
+      toast.error(error.response?.data?.error || 'Failed to save vendor.');
     }
   };
 
@@ -147,7 +170,7 @@ export default function Vendors() {
       fetchVendors();
     } catch (error: any) {
       console.error('Failed to update vendor status', error);
-      alert(error.response?.data?.error || 'Failed to update vendor status');
+      toast.error(error.response?.data?.error || 'Failed to update vendor status');
     }
   };
 
@@ -159,7 +182,7 @@ export default function Vendors() {
       await axios.delete(`${API_URL}/vendors/${vendor.vendorProfile.id}`, { headers: { Authorization: `Bearer ${token}` } });
       fetchVendors();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to delete vendor');
+      toast.error(error.response?.data?.error || 'Failed to delete vendor');
     }
   };
 
@@ -175,123 +198,118 @@ export default function Vendors() {
     return true;
   });
 
-  const getStatusBadge = (status: string) => {
-    switch(status) {
-      case 'APPROVED': return <Badge variant="success" className="!rounded-full">Approved</Badge>;
-      case 'PENDING': return <Badge variant="warning" className="!rounded-full animate-pulse">Needs Review</Badge>;
-      case 'UNDER_VERIFICATION': return <Badge variant="warning" className="!rounded-full animate-pulse">Needs Review</Badge>;
-      case 'REJECTED': return <Badge variant="danger" className="!rounded-full">Rejected</Badge>;
-      default: return <Badge variant="neutral" className="!rounded-full">{status}</Badge>;
-    }
-  };
+  const columns: Column<any>[] = [
+    {
+      key: 'vendor',
+      header: 'Vendor Info',
+      render: (vendor) => (
+        <div>
+          <div className="font-semibold text-content-primary">{vendor.name || 'N/A'}</div>
+          <div className="text-xs text-content-muted flex items-center gap-1 mt-0.5"><Phone className="w-3 h-3" /> {vendor.phone}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'store',
+      header: 'Store Details',
+      render: (vendor) => (
+        <div>
+          <div className="text-sm font-medium text-content-primary">{vendor.vendorProfile?.storeName || 'Not Set'}</div>
+          <div className="text-xs text-content-muted mt-0.5">{vendor.vendorProfile?.businessType || 'Retail'}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (vendor) => getStatusBadge(vendor.vendorProfile?.status),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      headerClassName: 'text-right',
+      className: 'text-right',
+      render: (vendor) => (
+        <div className="flex items-center justify-end gap-3">
+          {(vendor.vendorProfile?.status === 'UNDER_VERIFICATION' || vendor.vendorProfile?.status === 'PENDING') && (
+            <button
+              onClick={() => handleOpenReviewModal(vendor)}
+              className="text-warning-600 dark:text-warning-400 hover:text-warning-700 dark:hover:text-warning-300 text-sm font-semibold transition-colors inline-flex items-center gap-1"
+            >
+              <FileCheck className="w-4 h-4" /> Review KYC
+            </button>
+          )}
+          <button
+            onClick={() => handleOpenEditModal(vendor)}
+            className="text-brand-primary hover:text-brand-accent text-sm font-medium transition-colors"
+          >
+            Edit
+          </button>
+          <button
+            onClick={() => handleDelete(vendor)}
+            className="text-danger-500 hover:text-danger-600 transition-colors"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-6 pb-12">
+    <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="max-w-7xl mx-auto">
       {loadError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="mb-4 rounded-xl border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-600 dark:text-danger-400">
           {loadError}
         </div>
       )}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-brand-light flex items-center">
-          <Store className="w-8 h-8 mr-3 text-brand-primary" />
-          Marketplace Vendors
-        </h1>
+
+      <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-content-primary tracking-tight flex items-center gap-3">
+            <Icon3D name="vendors" size={30} eager /> Marketplace Vendors
+          </h1>
+          <p className="text-content-secondary mt-1 text-sm">Manage vendor onboarding, KYC review, and store details</p>
+        </div>
         <div className="flex items-center gap-3">
           {/* Every product belongs to a real vendor -- this is where staff
               review pending vendor submissions, low stock, and B2B pricing
               across all of them, so it's linked here rather than living as
               its own top-level nav item. */}
           <Link to="/products">
-            <Button variant="outline">
-              <Package className="w-5 h-5 mr-1" /> Review Vendor Products
-            </Button>
+            <Button variant="outline" icon={<Package size={15} />}>Review Vendor Products</Button>
           </Link>
-          <Button onClick={() => handleOpenEditModal()}>
-            <Plus className="w-5 h-5 mr-1" /> Add Vendor
-          </Button>
+          <Button icon={<Plus size={15} />} onClick={() => handleOpenEditModal()}>Add Vendor</Button>
         </div>
       </div>
 
-      <div className="bg-brand-panel border border-brand-border rounded-xl p-4 flex items-center">
-        <Search className="w-5 h-5 text-brand-muted mr-3" />
-        <input 
-          type="text" 
-          placeholder="Search by vendor name, store name, or phone..." 
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="bg-transparent border-none focus:outline-none text-brand-light w-full"
-        />
-      </div>
-
-      {loading ? (
-        <Loader fullScreen />
-      ) : filteredVendors.length === 0 ? (
-        <div className="bg-brand-panel border border-brand-border rounded-xl p-12 text-center">
-          <Store className="w-12 h-12 text-brand-muted mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-brand-light mb-2">No Vendors Found</h3>
-        </div>
-      ) : (
-        <div className="bg-brand-panel border border-brand-border rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-brand-dark border-b border-brand-border">
-                <th className="p-4 text-sm font-semibold text-brand-muted">Vendor Info</th>
-                <th className="p-4 text-sm font-semibold text-brand-muted">Store Details</th>
-                <th className="p-4 text-sm font-semibold text-brand-muted">Status</th>
-                <th className="p-4 text-sm font-semibold text-brand-muted text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-brand-border">
-              {filteredVendors.map(vendor => (
-                <tr key={vendor.id} className="hover:bg-brand-dark/50 transition-colors">
-                  <td className="p-4">
-                    <div className="text-sm font-bold text-brand-light">{vendor.name || 'N/A'}</div>
-                    <div className="text-xs text-brand-muted flex items-center mt-1">
-                      <Phone className="w-3 h-3 mr-1" /> {vendor.phone}
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="text-sm font-medium text-brand-light">{vendor.vendorProfile?.storeName || 'Not Set'}</div>
-                    <div className="text-xs text-brand-muted mt-1">{vendor.vendorProfile?.businessType || 'Retail'}</div>
-                  </td>
-                  <td className="p-4">
-                    {getStatusBadge(vendor.vendorProfile?.status)}
-                  </td>
-                  <td className="p-4 text-right space-x-3">
-                    {(vendor.vendorProfile?.status === 'UNDER_VERIFICATION' || vendor.vendorProfile?.status === 'PENDING') && (
-                      <button 
-                        onClick={() => handleOpenReviewModal(vendor)}
-                        className="text-yellow-500 hover:text-yellow-400 text-sm font-bold transition-colors inline-flex items-center"
-                      >
-                        <FileCheck className="w-4 h-4 mr-1" /> Review KYC
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleOpenEditModal(vendor)}
-                      className="text-brand-primary hover:text-brand-secondary text-sm font-medium transition-colors"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(vendor)}
-                      className="text-danger-500 hover:text-danger-400 text-sm font-medium transition-colors inline-flex items-center"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <Card padding="none" className="overflow-visible">
+        <div className="p-4 border-b border-border-default flex justify-end">
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by vendor name, store name, or phone…"
+              className="bg-surface-sunken border border-border-default rounded-xl pl-4 pr-4 py-2 text-sm text-content-primary outline-none focus:border-brand-primary w-72"
+            />
           </div>
         </div>
-      )}
+
+        <DataTable
+          columns={columns}
+          data={filteredVendors}
+          rowKey={(v) => v.id}
+          loading={loading}
+          pageSize={10}
+          emptyState={<EmptyState icon="vendors" title="No vendors found" description="No vendors match your current search." />}
+          className="rounded-none border-none shadow-none"
+        />
+      </Card>
 
       {/* KYC REVIEW MODAL */}
       {showReviewModal && activeVendor && (
-        <Dialog
+        <Modal
           isOpen={showReviewModal}
           onClose={() => setShowReviewModal(false)}
           title="Review Vendor Application"
@@ -307,118 +325,120 @@ export default function Vendors() {
             </>
           }
         >
-            <div className="space-y-8 flex-1">
-              {/* Business Details */}
-              <div>
-                <h4 className="text-lg font-bold text-brand-primary mb-4 flex items-center border-b border-brand-border pb-2">
-                  <Building className="w-5 h-5 mr-2" /> Business Details
-                </h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                  <div><p className="text-sm text-brand-muted">Store Name</p><p className="font-medium text-brand-light">{activeVendor.vendorProfile.storeName}</p></div>
-                  <div><p className="text-sm text-brand-muted">Owner Name</p><p className="font-medium text-brand-light">{activeVendor.name}</p></div>
-                  <div><p className="text-sm text-brand-muted">Business Type</p><p className="font-medium text-brand-light">{activeVendor.vendorProfile.businessType}</p></div>
-                  <div><p className="text-sm text-brand-muted">GST Number</p><p className="font-medium text-brand-light">{activeVendor.vendorProfile.gstNumber || 'N/A'}</p></div>
-                  <div><p className="text-sm text-brand-muted">PAN Number</p><p className="font-medium text-brand-light">{activeVendor.vendorProfile.panNumber}</p></div>
-                  <div><p className="text-sm text-brand-muted">Location</p><p className="font-medium text-brand-light">{activeVendor.city}, {activeVendor.state}</p></div>
+          <div className="space-y-8">
+            {/* Business Details */}
+            <div>
+              <h4 className="text-base font-bold text-brand-primary mb-4 flex items-center gap-2 border-b border-border-default pb-2">
+                <Building className="w-5 h-5" /> Business Details
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                <div><p className="text-sm text-content-muted">Store Name</p><p className="font-medium text-content-primary">{activeVendor.vendorProfile.storeName}</p></div>
+                <div><p className="text-sm text-content-muted">Owner Name</p><p className="font-medium text-content-primary">{activeVendor.name}</p></div>
+                <div><p className="text-sm text-content-muted">Business Type</p><p className="font-medium text-content-primary">{activeVendor.vendorProfile.businessType}</p></div>
+                <div><p className="text-sm text-content-muted">GST Number</p><p className="font-medium text-content-primary">{activeVendor.vendorProfile.gstNumber || 'N/A'}</p></div>
+                <div><p className="text-sm text-content-muted">PAN Number</p><p className="font-medium text-content-primary">{activeVendor.vendorProfile.panNumber}</p></div>
+                <div><p className="text-sm text-content-muted">Location</p><p className="font-medium text-content-primary">{activeVendor.city}, {activeVendor.state}</p></div>
+              </div>
+              {(activeVendor.vendorProfile.formattedAddress || activeVendor.vendorProfile.lat != null) && (
+                <div className="mt-4 space-y-2">
+                  <p className="text-sm text-content-muted flex items-center gap-1"><MapPin className="w-4 h-4" /> {activeVendor.vendorProfile.formattedAddress || 'Store location'}</p>
+                  <LocationMapView
+                    markers={activeVendor.vendorProfile.lat != null ? [{ id: 'store', lat: activeVendor.vendorProfile.lat, lng: activeVendor.vendorProfile.lng, label: activeVendor.vendorProfile.storeName }] : []}
+                    height={200}
+                    emptyLabel="No store location set"
+                  />
                 </div>
-                {(activeVendor.vendorProfile.formattedAddress || activeVendor.vendorProfile.lat != null) && (
-                  <div className="mt-4 space-y-2">
-                    <p className="text-sm text-brand-muted flex items-center"><MapPin className="w-4 h-4 mr-1" /> {activeVendor.vendorProfile.formattedAddress || 'Store location'}</p>
-                    <LocationMapView
-                      markers={activeVendor.vendorProfile.lat != null ? [{ id: 'store', lat: activeVendor.vendorProfile.lat, lng: activeVendor.vendorProfile.lng, label: activeVendor.vendorProfile.storeName }] : []}
-                      height={200}
-                      emptyLabel="No store location set"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Bank Details */}
-              <div>
-                <h4 className="text-lg font-bold text-brand-primary mb-4 flex items-center border-b border-brand-border pb-2">
-                  <Landmark className="w-5 h-5 mr-2" /> Bank Details
-                </h4>
-                {activeVendor.vendorProfile.bankAccounts && activeVendor.vendorProfile.bankAccounts.length > 0 ? (
-                  <div className="bg-brand-dark/50 p-4 rounded-xl border border-brand-border grid grid-cols-2 gap-4">
-                    <div><p className="text-sm text-brand-muted">Bank Name</p><p className="font-medium text-brand-light">{activeVendor.vendorProfile.bankAccounts[0].bankName}</p></div>
-                    <div><p className="text-sm text-brand-muted">Account Holder</p><p className="font-medium text-brand-light">{activeVendor.vendorProfile.bankAccounts[0].accountHolderName}</p></div>
-                    <div><p className="text-sm text-brand-muted">Account Number</p><p className="font-medium text-brand-light">{activeVendor.vendorProfile.bankAccounts[0].accountNumber}</p></div>
-                    <div><p className="text-sm text-brand-muted">IFSC Code</p><p className="font-medium text-brand-light">{activeVendor.vendorProfile.bankAccounts[0].ifscCode}</p></div>
-                  </div>
-                ) : (
-                  <p className="text-brand-muted text-sm italic">No bank details provided.</p>
-                )}
-              </div>
-
-              {/* Documents */}
-              <div>
-                <h4 className="text-lg font-bold text-brand-primary mb-4 flex items-center border-b border-brand-border pb-2">
-                  <FileText className="w-5 h-5 mr-2" /> Uploaded Documents
-                </h4>
-                {activeVendor.vendorProfile.documents && activeVendor.vendorProfile.documents.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {activeVendor.vendorProfile.documents.map((doc: any) => (
-                      <button
-                        type="button"
-                        key={doc.id}
-                        onClick={() => viewDocument(activeVendor.vendorProfile.id, doc.id)}
-                        className="flex flex-col items-center justify-center p-6 bg-brand-dark hover:bg-brand-primary/10 border border-brand-border hover:border-brand-primary rounded-xl transition-all group"
-                      >
-                        <FileText className="w-10 h-10 text-brand-muted group-hover:text-brand-primary mb-2 transition-colors" />
-                        <span className="text-sm font-bold text-brand-light group-hover:text-brand-primary transition-colors">{doc.type}</span>
-                        <span className="text-xs text-brand-muted mt-1 flex items-center"><Eye className="w-3 h-3 mr-1"/> View Document</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-brand-muted text-sm italic">No documents uploaded.</p>
-                )}
-              </div>
+              )}
             </div>
-        </Dialog>
+
+            {/* Bank Details */}
+            <div>
+              <h4 className="text-base font-bold text-brand-primary mb-4 flex items-center gap-2 border-b border-border-default pb-2">
+                <Landmark className="w-5 h-5" /> Bank Details
+              </h4>
+              {activeVendor.vendorProfile.bankAccounts && activeVendor.vendorProfile.bankAccounts.length > 0 ? (
+                <div className="bg-surface-sunken p-4 rounded-xl border border-border-default grid grid-cols-2 gap-4">
+                  <div><p className="text-sm text-content-muted">Bank Name</p><p className="font-medium text-content-primary">{activeVendor.vendorProfile.bankAccounts[0].bankName}</p></div>
+                  <div><p className="text-sm text-content-muted">Account Holder</p><p className="font-medium text-content-primary">{activeVendor.vendorProfile.bankAccounts[0].accountHolderName}</p></div>
+                  <div><p className="text-sm text-content-muted">Account Number</p><p className="font-medium text-content-primary">{activeVendor.vendorProfile.bankAccounts[0].accountNumber}</p></div>
+                  <div><p className="text-sm text-content-muted">IFSC Code</p><p className="font-medium text-content-primary">{activeVendor.vendorProfile.bankAccounts[0].ifscCode}</p></div>
+                </div>
+              ) : (
+                <p className="text-content-muted text-sm italic">No bank details provided.</p>
+              )}
+            </div>
+
+            {/* Documents */}
+            <div>
+              <h4 className="text-base font-bold text-brand-primary mb-4 flex items-center gap-2 border-b border-border-default pb-2">
+                <FileText className="w-5 h-5" /> Uploaded Documents
+              </h4>
+              {activeVendor.vendorProfile.documents && activeVendor.vendorProfile.documents.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {activeVendor.vendorProfile.documents.map((doc: any) => (
+                    <button
+                      type="button"
+                      key={doc.id}
+                      onClick={() => viewDocument(activeVendor.vendorProfile.id, doc.id)}
+                      className="flex flex-col items-center justify-center p-6 bg-surface-sunken hover:bg-brand-primary/10 border border-border-default hover:border-brand-primary rounded-xl transition-all group"
+                    >
+                      <FileText className="w-10 h-10 text-content-muted group-hover:text-brand-primary mb-2 transition-colors" />
+                      <span className="text-sm font-bold text-content-primary group-hover:text-brand-primary transition-colors">{doc.type}</span>
+                      <span className="text-xs text-content-muted mt-1 flex items-center gap-1"><Eye className="w-3 h-3" /> View Document</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-content-muted text-sm italic">No documents uploaded.</p>
+              )}
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Basic Edit Modal (Kept for backward compatibility) */}
-      <Dialog
+      <Modal
         isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
         title="Edit Vendor Core Details"
       >
-            <form onSubmit={handleSubmitEdit} className="space-y-4">
-               <div className="grid grid-cols-2 gap-4">
-                  <Input label="Owner Name" type="text" required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
-                  <Input label="Store Name" type="text" required value={formData.storeName} onChange={(e) => setFormData({...formData, storeName: e.target.value})} />
-                  <div className="col-span-2 flex items-center mt-2">
-                    <input type="checkbox" id="isActive" checked={formData.isActive} onChange={(e) => setFormData({...formData, isActive: e.target.checked})} className="mr-2" />
-                    <label htmlFor="isActive" className="text-sm font-medium text-brand-muted">Vendor is Active (can sell on platform)</label>
-                  </div>
-               </div>
+        <form onSubmit={handleSubmitEdit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <Input label="Owner Name" type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} />
+            <Input label="Store Name" type="text" required value={formData.storeName} onChange={(e) => setFormData({ ...formData, storeName: e.target.value })} />
+            <div className="col-span-2 mt-2">
+              <Checkbox
+                label="Vendor is Active (can sell on platform)"
+                checked={formData.isActive}
+                onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+              />
+            </div>
+          </div>
 
-               <div className="pt-4 border-t border-brand-border space-y-3">
-                 <p className="text-sm font-bold text-brand-light flex items-center"><MapPin className="w-4 h-4 mr-2" /> Store Location</p>
-                 <PlaceAutocompleteField onSelect={applyGeocodeResult} placeholder="Search for store address" />
-                 <AddressMapPicker
-                   latitude={formData.lat}
-                   longitude={formData.lng}
-                   onChange={({ latitude, longitude }) => setFormData({ ...formData, lat: latitude, lng: longitude })}
-                 />
-                 <div className="grid grid-cols-2 gap-4">
-                   <Input label="Address Line 1" type="text" value={formData.addressLine1} onChange={(e) => setFormData({...formData, addressLine1: e.target.value})} />
-                   <Input label="Address Line 2" type="text" value={formData.addressLine2} onChange={(e) => setFormData({...formData, addressLine2: e.target.value})} />
-                   <Input label="City" type="text" value={formData.city} onChange={(e) => setFormData({...formData, city: e.target.value})} />
-                   <Input label="State" type="text" value={formData.state} onChange={(e) => setFormData({...formData, state: e.target.value})} />
-                   <Input label="Pincode" type="text" value={formData.pincode} onChange={(e) => setFormData({...formData, pincode: e.target.value})} />
-                   <Input label="Country" type="text" value={formData.country} onChange={(e) => setFormData({...formData, country: e.target.value})} />
-                 </div>
-               </div>
+          <div className="pt-4 border-t border-border-default space-y-3">
+            <p className="text-sm font-bold text-content-primary flex items-center gap-2"><MapPin className="w-4 h-4" /> Store Location</p>
+            <PlaceAutocompleteField onSelect={applyGeocodeResult} placeholder="Search for store address" />
+            <AddressMapPicker
+              latitude={formData.lat}
+              longitude={formData.lng}
+              onChange={({ latitude, longitude }) => setFormData({ ...formData, lat: latitude, lng: longitude })}
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Address Line 1" type="text" value={formData.addressLine1} onChange={(e) => setFormData({ ...formData, addressLine1: e.target.value })} />
+              <Input label="Address Line 2" type="text" value={formData.addressLine2} onChange={(e) => setFormData({ ...formData, addressLine2: e.target.value })} />
+              <Input label="City" type="text" value={formData.city} onChange={(e) => setFormData({ ...formData, city: e.target.value })} />
+              <Input label="State" type="text" value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value })} />
+              <Input label="Pincode" type="text" value={formData.pincode} onChange={(e) => setFormData({ ...formData, pincode: e.target.value })} />
+              <Input label="Country" type="text" value={formData.country} onChange={(e) => setFormData({ ...formData, country: e.target.value })} />
+            </div>
+          </div>
 
-               <div className="flex space-x-4 mt-6 pt-4 border-t border-brand-border">
-                 <button type="button" onClick={() => setShowEditModal(false)} className="flex-1 bg-brand-dark text-brand-light px-4 py-2 rounded-lg font-bold">Cancel</button>
-                 <Button type="submit" className="flex-1">Save Changes</Button>
-               </div>
-            </form>
-      </Dialog>
-
-    </div>
+          <div className="flex gap-4 mt-6 pt-4 border-t border-border-default">
+            <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowEditModal(false)}>Cancel</Button>
+            <Button type="submit" className="flex-1">Save Changes</Button>
+          </div>
+        </form>
+      </Modal>
+    </motion.div>
   );
 }

@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
+import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
 import type { RootState } from '../store';
-import { Image as ImageIcon, Plus, Edit, Trash2, CheckCircle, XCircle } from 'lucide-react';
-import { Button, Card, Badge, Dialog, Input, Loader } from '@mechbazar/shared/web';
+import { Plus, Edit, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { Button, Card, Badge, Modal, Input, Select, Checkbox, Loader, EmptyState, Icon3D } from '../components/ui';
 import { API_URL } from '../config/api';
+import { fadeInUp } from '../utils/motion';
 
 export default function Banners() {
   const { token } = useSelector((state: RootState) => state.auth);
@@ -85,7 +88,7 @@ export default function Banners() {
       fetchBanners();
     } catch (error: any) {
       console.error('Failed to save banner', error);
-      alert(error.response?.data?.error || 'Failed to save banner.');
+      toast.error(error.response?.data?.error || 'Failed to save banner.');
     }
   };
 
@@ -102,66 +105,63 @@ export default function Banners() {
   };
 
   return (
-    <div className="space-y-6 pb-12">
+    <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="space-y-6 pb-12">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-neutral-100 flex items-center">
-          <ImageIcon className="w-8 h-8 mr-3 text-primary-500" />
-          Banners & CMS
+        <h1 className="text-2xl font-bold text-content-primary tracking-tight flex items-center gap-3">
+          <Icon3D name="banners" size={30} eager /> Banners & CMS
         </h1>
-        <Button onClick={() => handleOpenModal()}>
-          <Plus className="w-5 h-5 mr-1" /> Add Banner
-        </Button>
+        <Button icon={<Plus size={16} />} onClick={() => handleOpenModal()}>Add Banner</Button>
       </div>
 
       {loading ? (
         <Loader fullScreen />
       ) : banners.length === 0 ? (
-        <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-12 text-center">
-          <ImageIcon className="w-12 h-12 text-neutral-400 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-neutral-100 mb-2">No Banners Found</h3>
-          <p className="text-neutral-400 mb-6">Create promotional banners to display on the customer app.</p>
-          <Button onClick={() => handleOpenModal()}>
-            Add Your First Banner
-          </Button>
-        </div>
+        <Card>
+          <EmptyState
+            icon="banners"
+            title="No Banners Found"
+            description="Create promotional banners to display on the customer app."
+            action={<Button onClick={() => handleOpenModal()}>Add Your First Banner</Button>}
+          />
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {banners.map((banner) => (
-            <Card key={banner.id} variant="dark" className="!p-0 overflow-hidden group">
-              <div className="h-48 relative overflow-hidden bg-neutral-900">
+            <Card key={banner.id} padding="none" className="overflow-hidden group">
+              <div className="h-48 relative overflow-hidden bg-surface-sunken">
                 {banner.image ? (
                   <img src={banner.image} alt={banner.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-neutral-400">No Image</div>
+                  <div className="flex items-center justify-center h-full text-content-muted">No Image</div>
                 )}
-                <div className="absolute top-2 right-2 flex space-x-2">
-                  <button onClick={() => handleOpenModal(banner)} className="p-2 bg-neutral-900/80 rounded-lg text-primary-500 hover:bg-neutral-800 backdrop-blur-sm">
+                <div className="absolute top-2 right-2 flex gap-2">
+                  <button onClick={() => handleOpenModal(banner)} className="p-2 bg-surface-overlay/90 rounded-lg text-brand-primary hover:bg-surface-hover backdrop-blur-sm transition-colors">
                     <Edit className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete(banner.id)} className="p-2 bg-neutral-900/80 rounded-lg text-red-400 hover:bg-neutral-800 backdrop-blur-sm">
+                  <button onClick={() => handleDelete(banner.id)} className="p-2 bg-surface-overlay/90 rounded-lg text-danger-500 hover:bg-surface-hover backdrop-blur-sm transition-colors">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
                 <div className="absolute top-2 left-2">
-                  <Badge variant="neutral" className="!rounded-md backdrop-blur-sm uppercase">
+                  <Badge variant="neutral" className="backdrop-blur-sm uppercase">
                     {banner.type}
                   </Badge>
                 </div>
               </div>
               <div className="p-4">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-lg font-bold text-neutral-100">{banner.title}</h3>
+                  <h3 className="text-lg font-bold text-content-primary">{banner.title}</h3>
                   {banner.isActive ? (
-                    <Badge variant="success" className="!rounded-full flex items-center">
-                      <CheckCircle className="w-3 h-3 mr-1"/> Active
+                    <Badge variant="success" className="flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3"/> Active
                     </Badge>
                   ) : (
-                    <Badge variant="neutral" className="!rounded-full flex items-center">
-                      <XCircle className="w-3 h-3 mr-1"/> Inactive
+                    <Badge variant="neutral" className="flex items-center gap-1">
+                      <XCircle className="w-3 h-3"/> Inactive
                     </Badge>
                   )}
                 </div>
-                <div className="text-sm text-neutral-400">
+                <div className="text-sm text-content-muted">
                   {banner.startDate && banner.endDate ? (
                     <span>Runs: {new Date(banner.startDate).toLocaleDateString()} - {new Date(banner.endDate).toLocaleDateString()}</span>
                   ) : (
@@ -174,91 +174,82 @@ export default function Banners() {
         </div>
       )}
 
-      <Dialog
+      <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={isEditing ? 'Edit Banner' : 'Add New Banner'}
       >
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Input
-                label="Banner Title"
-                type="text"
-                required
-                value={formData.title}
-                onChange={(e) => setFormData({...formData, title: e.target.value})}
-              />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            label="Banner Title"
+            type="text"
+            required
+            value={formData.title}
+            onChange={(e) => setFormData({...formData, title: e.target.value})}
+          />
 
-              <Input
-                label="Image URL"
-                type="url"
-                required
-                value={formData.image}
-                onChange={(e) => setFormData({...formData, image: e.target.value})}
-              />
+          <Input
+            label="Image URL"
+            type="url"
+            required
+            value={formData.image}
+            onChange={(e) => setFormData({...formData, image: e.target.value})}
+          />
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-brand-muted mb-1">Placement Type</label>
-                  <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({...formData, type: e.target.value})}
-                    className="w-full bg-brand-dark border border-brand-border rounded-lg px-4 py-2 text-brand-light focus:outline-none focus:border-brand-primary"
-                  >
-                    <option value="HOMEPAGE">Homepage</option>
-                    <option value="CATEGORY">Category</option>
-                    <option value="PROMO">Promo</option>
-                  </select>
-                </div>
-                <Input
-                  label="Click Link (Optional)"
-                  type="text"
-                  value={formData.link}
-                  onChange={(e) => setFormData({...formData, link: e.target.value})}
-                />
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Select
+              label="Placement Type"
+              value={formData.type}
+              onChange={(e) => setFormData({...formData, type: e.target.value})}
+            >
+              <option value="HOMEPAGE">Homepage</option>
+              <option value="CATEGORY">Category</option>
+              <option value="PROMO">Promo</option>
+            </Select>
+            <Input
+              label="Click Link (Optional)"
+              type="text"
+              value={formData.link}
+              onChange={(e) => setFormData({...formData, link: e.target.value})}
+            />
+          </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  label="Start Date (Optional)"
-                  type="date"
-                  value={formData.startDate}
-                  onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-                />
-                <Input
-                  label="End Date (Optional)"
-                  type="date"
-                  value={formData.endDate}
-                  onChange={(e) => setFormData({...formData, endDate: e.target.value})}
-                />
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Input
+              label="Start Date (Optional)"
+              type="date"
+              value={formData.startDate}
+              onChange={(e) => setFormData({...formData, startDate: e.target.value})}
+            />
+            <Input
+              label="End Date (Optional)"
+              type="date"
+              value={formData.endDate}
+              onChange={(e) => setFormData({...formData, endDate: e.target.value})}
+            />
+          </div>
 
-              <div className="flex items-center space-x-2 pt-2">
-                <input
-                  type="checkbox"
-                  id="isActive"
-                  checked={formData.isActive}
-                  onChange={(e) => setFormData({...formData, isActive: e.target.checked})}
-                  className="w-4 h-4 text-primary-500 bg-neutral-900 border border-neutral-800 rounded focus:ring-primary-500"
-                />
-                <label htmlFor="isActive" className="text-sm font-medium text-neutral-100">
-                  Banner is Active
-                </label>
-              </div>
+          <Checkbox
+            label="Banner is Active"
+            checked={formData.isActive}
+            onChange={(e) => setFormData({...formData, isActive: e.target.checked})}
+          />
 
-              <div className="flex space-x-4 mt-6 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 bg-neutral-900 text-neutral-100 px-4 py-2 rounded-lg font-bold hover:bg-gray-800 transition-colors"
-                >
-                  Cancel
-                </button>
-                <Button type="submit" className="flex-1">
-                  {isEditing ? 'Save Changes' : 'Create Banner'}
-                </Button>
-              </div>
-            </form>
-      </Dialog>
-    </div>
+          <div className="flex gap-4 mt-6 pt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              className="flex-1"
+              onClick={() => setShowModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1">
+              {isEditing ? 'Save Changes' : 'Create Banner'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+    </motion.div>
   );
 }

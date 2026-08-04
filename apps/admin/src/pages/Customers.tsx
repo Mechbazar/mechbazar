@@ -2,17 +2,27 @@ import { useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
+import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
 import type { RootState } from '../store';
-import { Users as UsersIcon, CheckCircle, XCircle, Phone, Search, MapPin, Mail, Car, Package, Wrench, Trash2, AlertTriangle } from 'lucide-react';
-import { Badge, Button, Dialog, Loader } from '@mechbazar/shared/web';
+import { CheckCircle, XCircle, Phone, MapPin, Mail, Car, Package, Wrench, Trash2, AlertTriangle } from 'lucide-react';
+import { Badge, Button, Card, DataTable, EmptyState, Modal, Loader, Tabs, Icon3D } from '../components/ui';
+import type { Column, TabItem } from '../components/ui';
 import { API_URL } from '../config/api';
 import LocationMapView from '../components/maps/LocationMapView';
+import { fadeInUp } from '../utils/motion';
+
+const CUSTOMER_TABS: TabItem[] = [
+  { id: 'ALL', label: 'All' },
+  { id: 'RETAIL', label: 'Retail (B2C)' },
+  { id: 'WHOLESALE', label: 'Wholesale (B2B)' },
+];
 
 function InfoRow({ label, value, icon }: { label: string; value: any; icon?: ReactNode }) {
   return (
-    <div className="bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2">
-      <div className="text-[10px] uppercase tracking-wider text-neutral-500">{label}</div>
-      <div className="text-sm text-neutral-100 flex items-center gap-1.5 mt-0.5 break-all">
+    <div className="bg-surface-sunken border border-border-default rounded-xl px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wider text-content-muted">{label}</div>
+      <div className="text-sm text-content-primary flex items-center gap-1.5 mt-0.5 break-all">
         {icon}{value || '-'}
       </div>
     </div>
@@ -21,9 +31,9 @@ function InfoRow({ label, value, icon }: { label: string; value: any; icon?: Rea
 
 function StatTile({ label, value }: { label: string; value: number }) {
   return (
-    <div className="bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-center">
-      <div className="text-xl font-bold text-neutral-100">{value}</div>
-      <div className="text-[10px] uppercase tracking-wider text-neutral-500">{label}</div>
+    <div className="bg-surface-sunken border border-border-default rounded-xl px-3 py-2 text-center">
+      <div className="text-xl font-bold text-content-primary">{value}</div>
+      <div className="text-[10px] uppercase tracking-wider text-content-muted">{label}</div>
     </div>
   );
 }
@@ -31,7 +41,7 @@ function StatTile({ label, value }: { label: string; value: number }) {
 function Section({ title, icon, children }: { title: string; icon?: ReactNode; children: ReactNode }) {
   return (
     <div>
-      <h3 className="text-sm font-bold text-neutral-100 flex items-center gap-2 mb-2">{icon}{title}</h3>
+      <h3 className="text-sm font-bold text-content-primary flex items-center gap-2 mb-2">{icon}{title}</h3>
       {children}
     </div>
   );
@@ -39,14 +49,14 @@ function Section({ title, icon, children }: { title: string; icon?: ReactNode; c
 
 function HistoryRow({ title, status, amount, date }: { title: string; status: string; amount?: number; date?: string }) {
   return (
-    <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3 flex items-center justify-between">
+    <div className="bg-surface-sunken border border-border-default rounded-xl p-3 flex items-center justify-between">
       <div>
-        <div className="text-sm font-bold text-neutral-100">{title}</div>
-        <div className="text-xs text-neutral-400">{date ? new Date(date).toLocaleDateString() : ''}</div>
+        <div className="text-sm font-bold text-content-primary">{title}</div>
+        <div className="text-xs text-content-muted">{date ? new Date(date).toLocaleDateString() : ''}</div>
       </div>
       <div className="text-right">
-        <Badge variant="primary" className="!rounded-full !text-[10px]">{status}</Badge>
-        {amount != null && <div className="text-xs text-neutral-400 mt-1">₹{Number(amount).toLocaleString('en-IN')}</div>}
+        <Badge variant="primary" size="sm">{status}</Badge>
+        {amount != null && <div className="text-xs text-content-muted mt-1">₹{Number(amount).toLocaleString('en-IN')}</div>}
       </div>
     </div>
   );
@@ -130,6 +140,18 @@ export default function UsersPage() {
     }
   };
 
+  const handleApproveB2B = async (user: any) => {
+    try {
+      await axios.patch(`${API_URL}/customers/${user.id}`, { isBusinessVerified: true }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      fetchCustomers();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to approve B2B');
+    }
+  };
+
   const filteredCustomers = customers.filter(c => {
     if (filter !== 'ALL' && c.accountType !== filter) return false;
     if (searchQuery) {
@@ -143,133 +165,109 @@ export default function UsersPage() {
     return true;
   });
 
-  return (
-    <div className="space-y-6 pb-12">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-neutral-100 flex items-center">
-          <UsersIcon className="w-8 h-8 mr-3 text-primary-500" />
-          Customers
-        </h1>
-        <div className="flex bg-neutral-950 rounded-lg border border-neutral-800 p-1">
-          <button 
-            className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${filter === 'ALL' ? 'bg-primary-500 text-neutral-950' : 'text-neutral-400 hover:text-neutral-100'}`}
-            onClick={() => setFilter('ALL')}
-          >All</button>
-          <button 
-            className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${filter === 'RETAIL' ? 'bg-primary-500 text-neutral-950' : 'text-neutral-400 hover:text-neutral-100'}`}
-            onClick={() => setFilter('RETAIL')}
-          >Retail (B2C)</button>
-          <button 
-            className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${filter === 'WHOLESALE' ? 'bg-primary-500 text-neutral-950' : 'text-neutral-400 hover:text-neutral-100'}`}
-            onClick={() => setFilter('WHOLESALE')}
-          >Wholesale (B2B)</button>
+  const columns: Column<any>[] = [
+    {
+      key: 'customer',
+      header: 'Customer Details',
+      render: (user) => (
+        <div>
+          <div className="font-semibold text-content-primary">{user.name || 'Unknown User'}</div>
+          <div className="text-xs text-content-muted flex items-center gap-1 mt-0.5"><Phone className="w-3 h-3" /> {user.phone}</div>
         </div>
-      </div>
-
-      <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex items-center">
-        <Search className="w-5 h-5 text-neutral-400 mr-3" />
-        <input 
-          type="text" 
-          placeholder="Search by name, phone, or company..." 
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="bg-transparent border-none focus:outline-none text-neutral-100 w-full"
-        />
-      </div>
-
-      {loading ? (
-        <Loader fullScreen />
-      ) : filteredCustomers.length === 0 ? (
-        <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-12 text-center">
-          <UsersIcon className="w-12 h-12 text-neutral-400 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-neutral-100 mb-2">No Customers Found</h3>
-          <p className="text-neutral-400">No customers match your current filters.</p>
-        </div>
-      ) : (
-        <div className="bg-neutral-900 border border-neutral-800 rounded-xl overflow-hidden">
-          <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-neutral-950 border-b border-neutral-800">
-                <th className="p-4 text-sm font-semibold text-neutral-400">Customer Details</th>
-                <th className="p-4 text-sm font-semibold text-neutral-400">Account Type</th>
-                <th className="p-4 text-sm font-semibold text-neutral-400">B2B Info</th>
-                <th className="p-4 text-sm font-semibold text-neutral-400">Orders</th>
-                <th className="p-4 text-sm font-semibold text-neutral-400 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-800">
-              {filteredCustomers.map(user => (
-                <tr key={user.id} className="hover:bg-neutral-950/70 transition-colors">
-                  <td className="p-4">
-                    <div className="text-sm font-bold text-neutral-100">{user.name || 'Unknown User'}</div>
-                    <div className="text-xs text-neutral-400 flex items-center mt-1">
-                      <Phone className="w-3 h-3 mr-1" /> {user.phone}
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <Badge variant={user.accountType === 'WHOLESALE' ? 'primary' : 'success'} className="!rounded-full !text-[10px] uppercase tracking-wider">
-                      {user.accountType}
-                    </Badge>
-                  </td>
-                  <td className="p-4">
-                    {user.accountType === 'WHOLESALE' ? (
-                      <div>
-                        <div className="text-sm font-medium text-neutral-100">{user.companyName || 'N/A'}</div>
-                        {user.gstNumber && <div className="text-xs text-neutral-400">GST: {user.gstNumber}</div>}
-                        <div className="mt-1">
-                          {user.isBusinessVerified ? (
-                            <span className="flex items-center text-xs text-green-500"><CheckCircle className="w-3 h-3 mr-1"/> Verified B2B</span>
-                          ) : (
-                            <span className="flex items-center text-xs text-primary-500"><XCircle className="w-3 h-3 mr-1"/> Pending Verification</span>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-neutral-400">-</span>
-                    )}
-                  </td>
-                  <td className="p-4">
-                    <div className="text-sm text-neutral-100 font-medium">{user._count?.orders || 0} Orders</div>
-                  </td>
-                  <td className="p-4">
-                    <div className="flex items-center justify-end gap-3">
-                      {user.accountType === 'WHOLESALE' && !user.isBusinessVerified && (
-                        <button
-                          onClick={async () => {
-                            try {
-                              await axios.patch(`${API_URL}/customers/${user.id}`, { isBusinessVerified: true }, {
-                                headers: { Authorization: `Bearer ${token}` }
-                              });
-                              fetchCustomers();
-                            } catch (err) {
-                              console.error(err);
-                              alert('Failed to approve B2B');
-                            }
-                          }}
-                          className="text-neutral-950 bg-primary-500 hover:bg-primary-600 px-3 py-1 rounded text-xs font-bold transition-colors"
-                        >
-                          Approve B2B
-                        </button>
-                      )}
-                      <button
-                        onClick={() => openDetails(user)}
-                        className="text-primary-500 hover:text-primary-600 text-sm font-medium transition-colors"
-                      >
-                        View Details
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      ),
+    },
+    {
+      key: 'accountType',
+      header: 'Account Type',
+      render: (user) => (
+        <Badge variant={user.accountType === 'WHOLESALE' ? 'primary' : 'success'} size="sm" className="w-fit uppercase tracking-wide">
+          {user.accountType}
+        </Badge>
+      ),
+    },
+    {
+      key: 'b2b',
+      header: 'B2B Info',
+      render: (user) => user.accountType === 'WHOLESALE' ? (
+        <div>
+          <div className="text-sm font-medium text-content-primary">{user.companyName || 'N/A'}</div>
+          {user.gstNumber && <div className="text-xs text-content-muted">GST: {user.gstNumber}</div>}
+          <div className="mt-1">
+            {user.isBusinessVerified ? (
+              <span className="flex items-center gap-1 text-xs text-success-600 dark:text-success-400"><CheckCircle className="w-3 h-3" /> Verified B2B</span>
+            ) : (
+              <span className="flex items-center gap-1 text-xs text-warning-600 dark:text-warning-400"><XCircle className="w-3 h-3" /> Pending Verification</span>
+            )}
           </div>
         </div>
-      )}
+      ) : (
+        <span className="text-xs text-content-muted">-</span>
+      ),
+    },
+    {
+      key: 'orders',
+      header: 'Orders',
+      render: (user) => <span className="text-sm font-medium text-content-primary">{user._count?.orders || 0} Orders</span>,
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      headerClassName: 'text-right',
+      className: 'text-right',
+      render: (user) => (
+        <div className="flex items-center justify-end gap-3">
+          {user.accountType === 'WHOLESALE' && !user.isBusinessVerified && (
+            <Button size="xs" onClick={() => handleApproveB2B(user)}>Approve B2B</Button>
+          )}
+          <button
+            onClick={() => openDetails(user)}
+            className="text-brand-primary hover:text-brand-accent text-sm font-semibold transition-colors"
+          >
+            View Details
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  return (
+    <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="max-w-7xl mx-auto">
+      <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-content-primary tracking-tight flex items-center gap-3">
+            <Icon3D name="customers" size={30} eager /> Customers
+          </h1>
+          <p className="text-content-secondary mt-1 text-sm">Manage retail and wholesale customer accounts</p>
+        </div>
+      </div>
+
+      <Card padding="none" className="overflow-visible">
+        <div className="p-4 border-b border-border-default flex flex-wrap gap-3 justify-between items-center">
+          <Tabs tabs={CUSTOMER_TABS} value={filter} onChange={(id) => setFilter(id as 'ALL' | 'RETAIL' | 'WHOLESALE')} layoutId="customers-tab" />
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name, phone, or company…"
+              className="bg-surface-sunken border border-border-default rounded-xl pl-4 pr-4 py-2 text-sm text-content-primary outline-none focus:border-brand-primary w-64"
+            />
+          </div>
+        </div>
+
+        <DataTable
+          columns={columns}
+          data={filteredCustomers}
+          rowKey={(c) => c.id}
+          loading={loading}
+          pageSize={10}
+          emptyState={<EmptyState icon="customers" title="No customers found" description="No customers match your current filters." />}
+          className="rounded-none border-none shadow-none"
+        />
+      </Card>
 
       {activeCustomer && (
-        <Dialog
+        <Modal
           isOpen={!!activeCustomer}
           onClose={closeDetails}
           title={activeCustomer.name || 'Customer Details'}
@@ -294,16 +292,16 @@ export default function UsersPage() {
           ) : (
             <div className="space-y-5">
               {detailError && (
-                <div className="bg-danger-500/10 border border-danger-500/40 rounded-lg p-3 text-sm text-danger-500 flex items-start">
+                <div className="rounded-xl border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-600 dark:text-danger-400 flex items-start">
                   <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
                   <span>{detailError}</span>
                 </div>
               )}
 
               {confirmDelete && (
-                <div className="bg-neutral-950 border border-danger-500/50 rounded-lg p-4">
-                  <p className="text-sm font-bold text-neutral-100 mb-1">Delete this customer permanently?</p>
-                  <p className="text-xs text-neutral-400 mb-3">
+                <div className="bg-surface-sunken border border-danger-500/50 rounded-xl p-4">
+                  <p className="text-sm font-bold text-content-primary mb-1">Delete this customer permanently?</p>
+                  <p className="text-xs text-content-muted mb-3">
                     {activeCustomer.name || 'This user'} ({activeCustomer.phone}) and their saved addresses, garage,
                     wishlist and notifications will be removed. Customers with orders or service bookings cannot be
                     deleted. This cannot be undone.
@@ -348,7 +346,7 @@ export default function UsersPage() {
               {/* Addresses */}
               <Section title="Saved Addresses" icon={<MapPin className="w-4 h-4" />}>
                 {(!detail?.addresses || detail.addresses.length === 0) ? (
-                  <p className="text-neutral-400 text-sm italic">No saved addresses.</p>
+                  <p className="text-content-muted text-sm italic">No saved addresses.</p>
                 ) : (
                   <>
                     <LocationMapView
@@ -360,12 +358,12 @@ export default function UsersPage() {
                     />
                     <div className="space-y-3 mt-3">
                       {detail.addresses.map((addr: any) => (
-                        <div key={addr.id} className="bg-neutral-950 border border-neutral-800 rounded-lg p-3">
+                        <div key={addr.id} className="bg-surface-sunken border border-border-default rounded-xl p-3">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm font-bold text-neutral-100">{addr.title}</span>
-                            {addr.isDefault && <Badge variant="primary" className="!rounded-full !text-[10px]">Default</Badge>}
+                            <span className="text-sm font-bold text-content-primary">{addr.title}</span>
+                            {addr.isDefault && <Badge variant="primary" size="sm">Default</Badge>}
                           </div>
-                          <p className="text-sm text-neutral-400 flex items-start">
+                          <p className="text-sm text-content-muted flex items-start">
                             <MapPin className="w-4 h-4 mr-1.5 mt-0.5 flex-shrink-0" />
                             {addr.formattedAddress || `${addr.line1}${addr.line2 ? ', ' + addr.line2 : ''}, ${addr.city}, ${addr.state} ${addr.pincode}`}
                           </p>
@@ -379,20 +377,20 @@ export default function UsersPage() {
               {/* Garage */}
               <Section title="Garage" icon={<Car className="w-4 h-4" />}>
                 {(!detail?.userVehicles || detail.userVehicles.length === 0) ? (
-                  <p className="text-neutral-400 text-sm italic">No vehicles added.</p>
+                  <p className="text-content-muted text-sm italic">No vehicles added.</p>
                 ) : (
                   <div className="space-y-2">
                     {detail.userVehicles.map((v: any) => (
-                      <div key={v.id} className="bg-neutral-950 border border-neutral-800 rounded-lg p-3 flex items-center justify-between">
+                      <div key={v.id} className="bg-surface-sunken border border-border-default rounded-xl p-3 flex items-center justify-between">
                         <div>
-                          <div className="text-sm font-bold text-neutral-100">
+                          <div className="text-sm font-bold text-content-primary">
                             {v.brand} {v.model} {v.year ? `(${v.year})` : ''}
                           </div>
-                          <div className="text-xs text-neutral-400">
+                          <div className="text-xs text-content-muted">
                             {v.vehicleType}{v.fuelType ? ` · ${v.fuelType}` : ''}{v.registrationNumber ? ` · ${v.registrationNumber}` : ''}
                           </div>
                         </div>
-                        {v.isDefault && <Badge variant="primary" className="!rounded-full !text-[10px]">Default</Badge>}
+                        {v.isDefault && <Badge variant="primary" size="sm">Default</Badge>}
                       </div>
                     ))}
                   </div>
@@ -402,7 +400,7 @@ export default function UsersPage() {
               {/* Recent orders */}
               <Section title="Recent Orders" icon={<Package className="w-4 h-4" />}>
                 {(!detail?.orders || detail.orders.length === 0) ? (
-                  <p className="text-neutral-400 text-sm italic">No orders yet.</p>
+                  <p className="text-content-muted text-sm italic">No orders yet.</p>
                 ) : (
                   <div className="space-y-2">
                     {detail.orders.map((o: any) => (
@@ -421,7 +419,7 @@ export default function UsersPage() {
               {/* Recent bookings */}
               <Section title="Recent Service Bookings" icon={<Wrench className="w-4 h-4" />}>
                 {(!detail?.serviceBookings || detail.serviceBookings.length === 0) ? (
-                  <p className="text-neutral-400 text-sm italic">No service bookings yet.</p>
+                  <p className="text-content-muted text-sm italic">No service bookings yet.</p>
                 ) : (
                   <div className="space-y-2">
                     {detail.serviceBookings.map((b: any) => (
@@ -438,8 +436,8 @@ export default function UsersPage() {
               </Section>
             </div>
           )}
-        </Dialog>
+        </Modal>
       )}
-    </div>
+    </motion.div>
   );
 }

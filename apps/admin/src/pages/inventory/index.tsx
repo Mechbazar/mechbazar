@@ -1,42 +1,32 @@
 import { useState } from 'react';
-import { Warehouse, Users, FileText, BarChart2 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import InventoryDashboard from './InventoryDashboard';
 import Warehouses from './Warehouses';
 import Suppliers from './Suppliers';
 import PurchaseOrders from './PurchaseOrders';
+import { Tabs, Icon3D } from '../../components/ui';
+import type { TabItem } from '../../components/ui';
+import { fadeInUp } from '../../utils/motion';
 
-const TABS = [
-  { id: 'dashboard', label: 'Stock Ledger', icon: BarChart2 },
-  { id: 'warehouses', label: 'Warehouses', icon: Warehouse },
-  { id: 'suppliers', label: 'Suppliers', icon: Users },
-  { id: 'pos', label: 'Purchase Orders', icon: FileText },
+const TABS: TabItem[] = [
+  { id: 'dashboard', label: 'Stock Ledger' },
+  { id: 'warehouses', label: 'Warehouses' },
+  { id: 'suppliers', label: 'Suppliers' },
+  { id: 'pos', label: 'Purchase Orders' },
 ];
 
 export default function InventorySystem() {
   const [activeTab, setActiveTab] = useState('dashboard');
 
   return (
-    <div className="flex flex-col h-full">
+    <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="flex flex-col h-full max-w-7xl mx-auto">
       {/* Header & Tabs */}
       <div className="flex flex-col mb-6">
-        <h1 className="text-3xl font-bold text-primary-500 mb-4">Inventory Management</h1>
-        
-        <div className="flex space-x-2 border-b border-neutral-800">
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center px-4 py-3 border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? 'border-primary-500 text-primary-500 font-bold bg-neutral-950'
-                  : 'border-transparent text-neutral-100 hover:text-neutral-100 hover:bg-neutral-950/70'
-              }`}
-            >
-              <tab.icon className="w-5 h-5 mr-2" />
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        <h1 className="text-2xl font-bold text-content-primary tracking-tight flex items-center gap-3 mb-4">
+          <Icon3D name="warehouses" size={30} eager /> Inventory Management
+        </h1>
+
+        <Tabs tabs={TABS} value={activeTab} onChange={setActiveTab} layoutId="inventory-tabs" />
       </div>
 
       {/* Tab Content */}
@@ -46,6 +36,6 @@ export default function InventorySystem() {
         {activeTab === 'suppliers' && <Suppliers />}
         {activeTab === 'pos' && <PurchaseOrders />}
       </div>
-    </div>
+    </motion.div>
   );
 }

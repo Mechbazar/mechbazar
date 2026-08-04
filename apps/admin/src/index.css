@@ -1,36 +1,79 @@
 @import "tailwindcss";
+@import "@fontsource-variable/inter";
 @source "../../../packages/shared/src";
 @config "../../../packages/shared/src/tailwind.config.ts";
 
+/* Tailwind v4 class-based dark mode, scoped to this app's own build --
+   does not touch the shared tailwind.config.ts (also used by apps/vendor). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --surface-page: #f6f7fb;
+  --surface-card: #ffffff;
+  --surface-hover: #f1f2f6;
+  --surface-sunken: #eef0f5;
+  --surface-overlay: #ffffff;
+  --content-primary: #12141c;
+  --content-secondary: #4b4f5c;
+  --content-muted: #8a8e9c;
+  --border-default: #e7e8ee;
+  --border-strong: #d6d8e2;
+  --shadow-card: 0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.06);
+  --shadow-elevated: 0 4px 12px -2px rgb(16 24 40 / 0.08), 0 2px 6px -2px rgb(16 24 40 / 0.06);
+  --shadow-popover: 0 12px 32px -8px rgb(16 24 40 / 0.18), 0 4px 12px -4px rgb(16 24 40 / 0.08);
+}
+
+.dark {
+  --surface-page: #0b0d14;
+  --surface-card: #12141c;
+  --surface-hover: #1a1d28;
+  --surface-sunken: #0e1019;
+  --surface-overlay: #181b26;
+  --content-primary: #f4f5f8;
+  --content-secondary: #b6b9c6;
+  --content-muted: #767a8a;
+  --border-default: #232634;
+  --border-strong: #2e3142;
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.3), 0 1px 3px 0 rgb(0 0 0 / 0.4);
+  --shadow-elevated: 0 4px 16px -2px rgb(0 0 0 / 0.5), 0 2px 8px -2px rgb(0 0 0 / 0.4);
+  --shadow-popover: 0 16px 40px -8px rgb(0 0 0 / 0.6), 0 4px 16px -4px rgb(0 0 0 / 0.5);
+}
+
 @theme {
-  /* Brand accent matches the real customer app (apps/mobile) palette;
-     admin shell uses a light surface theme. */
+  /* Brand accent matches the real customer app (apps/mobile) palette. */
   --color-brand-primary: #DA3830;
   --color-brand-secondary: #F5A300;
   --color-brand-accent: #C6301B;
-  --color-brand-dark: #f3f4f6;
-  --color-brand-light: #111827;
-  --color-brand-panel: #ffffff;
-  --color-brand-border: #e5e7eb;
-  --color-brand-text: #111827;
-  --color-brand-muted: #6b7280;
+
+  --color-surface-page: var(--surface-page);
+  --color-surface-card: var(--surface-card);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-content-primary: var(--content-primary);
+  --color-content-secondary: var(--content-secondary);
+  --color-content-muted: var(--content-muted);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
+
+  --font-sans: 'InterVariable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 @layer base {
   body {
-    @apply bg-neutral-50 text-neutral-900 font-sans;
+    @apply bg-surface-page text-content-primary font-sans antialiased;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
-  
-  /* Custom Scrollbar for Light Theme */
+
   ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
   }
   ::-webkit-scrollbar-track {
-    background: #f3f4f6;
+    background: var(--surface-sunken);
   }
   ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: var(--border-strong);
     border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
@@ -39,53 +82,13 @@
 }
 
 @layer utilities {
-  .admin-light .bg-neutral-950,
-  .admin-light .bg-neutral-900,
-  .admin-light .bg-neutral-800 {
-    background-color: #ffffff;
-  }
+  .shadow-card { box-shadow: var(--shadow-card); }
+  .shadow-elevated { box-shadow: var(--shadow-elevated); }
+  .shadow-popover { box-shadow: var(--shadow-popover); }
 
-  .admin-light .border-neutral-900,
-  .admin-light .border-neutral-800,
-  .admin-light .border-neutral-700 {
-    border-color: #e5e7eb;
-  }
-
-  .admin-light .text-white,
-  .admin-light .text-neutral-100,
-  .admin-light .text-neutral-200,
-  .admin-light .text-neutral-300,
-  .admin-light .text-neutral-400 {
-    color: #111827;
-  }
-
-  .admin-light .text-neutral-500 {
-    color: #6b7280;
-  }
-
-  .admin-light .hover\:bg-neutral-900:hover,
-  .admin-light .hover\:bg-neutral-800:hover,
-  .admin-light .hover\:bg-brand-dark\/50:hover,
-  .admin-light .hover\:bg-brand-dark\/30:hover {
-    background-color: #f3f4f6;
-  }
-
-  .admin-light .bg-brand-dark,
-  .admin-light .bg-brand-dark\/50 {
-    background-color: #f8fafc;
-  }
-
-  .admin-light .border-brand-border {
-    border-color: #e5e7eb;
-  }
-
-  .admin-light .text-brand-light,
-  .admin-light .text-brand-text,
-  .admin-light .text-brand-dark {
-    color: #111827;
-  }
-
-  .admin-light .text-brand-muted {
-    color: #6b7280;
+  .glass-surface {
+    background: color-mix(in srgb, var(--surface-card) 72%, transparent);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
   }
 }

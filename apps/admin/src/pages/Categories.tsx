@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
+import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
 import type { RootState } from '../store';
-import { Layers, Search, MoreVertical, Edit2, Trash2, Smile } from 'lucide-react';
+import { Search, MoreVertical, Edit2, Trash2, Smile } from 'lucide-react';
 import EmojiPicker from 'emoji-picker-react';
-import { Button, Card, Badge, Dialog, Input } from '@mechbazar/shared/web';
+import { Button, Card, Badge, Modal, Input, Select, EmptyState, Icon3D } from '../components/ui';
 import { API_URL } from '../config/api';
+import { fadeInUp } from '../utils/motion';
 
 export default function Categories() {
   const { token } = useSelector((state: RootState) => state.auth);
@@ -68,7 +71,7 @@ export default function Categories() {
 
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || 'Failed to save category');
+        toast.error(data.error || 'Failed to save category');
         return;
       }
 
@@ -77,7 +80,7 @@ export default function Categories() {
       setEditingCategory(null);
     } catch (error) {
       console.error(error);
-      alert('Failed to save category');
+      toast.error('Failed to save category');
     }
   };
 
@@ -90,13 +93,13 @@ export default function Categories() {
         });
         if (!res.ok) {
           const data = await res.json();
-          alert(data.error || 'Failed to delete category');
+          toast.error(data.error || 'Failed to delete category');
           return;
         }
         loadCategories();
       } catch (error) {
         console.error(error);
-        alert('Failed to delete category');
+        toast.error('Failed to delete category');
       }
     }
   };
@@ -114,173 +117,149 @@ export default function Categories() {
   });
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-8">
+    <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="max-w-7xl mx-auto">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-            <Layers className="text-brand-primary w-8 h-8" />
-            Product Categories
+          <h2 className="text-2xl font-bold text-content-primary tracking-tight flex items-center gap-3">
+            <Icon3D name="categories" size={30} eager /> Product Categories
           </h2>
-          <p className="text-neutral-400 mt-1">Organize your inventory taxonomy for the mobile app</p>
+          <p className="text-content-secondary mt-1 text-sm">Organize your inventory taxonomy for the mobile app</p>
         </div>
-        <Button onClick={openAddModal}>
-          <span>+</span> Add Category
-        </Button>
+        <Button icon={<span className="text-base leading-none">+</span>} onClick={openAddModal}>Add Category</Button>
       </div>
 
-      {/* Toolbar */}
-      <div className="bg-neutral-900 p-4 rounded-2xl shadow-sm border border-neutral-800 flex gap-4 mb-8">
+      <Card padding="sm" className="flex gap-4 mb-6">
         <div className="flex-1 relative">
-          <Search className="absolute left-4 top-3 text-neutral-500 w-5 h-5" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-content-muted w-4 h-4" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search categories..."
-            className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-2.5 text-white placeholder-neutral-500 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+            className="w-full bg-surface-sunken border border-border-default rounded-xl pl-10 pr-4 py-2.5 text-content-primary placeholder-content-muted outline-none focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/20 text-sm"
           />
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-2.5 text-white outline-none font-medium focus:border-brand-primary"
-        >
+        <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="w-44">
           <option>All Status</option>
           <option>Active</option>
           <option>Inactive</option>
-        </select>
-      </div>
+        </Select>
+      </Card>
 
       {categories.length > 0 && filteredCategories.length === 0 && (
-        <div className="text-center py-12 text-neutral-400">No categories match your search.</div>
+        <Card><EmptyState icon="categories" title="No categories match your search" /></Card>
       )}
 
-      {/* Grid Layout */}
+      {categories.length === 0 && (
+        <Card><EmptyState icon="categories" title="No categories yet" description="Add your first category to organize the catalog." action={<Button onClick={openAddModal}>Add Category</Button>} /></Card>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredCategories.map((cat) => (
-          <Card key={cat.id} variant="dark" className="group relative">
+          <Card key={cat.id} className="group relative">
             <div className="flex justify-between items-start mb-4">
-              <div className="w-14 h-14 bg-neutral-950 rounded-2xl flex items-center justify-center text-2xl border border-neutral-800 overflow-hidden">
+              <div className="w-14 h-14 bg-surface-sunken rounded-2xl flex items-center justify-center text-2xl border border-border-default overflow-hidden">
                 {cat.icon?.startsWith('http') ? (
                   <img src={cat.icon} alt={cat.name} className="w-10 h-10 object-contain" />
                 ) : (
                   cat.icon
                 )}
               </div>
-              <button className="text-neutral-500 hover:text-white p-2">
+              <button className="text-content-muted hover:text-content-primary p-2">
                 <MoreVertical className="w-5 h-5" />
               </button>
 
-              {/* Dropdown Menu (Hidden by default, shown on hover for demo) */}
-              <div className="absolute right-4 top-14 bg-neutral-900 border border-neutral-800 rounded-xl shadow-lg w-32 hidden group-hover:block z-10">
+              <div className="absolute right-4 top-14 bg-surface-overlay border border-border-default rounded-xl shadow-popover w-32 hidden group-hover:block z-10">
                 <button
                   onClick={() => openEditModal(cat)}
-                  className="w-full text-left px-4 py-2.5 text-sm font-medium text-neutral-300 hover:bg-neutral-800 flex items-center gap-2 rounded-t-xl"
+                  className="w-full text-left px-4 py-2.5 text-sm font-medium text-content-secondary hover:bg-surface-hover flex items-center gap-2 rounded-t-xl"
                 >
                   <Edit2 className="w-4 h-4" /> Edit
                 </button>
                 <button
                   onClick={() => handleDelete(cat.id)}
-                  className="w-full text-left px-4 py-2.5 text-sm font-medium text-danger-400 hover:bg-danger-500/10 flex items-center gap-2 rounded-b-xl"
+                  className="w-full text-left px-4 py-2.5 text-sm font-medium text-danger-500 hover:bg-danger-500/10 flex items-center gap-2 rounded-b-xl"
                 >
                   <Trash2 className="w-4 h-4" /> Delete
                 </button>
               </div>
             </div>
 
-            <h3 className="text-lg font-bold text-white mb-1">{cat.name}</h3>
+            <h3 className="text-base font-bold text-content-primary mb-1">{cat.name}</h3>
 
-            <div className="flex justify-between items-center mt-4 pt-4 border-t border-neutral-800">
-              <span className="text-neutral-400 text-sm font-medium">{cat.products} Products</span>
-              <Badge variant={cat.status === 'Active' ? 'success' : 'neutral'} className="!rounded-full">
-                {cat.status}
-              </Badge>
+            <div className="flex justify-between items-center mt-4 pt-4 border-t border-border-default">
+              <span className="text-content-muted text-sm font-medium">{cat.products} Products</span>
+              <Badge variant={cat.status === 'Active' ? 'success' : 'neutral'} size="sm">{cat.status}</Badge>
             </div>
           </Card>
         ))}
       </div>
 
-      {/* Add Category Modal */}
-      <Dialog
+      <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={editingCategory ? 'Edit Category' : 'Add Category'}
         footer={
           <>
-            <button onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 rounded-xl font-semibold text-neutral-300 hover:bg-neutral-800">Cancel</button>
+            <Button variant="secondary" onClick={() => setIsModalOpen(false)}>Cancel</Button>
             <Button onClick={handleSave}>{editingCategory ? 'Save Changes' : 'Create Category'}</Button>
           </>
         }
       >
         <div className="space-y-5">
-              <Input
-                label="Category Name"
+          <Input
+            label="Category Name"
+            type="text"
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            placeholder="e.g. Spark Plugs"
+          />
+
+          <div className="relative" ref={emojiPickerRef}>
+            <label className="block text-sm font-medium text-content-secondary mb-1.5">Icon (Emoji or Image URL)</label>
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                {formData.icon && !formData.icon.startsWith('http') && <span className="text-xl">{formData.icon}</span>}
+              </div>
+              <input
                 type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({...formData, name: e.target.value})}
-                placeholder="e.g. Spark Plugs"
+                value={formData.icon}
+                onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
+                className={`w-full bg-surface-card border border-border-default rounded-xl ${formData.icon && !formData.icon.startsWith('http') ? 'pl-10' : 'px-3.5'} pr-12 py-2.5 text-content-primary outline-none focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/20 text-sm`}
+                placeholder="e.g. ⚡ or https://..."
               />
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className="absolute inset-y-0 right-2 flex items-center p-2 text-content-muted hover:text-brand-primary transition-colors"
+              >
+                <Smile className="w-5 h-5" />
+              </button>
+            </div>
 
-              <div className="relative" ref={emojiPickerRef}>
-                <label className="block text-sm font-semibold text-neutral-300 mb-2">Icon (Emoji or Image URL)</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    {formData.icon && !formData.icon.startsWith('http') && <span className="text-xl">{formData.icon}</span>}
-                  </div>
-                  <input
-                    type="text"
-                    value={formData.icon}
-                    onChange={(e) => setFormData({...formData, icon: e.target.value})}
-                    className={`w-full bg-neutral-950 border border-neutral-800 rounded-xl ${formData.icon && !formData.icon.startsWith('http') ? 'pl-10' : 'px-4'} pr-12 py-3 text-white outline-none focus:border-brand-primary`}
-                    placeholder="e.g. ⚡ or https://..."
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                    className="absolute inset-y-0 right-2 flex items-center p-2 text-neutral-500 hover:text-brand-primary transition-colors"
-                  >
-                    <Smile className="w-5 h-5" />
-                  </button>
-                </div>
-
-                {showEmojiPicker && (
-                  <div className="absolute z-50 mt-2 shadow-2xl rounded-xl overflow-hidden border border-neutral-800">
-                    <EmojiPicker
-                      onEmojiClick={(emojiObject) => {
-                        setFormData({...formData, icon: emojiObject.emoji});
-                        setShowEmojiPicker(false);
-                      }}
-                    />
-                  </div>
-                )}
+            {showEmojiPicker && (
+              <div className="absolute z-50 mt-2 shadow-popover rounded-xl overflow-hidden border border-border-default">
+                <EmojiPicker
+                  onEmojiClick={(emojiObject) => {
+                    setFormData({ ...formData, icon: emojiObject.emoji });
+                    setShowEmojiPicker(false);
+                  }}
+                />
               </div>
+            )}
+          </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-neutral-300 mb-2">Vehicle Type</label>
-                <select
-                  value={formData.vehicleType}
-                  onChange={(e) => setFormData({...formData, vehicleType: e.target.value})}
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white outline-none focus:border-brand-primary"
-                >
-                  <option value="CAR">Car</option>
-                  <option value="BIKE">Bike</option>
-                </select>
-              </div>
+          <Select label="Vehicle Type" value={formData.vehicleType} onChange={(e) => setFormData({ ...formData, vehicleType: e.target.value })}>
+            <option value="CAR">Car</option>
+            <option value="BIKE">Bike</option>
+          </Select>
 
-              <div>
-                <label className="block text-sm font-semibold text-neutral-300 mb-2">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({...formData, status: e.target.value})}
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white outline-none focus:border-brand-primary"
-                >
-                  <option value="Active">Active (Visible in App)</option>
-                  <option value="Inactive">Inactive (Hidden)</option>
-                </select>
-              </div>
+          <Select label="Status" value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
+            <option value="Active">Active (Visible in App)</option>
+            <option value="Inactive">Inactive (Hidden)</option>
+          </Select>
         </div>
-      </Dialog>
-    </div>
+      </Modal>
+    </motion.div>
   );
 }

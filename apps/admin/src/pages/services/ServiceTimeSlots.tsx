@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 import type { RootState } from '../../store';
-import { Clock3, Edit2, Trash2 } from 'lucide-react';
-import { Button, Badge, Dialog, Input } from '@mechbazar/shared/web';
+import { Edit2, Trash2 } from 'lucide-react';
+import { Button, Card, Badge, Modal, Input, DataTable, EmptyState, Icon3D } from '../../components/ui';
+import type { Column } from '../../components/ui';
 import { API_URL } from '../../config/api';
 
 const emptyForm = { label: '', startTime: '', endTime: '', maxBookingsPerSlot: '20', isActive: true, sortOrder: 0 };
@@ -40,7 +43,7 @@ export default function ServiceTimeSlots() {
 
   const handleSave = async () => {
     if (!formData.label || !formData.startTime || !formData.endTime) {
-      alert('Label, start time and end time are required');
+      toast.error('Label, start time and end time are required');
       return;
     }
     const payload = { ...formData, maxBookingsPerSlot: Number(formData.maxBookingsPerSlot) || 20 };
@@ -58,14 +61,14 @@ export default function ServiceTimeSlots() {
           });
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || 'Failed to save time slot');
+        toast.error(data.error || 'Failed to save time slot');
         return;
       }
       loadSlots();
       setIsModalOpen(false);
     } catch (error) {
       console.error(error);
-      alert('Failed to save time slot');
+      toast.error('Failed to save time slot');
     }
   };
 
@@ -78,13 +81,13 @@ export default function ServiceTimeSlots() {
       });
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || 'Failed to delete time slot');
+        toast.error(data.error || 'Failed to delete time slot');
         return;
       }
       loadSlots();
     } catch (error) {
       console.error(error);
-      alert('Failed to delete time slot');
+      toast.error('Failed to delete time slot');
     }
   };
 
@@ -101,71 +104,67 @@ export default function ServiceTimeSlots() {
     }
   };
 
+  const columns: Column<any>[] = [
+    { key: 'label', header: 'Label', render: (slot) => <span className="text-sm font-bold text-content-primary">{slot.label}</span> },
+    { key: 'window', header: 'Window', render: (slot) => <span className="text-sm text-content-secondary">{slot.startTime} – {slot.endTime}</span> },
+    { key: 'max', header: 'Max / Day', render: (slot) => <span className="text-sm text-content-secondary">{slot.maxBookingsPerSlot}</span> },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (slot) => (
+        <button onClick={() => toggleActive(slot)}>
+          <Badge variant={slot.isActive ? 'success' : 'neutral'} size="sm" className="cursor-pointer">
+            {slot.isActive ? 'Active' : 'Disabled'}
+          </Badge>
+        </button>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      headerClassName: 'text-right',
+      className: 'text-right',
+      render: (slot) => (
+        <div className="flex justify-end gap-1">
+          <button onClick={() => openEditModal(slot)} className="text-brand-primary hover:text-brand-accent p-1.5">
+            <Edit2 className="w-4 h-4" />
+          </button>
+          <button onClick={() => handleDelete(slot.id)} className="text-danger-500 hover:text-danger-600 p-1.5">
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="flex justify-between items-center mb-8">
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="max-w-5xl mx-auto space-y-6">
+      <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-            <Clock3 className="text-brand-primary w-8 h-8" />
-            Time Slots
+          <h2 className="text-2xl font-bold text-content-primary tracking-tight flex items-center gap-3">
+            <Icon3D name="service_catalog" size={30} eager /> Time Slots
           </h2>
-          <p className="text-neutral-400 mt-1">Booking windows customers can choose from, with a per-slot daily capacity</p>
+          <p className="text-content-secondary mt-1 text-sm">Booking windows customers can choose from, with a per-slot daily capacity</p>
         </div>
-        <Button onClick={openAddModal}>
-          <span>+</span> Add Time Slot
-        </Button>
+        <Button onClick={openAddModal}>+ Add Time Slot</Button>
       </div>
 
-      <div className="bg-neutral-900 rounded-2xl border border-neutral-800 overflow-hidden">
-        <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-neutral-950 text-neutral-500 text-xs uppercase tracking-wider">
-              <th className="p-4 font-semibold">Label</th>
-              <th className="p-4 font-semibold">Window</th>
-              <th className="p-4 font-semibold">Max / Day</th>
-              <th className="p-4 font-semibold">Status</th>
-              <th className="p-4 font-semibold text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-neutral-800">
-            {slots.map((slot) => (
-              <tr key={slot.id} className="hover:bg-neutral-800/50 transition-colors">
-                <td className="p-4 text-white font-medium">{slot.label}</td>
-                <td className="p-4 text-neutral-300">{slot.startTime} – {slot.endTime}</td>
-                <td className="p-4 text-neutral-300">{slot.maxBookingsPerSlot}</td>
-                <td className="p-4">
-                  <button onClick={() => toggleActive(slot)}>
-                    <Badge variant={slot.isActive ? 'success' : 'neutral'} className="!rounded-full cursor-pointer">
-                      {slot.isActive ? 'Active' : 'Disabled'}
-                    </Badge>
-                  </button>
-                </td>
-                <td className="p-4 text-right">
-                  <button onClick={() => openEditModal(slot)} className="text-brand-primary hover:text-brand-secondary p-1 mr-2">
-                    <Edit2 className="w-4 h-4 inline" />
-                  </button>
-                  <button onClick={() => handleDelete(slot.id)} className="text-danger-400 hover:text-danger-300 p-1">
-                    <Trash2 className="w-4 h-4 inline" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {slots.length === 0 && (
-              <tr><td colSpan={5} className="text-center py-12 text-neutral-500">No time slots configured yet.</td></tr>
-            )}
-          </tbody>
-        </table>
-        </div>
-      </div>
+      <Card padding="none">
+        <DataTable
+          columns={columns}
+          data={slots}
+          rowKey={(slot) => slot.id}
+          emptyState={<EmptyState icon="service_catalog" title="No time slots configured yet" action={<Button onClick={openAddModal}>Add Time Slot</Button>} />}
+        />
+      </Card>
 
-      <Dialog
+      <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={editingSlot ? 'Edit Time Slot' : 'Add Time Slot'}
         footer={
           <>
-            <button onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 rounded-xl font-semibold text-neutral-300 hover:bg-neutral-800">Cancel</button>
+            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
             <Button onClick={handleSave}>{editingSlot ? 'Save Changes' : 'Create Slot'}</Button>
           </>
         }
@@ -184,7 +183,7 @@ export default function ServiceTimeSlots() {
             helperText="How many bookings can share this slot on a given day before it's marked full"
           />
         </div>
-      </Dialog>
-    </div>
+      </Modal>
+    </motion.div>
   );
 }

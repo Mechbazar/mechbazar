@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { Button, Card, Alert, Input } from '@mechbazar/shared/web';
+import { motion } from 'framer-motion';
+import { CheckCircle2, AlertCircle } from 'lucide-react';
+import { Button, Card, Input } from '../components/ui';
 import { API_URL } from '../config/api';
+import { fadeInUp } from '../utils/motion';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -39,47 +42,59 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-neutral-950 px-4">
-      <Card variant="dark" className="w-full max-w-md !p-8 shadow-2xl">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-primary-500 mb-2">Reset Password</h1>
-          <p className="text-neutral-400">Enter your email to receive a reset link</p>
-        </div>
+    <div className="relative flex min-h-screen w-full items-center justify-center bg-surface-page px-4 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_var(--brand-primary)_0%,_transparent_35%)] opacity-[0.06]" />
+      <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="relative w-full max-w-md">
+        <Card className="!p-8 shadow-xl">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-content-primary mb-2">Reset Password</h1>
+            <p className="text-content-secondary text-sm">Enter your email to receive a reset link</p>
+          </div>
 
-        {submitted ? (
-          <Alert type="info" message="If an account exists for this email, a reset link has been sent. Check your inbox." className="mb-6 text-center">
-            <div className="mt-4">
-              <Link to="/login" className="text-primary-500 font-bold hover:underline">
-                Return to Login
-              </Link>
+          {submitted ? (
+            <div className="text-center">
+              <div className="flex items-start gap-2 rounded-xl border border-info-500/30 bg-info-500/10 px-4 py-3 text-sm text-info-600 dark:text-info-300">
+                <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>If an account exists for this email, a reset link has been sent. Check your inbox.</span>
+              </div>
+              <div className="mt-5">
+                <Link to="/login" className="text-brand-primary font-semibold hover:text-brand-accent transition-colors text-sm">
+                  Return to Login
+                </Link>
+              </div>
             </div>
-          </Alert>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {error && <Alert type="error" message={error} />}
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {error && (
+                <div className="flex items-start gap-2 rounded-xl border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-600 dark:text-danger-300">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
 
-            <Input
-              label="Email Address"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              disabled={loading}
-            />
+              <Input
+                label="Email Address"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                disabled={loading}
+              />
 
-            <Button type="submit" isLoading={loading} disabled={loading} className="w-full">
-              Send Reset Link
-            </Button>
+              <Button type="submit" isLoading={loading} disabled={loading} className="w-full">
+                Send Reset Link
+              </Button>
 
-            <div className="text-center mt-4">
-              <Link to="/login" className="text-sm text-neutral-400 hover:text-primary-500 transition-colors">
-                Back to Sign In
-              </Link>
-            </div>
-          </form>
-        )}
-      </Card>
+              <div className="text-center mt-4">
+                <Link to="/login" className="text-sm text-content-muted hover:text-brand-primary transition-colors">
+                  Back to Sign In
+                </Link>
+              </div>
+            </form>
+          )}
+        </Card>
+      </motion.div>
     </div>
   );
 }

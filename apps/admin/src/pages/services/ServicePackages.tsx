@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { motion } from 'framer-motion';
+import toast from 'react-hot-toast';
 import type { RootState } from '../../store';
-import { Package, Search, Edit2, Trash2, Star } from 'lucide-react';
-import { Button, Card, Badge, Dialog, Input } from '@mechbazar/shared/web';
+import { Search, Edit2, Trash2, Star } from 'lucide-react';
+import { Button, Card, Badge, Modal, Input, Checkbox, EmptyState, Icon3D } from '../../components/ui';
 import { API_URL, resolveUploadUrl } from '../../config/api';
 
 const emptyForm = {
@@ -74,13 +76,13 @@ export default function ServicePackages() {
       });
       const data = await res.json();
       if (!res.ok) {
-        alert(data.error || 'Failed to upload image');
+        toast.error(data.error || 'Failed to upload image');
         return;
       }
       setFormData((prev) => ({ ...prev, image: data.url }));
     } catch (err) {
       console.error(err);
-      alert('Failed to upload image');
+      toast.error('Failed to upload image');
     } finally {
       setUploading(false);
     }
@@ -88,7 +90,7 @@ export default function ServicePackages() {
 
   const handleSave = async () => {
     if (!formData.categoryId || !formData.name || !formData.price) {
-      alert('Category, name and price are required');
+      toast.error('Category, name and price are required');
       return;
     }
     const payload = {
@@ -121,7 +123,7 @@ export default function ServicePackages() {
 
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || 'Failed to save package');
+        toast.error(data.error || 'Failed to save package');
         return;
       }
 
@@ -130,7 +132,7 @@ export default function ServicePackages() {
       setEditingPackage(null);
     } catch (error) {
       console.error(error);
-      alert('Failed to save package');
+      toast.error('Failed to save package');
     }
   };
 
@@ -143,126 +145,124 @@ export default function ServicePackages() {
       });
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || 'Failed to delete package');
+        toast.error(data.error || 'Failed to delete package');
         return;
       }
       loadData();
     } catch (error) {
       console.error(error);
-      alert('Failed to delete package');
+      toast.error('Failed to delete package');
     }
   };
 
   const filtered = packages.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <div className="flex justify-between items-center mb-8">
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="max-w-7xl mx-auto">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-            <Package className="text-brand-primary w-8 h-8" />
-            Service Packages
+          <h2 className="text-2xl font-bold text-content-primary tracking-tight flex items-center gap-3">
+            <Icon3D name="service_catalog" size={30} eager /> Service Packages
           </h2>
-          <p className="text-neutral-400 mt-1">Set pricing, estimated time, and inclusions for each service</p>
+          <p className="text-content-secondary mt-1 text-sm">Set pricing, estimated time, and inclusions for each service</p>
         </div>
-        <Button onClick={openAddModal} disabled={categories.length === 0}>
-          <span>+</span> Add Package
-        </Button>
+        <Button onClick={openAddModal} disabled={categories.length === 0}>+ Add Package</Button>
       </div>
 
       {categories.length === 0 && (
-        <div className="mb-6 rounded-xl border border-warning-500/30 bg-warning-500/10 px-4 py-3 text-sm text-warning-300">
+        <div className="mb-6 rounded-xl border border-warning-500/30 bg-warning-500/10 px-4 py-3 text-sm text-warning-600 dark:text-warning-300">
           Create a service category first before adding packages.
         </div>
       )}
 
-      <div className="bg-neutral-900 p-4 rounded-2xl shadow-sm border border-neutral-800 flex gap-4 mb-8">
+      <Card padding="sm" className="flex gap-4 mb-6">
         <div className="flex-1 relative">
-          <Search className="absolute left-4 top-3 text-neutral-500 w-5 h-5" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-content-muted w-4 h-4" />
           <input
             type="text"
             placeholder="Search packages..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-12 pr-4 py-2.5 text-white placeholder-neutral-500 outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary"
+            className="w-full bg-surface-sunken border border-border-default rounded-xl pl-10 pr-4 py-2.5 text-content-primary placeholder-content-muted outline-none focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/20 text-sm"
           />
         </div>
-      </div>
+      </Card>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filtered.map((pkg) => (
-          <Card key={pkg.id} variant="dark">
-            <div className="flex justify-between items-start mb-2 gap-2 flex-wrap">
-              <div className="flex gap-2 flex-wrap">
-                <Badge variant="secondary" className="!rounded-full">{pkg.category?.name}</Badge>
-                {pkg.isPopular && <Badge variant="warning" className="!rounded-full">Popular</Badge>}
-                {pkg.isRecommended && <Badge variant="info" className="!rounded-full">Recommended</Badge>}
-                {pkg.isEmergency && <Badge variant="danger" className="!rounded-full">Emergency</Badge>}
+      {filtered.length === 0 ? (
+        <Card><EmptyState icon="service_catalog" title="No service packages found" /></Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filtered.map((pkg) => (
+            <Card key={pkg.id}>
+              <div className="flex justify-between items-start mb-2 gap-2 flex-wrap">
+                <div className="flex gap-2 flex-wrap">
+                  <Badge variant="secondary" size="sm">{pkg.category?.name}</Badge>
+                  {pkg.isPopular && <Badge variant="warning" size="sm">Popular</Badge>}
+                  {pkg.isRecommended && <Badge variant="info" size="sm">Recommended</Badge>}
+                  {pkg.isEmergency && <Badge variant="danger" size="sm">Emergency</Badge>}
+                </div>
+                <Badge variant={pkg.isActive ? 'success' : 'neutral'} size="sm">{pkg.isActive ? 'Active' : 'Disabled'}</Badge>
               </div>
-              <Badge variant={pkg.isActive ? 'success' : 'neutral'} className="!rounded-full">{pkg.isActive ? 'Active' : 'Disabled'}</Badge>
-            </div>
-            {pkg.image && (
-              <img src={resolveUploadUrl(pkg.image)} alt={pkg.name} className="w-full h-32 object-cover rounded-xl mb-3 border border-neutral-800" />
-            )}
-            <h3 className="text-lg font-bold text-white mb-1">{pkg.name}</h3>
-            <p className="text-neutral-400 text-sm mb-1 line-clamp-2">{pkg.description || 'No description'}</p>
-            {pkg.reviewCount > 0 && (
-              <p className="text-xs text-neutral-500 mb-2 flex items-center gap-1">
-                <Star className="w-3 h-3 fill-warning-400 text-warning-400" /> {pkg.rating.toFixed(1)} ({pkg.reviewCount} review{pkg.reviewCount !== 1 ? 's' : ''})
-              </p>
-            )}
+              {pkg.image && (
+                <img src={resolveUploadUrl(pkg.image)} alt={pkg.name} className="w-full h-32 object-cover rounded-xl mb-3 border border-border-default" />
+              )}
+              <h3 className="text-base font-bold text-content-primary mb-1">{pkg.name}</h3>
+              <p className="text-content-secondary text-sm mb-1 line-clamp-2">{pkg.description || 'No description'}</p>
+              {pkg.reviewCount > 0 && (
+                <p className="text-xs text-content-muted mb-2 flex items-center gap-1">
+                  <Star className="w-3 h-3 fill-warning-400 text-warning-400" /> {pkg.rating.toFixed(1)} ({pkg.reviewCount} review{pkg.reviewCount !== 1 ? 's' : ''})
+                </p>
+              )}
 
-            {pkg.includedServices?.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                {pkg.includedServices.slice(0, 3).map((s: string, i: number) => (
-                  <span key={i} className="text-xs bg-neutral-800 text-neutral-300 px-2 py-1 rounded">{s}</span>
-                ))}
-              </div>
-            )}
+              {pkg.includedServices?.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {pkg.includedServices.slice(0, 3).map((s: string, i: number) => (
+                    <span key={i} className="text-xs bg-surface-sunken text-content-secondary px-2 py-1 rounded-md">{s}</span>
+                  ))}
+                </div>
+              )}
 
-            <div className="flex justify-between items-center mt-4 pt-4 border-t border-neutral-800">
-              <div>
-                {pkg.discountPrice != null && pkg.discountPrice < pkg.price && (
-                  <span className="text-neutral-500 text-sm line-through mr-2">₹{pkg.price}</span>
-                )}
-                <span className="text-white font-bold text-lg">₹{pkg.discountPrice ?? pkg.price}</span>
-                <span className="text-neutral-500 text-xs ml-2">· {pkg.estimatedMinutes} mins</span>
+              <div className="flex justify-between items-center mt-4 pt-4 border-t border-border-default">
+                <div>
+                  {pkg.discountPrice != null && pkg.discountPrice < pkg.price && (
+                    <span className="text-content-muted text-sm line-through mr-2">₹{pkg.price}</span>
+                  )}
+                  <span className="text-content-primary font-bold text-lg">₹{pkg.discountPrice ?? pkg.price}</span>
+                  <span className="text-content-muted text-xs ml-2">· {pkg.estimatedMinutes} mins</span>
+                </div>
+                <div className="flex gap-1">
+                  <button onClick={() => openEditModal(pkg)} className="text-brand-primary hover:text-brand-accent p-1.5">
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => handleDelete(pkg.id)} className="text-danger-500 hover:text-danger-600 p-1.5">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => openEditModal(pkg)} className="text-brand-primary hover:text-brand-secondary p-1">
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button onClick={() => handleDelete(pkg.id)} className="text-danger-400 hover:text-danger-300 p-1">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </Card>
-        ))}
-        {filtered.length === 0 && (
-          <div className="col-span-full text-center py-16 text-neutral-500">No service packages found.</div>
-        )}
-      </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      <Dialog
+      <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={editingPackage ? 'Edit Package' : 'Add Package'}
         size="lg"
         footer={
           <>
-            <button onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 rounded-xl font-semibold text-neutral-300 hover:bg-neutral-800">Cancel</button>
+            <Button variant="ghost" onClick={() => setIsModalOpen(false)}>Cancel</Button>
             <Button onClick={handleSave}>{editingPackage ? 'Save Changes' : 'Create Package'}</Button>
           </>
         }
       >
         <div className="space-y-5">
           <div>
-            <label className="block text-sm font-semibold text-neutral-300 mb-2">Category</label>
+            <label className="block text-sm font-medium text-content-secondary mb-1.5">Category</label>
             <select
               value={formData.categoryId}
               onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
-              className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white outline-none focus:border-brand-primary"
+              className="w-full bg-surface-sunken border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-content-primary outline-none focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/20"
             >
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>{c.name} ({c.vehicleType})</option>
@@ -279,12 +279,12 @@ export default function ServicePackages() {
           />
 
           <div>
-            <label className="block text-sm font-semibold text-neutral-300 mb-2">Description</label>
+            <label className="block text-sm font-medium text-content-secondary mb-1.5">Description</label>
             <textarea
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               rows={2}
-              className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white outline-none focus:border-brand-primary"
+              className="w-full bg-surface-sunken border border-border-default rounded-xl px-3.5 py-2.5 text-sm text-content-primary outline-none focus:border-brand-primary focus:ring-4 focus:ring-brand-primary/20 resize-none"
             />
           </div>
 
@@ -294,7 +294,7 @@ export default function ServicePackages() {
             <Input label="Est. Minutes" type="number" value={formData.estimatedMinutes} onChange={(e) => setFormData({ ...formData, estimatedMinutes: e.target.value })} />
           </div>
           {formData.price && formData.discountPrice && Number(formData.discountPrice) < Number(formData.price) && (
-            <p className="text-xs text-success-400 -mt-3">
+            <p className="text-xs text-success-500 -mt-3">
               {Math.round(((Number(formData.price) - Number(formData.discountPrice)) / Number(formData.price)) * 100)}% off preview
             </p>
           )}
@@ -308,47 +308,29 @@ export default function ServicePackages() {
           />
 
           <div>
-            <label className="block text-sm font-semibold text-neutral-300 mb-2">Service Image</label>
+            <label className="block text-sm font-medium text-content-secondary mb-1.5">Service Image</label>
             {formData.image && (
-              <img src={resolveUploadUrl(formData.image)} alt="Preview" className="w-full h-40 object-cover rounded-xl mb-2 border border-neutral-800" />
+              <img src={resolveUploadUrl(formData.image)} alt="Preview" className="w-full h-40 object-cover rounded-xl mb-2 border border-border-default" />
             )}
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={(e) => e.target.files?.[0] && handleImageUpload(e.target.files[0])}
               disabled={uploading}
-              className="w-full text-sm text-neutral-300 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-brand-primary file:text-white file:font-semibold file:cursor-pointer"
+              className="w-full text-sm text-content-secondary file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-brand-primary file:text-white file:font-semibold file:cursor-pointer"
             />
-            {uploading && <p className="text-xs text-neutral-500 mt-1">Uploading...</p>}
+            {uploading && <p className="text-xs text-content-muted mt-1">Uploading...</p>}
           </div>
 
           <div className="grid grid-cols-3 gap-4">
-            <label className="flex items-center gap-2 text-sm font-medium text-neutral-300">
-              <input type="checkbox" checked={formData.isPopular} onChange={(e) => setFormData({ ...formData, isPopular: e.target.checked })} className="w-4 h-4 text-brand-primary bg-neutral-950 border-neutral-800 rounded focus:ring-brand-primary" />
-              Popular
-            </label>
-            <label className="flex items-center gap-2 text-sm font-medium text-neutral-300">
-              <input type="checkbox" checked={formData.isRecommended} onChange={(e) => setFormData({ ...formData, isRecommended: e.target.checked })} className="w-4 h-4 text-brand-primary bg-neutral-950 border-neutral-800 rounded focus:ring-brand-primary" />
-              Recommended
-            </label>
-            <label className="flex items-center gap-2 text-sm font-medium text-neutral-300">
-              <input type="checkbox" checked={formData.isEmergency} onChange={(e) => setFormData({ ...formData, isEmergency: e.target.checked })} className="w-4 h-4 text-brand-primary bg-neutral-950 border-neutral-800 rounded focus:ring-brand-primary" />
-              Emergency
-            </label>
+            <Checkbox label="Popular" checked={formData.isPopular} onChange={(e) => setFormData({ ...formData, isPopular: e.target.checked })} />
+            <Checkbox label="Recommended" checked={formData.isRecommended} onChange={(e) => setFormData({ ...formData, isRecommended: e.target.checked })} />
+            <Checkbox label="Emergency" checked={formData.isEmergency} onChange={(e) => setFormData({ ...formData, isEmergency: e.target.checked })} />
           </div>
 
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="pkgActive"
-              checked={formData.isActive}
-              onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-              className="w-4 h-4 text-brand-primary bg-neutral-950 border-neutral-800 rounded focus:ring-brand-primary"
-            />
-            <label htmlFor="pkgActive" className="text-sm font-medium text-neutral-300">Package is Active</label>
-          </div>
+          <Checkbox label="Package is Active" checked={formData.isActive} onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })} />
         </div>
-      </Dialog>
-    </div>
+      </Modal>
+    </motion.div>
   );
 }

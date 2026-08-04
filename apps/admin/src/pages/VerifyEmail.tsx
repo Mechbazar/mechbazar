@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import axios from 'axios';
+import { motion } from 'framer-motion';
+import { AlertCircle, CheckCircle2, Info } from 'lucide-react';
 import { loginSuccess } from '../store';
-import { Button, Card, Alert } from '@mechbazar/shared/web';
+import { Button, Card } from '../components/ui';
 import { API_URL } from '../config/api';
 import { auth } from '../config/firebase';
+import { fadeInUp } from '../utils/motion';
 
 const RESEND_COOLDOWN_SECONDS = 60;
 
@@ -32,11 +35,17 @@ export default function VerifyEmail() {
   // `currentUser` to resend/re-check against -- send them back to sign in.
   if (!auth.currentUser) {
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-neutral-950 px-4">
-        <Card variant="dark" className="w-full max-w-md !p-8 shadow-2xl text-center">
-          <Alert type="info" message="Your session has expired. Please sign in again." className="mb-6" />
-          <Link to="/login" className="text-primary-500 font-bold hover:underline">Return to Login</Link>
-        </Card>
+      <div className="relative flex min-h-screen w-full items-center justify-center bg-surface-page px-4 overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_var(--brand-primary)_0%,_transparent_35%)] opacity-[0.06]" />
+        <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="relative w-full max-w-md">
+          <Card className="!p-8 shadow-xl text-center">
+            <div className="flex items-start gap-2 rounded-xl border border-info-500/30 bg-info-500/10 px-4 py-3 text-sm text-info-600 dark:text-info-300 mb-6 text-left">
+              <Info className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>Your session has expired. Please sign in again.</span>
+            </div>
+            <Link to="/login" className="text-brand-primary font-semibold hover:text-brand-accent transition-colors text-sm">Return to Login</Link>
+          </Card>
+        </motion.div>
       </div>
     );
   }
@@ -94,39 +103,52 @@ export default function VerifyEmail() {
   };
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-neutral-950 px-4">
-      <Card variant="dark" className="w-full max-w-md !p-8 shadow-2xl">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-primary-500 mb-2">Verify your email</h1>
-          <p className="text-neutral-400">
-            We sent a verification link to <span className="text-neutral-200 font-medium">{email}</span>. Please verify your email to continue.
-          </p>
-        </div>
+    <div className="relative flex min-h-screen w-full items-center justify-center bg-surface-page px-4 overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_var(--brand-primary)_0%,_transparent_35%)] opacity-[0.06]" />
+      <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="relative w-full max-w-md">
+        <Card className="!p-8 shadow-xl">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-content-primary mb-2">Verify your email</h1>
+            <p className="text-content-secondary text-sm">
+              We sent a verification link to <span className="text-content-primary font-medium">{email}</span>. Please verify your email to continue.
+            </p>
+          </div>
 
-        {error && <Alert type="error" message={error} className="mb-6" />}
-        {info && <Alert type="success" message={info} className="mb-6" />}
+          {error && (
+            <div className="mb-6 flex items-start gap-2 rounded-xl border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-600 dark:text-danger-300">
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+          {info && (
+            <div className="mb-6 flex items-start gap-2 rounded-xl border border-success-500/30 bg-success-500/10 px-4 py-3 text-sm text-success-600 dark:text-success-300">
+              <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{info}</span>
+            </div>
+          )}
 
-        <div className="space-y-3">
-          <Button onClick={handleContinue} isLoading={checking} disabled={checking} className="w-full">
-            I've verified, continue
-          </Button>
-          <Button
-            onClick={handleResend}
-            isLoading={resending}
-            disabled={resending || cooldown > 0}
-            variant="secondary"
-            className="w-full"
-          >
-            {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend verification email'}
-          </Button>
-        </div>
+          <div className="space-y-3">
+            <Button onClick={handleContinue} isLoading={checking} disabled={checking} className="w-full">
+              I've verified, continue
+            </Button>
+            <Button
+              onClick={handleResend}
+              isLoading={resending}
+              disabled={resending || cooldown > 0}
+              variant="secondary"
+              className="w-full"
+            >
+              {cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend verification email'}
+            </Button>
+          </div>
 
-        <div className="text-center mt-6">
-          <Link to="/login" className="text-sm text-neutral-400 hover:text-primary-500 transition-colors">
-            Back to Sign In
-          </Link>
-        </div>
-      </Card>
+          <div className="text-center mt-6">
+            <Link to="/login" className="text-sm text-content-muted hover:text-brand-primary transition-colors">
+              Back to Sign In
+            </Link>
+          </div>
+        </Card>
+      </motion.div>
     </div>
   );
 }

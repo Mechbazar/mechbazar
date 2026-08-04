@@ -2,14 +2,18 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
 import { useSearchParams } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
 import type { RootState } from '../store';
 import {
-  ClipboardList, Search, Clock, Wrench, CheckCircle, UserPlus, X, FileText, IndianRupee,
-  Ban, MapPin, Star, Navigation as NavigationIcon, PlayCircle, ChevronLeft, ChevronRight,
+  Clock, Wrench, CheckCircle, UserPlus, X, FileText, IndianRupee,
+  Ban, MapPin, Star, Navigation as NavigationIcon, PlayCircle,
 } from 'lucide-react';
-import { Badge, Dialog, Button, Loader } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
 import { getAdminSocket } from '../services/adminRealtime';
+import { Badge, Button, Card, DataTable, EmptyState, Loader, Modal, Tabs, Icon3D } from '../components/ui';
+import type { Column, TabItem } from '../components/ui';
+import { fadeInUp } from '../utils/motion';
 
 const BOOKINGS_POLL_INTERVAL_MS = 15000;
 const PAGE_SIZE = 20;
@@ -46,18 +50,20 @@ const STATUS_TABS: { label: string; statuses?: string[] }[] = [
   { label: 'Cancelled', statuses: ['CANCELLED'] },
 ];
 
+const TABS: TabItem[] = STATUS_TABS.map((t) => ({ id: t.label, label: t.label }));
+
 const getStatusBadge = (status: string) => {
   switch (status) {
-    case 'PENDING_ADMIN_ASSIGNMENT': return <Badge variant="secondary" className="!rounded-full flex items-center gap-1 w-fit"><Clock className="w-3 h-3" /> Pending Assignment</Badge>;
-    case 'MECHANIC_ASSIGNED': return <Badge variant="warning" className="!rounded-full flex items-center gap-1 w-fit"><Wrench className="w-3 h-3" /> Assigned</Badge>;
-    case 'MECHANIC_ACCEPTED': return <Badge variant="primary" className="!rounded-full flex items-center gap-1 w-fit">Accepted</Badge>;
-    case 'MECHANIC_ON_THE_WAY': return <Badge variant="primary" className="!rounded-full flex items-center gap-1 w-fit">On The Way</Badge>;
-    case 'ARRIVED': return <Badge variant="primary" className="!rounded-full flex items-center gap-1 w-fit">Arrived</Badge>;
-    case 'WORK_STARTED': return <Badge variant="primary" className="!rounded-full flex items-center gap-1 w-fit">Work Started</Badge>;
-    case 'COMPLETED': return <Badge variant="success" className="!rounded-full flex items-center gap-1 w-fit"><CheckCircle className="w-3 h-3" /> Completed</Badge>;
-    case 'CANCELLED': return <Badge variant="danger" className="!rounded-full flex items-center gap-1 w-fit"><X className="w-3 h-3" /> Cancelled</Badge>;
-    case 'REJECTED': return <Badge variant="danger" className="!rounded-full flex items-center gap-1 w-fit"><Ban className="w-3 h-3" /> Rejected</Badge>;
-    default: return <Badge variant="neutral" className="!rounded-full">{status}</Badge>;
+    case 'PENDING_ADMIN_ASSIGNMENT': return <Badge variant="secondary" className="flex items-center gap-1 w-fit"><Clock className="w-3 h-3" /> Pending Assignment</Badge>;
+    case 'MECHANIC_ASSIGNED': return <Badge variant="warning" className="flex items-center gap-1 w-fit"><Wrench className="w-3 h-3" /> Assigned</Badge>;
+    case 'MECHANIC_ACCEPTED': return <Badge variant="primary" className="flex items-center gap-1 w-fit">Accepted</Badge>;
+    case 'MECHANIC_ON_THE_WAY': return <Badge variant="primary" className="flex items-center gap-1 w-fit">On The Way</Badge>;
+    case 'ARRIVED': return <Badge variant="primary" className="flex items-center gap-1 w-fit">Arrived</Badge>;
+    case 'WORK_STARTED': return <Badge variant="primary" className="flex items-center gap-1 w-fit">Work Started</Badge>;
+    case 'COMPLETED': return <Badge variant="success" className="flex items-center gap-1 w-fit"><CheckCircle className="w-3 h-3" /> Completed</Badge>;
+    case 'CANCELLED': return <Badge variant="danger" className="flex items-center gap-1 w-fit"><X className="w-3 h-3" /> Cancelled</Badge>;
+    case 'REJECTED': return <Badge variant="danger" className="flex items-center gap-1 w-fit"><Ban className="w-3 h-3" /> Rejected</Badge>;
+    default: return <Badge variant="neutral" className="w-fit">{status}</Badge>;
   }
 };
 
@@ -65,6 +71,7 @@ export default function ServiceBookingsPage() {
   const { token } = useSelector((state: RootState) => state.auth);
   const [searchParams] = useSearchParams();
   const [bookings, setBookings] = useState<any[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(true);
   const [activeTab, setActiveTab] = useState(() => {
     const initial = searchParams.get('filter');
     const match = STATUS_TABS.find((t) => t.label.toLowerCase() === initial?.toLowerCase());
@@ -78,7 +85,6 @@ export default function ServiceBookingsPage() {
   const [invoice, setInvoice] = useState<any | null>(null);
   const [loadError, setLoadError] = useState('');
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
   const [assigningBooking, setAssigningBooking] = useState<any | null>(null);
@@ -123,11 +129,12 @@ export default function ServiceBookingsPage() {
         params: buildParams(),
       });
       setBookings(res.data.bookings);
-      setTotalPages(res.data.pages);
       setTotalCount(res.data.total);
     } catch (error) {
       console.error('Failed to fetch bookings', error);
       setLoadError('Could not load bookings. Please sign out and sign in again.');
+    } finally {
+      setLoadingBookings(false);
     }
   };
 
@@ -181,7 +188,7 @@ export default function ServiceBookingsPage() {
       setAssigningBooking(null);
       fetchBookings();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to assign technician');
+      toast.error(error.response?.data?.error || 'Failed to assign technician');
     }
   };
 
@@ -192,7 +199,7 @@ export default function ServiceBookingsPage() {
       if (selectedBooking?.id === bookingId) setSelectedBooking(null);
       fetchBookings();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to cancel booking');
+      toast.error(error.response?.data?.error || 'Failed to cancel booking');
     }
   };
 
@@ -204,7 +211,7 @@ export default function ServiceBookingsPage() {
       const res = await axios.get(`${API_URL}/services/bookings/all`, { headers: { Authorization: `Bearer ${token}` } });
       setSelectedBooking(res.data.find((b: any) => b.id === bookingId) || null);
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to refund payment');
+      toast.error(error.response?.data?.error || 'Failed to refund payment');
     }
   };
 
@@ -213,7 +220,7 @@ export default function ServiceBookingsPage() {
       const res = await axios.get(`${API_URL}/services/bookings/${bookingId}/invoice`, { headers: { Authorization: `Bearer ${token}` } });
       setInvoice(res.data);
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to load invoice');
+      toast.error(error.response?.data?.error || 'Failed to load invoice');
     }
   };
 
@@ -227,70 +234,139 @@ export default function ServiceBookingsPage() {
       await axios.patch(`${API_URL}/services/bookings/${bookingId}/admin-status`, { status: next }, { headers: { Authorization: `Bearer ${token}` } });
       fetchBookings();
     } catch (error: any) {
-      alert(error.response?.data?.error || `Failed to ${label.toLowerCase()}`);
+      toast.error(error.response?.data?.error || `Failed to ${label.toLowerCase()}`);
     }
   };
 
+  const columns: Column<any>[] = [
+    {
+      key: 'bookingId',
+      header: 'Booking ID',
+      render: (b) => (
+        <div>
+          <button className="font-semibold text-content-primary hover:text-brand-primary transition-colors" onClick={() => setSelectedBooking(b)}>
+            #{b.bookingNumber}
+          </button>
+          <div className="text-xs text-content-muted mt-0.5">₹{b.finalAmount}</div>
+        </div>
+      ),
+    },
+    { key: 'customer', header: 'Customer', render: (b) => <span className="text-sm text-content-primary">{b.user?.name || 'Unknown'}</span> },
+    { key: 'phone', header: 'Phone', render: (b) => <span className="text-sm text-content-secondary">{b.user?.phone}</span> },
+    { key: 'vehicle', header: 'Vehicle', render: (b) => <span className="text-sm text-content-secondary">{b.vehicleBrand} {b.vehicleModel} ({b.vehicleType})</span> },
+    { key: 'service', header: 'Service', render: (b) => <span className="text-sm text-content-secondary">{b.package?.name}</span> },
+    { key: 'date', header: 'Booking Date', render: (b) => <span className="text-sm text-content-secondary">{new Date(b.scheduledDate).toLocaleDateString()}</span> },
+    {
+      key: 'address',
+      header: 'Address',
+      render: (b) => (
+        <span className="text-xs text-content-muted block max-w-[180px] truncate">
+          {b.address ? `${b.address.city}, ${b.address.pincode}` : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'payment',
+      header: 'Payment',
+      render: (b) => (
+        <Badge variant={b.payment?.status === 'SUCCESS' ? 'success' : b.payment?.status === 'REFUNDED' ? 'warning' : 'secondary'}>
+          {b.payment?.status === 'SUCCESS' ? 'Paid' : b.payment?.status === 'REFUNDED' ? 'Refunded' : 'Unpaid'}
+        </Badge>
+      ),
+    },
+    { key: 'status', header: 'Status', render: (b) => getStatusBadge(b.status) },
+    {
+      key: 'mechanic',
+      header: 'Mechanic',
+      render: (b) => b.technician
+        ? <span className="text-sm font-medium text-content-secondary">{b.technician.user?.name}</span>
+        : <span className="text-sm text-content-muted italic">Unassigned</span>,
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      headerClassName: 'text-right',
+      className: 'text-right',
+      render: (b) => (
+        <div className="flex justify-end gap-2">
+          {!['COMPLETED', 'CANCELLED'].includes(b.status) && (
+            <button
+              onClick={() => openAssignDialog(b)}
+              className="bg-navy-500/10 text-navy-600 dark:text-navy-400 hover:bg-navy-500/20 px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors"
+            >
+              <UserPlus className="w-4 h-4" /> {b.technician ? 'Reassign' : 'Assign'}
+            </button>
+          )}
+          {(ADMIN_STATUS_ACTIONS[b.status] || []).map((action) => (
+            <button
+              key={action.next}
+              onClick={() => handleAdminStatusChange(b.id, action.next, action.label)}
+              className="bg-success-500/10 text-success-600 dark:text-success-400 hover:bg-success-500/20 px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors"
+              title={action.label}
+            >
+              <PlayCircle className="w-4 h-4" /> {action.label}
+            </button>
+          ))}
+          {!['COMPLETED', 'CANCELLED'].includes(b.status) && (
+            <button onClick={() => handleCancelBooking(b.id)} className="text-danger-500 hover:text-danger-400 p-2 transition-colors" title="Cancel Booking">
+              <Ban className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <div className="max-w-7xl mx-auto">
+    <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="max-w-7xl mx-auto">
       {loadError && (
-        <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{loadError}</div>
+        <div className="mb-4 rounded-xl border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-600 dark:text-danger-400">
+          {loadError}
+        </div>
       )}
 
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-3xl font-bold text-white tracking-tight flex items-center gap-3">
-            <ClipboardList className="text-brand-primary w-8 h-8" />
-            Service Bookings
+          <h2 className="text-2xl font-bold text-content-primary tracking-tight flex items-center gap-3">
+            <Icon3D name="bookings" size={30} eager /> Service Bookings
           </h2>
-          <p className="text-neutral-400 mt-1">Assign mechanics, track progress, and resolve issues</p>
+          <p className="text-content-secondary mt-1 text-sm">Assign mechanics, track progress, and resolve issues</p>
         </div>
       </div>
 
-      <div className="bg-neutral-900 rounded-2xl shadow-sm border border-neutral-800 overflow-visible">
-        <div className="p-4 border-b border-neutral-800 flex flex-col gap-3 bg-neutral-950/50">
+      <Card padding="none" className="overflow-visible">
+        <div className="p-4 border-b border-border-default flex flex-col gap-3">
           <div className="flex flex-wrap justify-between items-center gap-4">
-            <div className="flex gap-2 flex-wrap">
-              {STATUS_TABS.map((tab) => (
-                <button
-                  key={tab.label}
-                  onClick={() => goToTab(tab.label)}
-                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-colors ${activeTab === tab.label ? 'bg-brand-primary text-white' : 'text-neutral-400 hover:bg-neutral-800'}`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-2.5 text-neutral-500 w-4 h-4" />
-              <input
-                type="text"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder="Search booking #, name, phone..."
-                className="bg-neutral-950 border border-neutral-800 rounded-lg pl-9 pr-4 py-2 text-sm text-white outline-none focus:border-brand-primary w-64"
-              />
-            </div>
+            <Tabs tabs={TABS} value={activeTab} onChange={goToTab} layoutId="bookings-tab" />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search booking #, name, phone..."
+              className="bg-surface-sunken border border-border-default rounded-xl pl-4 pr-4 py-2 text-sm text-content-primary outline-none focus:border-brand-primary w-64"
+            />
           </div>
 
-          <div className="flex flex-wrap gap-4">
-            <div className="flex gap-2">
+          <div className="flex flex-wrap gap-5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-content-muted uppercase tracking-wide">Payment</span>
               {(['All', 'Paid', 'Unpaid'] as const).map((opt) => (
                 <button
                   key={opt}
                   onClick={() => goToPaymentFilter(opt)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${paymentFilter === opt ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:bg-neutral-800'}`}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${paymentFilter === opt ? 'bg-brand-primary/10 text-brand-primary' : 'text-content-muted hover:bg-surface-hover hover:text-content-primary'}`}
                 >
                   {opt}
                 </button>
               ))}
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-content-muted uppercase tracking-wide">Vehicle</span>
               {(['All', 'CAR', 'BIKE'] as const).map((opt) => (
                 <button
                   key={opt}
                   onClick={() => goToVehicleFilter(opt)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${vehicleFilter === opt ? 'bg-neutral-700 text-white' : 'text-neutral-500 hover:bg-neutral-800'}`}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${vehicleFilter === opt ? 'bg-brand-primary/10 text-brand-primary' : 'text-content-muted hover:bg-surface-hover hover:text-content-primary'}`}
                 >
                   {opt === 'CAR' ? 'Car' : opt === 'BIKE' ? 'Bike' : opt}
                 </button>
@@ -299,137 +375,47 @@ export default function ServiceBookingsPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-neutral-950 text-neutral-500 text-xs uppercase tracking-wider">
-                <th className="p-4 font-semibold">Booking ID</th>
-                <th className="p-4 font-semibold">Customer</th>
-                <th className="p-4 font-semibold">Phone</th>
-                <th className="p-4 font-semibold">Vehicle</th>
-                <th className="p-4 font-semibold">Service</th>
-                <th className="p-4 font-semibold">Booking Date</th>
-                <th className="p-4 font-semibold">Address</th>
-                <th className="p-4 font-semibold">Payment</th>
-                <th className="p-4 font-semibold">Status</th>
-                <th className="p-4 font-semibold">Mechanic</th>
-                <th className="p-4 font-semibold text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-800">
-              {bookings.length === 0 && (
-                <tr><td colSpan={11} className="text-center py-12 text-neutral-500">No bookings found.</td></tr>
-              )}
-              {bookings.map((b) => (
-                <tr key={b.id} className="hover:bg-neutral-800/50 transition-colors">
-                  <td className="p-4">
-                    <div className="font-bold text-white cursor-pointer hover:text-brand-primary" onClick={() => setSelectedBooking(b)}>#{b.bookingNumber}</div>
-                    <div className="text-xs text-neutral-500 mt-1">₹{b.finalAmount}</div>
-                  </td>
-                  <td className="p-4 text-sm text-white">{b.user?.name || 'Unknown'}</td>
-                  <td className="p-4 text-sm text-neutral-400">{b.user?.phone}</td>
-                  <td className="p-4 text-sm text-neutral-400">{b.vehicleBrand} {b.vehicleModel} ({b.vehicleType})</td>
-                  <td className="p-4 text-sm text-neutral-400">{b.package?.name}</td>
-                  <td className="p-4 text-sm text-neutral-400">{new Date(b.scheduledDate).toLocaleDateString()}</td>
-                  <td className="p-4 text-xs text-neutral-500 max-w-[180px] truncate">{b.address ? `${b.address.city}, ${b.address.pincode}` : '—'}</td>
-                  <td className="p-4">
-                    <Badge variant={b.payment?.status === 'SUCCESS' ? 'success' : b.payment?.status === 'REFUNDED' ? 'warning' : 'secondary'} className="!rounded-full">
-                      {b.payment?.status === 'SUCCESS' ? 'Paid' : b.payment?.status === 'REFUNDED' ? 'Refunded' : 'Unpaid'}
-                    </Badge>
-                  </td>
-                  <td className="p-4">{getStatusBadge(b.status)}</td>
-                  <td className="p-4">
-                    {b.technician ? (
-                      <span className="text-sm font-medium text-neutral-300">{b.technician.user?.name}</span>
-                    ) : (
-                      <span className="text-sm text-neutral-500 italic">Unassigned</span>
-                    )}
-                  </td>
-                  <td className="p-4 text-right">
-                    <div className="flex justify-end gap-2">
-                      {!['COMPLETED', 'CANCELLED'].includes(b.status) && (
-                        <button
-                          onClick={() => openAssignDialog(b)}
-                          className="bg-navy-500/10 text-navy-400 hover:bg-navy-500/20 px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors"
-                        >
-                          <UserPlus className="w-4 h-4" /> {b.technician ? 'Reassign' : 'Assign'}
-                        </button>
-                      )}
-                      {(ADMIN_STATUS_ACTIONS[b.status] || []).map((action) => (
-                        <button
-                          key={action.next}
-                          onClick={() => handleAdminStatusChange(b.id, action.next, action.label)}
-                          className="bg-success-500/10 text-success-400 hover:bg-success-500/20 px-3 py-1.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-colors"
-                          title={action.label}
-                        >
-                          <PlayCircle className="w-4 h-4" /> {action.label}
-                        </button>
-                      ))}
-                      {!['COMPLETED', 'CANCELLED'].includes(b.status) && (
-                        <button onClick={() => handleCancelBooking(b.id)} className="text-danger-400 hover:text-danger-300 p-2 transition-colors" title="Cancel Booking">
-                          <Ban className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={columns}
+          data={bookings}
+          rowKey={(b) => b.id}
+          loading={loadingBookings}
+          serverPagination={{ page, pageSize: PAGE_SIZE, total: totalCount, onPageChange: setPage }}
+          emptyState={<EmptyState icon="bookings" title="No bookings found" description="Try a different tab or search term." />}
+          className="rounded-none border-none shadow-none"
+        />
+      </Card>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 p-4 border-t border-neutral-800 text-sm text-neutral-400">
-          <span>{totalCount} booking{totalCount === 1 ? '' : 's'} total</span>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setPage((p) => Math.max(p - 1, 1))}
-              disabled={page <= 1}
-              className="p-2 rounded-lg border border-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-neutral-800 transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span>Page {page} of {totalPages}</span>
-            <button
-              onClick={() => setPage((p) => Math.min(p + 1, totalPages))}
-              disabled={page >= totalPages}
-              className="p-2 rounded-lg border border-neutral-800 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-neutral-800 transition-colors"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Assign Mechanic dialog -- shows a real comparison view (photo, rating,
+      {/* Assign Mechanic modal -- shows a real comparison view (photo, rating,
           experience, skills, distance, current jobs, availability) instead of
           a bare name list. */}
-      <Dialog
+      <Modal
         isOpen={!!assigningBooking}
         onClose={() => setAssigningBooking(null)}
         title={`Assign Mechanic — #${assigningBooking?.bookingNumber || ''}`}
         size="xl"
       >
         {candidatesLoading ? (
-          <Loader />
+          <div className="flex justify-center py-8"><Loader /></div>
         ) : candidates.length === 0 ? (
-          <p className="text-neutral-400 text-sm py-8 text-center">No approved mechanics match this booking's vehicle type.</p>
+          <p className="text-content-muted text-sm py-8 text-center">No approved mechanics match this booking's vehicle type.</p>
         ) : (
           <div className="space-y-3">
             {candidates.map((c) => (
-              <div key={c.id} className="flex items-center justify-between gap-4 rounded-xl border border-neutral-800 bg-neutral-950 p-4">
+              <div key={c.id} className="flex items-center justify-between gap-4 rounded-xl border border-border-default bg-surface-sunken p-4">
                 <div className="flex items-center gap-4 min-w-0">
                   <TechnicianAvatar technicianId={c.id} documentId={c.photoDocumentId} name={c.name} token={token} />
                   <div className="min-w-0">
-                    <p className="font-bold text-white truncate">{c.name}</p>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-400 mt-1">
+                    <p className="font-bold text-content-primary truncate">{c.name}</p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-content-muted mt-1">
                       <span className="flex items-center gap-1"><Star className="w-3 h-3 text-warning-400" /> {(c.rating || 0).toFixed(1)}</span>
                       <span>{c.experienceYears != null ? `${c.experienceYears} yrs exp` : 'Exp N/A'}</span>
                       {c.distanceKm != null && <span className="flex items-center gap-1"><NavigationIcon className="w-3 h-3" /> {c.distanceKm.toFixed(1)} km</span>}
                       <span>{c.currentJobs} active job{c.currentJobs === 1 ? '' : 's'}</span>
-                      <span className={c.isOnline ? 'text-success-400' : 'text-neutral-500'}>{c.isOnline ? 'Online' : 'Offline'}</span>
+                      <span className={c.isOnline ? 'text-success-600 dark:text-success-400' : 'text-content-muted'}>{c.isOnline ? 'Online' : 'Offline'}</span>
                     </div>
                     {c.skills?.length > 0 && (
-                      <p className="text-xs text-neutral-500 mt-1 truncate">{c.skills.join(', ')}</p>
+                      <p className="text-xs text-content-muted mt-1 truncate">{c.skills.join(', ')}</p>
                     )}
                   </div>
                 </div>
@@ -438,103 +424,98 @@ export default function ServiceBookingsPage() {
             ))}
           </div>
         )}
-      </Dialog>
+      </Modal>
 
-      {selectedBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-neutral-900 rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-6 border-b border-neutral-800">
-              <h3 className="text-xl font-bold text-white">Booking #{selectedBooking.bookingNumber}</h3>
-              <button onClick={() => { setSelectedBooking(null); setInvoice(null); }} className="text-neutral-500 hover:text-white">
-                <X className="w-6 h-6" />
-              </button>
+      {/* Booking Details modal */}
+      <Modal
+        isOpen={!!selectedBooking}
+        onClose={() => { setSelectedBooking(null); setInvoice(null); }}
+        title={selectedBooking ? `Booking #${selectedBooking.bookingNumber}` : ''}
+        size="lg"
+      >
+        {selectedBooking && (
+          <>
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <p className="text-sm text-content-muted mb-1">Customer</p>
+                <p className="font-bold text-content-primary">{selectedBooking.user?.name}</p>
+                <p className="text-content-secondary text-sm">{selectedBooking.user?.phone}</p>
+                {selectedBooking.address && (
+                  <p className="text-content-secondary text-sm mt-1 flex items-center gap-1">
+                    <MapPin className="w-3 h-3" /> {selectedBooking.address.line1}, {selectedBooking.address.city}, {selectedBooking.address.state} {selectedBooking.address.pincode}
+                  </p>
+                )}
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-content-muted mb-1">Status</p>
+                {getStatusBadge(selectedBooking.status)}
+              </div>
             </div>
 
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <p className="text-sm text-neutral-500 mb-1">Customer</p>
-                  <p className="font-bold text-white">{selectedBooking.user?.name}</p>
-                  <p className="text-neutral-400 text-sm">{selectedBooking.user?.phone}</p>
-                  {selectedBooking.address && (
-                    <p className="text-neutral-400 text-sm mt-1 flex items-center gap-1">
-                      <MapPin className="w-3 h-3" /> {selectedBooking.address.line1}, {selectedBooking.address.city}, {selectedBooking.address.state} {selectedBooking.address.pincode}
-                    </p>
-                  )}
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-neutral-500 mb-1">Status</p>
-                  {getStatusBadge(selectedBooking.status)}
-                </div>
-              </div>
+            <div className="bg-surface-sunken p-4 rounded-xl mb-6">
+              <p className="font-medium text-content-secondary mb-1">{selectedBooking.package?.name}</p>
+              <p className="text-sm text-content-muted">{selectedBooking.vehicleBrand} {selectedBooking.vehicleModel} · {selectedBooking.category?.name}</p>
+              {selectedBooking.issueDescription && (
+                <p className="text-sm text-content-secondary mt-2 italic">"{selectedBooking.issueDescription}"</p>
+              )}
+            </div>
 
-              <div className="bg-neutral-950 p-4 rounded-lg mb-6">
-                <p className="font-medium text-neutral-300 mb-1">{selectedBooking.package?.name}</p>
-                <p className="text-sm text-neutral-500">{selectedBooking.vehicleBrand} {selectedBooking.vehicleModel} · {selectedBooking.category?.name}</p>
-                {selectedBooking.issueDescription && (
-                  <p className="text-sm text-neutral-400 mt-2 italic">"{selectedBooking.issueDescription}"</p>
-                )}
-              </div>
-
-              <h4 className="font-bold text-white mb-4 border-b border-neutral-800 pb-2">Booking Timeline</h4>
-              <div className="space-y-3 mb-6">
-                {(selectedBooking.statusHistory || []).map((h: any) => (
-                  <div key={h.id} className="flex justify-between items-center bg-neutral-950 p-3 rounded-lg">
-                    <div>
-                      <p className="font-medium text-white text-sm">{h.status.replace(/_/g, ' ')}</p>
-                      {h.note && <p className="text-xs text-neutral-500 mt-1">{h.note}</p>}
-                    </div>
-                    <p className="text-xs text-neutral-500">{new Date(h.createdAt).toLocaleString()}</p>
-                  </div>
-                ))}
-                {(!selectedBooking.statusHistory || selectedBooking.statusHistory.length === 0) && (
-                  <p className="text-neutral-500 text-sm">No status history yet.</p>
-                )}
-              </div>
-
-              <div className="bg-neutral-950 p-4 rounded-lg flex justify-between items-center mb-4">
-                <p className="font-medium text-neutral-300">Total Amount</p>
-                <p className="text-xl font-bold text-white">₹{selectedBooking.finalAmount?.toLocaleString()}</p>
-              </div>
-
-              {selectedBooking.payment && (
-                <div className="bg-neutral-950 p-4 rounded-lg flex justify-between items-center mb-6">
+            <h4 className="font-bold text-content-primary mb-3 border-b border-border-default pb-2">Booking Timeline</h4>
+            <div className="space-y-3 mb-6">
+              {(selectedBooking.statusHistory || []).map((h: any) => (
+                <div key={h.id} className="flex justify-between items-center bg-surface-sunken p-3 rounded-xl">
                   <div>
-                    <p className="font-medium text-neutral-300">Payment ({selectedBooking.payment.method})</p>
-                    <p className={`text-sm font-bold ${selectedBooking.payment.status === 'REFUNDED' ? 'text-warning-400' : 'text-neutral-400'}`}>
-                      {selectedBooking.payment.status}
-                    </p>
+                    <p className="font-medium text-content-primary text-sm">{h.status.replace(/_/g, ' ')}</p>
+                    {h.note && <p className="text-xs text-content-muted mt-1">{h.note}</p>}
                   </div>
-                  {selectedBooking.payment.status !== 'REFUNDED' && (
-                    <button onClick={() => handleRefund(selectedBooking.id)} className="flex items-center gap-2 text-sm font-bold text-warning-400 hover:text-warning-300">
-                      <IndianRupee className="w-4 h-4" /> Refund
-                    </button>
-                  )}
+                  <p className="text-xs text-content-muted">{new Date(h.createdAt).toLocaleString()}</p>
                 </div>
+              ))}
+              {(!selectedBooking.statusHistory || selectedBooking.statusHistory.length === 0) && (
+                <p className="text-content-muted text-sm">No status history yet.</p>
               )}
-
-              {invoice && (
-                <div className="bg-neutral-950 p-4 rounded-lg mb-6">
-                  <p className="font-bold text-white mb-2">{invoice.invoiceNumber}</p>
-                  <div className="text-sm text-neutral-400 space-y-1">
-                    <div className="flex justify-between"><span>Subtotal</span><span>₹{invoice.subtotal}</span></div>
-                    <div className="flex justify-between"><span>Additional Work</span><span>₹{invoice.additionalCost}</span></div>
-                    <div className="flex justify-between"><span>Discount</span><span>₹{invoice.discountAmount}</span></div>
-                    <div className="flex justify-between font-bold text-white"><span>Total</span><span>₹{invoice.totalAmount}</span></div>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-4">
-                <button onClick={() => handleViewInvoice(selectedBooking.id)} className="flex-1 bg-neutral-800 text-neutral-300 py-2.5 rounded-lg font-bold hover:bg-neutral-700 flex items-center justify-center gap-2">
-                  <FileText className="w-4 h-4" /> {invoice ? 'Refresh Invoice' : 'Generate / View Invoice'}
-                </button>
-              </div>
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+
+            <div className="bg-surface-sunken p-4 rounded-xl flex justify-between items-center mb-4">
+              <p className="font-medium text-content-secondary">Total Amount</p>
+              <p className="text-xl font-bold text-content-primary">₹{selectedBooking.finalAmount?.toLocaleString()}</p>
+            </div>
+
+            {selectedBooking.payment && (
+              <div className="bg-surface-sunken p-4 rounded-xl flex justify-between items-center mb-6">
+                <div>
+                  <p className="font-medium text-content-secondary">Payment ({selectedBooking.payment.method})</p>
+                  <p className={`text-sm font-bold ${selectedBooking.payment.status === 'REFUNDED' ? 'text-warning-600 dark:text-warning-400' : 'text-content-secondary'}`}>
+                    {selectedBooking.payment.status}
+                  </p>
+                </div>
+                {selectedBooking.payment.status !== 'REFUNDED' && (
+                  <button onClick={() => handleRefund(selectedBooking.id)} className="flex items-center gap-2 text-sm font-bold text-warning-600 dark:text-warning-400 hover:text-warning-500">
+                    <IndianRupee className="w-4 h-4" /> Refund
+                  </button>
+                )}
+              </div>
+            )}
+
+            {invoice && (
+              <div className="bg-surface-sunken p-4 rounded-xl mb-6">
+                <p className="font-bold text-content-primary mb-2">{invoice.invoiceNumber}</p>
+                <div className="text-sm text-content-secondary space-y-1">
+                  <div className="flex justify-between"><span>Subtotal</span><span>₹{invoice.subtotal}</span></div>
+                  <div className="flex justify-between"><span>Additional Work</span><span>₹{invoice.additionalCost}</span></div>
+                  <div className="flex justify-between"><span>Discount</span><span>₹{invoice.discountAmount}</span></div>
+                  <div className="flex justify-between font-bold text-content-primary"><span>Total</span><span>₹{invoice.totalAmount}</span></div>
+                </div>
+              </div>
+            )}
+
+            <Button variant="secondary" className="w-full" icon={<FileText className="w-4 h-4" />} onClick={() => handleViewInvoice(selectedBooking.id)}>
+              {invoice ? 'Refresh Invoice' : 'Generate / View Invoice'}
+            </Button>
+          </>
+        )}
+      </Modal>
+    </motion.div>
   );
 }
 
@@ -560,10 +541,10 @@ function TechnicianAvatar({ technicianId, documentId, name, token }: { technicia
   }, [technicianId, documentId, token]);
 
   if (url) {
-    return <img src={url} alt={name} className="w-12 h-12 rounded-full object-cover border border-neutral-700 shrink-0" />;
+    return <img src={url} alt={name} className="w-12 h-12 rounded-full object-cover border border-border-default shrink-0" />;
   }
   return (
-    <div className="w-12 h-12 rounded-full bg-neutral-800 flex items-center justify-center text-lg font-bold text-brand-primary border border-neutral-700 shrink-0">
+    <div className="w-12 h-12 rounded-full bg-surface-hover flex items-center justify-center text-lg font-bold text-brand-primary border border-border-default shrink-0">
       {name ? name.charAt(0).toUpperCase() : 'M'}
     </div>
   );

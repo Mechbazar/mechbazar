@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
+import toast from 'react-hot-toast';
+import { motion } from 'framer-motion';
 import { Trash2 } from 'lucide-react';
-import { Button, Card, Dialog, Input, Loader } from '@mechbazar/shared/web';
+import { Button, Card, DataTable, EmptyState, Modal, Input, Select, Icon3D } from '../components/ui';
+import type { Column } from '../components/ui';
 import type { RootState } from '../store';
 import { API_URL } from '../config/api';
+import { fadeInUp } from '../utils/motion';
 
 const NEW = '__new__';
 
@@ -142,7 +146,7 @@ export default function Vehicles() {
       await axios.delete(`${API_URL}/vehicles/${vehicle.id}`, authHeaders);
       fetchVehicles();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Failed to delete vehicle');
+      toast.error(error.response?.data?.error || 'Failed to delete vehicle');
     }
   };
 
@@ -202,94 +206,71 @@ export default function Vehicles() {
     }
   };
 
-  const selectClass = 'w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white outline-none focus:border-brand-primary';
+  const columns: Column<any>[] = [
+    { key: 'make', header: 'Make', render: (v) => <span className="text-content-primary">{v.manufacturer.name}</span> },
+    { key: 'model', header: 'Model', render: (v) => <span className="text-content-primary">{v.model.name}</span> },
+    { key: 'variant', header: 'Variant', render: (v) => <span className="text-content-secondary">{v.variant?.name || '—'}</span> },
+    { key: 'year', header: 'Year', render: (v) => <span className="text-content-primary">{v.year}</span> },
+    { key: 'fuel', header: 'Fuel', render: (v) => <span className="text-content-secondary">{v.fuelType.name}</span> },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (v) => (
+        <div className="flex items-center gap-4">
+          <button className="text-brand-primary cursor-pointer font-medium hover:underline" onClick={() => openEditModal(v)}>Edit</button>
+          <button className="text-danger-500 hover:text-danger-400 transition-colors inline-flex items-center" onClick={() => handleDelete(v)}>
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div className="p-6">
+    <motion.div variants={fadeInUp} initial="hidden" animate="visible">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold text-white">Vehicle Master Management</h2>
-        <Button onClick={openAddModal}>+ Add New Vehicle</Button>
+        <h2 className="text-2xl font-bold text-content-primary flex items-center gap-3">
+          <Icon3D name="vehicles" size={30} eager /> Vehicle Master Management
+        </h2>
+        <Button icon={<span className="text-base leading-none">+</span>} onClick={openAddModal}>Add New Vehicle</Button>
       </div>
 
       {loadError && (
-        <div className="mb-4 rounded-lg border border-danger-700/50 bg-danger-950/30 px-4 py-3 text-sm text-danger-300">
+        <div className="mb-4 rounded-xl border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-600 dark:text-danger-400">
           {loadError}
         </div>
       )}
 
-      {loading ? (
-        <Loader fullScreen />
-      ) : vehicles.length === 0 ? (
-        <Card variant="dark" className="p-12 text-center text-neutral-400">
-          No vehicles yet. Click "Add New Vehicle" to add your first make/model/variant combination.
-        </Card>
-      ) : (
-        <Card variant="dark" className="!p-0 overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-neutral-950 border-b border-neutral-800 text-neutral-400">
-                <th className="p-4 font-semibold">Make</th>
-                <th className="p-4 font-semibold">Model</th>
-                <th className="p-4 font-semibold">Variant</th>
-                <th className="p-4 font-semibold">Year</th>
-                <th className="p-4 font-semibold">Fuel</th>
-                <th className="p-4 font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-800">
-              {vehicles.map((v) => (
-                <tr key={v.id} className="hover:bg-neutral-950/70">
-                  <td className="p-4 text-neutral-100">{v.manufacturer.name}</td>
-                  <td className="p-4 text-neutral-100">{v.model.name}</td>
-                  <td className="p-4 text-neutral-100">{v.variant?.name || '—'}</td>
-                  <td className="p-4 text-neutral-100">{v.year}</td>
-                  <td className="p-4 text-neutral-100">{v.fuelType.name}</td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-4">
-                      <button
-                        className="text-primary-500 cursor-pointer font-medium hover:underline"
-                        onClick={() => openEditModal(v)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="text-danger-500 hover:text-danger-400 transition-colors inline-flex items-center"
-                        onClick={() => handleDelete(v)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      )}
+      <Card padding="none">
+        <DataTable
+          columns={columns}
+          data={vehicles}
+          rowKey={(v) => v.id}
+          loading={loading}
+          pageSize={10}
+          emptyState={<EmptyState icon="vehicles" title="No vehicles yet" description={'Click "Add New Vehicle" to add your first make/model/variant combination.'} action={<Button onClick={openAddModal}>Add New Vehicle</Button>} />}
+        />
+      </Card>
 
-      <Dialog isOpen={isModalOpen} onClose={closeModal} title={editingId ? 'Edit Vehicle' : 'Add Vehicle'}>
+      <Modal isOpen={isModalOpen} onClose={closeModal} title={editingId ? 'Edit Vehicle' : 'Add Vehicle'}>
         <div className="space-y-4">
           {formError && (
-            <p className="text-sm text-danger-400 bg-danger-950/30 border border-danger-700/50 rounded-lg px-3 py-2">{formError}</p>
+            <p className="text-sm text-danger-600 dark:text-danger-400 bg-danger-500/10 border border-danger-500/30 rounded-xl px-3 py-2">{formError}</p>
           )}
 
-          <div>
-            <label className="block text-sm font-semibold text-neutral-400 mb-2">Type</label>
-            <select className={selectClass} value={form.type} onChange={(e) => handleTypeChange(e.target.value as 'CAR' | 'BIKE')}>
-              <option value="CAR">Car</option>
-              <option value="BIKE">Bike</option>
-            </select>
-          </div>
+          <Select label="Type" value={form.type} onChange={(e) => handleTypeChange(e.target.value as 'CAR' | 'BIKE')}>
+            <option value="CAR">Car</option>
+            <option value="BIKE">Bike</option>
+          </Select>
 
           <div>
-            <label className="block text-sm font-semibold text-neutral-400 mb-2">Make</label>
-            <select className={selectClass} value={form.manufacturerId} onChange={(e) => handleManufacturerChange(e.target.value)}>
+            <Select label="Make" value={form.manufacturerId} onChange={(e) => handleManufacturerChange(e.target.value)}>
               <option value="">Select make…</option>
               {manufacturers.map((m) => (
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
               <option value={NEW}>+ Add new make…</option>
-            </select>
+            </Select>
             {form.manufacturerId === NEW && (
               <Input
                 className="mt-2"
@@ -301,19 +282,13 @@ export default function Vehicles() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-neutral-400 mb-2">Model</label>
-            <select
-              className={selectClass}
-              value={form.modelId}
-              onChange={(e) => handleModelChange(e.target.value)}
-              disabled={!form.manufacturerId}
-            >
+            <Select label="Model" value={form.modelId} onChange={(e) => handleModelChange(e.target.value)} disabled={!form.manufacturerId}>
               <option value="">Select model…</option>
               {models.map((m) => (
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
               <option value={NEW}>+ Add new model…</option>
-            </select>
+            </Select>
             {form.modelId === NEW && (
               <Input
                 className="mt-2"
@@ -325,9 +300,8 @@ export default function Vehicles() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-neutral-400 mb-2">Variant (optional)</label>
-            <select
-              className={selectClass}
+            <Select
+              label="Variant (optional)"
               value={form.variantId}
               onChange={(e) => setForm((f) => ({ ...f, variantId: e.target.value, newVariantName: '' }))}
               disabled={!form.modelId || form.modelId === NEW}
@@ -337,7 +311,7 @@ export default function Vehicles() {
                 <option key={v.id} value={v.id}>{v.name}</option>
               ))}
               <option value={NEW}>+ Add new variant…</option>
-            </select>
+            </Select>
             {form.variantId === NEW && (
               <Input
                 className="mt-2"
@@ -350,18 +324,13 @@ export default function Vehicles() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-neutral-400 mb-2">Fuel</label>
-              <select
-                className={selectClass}
-                value={form.fuelTypeId}
-                onChange={(e) => setForm((f) => ({ ...f, fuelTypeId: e.target.value, newFuelTypeName: '' }))}
-              >
+              <Select label="Fuel" value={form.fuelTypeId} onChange={(e) => setForm((f) => ({ ...f, fuelTypeId: e.target.value, newFuelTypeName: '' }))}>
                 <option value="">Select fuel…</option>
                 {fuelTypes.map((f) => (
                   <option key={f.id} value={f.id}>{f.name}</option>
                 ))}
                 <option value={NEW}>+ Add new…</option>
-              </select>
+              </Select>
               {form.fuelTypeId === NEW && (
                 <Input
                   className="mt-2"
@@ -371,23 +340,21 @@ export default function Vehicles() {
                 />
               )}
             </div>
-            <div>
-              <Input
-                label="Year"
-                type="number"
-                placeholder="2024"
-                value={form.year}
-                onChange={(e) => setForm((f) => ({ ...f, year: e.target.value }))}
-              />
-            </div>
+            <Input
+              label="Year"
+              type="number"
+              placeholder="2024"
+              value={form.year}
+              onChange={(e) => setForm((f) => ({ ...f, year: e.target.value }))}
+            />
           </div>
 
-          <div className="flex justify-end space-x-2 mt-4">
-            <button className="px-4 py-2 text-neutral-400 hover:text-white" onClick={closeModal}>Cancel</button>
+          <div className="flex justify-end gap-3 mt-4">
+            <Button variant="ghost" onClick={closeModal}>Cancel</Button>
             <Button onClick={handleSave} isLoading={saving}>{editingId ? 'Save Changes' : 'Add Vehicle'}</Button>
           </div>
         </div>
-      </Dialog>
-    </div>
+      </Modal>
+    </motion.div>
   );
 }
