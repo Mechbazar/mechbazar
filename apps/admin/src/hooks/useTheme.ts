@@ -7,7 +7,9 @@ const STORAGE_KEY = 'admin-theme';
 function getInitialTheme(): Theme {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored === 'light' || stored === 'dark') return stored;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  // Luxury dark is the admin panel's primary design -- default here even for
+  // first-time visitors whose OS prefers light, rather than following system.
+  return 'dark';
 }
 
 function applyTheme(theme: Theme) {

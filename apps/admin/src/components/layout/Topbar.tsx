@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Menu, Search, Sun, Moon, KeyRound, LogOut, ChevronDown } from 'lucide-react';
+import { Menu, Search, Sun, Moon, History, Settings, KeyRound, LogOut, ChevronDown } from 'lucide-react';
 import type { RootState } from '../../store';
 import { useTheme } from '../../hooks/useTheme';
 import { SearchCommandPalette } from '../ui/SearchCommandPalette';
@@ -13,7 +14,28 @@ interface TopbarProps {
   onLogout: () => void;
 }
 
+function ThemeToggle({ theme, onToggle }: { theme: 'light' | 'dark'; onToggle: () => void }) {
+  const isDark = theme === 'dark';
+  return (
+    <button
+      onClick={onToggle}
+      aria-label="Toggle theme"
+      aria-pressed={isDark}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ${isDark ? 'icon-tile' : 'bg-surface-hover border border-border-default'}`}
+    >
+      <motion.span
+        layout
+        transition={{ type: 'spring', stiffness: 500, damping: 32 }}
+        className={`absolute top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm ${isDark ? 'right-0.5 text-brand-primary' : 'left-0.5 text-content-muted'}`}
+      >
+        {isDark ? <Moon size={11} strokeWidth={2.5} /> : <Sun size={11} strokeWidth={2.5} />}
+      </motion.span>
+    </button>
+  );
+}
+
 export function Topbar({ onOpenMobileMenu, onChangePassword, onLogout }: TopbarProps) {
+  const navigate = useNavigate();
   const user = useSelector((state: RootState) => state.auth.user);
   const { theme, toggleTheme } = useTheme();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -52,8 +74,8 @@ export function Topbar({ onOpenMobileMenu, onChangePassword, onLogout }: TopbarP
         className="hidden sm:flex items-center gap-2.5 flex-1 max-w-sm px-3.5 py-2 rounded-xl border border-border-default bg-surface-sunken text-content-muted hover:border-border-strong transition-colors"
       >
         <Search size={15} />
-        <span className="text-sm">Search everything…</span>
-        <kbd className="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-surface-hover text-content-muted">Ctrl K</kbd>
+        <span className="text-sm">Search anything...</span>
+        <kbd className="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-surface-hover text-content-muted">Ctrl + K</kbd>
       </button>
 
       <button onClick={() => setSearchOpen(true)} className="sm:hidden p-2 text-content-secondary hover:text-content-primary" aria-label="Search">
@@ -62,26 +84,27 @@ export function Topbar({ onOpenMobileMenu, onChangePassword, onLogout }: TopbarP
 
       <div className="flex-1 sm:flex-none" />
 
+      <ThemeToggle theme={theme} onToggle={toggleTheme} />
+
       <button
-        onClick={toggleTheme}
+        onClick={() => navigate('/audit-logs')}
         className="p-2 rounded-xl text-content-secondary hover:text-content-primary hover:bg-surface-hover transition-colors"
-        aria-label="Toggle theme"
+        aria-label="Audit logs"
+        title="Audit Logs"
       >
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.span
-            key={theme}
-            initial={{ opacity: 0, rotate: -60, scale: 0.6 }}
-            animate={{ opacity: 1, rotate: 0, scale: 1 }}
-            exit={{ opacity: 0, rotate: 60, scale: 0.6 }}
-            transition={{ duration: 0.18 }}
-            className="flex"
-          >
-            {theme === 'dark' ? <Sun size={19} /> : <Moon size={19} />}
-          </motion.span>
-        </AnimatePresence>
+        <History size={19} />
       </button>
 
       <NotificationCenter />
+
+      <button
+        onClick={onChangePassword}
+        className="p-2 rounded-xl text-content-secondary hover:text-content-primary hover:bg-surface-hover transition-colors"
+        aria-label="Account settings"
+        title="Change Password"
+      >
+        <Settings size={19} />
+      </button>
 
       <div className="relative" ref={menuRef}>
         <button
@@ -93,7 +116,7 @@ export function Topbar({ onOpenMobileMenu, onChangePassword, onLogout }: TopbarP
           </span>
           <span className="hidden md:flex flex-col items-start leading-tight">
             <span className="text-sm font-semibold text-content-primary max-w-[9rem] truncate">{user?.name || 'Admin'}</span>
-            <span className="text-[11px] text-content-muted">{user?.role?.replace(/_/g, ' ')}</span>
+            <span className="text-[11px] text-content-muted">{user?.role?.split('_').map((w) => w[0] + w.slice(1).toLowerCase()).join(' ')}</span>
           </span>
           <ChevronDown size={14} className="hidden md:block text-content-muted" />
         </button>

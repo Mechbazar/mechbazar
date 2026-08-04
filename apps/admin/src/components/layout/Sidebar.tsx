@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
-import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Menu, X, KeyRound, LogOut, ChevronDown } from 'lucide-react';
 import type { RootState } from '../../store';
 import { NAV_ROLES } from '../../config/navRoles';
+import { useTheme } from '../../hooks/useTheme';
 import { Icon3D } from '../ui/Icon3D';
 import type { Icon3DName } from '../../assets/icons3d/manifest';
 import { Logo } from '@mechbazar/shared/web';
@@ -32,30 +33,25 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: 'Catalog',
+    label: 'Management',
     links: [
-      { to: '/categories', icon: 'categories', label: 'Categories' },
+      { to: '/vendors', icon: 'vendors', label: 'Vendors' },
+      { to: '/customers', icon: 'customers', label: 'Customers' },
       { to: '/inventory', icon: 'warehouses', label: 'Inventory' },
+      { to: '/categories', icon: 'categories', label: 'Categories' },
       { to: '/services', icon: 'service_catalog', label: 'Service Catalog' },
       { to: '/vehicles', icon: 'vehicles', label: 'Vehicle Master' },
     ],
   },
   {
-    label: 'Network',
-    links: [
-      { to: '/vendors', icon: 'vendors', label: 'Vendors' },
-      { to: '/customers', icon: 'customers', label: 'Customers' },
-    ],
-  },
-  {
     label: 'Marketing',
     links: [
-      { to: '/cms', icon: 'banners', label: 'Banners & CMS' },
       { to: '/coupons', icon: 'coupons', label: 'Coupons' },
+      { to: '/cms', icon: 'banners', label: 'Banners & CMS' },
     ],
   },
   {
-    label: 'Finance & Reports',
+    label: 'Reports',
     links: [
       { to: '/payouts', icon: 'payouts', label: 'Payouts' },
       { to: '/reports', icon: 'reports', label: 'Reports' },
@@ -69,26 +65,41 @@ const COLLAPSE_KEY = 'admin-sidebar-collapsed';
 interface SidebarProps {
   mobileOpen: boolean;
   onMobileClose: () => void;
+  onChangePassword: () => void;
+  onLogout: () => void;
 }
 
-export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
+export function Sidebar({ mobileOpen, onMobileClose, onChangePassword, onLogout }: SidebarProps) {
   const location = useLocation();
-  const role = useSelector((state: RootState) => state.auth.user?.role);
+  const { theme } = useTheme();
+  const user = useSelector((state: RootState) => state.auth.user);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(COLLAPSE_KEY) === '1');
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     localStorage.setItem(COLLAPSE_KEY, collapsed ? '1' : '0');
   }, [collapsed]);
 
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) setProfileOpen(false);
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
+
   const groups = NAV_GROUPS.map((group) => ({
     ...group,
-    links: group.links.filter((link) => !NAV_ROLES[link.to] || (role && NAV_ROLES[link.to].includes(role))),
+    links: group.links.filter((link) => !NAV_ROLES[link.to] || (user?.role && NAV_ROLES[link.to].includes(user.role))),
   })).filter((group) => group.links.length > 0);
+
+  const initials = (user?.name || user?.email || '?').trim().charAt(0).toUpperCase();
 
   return (
     <>
       {mobileOpen && (
-        <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={onMobileClose} />
+        <div className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden" onClick={onMobileClose} />
       )}
 
       <motion.aside
@@ -99,9 +110,21 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         }`}
       >
         <div className="h-16 px-4 border-b border-border-default flex items-center justify-between shrink-0">
-          {!collapsed ? <Logo width={150} /> : <span className="mx-auto h-8 w-8 rounded-lg bg-brand-primary" />}
-          <button onClick={onMobileClose} className="lg:hidden text-content-secondary hover:text-content-primary" aria-label="Close menu">
-            <X size={18} />
+          {!collapsed ? (
+            <div className="min-w-0">
+              <Logo width={132} tone={theme === 'dark' ? 'dark' : 'light'} />
+              <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-content-muted">Admin Portal</p>
+            </div>
+          ) : (
+            <span className="mx-auto h-8 w-8 rounded-lg icon-tile" />
+          )}
+          <button
+            onClick={() => (mobileOpen ? onMobileClose() : setCollapsed((v) => !v))}
+            className="p-1.5 -mr-1 rounded-lg text-content-muted hover:text-content-primary hover:bg-surface-hover transition-colors shrink-0"
+            aria-label={mobileOpen ? 'Close menu' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <span className="lg:hidden"><X size={18} /></span>
+            <span className="hidden lg:block"><Menu size={18} /></span>
           </button>
         </div>
 
@@ -109,7 +132,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           {groups.map((group) => (
             <div key={group.label}>
               {!collapsed && (
-                <p className="px-2.5 mb-1 text-[11px] font-semibold uppercase tracking-wide text-content-muted">{group.label}</p>
+                <p className="px-2.5 mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-content-muted">{group.label}</p>
               )}
               <div className="space-y-0.5">
                 {group.links.map((link) => {
@@ -120,18 +143,18 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                       to={link.to}
                       onClick={onMobileClose}
                       title={collapsed ? link.label : undefined}
-                      className={`relative flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition-colors ${
-                        active ? 'text-brand-primary' : 'text-content-secondary hover:text-content-primary hover:bg-surface-hover'
+                      className={`relative flex items-center gap-3 rounded-xl px-2.5 py-2.5 transition-colors ${
+                        active ? 'text-white' : 'text-content-secondary hover:text-content-primary hover:bg-surface-hover'
                       } ${collapsed ? 'justify-center' : ''}`}
                     >
                       {active && (
                         <motion.span
                           layoutId="sidebar-active-pill"
-                          className="absolute inset-0 rounded-xl bg-brand-primary/10"
+                          className="absolute inset-0 rounded-xl icon-tile"
                           transition={{ type: 'spring', stiffness: 420, damping: 34 }}
                         />
                       )}
-                      <Icon3D name={link.icon} size={22} eager className="relative shrink-0" />
+                      <Icon3D name={link.icon} size={18} strokeWidth={1.75} className="relative shrink-0" />
                       {!collapsed && <span className="relative text-sm font-medium truncate">{link.label}</span>}
                     </Link>
                   );
@@ -141,13 +164,50 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           ))}
         </nav>
 
-        <button
-          onClick={() => setCollapsed((v) => !v)}
-          className="hidden lg:flex items-center justify-center gap-2 m-2.5 py-2 rounded-xl text-content-muted hover:text-content-primary hover:bg-surface-hover transition-colors shrink-0"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {collapsed ? <ChevronRight size={16} /> : <><ChevronLeft size={16} /><span className="text-xs font-medium">Collapse</span></>}
-        </button>
+        <div ref={profileRef} className="relative shrink-0 border-t border-border-default p-2.5">
+          <AnimatePresence>
+            {profileOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                transition={{ duration: 0.15 }}
+                className="absolute bottom-full left-2.5 right-2.5 mb-2 rounded-2xl border border-border-default bg-surface-overlay shadow-popover overflow-hidden"
+              >
+                <button
+                  onClick={() => { setProfileOpen(false); onChangePassword(); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-content-primary hover:bg-surface-hover transition-colors"
+                >
+                  <KeyRound size={15} /> Change Password
+                </button>
+                <button
+                  onClick={() => { setProfileOpen(false); onLogout(); }}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-danger-500 hover:bg-surface-hover transition-colors"
+                >
+                  <LogOut size={15} /> Sign Out
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <button
+            onClick={() => setProfileOpen((v) => !v)}
+            className={`w-full flex items-center gap-2.5 rounded-xl px-2 py-2 hover:bg-surface-hover transition-colors ${collapsed ? 'justify-center' : ''}`}
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full icon-tile text-white text-sm font-semibold">
+              {initials}
+            </span>
+            {!collapsed && (
+              <>
+                <span className="flex-1 min-w-0 text-left leading-tight">
+                  <span className="block text-sm font-semibold text-content-primary truncate">{user?.name || 'Admin'}</span>
+                  <span className="block text-[11px] text-content-muted truncate">{user?.email}</span>
+                </span>
+                <ChevronDown size={14} className="text-content-muted shrink-0" />
+              </>
+            )}
+          </button>
+        </div>
       </motion.aside>
     </>
   );

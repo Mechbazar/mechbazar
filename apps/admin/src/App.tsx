@@ -90,7 +90,12 @@ function MainLayout() {
 
   return (
     <div className="flex min-h-screen bg-surface-page text-content-primary">
-      <Sidebar mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        mobileOpen={sidebarOpen}
+        onMobileClose={() => setSidebarOpen(false)}
+        onChangePassword={() => setShowChangePassword(true)}
+        onLogout={handleLogout}
+      />
 
       <ChangePasswordDialog isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} />
 

@@ -31,8 +31,8 @@ export const Card: React.FC<CardProps> = ({
 
   return (
     <motion.div
-      className={`rounded-2xl transition-colors duration-200 ${variants[variant]} ${paddings[padding]} ${hover ? 'cursor-pointer' : ''} ${className}`}
-      whileHover={hover ? { y: -3, boxShadow: 'var(--shadow-elevated)' } : undefined}
+      className={`rounded-2xl transition-colors duration-200 ${variants[variant]} ${paddings[padding]} ${hover ? 'cursor-pointer hover:border-border-strong' : ''} ${className}`}
+      whileHover={hover ? { y: -3, boxShadow: 'var(--shadow-glow)' } : undefined}
       transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
       {...props}
     >

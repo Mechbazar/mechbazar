@@ -21,29 +21,34 @@
   --shadow-card: 0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.06);
   --shadow-elevated: 0 4px 12px -2px rgb(16 24 40 / 0.08), 0 2px 6px -2px rgb(16 24 40 / 0.06);
   --shadow-popover: 0 12px 32px -8px rgb(16 24 40 / 0.18), 0 4px 12px -4px rgb(16 24 40 / 0.08);
+  --shadow-glow: 0 8px 24px -6px rgb(225 29 46 / 0.25);
 }
 
+/* Premium luxury-dark palette -- black canvas, near-black cards, red accent.
+   This is the app's primary/default aesthetic; .dark is applied on <html>
+   before first paint (see getInitialTheme in useTheme.ts) so :root above only
+   matters for users who explicitly opt into light mode. */
 .dark {
-  --surface-page: #0b0d14;
-  --surface-card: #12141c;
-  --surface-hover: #1a1d28;
-  --surface-sunken: #0e1019;
-  --surface-overlay: #181b26;
-  --content-primary: #f4f5f8;
-  --content-secondary: #b6b9c6;
-  --content-muted: #767a8a;
-  --border-default: #232634;
-  --border-strong: #2e3142;
-  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.3), 0 1px 3px 0 rgb(0 0 0 / 0.4);
-  --shadow-elevated: 0 4px 16px -2px rgb(0 0 0 / 0.5), 0 2px 8px -2px rgb(0 0 0 / 0.4);
-  --shadow-popover: 0 16px 40px -8px rgb(0 0 0 / 0.6), 0 4px 16px -4px rgb(0 0 0 / 0.5);
+  --surface-page: #0b0b0b;
+  --surface-card: #151515;
+  --surface-hover: #1f1f1f;
+  --surface-sunken: #101010;
+  --surface-overlay: #1a1a1a;
+  --content-primary: #f7f7f7;
+  --content-secondary: #a3a3a8;
+  --content-muted: #6b6b70;
+  --border-default: rgb(255 255 255 / 0.08);
+  --border-strong: rgb(255 255 255 / 0.16);
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.4), 0 2px 8px -2px rgb(0 0 0 / 0.5);
+  --shadow-elevated: 0 8px 24px -4px rgb(0 0 0 / 0.6), 0 2px 8px -2px rgb(0 0 0 / 0.5);
+  --shadow-popover: 0 20px 48px -8px rgb(0 0 0 / 0.7), 0 4px 16px -4px rgb(0 0 0 / 0.6);
+  --shadow-glow: 0 8px 28px -4px rgb(225 29 46 / 0.35);
 }
 
 @theme {
-  /* Brand accent matches the real customer app (apps/mobile) palette. */
-  --color-brand-primary: #DA3830;
-  --color-brand-secondary: #F5A300;
-  --color-brand-accent: #C6301B;
+  --color-brand-primary: #E11D2E;
+  --color-brand-secondary: #FF5A68;
+  --color-brand-accent: #B0121F;
 
   --color-surface-page: var(--surface-page);
   --color-surface-card: var(--surface-card);
@@ -77,7 +82,7 @@
     border-radius: 4px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #DA3830;
+    background: #E11D2E;
   }
 }
 
@@ -85,10 +90,16 @@
   .shadow-card { box-shadow: var(--shadow-card); }
   .shadow-elevated { box-shadow: var(--shadow-elevated); }
   .shadow-popover { box-shadow: var(--shadow-popover); }
+  .shadow-glow { box-shadow: var(--shadow-glow); }
 
   .glass-surface {
     background: color-mix(in srgb, var(--surface-card) 72%, transparent);
     backdrop-filter: blur(16px) saturate(140%);
     -webkit-backdrop-filter: blur(16px) saturate(140%);
+  }
+
+  .icon-tile {
+    background: linear-gradient(135deg, #ED2A3B 0%, #C4101F 100%);
+    box-shadow: 0 4px 14px -2px rgb(225 29 46 / 0.45), inset 0 1px 0 0 rgb(255 255 255 / 0.12);
   }
 }

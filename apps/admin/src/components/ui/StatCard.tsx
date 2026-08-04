@@ -8,13 +8,16 @@ import { SkeletonStatCard } from './Skeleton';
 
 type Gradient = 'red' | 'blue' | 'green' | 'purple' | 'amber' | 'indigo';
 
-const gradients: Record<Gradient, string> = {
-  red: 'from-rose-500 to-red-400',
-  blue: 'from-sky-500 to-blue-400',
-  green: 'from-emerald-500 to-teal-400',
-  purple: 'from-violet-500 to-purple-400',
-  amber: 'from-amber-500 to-orange-400',
-  indigo: 'from-indigo-500 to-blue-500',
+// 'red' renders the bold brand-gradient tile (reserved for a page's primary/
+// hero metric); every other variant is a restrained tinted chip so pages that
+// color-code stats (e.g. amber for low-stock warnings) keep that meaning
+// without reintroducing the old rainbow-gradient-square look.
+const tintedTiles: Record<Exclude<Gradient, 'red'>, string> = {
+  blue: 'bg-sky-500/10 text-sky-400 border border-sky-500/15',
+  green: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/15',
+  purple: 'bg-violet-500/10 text-violet-400 border border-violet-500/15',
+  amber: 'bg-amber-500/10 text-amber-400 border border-amber-500/15',
+  indigo: 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/15',
 };
 
 interface StatCardProps {
@@ -25,12 +28,13 @@ interface StatCardProps {
   icon: Icon3DName;
   gradient?: Gradient;
   trend?: number;
+  trendLabel?: string;
   sparkline?: number[];
   loading?: boolean;
   onClick?: () => void;
 }
 
-export function StatCard({ title, value, valuePrefix = '', valueSuffix = '', icon, gradient = 'red', trend, sparkline, loading, onClick }: StatCardProps) {
+export function StatCard({ title, value, valuePrefix = '', valueSuffix = '', icon, gradient = 'red', trend, trendLabel, sparkline, loading, onClick }: StatCardProps) {
   if (loading) return <SkeletonStatCard />;
 
   const trendUp = typeof trend === 'number' && trend >= 0;
@@ -44,14 +48,21 @@ export function StatCard({ title, value, valuePrefix = '', valueSuffix = '', ico
             <AnimatedCounter value={value} prefix={valuePrefix} suffix={valueSuffix} />
           </p>
           {typeof trend === 'number' && (
-            <div className={`mt-2 inline-flex items-center gap-1 text-xs font-semibold ${trendUp ? 'text-success-600 dark:text-success-400' : 'text-danger-600 dark:text-danger-400'}`}>
-              {trendUp ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-              {Math.abs(trend).toFixed(1)}%
+            <div className="mt-2 flex items-center gap-1.5 text-xs">
+              <span className={`inline-flex items-center gap-1 font-semibold ${trendUp ? 'text-success-600 dark:text-success-400' : 'text-danger-600 dark:text-danger-400'}`}>
+                {trendUp ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
+                {Math.abs(trend).toFixed(1)}%
+              </span>
+              {trendLabel && <span className="text-content-muted">{trendLabel}</span>}
             </div>
           )}
         </div>
-        <div className={`shrink-0 h-12 w-12 rounded-2xl bg-gradient-to-br ${gradients[gradient]} flex items-center justify-center shadow-card`}>
-          <Icon3D name={icon} size={28} eager />
+        <div
+          className={`shrink-0 h-12 w-12 rounded-xl flex items-center justify-center ${
+            gradient === 'red' ? 'icon-tile text-white' : tintedTiles[gradient]
+          }`}
+        >
+          <Icon3D name={icon} size={22} strokeWidth={1.75} />
         </div>
       </div>
       {sparkline && sparkline.length > 1 && (
@@ -60,11 +71,11 @@ export function StatCard({ title, value, valuePrefix = '', valueSuffix = '', ico
             <AreaChart data={sparkline.map((v, i) => ({ i, v }))}>
               <defs>
                 <linearGradient id={`spark-${title.replace(/\s+/g, '')}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#DA3830" stopOpacity={0.35} />
-                  <stop offset="100%" stopColor="#DA3830" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#E11D2E" stopOpacity={0.35} />
+                  <stop offset="100%" stopColor="#E11D2E" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <Area type="monotone" dataKey="v" stroke="#DA3830" strokeWidth={1.75} fill={`url(#spark-${title.replace(/\s+/g, '')})`} />
+              <Area type="monotone" dataKey="v" stroke="#E11D2E" strokeWidth={1.75} fill={`url(#spark-${title.replace(/\s+/g, '')})`} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
