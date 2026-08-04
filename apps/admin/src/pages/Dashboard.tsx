@@ -361,7 +361,7 @@ export default function Dashboard() {
       </motion.div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-2 space-y-6">
+        <div className="xl:col-span-2 space-y-6 min-w-0">
           {/* Revenue Overview */}
           <motion.div variants={staggerItem}>
             <Card padding="md">
@@ -584,7 +584,7 @@ export default function Dashboard() {
         </div>
 
         {/* Live Activity */}
-        <motion.div variants={staggerItem} className="xl:col-span-1">
+        <motion.div variants={staggerItem} className="xl:col-span-1 min-w-0">
           <Card padding="md" className="sticky top-20">
             <h3 className="text-sm font-bold text-content-primary mb-4 flex items-center gap-2">
               <Radio size={15} className="text-brand-primary" /> Live Activity
