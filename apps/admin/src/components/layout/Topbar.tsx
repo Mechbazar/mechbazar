@@ -82,7 +82,7 @@ export function Topbar({ onOpenMobileMenu, onChangePassword, onLogout }: TopbarP
         <Search size={19} />
       </button>
 
-      <div className="flex-1 sm:flex-none" />
+      <div className="flex-1" />
 
       <ThemeToggle theme={theme} onToggle={toggleTheme} />
 
