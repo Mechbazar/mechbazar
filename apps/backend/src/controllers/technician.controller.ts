@@ -23,8 +23,15 @@ const DOCUMENT_LIST_SELECT = { id: true, technicianId: true, type: true, status:
 
 export const getTechnicians = async (req: Request, res: Response): Promise<void> => {
   try {
+    // Optional status filter -- powers the admin Dashboard's Pending Approvals
+    // widget (?status=UNDER_VERIFICATION). Additive: omitted keeps today's full-list behavior.
+    const statusFilter = req.query.status ? String(req.query.status) as TechnicianStatus : undefined;
+
     const technicians = await prisma.user.findMany({
-      where: { roles: { has: Role.SERVICE_TECHNICIAN } },
+      where: {
+        roles: { has: Role.SERVICE_TECHNICIAN },
+        ...(statusFilter ? { technicianProfile: { status: statusFilter } } : {}),
+      },
       include: {
         technicianProfile: {
           include: { documents: { select: DOCUMENT_LIST_SELECT }, bankAccounts: true },

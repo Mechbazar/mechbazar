@@ -5,7 +5,7 @@ import bcrypt from 'bcrypt';
 import { generateToken } from '../utils/jwt';
 import { AuthRequest } from '../middlewares/auth';
 import { restoreOrderStock, creditOrderDelivery, notifyWalletCredits } from './order.controller';
-import { notifyUser } from '../utils/notify';
+import { notifyUser, notifyAdmins } from '../utils/notify';
 import { sanitizeUser, sanitizeUsers, sanitizeOrders, stripDeliveryOtp, stripDeliveryOtps } from '../utils/sanitizeUser';
 import { recordAuditLog } from '../utils/auditLog';
 import { verifyFirebaseIdTokenAndResolveUser, FirebaseAuthError, FirebaseAuthErrorCode } from '../utils/firebaseAuth';
@@ -484,8 +484,18 @@ export const submitForApproval = async (req: Request, res: Response): Promise<vo
       where: { userId },
       data: {
         status: VendorStatus.UNDER_VERIFICATION
-      }
+      },
+      include: { user: { select: { name: true, phone: true } } }
     });
+
+    // Powers the admin Dashboard's Pending Approvals widget/activity feed --
+    // this is the point a vendor actually has something for an admin to review.
+    notifyAdmins(
+      'New vendor pending approval',
+      `${vendor.storeName} (${vendor.user.name || vendor.user.phone}) submitted documents for review.`,
+      { vendorId: vendor.id },
+      { type: 'ADMIN_VENDOR_PENDING' }
+    );
 
     res.status(200).json(vendor);
   } catch (error) {
@@ -906,9 +916,15 @@ export const requestPayout = async (req: Request, res: Response): Promise<void> 
 
 export const getVendors = async (req: Request, res: Response): Promise<void> => {
   try {
+    // Optional status filter -- powers the admin Dashboard's Pending Approvals
+    // widget (?status=UNDER_VERIFICATION) without pulling every vendor down to
+    // filter client-side. Additive: omitting it keeps today's full-list behavior.
+    const statusFilter = req.query.status ? String(req.query.status) as VendorStatus : undefined;
+
     const vendors = await prisma.user.findMany({
       where: {
-        roles: { has: Role.VENDOR }
+        roles: { has: Role.VENDOR },
+        ...(statusFilter ? { vendorProfile: { status: statusFilter } } : {}),
       },
       include: {
         vendorProfile: {
@@ -952,6 +968,39 @@ export const getAllSettlements = async (req: Request, res: Response): Promise<vo
   } catch (error) {
     console.error('Error fetching settlements:', error);
     res.status(500).json({ error: 'Failed to fetch settlements' });
+  }
+};
+
+// Backs the admin Dashboard's Vendor Leaderboard widget. Unlike the existing
+// public GET /vendors/top (ranks by Product.salesCount, no ₹ figure), this
+// aggregates actual order revenue per vendor over a date range -- admin-only.
+export const getVendorLeaderboard = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const days = Math.min(Math.max(Number(req.query.days) || 30, 1), 365);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 50);
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    since.setHours(0, 0, 0, 0);
+
+    const rows = await prisma.$queryRaw<{ vendorId: string; storeName: string; revenue: number; orderCount: bigint }[]>`
+      SELECT p."vendorId" AS "vendorId",
+             v."storeName" AS "storeName",
+             SUM(oi.price * oi.quantity)::float AS revenue,
+             COUNT(DISTINCT oi."orderId")::int AS "orderCount"
+      FROM "OrderItem" oi
+      JOIN "Order" o ON o.id = oi."orderId"
+      JOIN "Product" p ON p.id = oi."productId"
+      JOIN "Vendor" v ON v.id = p."vendorId"
+      WHERE o.status != 'CANCELLED' AND o."createdAt" >= ${since}
+      GROUP BY p."vendorId", v."storeName"
+      ORDER BY revenue DESC
+      LIMIT ${limit}
+    `;
+
+    res.json(rows.map((r) => ({ vendorId: r.vendorId, storeName: r.storeName, revenue: r.revenue, orderCount: Number(r.orderCount) })));
+  } catch (error) {
+    console.error('Error fetching vendor leaderboard:', error);
+    res.status(500).json({ error: 'Failed to fetch vendor leaderboard' });
   }
 };
 

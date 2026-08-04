@@ -4,7 +4,7 @@ import prisma from '../config/prisma';
 import { AuthRequest } from '../middlewares/auth';
 import { sendExpoPush } from '../utils/expoPush';
 import { resolveCoupon } from './coupon.controller';
-import { notifyUser } from '../utils/notify';
+import { notifyUser, notifyAdmins } from '../utils/notify';
 import { sanitizeOrder, sanitizeOrders, stripDeliveryOtp, stripDeliveryOtps } from '../utils/sanitizeUser';
 import { pendingPaymentCreateInput, creditWalletForOnlineRefund } from '../services/payment.service';
 
@@ -351,6 +351,16 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       'Order placed',
       `Your order #${newOrder.id.slice(0, 8)} has been placed successfully.`,
       { orderId: newOrder.id, status: newOrder.status }
+    );
+
+    // Powers the admin Dashboard's live activity feed. socketOnly: high-frequency
+    // event -- a persisted Notification row per order would flood the admin
+    // notification centre, so this is a live ping only, not an actionable item.
+    notifyAdmins(
+      'New order placed',
+      `${user.name || user.phone} placed an order worth ₹${newOrder.finalAmount.toLocaleString('en-IN')}.`,
+      { orderId: newOrder.id, finalAmount: newOrder.finalAmount },
+      { type: 'ADMIN_NEW_ORDER', socketOnly: true }
     );
 
     res.status(201).json({

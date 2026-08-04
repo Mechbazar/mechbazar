@@ -18,6 +18,7 @@ import {
   reconcilePasswordAfterFirebaseReset,
 } from '../utils/firebasePassword';
 import { sanitizeUser } from '../utils/sanitizeUser';
+import { notifyAdmins } from '../utils/notify';
 import { isEmailConfigured } from '../config/env';
 import prisma from '../config/prisma';
 
@@ -139,6 +140,16 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
 
     const token = generateToken(user.id, user.role, { accountType: user.accountType });
+
+    // Powers the admin Dashboard's live activity feed. socketOnly: high-frequency
+    // event -- a persisted Notification row per signup would flood the admin
+    // notification centre, so this is a live ping only, not an actionable item.
+    notifyAdmins(
+      'New customer signed up',
+      `${user.name || user.phone} just created an account.`,
+      { userId: user.id },
+      { type: 'ADMIN_NEW_CUSTOMER', socketOnly: true }
+    );
 
     res.status(201).json({ user: sanitizeUser(user), token });
   } catch (error) {

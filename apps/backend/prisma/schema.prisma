@@ -848,6 +848,15 @@ model NewsletterSubscriber {
 // ADMIN & LOGS
 // =======================
 
+// Generic admin-editable key/value store. First consumer: the Dashboard's
+// monthly revenue target (key "revenue_target_monthly"), so it's a real
+// persisted, admin-settable number instead of a client-side formula.
+model PlatformSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 model AuditLog {
   id        String   @id @default(uuid())
   userId    String

@@ -23,6 +23,7 @@ import {
   getSalesChart,
   getAllSettlements,
   updateSettlementStatus,
+  getVendorLeaderboard,
   // New endpoints
   getDashboardStats,
   updateMyProduct,
@@ -91,5 +92,6 @@ router.patch('/:id/status', authenticate, authorize(admins), updateVendorStatus)
 router.delete('/:id', authenticate, authorize(admins), deleteVendor);
 router.get('/settlements', authenticate, authorize(admins), getAllSettlements);
 router.patch('/settlements/:id/status', authenticate, authorize(admins), updateSettlementStatus);
+router.get('/leaderboard', authenticate, authorize(admins), getVendorLeaderboard);
 
 export default router;
