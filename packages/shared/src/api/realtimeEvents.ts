@@ -8,6 +8,8 @@
 export const CLIENT_EVENTS = {
   JOB_SUBSCRIBE: 'job:subscribe',
   JOB_UNSUBSCRIBE: 'job:unsubscribe',
+  ORDER_SUBSCRIBE: 'order:subscribe',
+  ORDER_UNSUBSCRIBE: 'order:unsubscribe',
   LOCATION_BATCH: 'location:batch',
   ADMIN_WATCH_LIVE_MAP: 'admin:watch-live-map',
   ADMIN_UNWATCH_LIVE_MAP: 'admin:unwatch-live-map',
@@ -23,11 +25,14 @@ export const SERVER_EVENTS = {
   JOB_OTP: 'job:otp',
   JOB_PHOTO: 'job:photo',
   JOB_MESSAGE: 'job:message',
+  ORDER_STATUS: 'order:status',
+  ORDER_TIMELINE: 'order:timeline',
   OFFER_NEW: 'offer:new',
   OFFER_CLOSED: 'offer:closed',
   NOTIFICATION: 'notification',
   ADMIN_MECHANIC_LOCATION: 'admin:mechanic-location',
   ADMIN_JOB_UPDATE: 'admin:job-update',
+  ADMIN_ORDER_UPDATE: 'admin:order-update',
 } as const;
 
 export interface JobStatusEvent {
@@ -114,6 +119,17 @@ export interface OfferClosedEvent {
   bookingId: string;
   reason: 'EXPIRED' | 'SUPERSEDED' | 'CANCELLED' | 'DECLINED';
 }
+
+export interface OrderStatusEvent {
+  orderId: string;
+  status: string;
+  previousStatus: string | null;
+  at: string;
+  message: string;
+}
+
+export interface OrderTimelineStepEvent { key: string; label: string; at: string | null; done: boolean }
+export interface OrderTimelineEvent { orderId: string; steps: OrderTimelineStepEvent[] }
 
 export interface NotificationEvent {
   id: string | null;

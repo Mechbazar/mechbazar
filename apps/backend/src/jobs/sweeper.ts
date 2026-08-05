@@ -5,6 +5,8 @@ import { sweepExpiredOtps } from '../services/jobOtp.service';
 import { sweepOldPings } from '../services/tracking.service';
 import { reconcileStalePendingPayments } from '../services/payment.service';
 import { generateScheduledSettlements } from '../services/settlement.service';
+import { sweepScheduledNotifications } from '../services/broadcast.service';
+import { retryFailedNotificationDeliveries } from '../utils/notify';
 
 // Background maintenance.
 //
@@ -37,6 +39,15 @@ const PAYMENT_RECONCILE_SWEEP_MS = 5 * 60_000;
 // than fine-grained enough -- a settlement generated an hour "late" is not a
 // correctness issue, only ever a delay (see settlement.service.ts).
 const SETTLEMENT_GENERATION_SWEEP_MS = 60 * 60_000;
+// SCHEDULED NOTIFICATION (60s) -- an admin picked a specific send time; a
+// minute of slop is unnoticeable, and it's a cheap indexed query
+// (status/sendAt) unless something is actually due.
+const SCHEDULED_NOTIFICATION_SWEEP_MS = 60_000;
+// DELIVERY RETRY (5m) -- rides out a transient Expo/FCM outage; not
+// latency-sensitive (push delivery already isn't instant), and each retried
+// notification makes its own HTTP call to Expo/FCM, so this stays
+// infrequent even though its own DB query is cheap.
+const DELIVERY_RETRY_SWEEP_MS = 5 * 60_000;
 
 const timers: NodeJS.Timeout[] = [];
 
@@ -115,8 +126,22 @@ export function startSweepers(): void {
     }
   });
 
+  schedule('scheduled-notifications', SCHEDULED_NOTIFICATION_SWEEP_MS, async () => {
+    const { sent, failed } = await sweepScheduledNotifications();
+    if (sent || failed) {
+      console.log(`[sweeper] scheduled-notifications: sent=${sent} failed=${failed}`);
+    }
+  });
+
+  schedule('delivery-retry', DELIVERY_RETRY_SWEEP_MS, async () => {
+    const { retried, recovered } = await retryFailedNotificationDeliveries();
+    if (retried) {
+      console.log(`[sweeper] delivery-retry: retried=${retried} recovered=${recovered}`);
+    }
+  });
+
   console.log(
-    `[sweeper] started (assignment ${DISPATCH_SWEEP_MS / 1000}s, presence ${PRESENCE_SWEEP_MS / 1000}s, retention ${RETENTION_SWEEP_MS / 60000}m, payment-reconcile ${PAYMENT_RECONCILE_SWEEP_MS / 60000}m, settlement-generation ${SETTLEMENT_GENERATION_SWEEP_MS / 60000}m)`
+    `[sweeper] started (assignment ${DISPATCH_SWEEP_MS / 1000}s, presence ${PRESENCE_SWEEP_MS / 1000}s, retention ${RETENTION_SWEEP_MS / 60000}m, payment-reconcile ${PAYMENT_RECONCILE_SWEEP_MS / 60000}m, settlement-generation ${SETTLEMENT_GENERATION_SWEEP_MS / 60000}m, scheduled-notifications ${SCHEDULED_NOTIFICATION_SWEEP_MS / 1000}s, delivery-retry ${DELIVERY_RETRY_SWEEP_MS / 60000}m)`
   );
 }
 

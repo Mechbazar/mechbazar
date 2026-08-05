@@ -6,6 +6,7 @@ import { AuthRequest } from '../middlewares/auth';
 import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
 import { generateToken } from '../utils/jwt';
 import { notifyUser } from '../utils/notify';
+import { registerPushDevice, removePushDeviceByToken } from '../utils/pushDevice';
 import { sanitizeUser, sanitizeUsers } from '../utils/sanitizeUser';
 import { recordAuditLog } from '../utils/auditLog';
 import prisma from '../config/prisma';
@@ -692,6 +693,9 @@ export const registerMyPushToken = async (req: AuthRequest, res: Response): Prom
       where: { id: technician.id },
       data: { expoPushToken: token },
     });
+    // Also upsert into the multi-device PushDevice store, keyed by the
+    // mechanic's own User.id -- see utils/notify.ts and utils/pushDevice.ts.
+    await registerPushDevice(req.user!.userId, token, 'EXPO');
     res.status(204).send();
   } catch (error) {
     console.error('Error registering push token:', error);
@@ -712,6 +716,7 @@ export const clearMyPushToken = async (req: AuthRequest, res: Response): Promise
       where: { id: technician.id },
       data: { expoPushToken: null },
     });
+    await removePushDeviceByToken(req.user!.userId, technician.expoPushToken);
     res.status(204).send();
   } catch (error) {
     console.error('Error clearing push token:', error);

@@ -1,11 +1,15 @@
-import { Suspense, lazy, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Toaster } from 'react-hot-toast';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { signOut } from 'firebase/auth';
+import axios from 'axios';
 import { logout } from './store';
+import type { RootState } from './store';
 import { auth } from './config/firebase';
+import { registerForWebPushAsync } from './services/webPush';
+import { API_URL } from './config/api';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Sidebar } from './components/layout/Sidebar';
 import { Topbar } from './components/layout/Topbar';
@@ -39,6 +43,9 @@ const Payouts = lazy(() => import('./pages/Payouts'));
 const Reports = lazy(() => import('./pages/Reports'));
 const AuditLogs = lazy(() => import('./pages/AuditLogs'));
 const CommissionSettings = lazy(() => import('./pages/CommissionSettings'));
+const NotificationPreferences = lazy(() => import('./pages/NotificationPreferences'));
+const Broadcast = lazy(() => import('./pages/Broadcast'));
+const NotificationAnalytics = lazy(() => import('./pages/NotificationAnalytics'));
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -57,6 +64,9 @@ function AnimatedRoutes() {
           <Route path="coupons" element={<Coupons />} />
           <Route path="payouts" element={<Payouts />} />
           <Route path="commission-settings" element={<CommissionSettings />} />
+          <Route path="notification-preferences" element={<NotificationPreferences />} />
+          <Route path="broadcast" element={<Broadcast />} />
+          <Route path="notification-analytics" element={<NotificationAnalytics />} />
           <Route path="reports" element={<Reports />} />
           <Route path="audit-logs" element={<AuditLogs />} />
           <Route path="vehicles" element={<Vehicles />} />
@@ -80,10 +90,41 @@ function AnimatedRoutes() {
 
 function MainLayout() {
   const dispatch = useDispatch();
+  const token = useSelector((state: RootState) => state.auth.token);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
 
-  const handleLogout = () => {
+  // Browser push -- writes to User.fcmToken. MainLayout only ever renders
+  // behind ProtectedRoute, so a token is guaranteed here.
+  useEffect(() => {
+    if (!token) return;
+    (async () => {
+      try {
+        const fcmToken = await registerForWebPushAsync();
+        if (!fcmToken) return;
+        await axios.patch(
+          `${API_URL}/auth/push-token`,
+          { token: fcmToken, type: 'fcm' },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } catch (e) {
+        console.error('Failed to register web push token:', e);
+      }
+    })();
+  }, [token]);
+
+  const handleLogout = async () => {
+    // A web push token identifies the browser, not the account -- on a
+    // shared/reset machine, leaving it registered would keep sending this
+    // account's notifications to whoever logs in next. Best-effort: logout
+    // proceeds even if this fails.
+    if (token) {
+      try {
+        await axios.delete(`${API_URL}/auth/push-token?type=fcm`, { headers: { Authorization: `Bearer ${token}` } });
+      } catch (e) {
+        console.error('Failed to clear push token on logout:', e);
+      }
+    }
     dispatch(logout());
     // Best-effort -- app-JWT logout must succeed even if this fails (e.g.
     // Firebase session already gone), so it's not awaited/blocking.

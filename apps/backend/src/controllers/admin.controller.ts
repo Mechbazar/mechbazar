@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
-import { Role } from '@prisma/client';
+import { Role, ScheduledNotificationStatus, Prisma } from '@prisma/client';
 import prisma from '../config/prisma';
 import { AuthRequest } from '../middlewares/auth';
-import { notifyUser } from '../utils/notify';
+import { notifyUser, classifyNotificationDisplayCategory } from '../utils/notify';
+import { isBroadcastAudience, sendBroadcast, BroadcastFilters } from '../services/broadcast.service';
 
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
@@ -384,40 +385,176 @@ export const updateRevenueTarget = async (req: Request, res: Response) => {
   }
 };
 
-type BroadcastAudience = 'ALL_CUSTOMERS' | 'ALL_VENDORS' | 'ALL_TECHNICIANS' | 'ALL_RIDERS';
-
-const AUDIENCE_ROLE: Record<BroadcastAudience, Role> = {
-  ALL_CUSTOMERS: Role.CUSTOMER,
-  ALL_VENDORS: Role.VENDOR,
-  ALL_TECHNICIANS: Role.SERVICE_TECHNICIAN,
-  ALL_RIDERS: Role.DELIVERY_PARTNER,
-};
-
-// Backs the Dashboard's "Send Notification" quick action -- a real broadcast,
-// reusing the same per-user notification fan-out every other admin
-// notification already goes through (utils/notify.ts's notifyUser), just
-// looped over an audience instead of a single recipient. Fine at current
-// scale; a large audience should eventually move off the request thread.
+// Backs the admin broadcast composer (and the Dashboard's older "Send
+// Notification" quick action, which still posts here with no city/state/
+// language) -- a real broadcast, reusing the same per-user notification
+// fan-out every other admin notification already goes through
+// (utils/notify.ts's notifyUser via services/broadcast.service.ts), just
+// looped over a resolved audience instead of a single recipient. Fine at
+// current scale; a large audience should eventually move off the request
+// thread (see the sentCount cap discussion on scheduled sends below).
 export const broadcastNotification = async (req: Request, res: Response) => {
   try {
-    const { title, body, audience } = req.body as { title?: string; body?: string; audience?: BroadcastAudience };
+    const { title, body, audience, city, state, language } = req.body as {
+      title?: string;
+      body?: string;
+      audience?: string;
+      city?: string;
+      state?: string;
+      language?: string;
+    };
 
     if (!title || !body) {
       res.status(400).json({ error: 'title and body are required' });
       return;
     }
-    const role = audience ? AUDIENCE_ROLE[audience] : undefined;
-    if (!role) {
+    if (!isBroadcastAudience(audience)) {
       res.status(400).json({ error: 'audience must be one of ALL_CUSTOMERS, ALL_VENDORS, ALL_TECHNICIANS, ALL_RIDERS' });
       return;
     }
 
-    const recipients = await prisma.user.findMany({ where: { roles: { has: role } }, select: { id: true } });
-    await Promise.all(recipients.map((r) => notifyUser(r.id, title, body, {}, { type: 'ADMIN_BROADCAST' })));
-
-    res.json({ sent: recipients.length });
+    const sent = await sendBroadcast(title, body, { audience, city, state, language });
+    res.json({ sent });
   } catch (error) {
     console.error('Error broadcasting notification:', error);
     res.status(500).json({ error: 'Failed to broadcast notification' });
+  }
+};
+
+// ============ Scheduled broadcasts ============
+// A ScheduledNotification row queued for a future send. Picked up by
+// jobs/sweeper.ts's scheduled-notification sweep, which resolves the same
+// audience filters through services/broadcast.service.ts and sends it
+// through the same fan-out as an immediate broadcast above.
+
+export const createScheduledNotification = async (req: AuthRequest, res: Response) => {
+  try {
+    const { title, body, audience, city, state, language, sendAt } = req.body as {
+      title?: string;
+      body?: string;
+      audience?: string;
+      city?: string;
+      state?: string;
+      language?: string;
+      sendAt?: string;
+    };
+
+    if (!title || !body) {
+      res.status(400).json({ error: 'title and body are required' });
+      return;
+    }
+    if (!isBroadcastAudience(audience)) {
+      res.status(400).json({ error: 'audience must be one of ALL_CUSTOMERS, ALL_VENDORS, ALL_TECHNICIANS, ALL_RIDERS' });
+      return;
+    }
+    const sendAtDate = sendAt ? new Date(sendAt) : null;
+    if (!sendAtDate || Number.isNaN(sendAtDate.getTime()) || sendAtDate.getTime() <= Date.now()) {
+      res.status(400).json({ error: 'sendAt must be a valid future date/time' });
+      return;
+    }
+
+    const filters: BroadcastFilters = { audience, city, state, language };
+    const scheduled = await prisma.scheduledNotification.create({
+      data: {
+        title,
+        body,
+        audience: filters as object,
+        sendAt: sendAtDate,
+        createdByUserId: req.user!.userId,
+      },
+    });
+    res.status(201).json(scheduled);
+  } catch (error) {
+    console.error('Error creating scheduled notification:', error);
+    res.status(500).json({ error: 'Failed to create scheduled notification' });
+  }
+};
+
+export const getScheduledNotifications = async (req: Request, res: Response) => {
+  try {
+    const notifications = await prisma.scheduledNotification.findMany({ orderBy: { sendAt: 'desc' }, take: 100 });
+    res.json(notifications);
+  } catch (error) {
+    console.error('Error fetching scheduled notifications:', error);
+    res.status(500).json({ error: 'Failed to fetch scheduled notifications' });
+  }
+};
+
+export const cancelScheduledNotification = async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const existing = await prisma.scheduledNotification.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Scheduled notification not found' });
+      return;
+    }
+    if (existing.status !== ScheduledNotificationStatus.PENDING) {
+      res.status(400).json({ error: `Cannot cancel a notification that is already ${existing.status}` });
+      return;
+    }
+    const updated = await prisma.scheduledNotification.update({
+      where: { id },
+      data: { status: ScheduledNotificationStatus.CANCELLED },
+    });
+    res.json(updated);
+  } catch (error) {
+    console.error('Error cancelling scheduled notification:', error);
+    res.status(500).json({ error: 'Failed to cancel scheduled notification' });
+  }
+};
+
+// ============ Notification analytics ============
+// Aggregates Notification's delivery/engagement columns (see notify.ts and
+// the delivery-retry sweep in jobs/sweeper.ts for how deliveryStatus/
+// deliveredAt get set, and customer.controller.ts's markNotificationRead/
+// markNotificationOpened for openedAt/clickedAt). Optional date range +
+// type filter; no audience filter today since Notification doesn't retain
+// which broadcast/category sent it beyond `type`.
+export const getNotificationAnalytics = async (req: Request, res: Response) => {
+  try {
+    const { from, to, type } = req.query as { from?: string; to?: string; type?: string };
+    const where: Record<string, unknown> = {};
+    if (from || to) {
+      where.createdAt = {
+        ...(from ? { gte: new Date(from) } : {}),
+        ...(to ? { lte: new Date(to) } : {}),
+      };
+    }
+    if (type) where.type = type;
+
+    const [sent, delivered, opened, clicked, all] = await Promise.all([
+      prisma.notification.count({ where }),
+      prisma.notification.count({ where: { ...where, deliveredAt: { not: null } } }),
+      prisma.notification.count({ where: { ...where, openedAt: { not: null } } }),
+      prisma.notification.count({ where: { ...where, clickedAt: { not: null } } }),
+      // Sampled for the by-category breakdown -- type + createdAt only, cheap
+      // even at high volume, capped so a huge date range can't return an
+      // unbounded row set to aggregate in memory below.
+      prisma.notification.findMany({ where, select: { type: true }, take: 20000 }),
+    ]);
+
+    const failed = await prisma.notification.count({
+      where: { ...where, deliveryStatus: { not: Prisma.JsonNull } as any, deliveredAt: null },
+    });
+
+    const byCategory: Record<string, number> = {};
+    for (const row of all) {
+      const category = classifyNotificationDisplayCategory(row.type);
+      byCategory[category] = (byCategory[category] || 0) + 1;
+    }
+
+    res.json({
+      sent,
+      delivered,
+      opened,
+      clicked,
+      failed,
+      deliveryRate: sent ? Math.round((delivered / sent) * 1000) / 10 : 0,
+      ctr: delivered ? Math.round((clicked / delivered) * 1000) / 10 : 0,
+      byCategory,
+    });
+  } catch (error) {
+    console.error('Error computing notification analytics:', error);
+    res.status(500).json({ error: 'Failed to compute notification analytics' });
   }
 };

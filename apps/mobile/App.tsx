@@ -58,6 +58,7 @@ import EditProfileScreen from './src/screens/EditProfileScreen';
 import WishlistScreen from './src/screens/WishlistScreen';
 import AddressManagementScreen from './src/screens/AddressManagementScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
+import NotificationPreferencesScreen from './src/screens/NotificationPreferencesScreen';
 import HelpCenterScreen from './src/screens/HelpCenterScreen';
 import StaticPageScreen from './src/screens/StaticPageScreen';
 
@@ -554,6 +555,7 @@ function RootNavigator() {
             <Stack.Screen name="Wishlist" component={WishlistScreen} />
             <Stack.Screen name="AddressManagement" component={AddressManagementScreen} />
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} />
             <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
             <Stack.Screen name="StaticPage" component={StaticPageScreen} />
             {/* Cart is reached via the header cart icon (HeaderCartButton) rather

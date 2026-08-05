@@ -11,6 +11,10 @@ import {
   getRevenueTarget,
   updateRevenueTarget,
   broadcastNotification,
+  createScheduledNotification,
+  getScheduledNotifications,
+  cancelScheduledNotification,
+  getNotificationAnalytics,
 } from '../controllers/admin.controller';
 import { authenticate, authorize } from '../middlewares/auth';
 import { Role } from '@prisma/client';
@@ -30,5 +34,9 @@ router.get('/search', authenticate, authorize(admins), globalSearch);
 router.get('/settings/revenue-target', authenticate, authorize(admins), getRevenueTarget);
 router.put('/settings/revenue-target', authenticate, authorize(admins), updateRevenueTarget);
 router.post('/notifications/broadcast', authenticate, authorize(admins), broadcastNotification);
+router.post('/notifications/scheduled', authenticate, authorize(admins), createScheduledNotification);
+router.get('/notifications/scheduled', authenticate, authorize(admins), getScheduledNotifications);
+router.delete('/notifications/scheduled/:id', authenticate, authorize(admins), cancelScheduledNotification);
+router.get('/notifications/analytics', authenticate, authorize(admins), getNotificationAnalytics);
 
 export default router;

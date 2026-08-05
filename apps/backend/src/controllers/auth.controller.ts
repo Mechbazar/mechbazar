@@ -19,6 +19,7 @@ import {
 } from '../utils/firebasePassword';
 import { sanitizeUser } from '../utils/sanitizeUser';
 import { notifyAdmins } from '../utils/notify';
+import { registerPushDevice, removePushDeviceByToken } from '../utils/pushDevice';
 import { isEmailConfigured } from '../config/env';
 import prisma from '../config/prisma';
 
@@ -332,6 +333,9 @@ export const registerPushToken = async (req: AuthRequest, res: Response): Promis
       // web-push channel (apps/mobile/src/services/webPush.web.ts).
       data: type === 'fcm' ? { fcmToken: token } : { expoPushToken: token },
     });
+    // Also upsert into the multi-device PushDevice store (see utils/notify.ts)
+    // -- additive, the legacy column above stays the single-device fallback.
+    await registerPushDevice(req.user!.userId, token, type === 'fcm' ? 'FCM' : 'EXPO');
     res.status(204).send();
   } catch (error) {
     console.error('Error registering push token:', error);
@@ -350,10 +354,15 @@ export const clearPushToken = async (req: AuthRequest, res: Response): Promise<v
       res.status(400).json({ error: "type must be 'expo' or 'fcm'" });
       return;
     }
+    const current = await prisma.user.findUnique({
+      where: { id: req.user!.userId },
+      select: { expoPushToken: true, fcmToken: true },
+    });
     await prisma.user.update({
       where: { id: req.user!.userId },
       data: type === 'fcm' ? { fcmToken: null } : { expoPushToken: null },
     });
+    await removePushDeviceByToken(req.user!.userId, type === 'fcm' ? current?.fcmToken : current?.expoPushToken);
     res.status(204).send();
   } catch (error) {
     console.error('Error clearing push token:', error);

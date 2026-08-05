@@ -80,6 +80,25 @@ export const riderService = {
     await apiClient.delete('/riders/me/push-token');
   },
 
+  // Self-service notification history -- role-agnostic endpoint (works for
+  // any authenticated identity via JWT), not rider-specific like the routes
+  // above, but kept here since this is the app's own service module.
+  getNotifications: async () => {
+    const response = await apiClient.get('/customers/notifications');
+    return response.data;
+  },
+  markNotificationRead: async (id: string) => {
+    const response = await apiClient.patch(`/customers/notifications/${id}/read`);
+    return response.data;
+  },
+  markAllNotificationsRead: async () => {
+    const response = await apiClient.patch('/customers/notifications/read-all');
+    return response.data;
+  },
+  deleteNotification: async (id: string) => {
+    await apiClient.delete(`/customers/notifications/${id}`);
+  },
+
   // Deliveries
   getMyDeliveries: async () => {
     const response = await apiClient.get('/riders/me/deliveries');

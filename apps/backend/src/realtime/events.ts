@@ -18,6 +18,8 @@ export const ROOMS = {
   technician: (technicianId: string) => `tech:${technicianId}`,
   /** Everyone currently watching one job: its customer, its mechanic, admins. */
   job: (bookingId: string) => `job:${bookingId}`,
+  /** Everyone currently watching one order: its customer, its rider, admins. */
+  order: (orderId: string) => `order:${orderId}`,
   /** All connected admin/ops consoles. */
   admins: 'admins',
   /** Admin live-ops map -- opt-in, because it is the only high-frequency feed. */
@@ -32,6 +34,9 @@ export const CLIENT_EVENTS = {
   /** Subscribe to a job's room. Ack: { ok, error? }. */
   JOB_SUBSCRIBE: 'job:subscribe',
   JOB_UNSUBSCRIBE: 'job:unsubscribe',
+  /** Subscribe to an order's room. Ack: { ok, error? }. */
+  ORDER_SUBSCRIBE: 'order:subscribe',
+  ORDER_UNSUBSCRIBE: 'order:unsubscribe',
   /**
    * Mechanic location batch. Sent every TRACKING_PING_INTERVAL_SECONDS while a
    * job is active, and as a backlog flush after a reconnect. Ack carries the
@@ -68,6 +73,11 @@ export const SERVER_EVENTS = {
   /** Chat message on a job. */
   JOB_MESSAGE: 'job:message',
 
+  /** Order moved to a new OrderStatus. Payload: OrderStatusEvent. */
+  ORDER_STATUS: 'order:status',
+  /** Full timeline refresh (sent on subscribe, and after any status change). */
+  ORDER_TIMELINE: 'order:timeline',
+
   /** A new offer is on the table for this mechanic. Payload: OfferEvent. */
   OFFER_NEW: 'offer:new',
   /** An offer this mechanic held is gone (expired, superseded, cancelled). */
@@ -80,6 +90,8 @@ export const SERVER_EVENTS = {
   ADMIN_MECHANIC_LOCATION: 'admin:mechanic-location',
   /** Admin live map: a job entered/left the active set. */
   ADMIN_JOB_UPDATE: 'admin:job-update',
+  /** Admin ops feed: an order's status changed. */
+  ADMIN_ORDER_UPDATE: 'admin:order-update',
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -191,6 +203,27 @@ export interface OfferClosedEvent {
   offerId: string;
   bookingId: string;
   reason: 'EXPIRED' | 'SUPERSEDED' | 'CANCELLED' | 'DECLINED';
+}
+
+export interface OrderStatusEvent {
+  orderId: string;
+  status: string;
+  previousStatus: string | null;
+  at: string; // ISO8601
+  /** Customer-facing one-liner, so clients don't each invent their own copy. */
+  message: string;
+}
+
+export interface OrderTimelineStep {
+  key: string;
+  label: string;
+  at: string | null;
+  done: boolean;
+}
+
+export interface OrderTimelineEvent {
+  orderId: string;
+  steps: OrderTimelineStep[];
 }
 
 export interface NotificationEvent {

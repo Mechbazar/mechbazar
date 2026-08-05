@@ -8,6 +8,7 @@ import { OnboardingWizard } from '../screens/registration/OnboardingWizard';
 import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
 import { StatusScreen } from '../screens/registration/StatusScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
+import { NotificationPreferencesScreen } from '../screens/NotificationPreferencesScreen';
 import { AnalyticsScreen } from '../screens/AnalyticsScreen';
 import { TabNavigator } from './TabNavigator';
 
@@ -99,6 +100,11 @@ export const MainStack = () => {
         name="Notifications"
         component={NotificationsScreen}
         options={{ title: 'Notifications', headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.text }}
+      />
+      <Stack.Screen
+        name="NotificationPreferences"
+        component={NotificationPreferencesScreen}
+        options={{ title: 'Notification Preferences', headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.text }}
       />
       <Stack.Screen
         name="Analytics"

@@ -202,6 +202,13 @@ export const ProfileScreen = () => {
           style={{marginBottom: 12}}
         />
 
+        <Button
+          title="Notification Preferences"
+          onPress={() => navigation.navigate('NotificationPreferences')}
+          variant="outline"
+          style={{marginBottom: 12}}
+        />
+
         <Button title="Sign Out" onPress={handleLogout} style={{backgroundColor: colors.danger}} />
       </View>
     </ScrollView>

@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { signOut } from 'firebase/auth';
+import axios from 'axios';
 import type { RootState } from '../store';
 import { logout } from '../store/slices/authSlice';
 import { auth } from '../config/firebase';
+import { API_URL } from '../config/api';
 import {
-  LayoutDashboard, Package, ShoppingCart, Warehouse, Wallet, Settings, LogOut, Store, X, Tag, Bell, RotateCcw, KeyRound, Sun, Moon
+  LayoutDashboard, Package, ShoppingCart, Warehouse, Wallet, Settings, LogOut, Store, X, Tag, Bell, BellRing, RotateCcw, KeyRound, Sun, Moon
 } from 'lucide-react';
 import { Logo } from '@mechbazar/shared/web';
 import ChangePasswordDialog from './ChangePasswordDialog';
@@ -39,6 +41,7 @@ const navItems = [
   { to: '/returns',       icon: RotateCcw,       label: 'Returns' },
   { to: '/coupons',       icon: Tag,             label: 'Coupons' },
   { to: '/notifications', icon: Bell,            label: 'Notifications' },
+  { to: '/notification-preferences', icon: BellRing, label: 'Notification Preferences' },
   { to: '/wallet',        icon: Wallet,          label: 'Wallet & Payouts' },
   { to: '/profile',       icon: Settings,        label: 'Profile & Settings' },
 ];
@@ -51,7 +54,7 @@ interface SidebarProps {
 export default function Sidebar({ open = false, onClose }: SidebarProps) {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const dispatch = useDispatch();
-  const { user, vendorProfile } = useSelector((state: RootState) => state.auth);
+  const { user, vendorProfile, token } = useSelector((state: RootState) => state.auth);
 
   const { theme } = useTheme();
 
@@ -123,7 +126,18 @@ export default function Sidebar({ open = false, onClose }: SidebarProps) {
           <KeyRound className="w-4 h-4" /> Change Password
         </button>
         <button
-          onClick={() => {
+          onClick={async () => {
+            // A web push token identifies the browser, not the account -- on
+            // a shared/reset machine, leaving it registered would keep
+            // sending this account's notifications to whoever logs in next.
+            // Best-effort: sign-out proceeds even if this fails.
+            if (token) {
+              try {
+                await axios.delete(`${API_URL}/auth/push-token?type=fcm`, { headers: { Authorization: `Bearer ${token}` } });
+              } catch (e) {
+                console.error('Failed to clear push token on logout:', e);
+              }
+            }
             dispatch(logout());
             signOut(auth).catch(() => {});
           }}

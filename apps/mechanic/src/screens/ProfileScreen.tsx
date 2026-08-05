@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useDispatch } from 'react-redux';
 import * as SecureStore from 'expo-secure-store';
 import { colors, Typography, Card, Button, Loader, technicianService } from '@mechbazar/shared';
-import { Star, ChevronRight } from 'lucide-react-native';
+import { Star, ChevronRight, BellRing } from 'lucide-react-native';
 import { logout } from '../store';
 
 export const ProfileScreen = ({ navigation }: { navigation: any }) => {
@@ -89,6 +89,17 @@ export const ProfileScreen = ({ navigation }: { navigation: any }) => {
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Typography variant="body" style={{ fontWeight: '700' }}>My Reviews</Typography>
               <Typography variant="caption">See what customers said about your work</Typography>
+            </View>
+            <ChevronRight color={colors.textSecondary} size={20} />
+          </Card>
+        </TouchableOpacity>
+
+        <TouchableOpacity activeOpacity={0.7} onPress={() => navigation.getParent()?.navigate('NotificationPreferences')}>
+          <Card style={styles.reviewsLink}>
+            <BellRing color={colors.info} size={22} />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Typography variant="body" style={{ fontWeight: '700' }}>Notification Preferences</Typography>
+              <Typography variant="caption">Choose which alerts you want to receive</Typography>
             </View>
             <ChevronRight color={colors.textSecondary} size={20} />
           </Card>
