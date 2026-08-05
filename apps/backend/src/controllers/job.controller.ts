@@ -17,6 +17,7 @@ import {
 } from '../services/jobOtp.service';
 import { ingestPings, getJobTrail, forgetJobTracking, PingInput } from '../services/tracking.service';
 import { placeMaskedCall, contactAvailability, CallError, recordCallStatus } from '../services/call.service';
+import { creditServiceCompletion } from '../services/commission.service';
 import { emitToJob } from '../realtime/gateway';
 import { SERVER_EVENTS } from '../realtime/events';
 import { notifyUser, notifyAdmins, NOTIFY } from '../utils/notify';
@@ -876,10 +877,10 @@ export const completeJob = async (req: AuthRequest, res: Response) => {
       // Credit the mechanic and settle payment inside the same transaction as
       // the transition. Previously these were separate writes, which meant a
       // failure between them could complete a job without paying anyone.
-      await tx.serviceTechnician.update({
-        where: { id: tech.id },
-        data: { walletBalance: { increment: result.booking.finalAmount }, totalJobs: { increment: 1 } },
-      });
+      // creditServiceCompletion resolves the platform/mechanic commission
+      // split instead of paying the mechanic the full finalAmount -- see
+      // services/commission.service.ts.
+      await creditServiceCompletion(tx, result.booking, tech.id);
       await tx.payment.updateMany({
         where: { serviceBookingId: bookingId, status: { not: 'SUCCESS' } },
         data: { status: 'SUCCESS' },

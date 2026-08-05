@@ -7,6 +7,7 @@ import { resolveCoupon } from './coupon.controller';
 import { notifyUser, notifyAdmins } from '../utils/notify';
 import { sanitizeOrder, sanitizeOrders, stripDeliveryOtp, stripDeliveryOtps } from '../utils/sanitizeUser';
 import { pendingPaymentCreateInput, creditWalletForOnlineRefund } from '../services/payment.service';
+import { resolveProductCommissionPercent, resolveRiderPayout, recordCommission, round2 } from '../services/commission.service';
 
 // Thrown from inside the createOrder $transaction to carry an intended HTTP
 // status (400/409) back out through Prisma's error propagation, instead of
@@ -74,14 +75,23 @@ export const restoreOrderStock = async (
 };
 
 type DeliveryCreditOrder = {
+  id: string;
   deliveryPartnerId: string | null;
   deliveryFee: number;
-  items: { price: number; quantity: number; product: { vendorId: string } | null }[];
+  address: { lat: number | null; lng: number | null } | null;
+  items: {
+    id: string;
+    price: number;
+    quantity: number;
+    commissionPercent: number | null;
+    commissionAmount: number | null;
+    product: { vendorId: string; vendor: { lat: number | null; lng: number | null } | null } | null;
+  }[];
 };
 
 // Shared by updateMyDeliveryStatus (rider's own flow), updateAdminOrderStatus,
 // and vendor.controller.ts's updateOrderStatus: credits the assigned rider's
-// delivery fee and each vendor's share of the order total when an order is
+// payout and each vendor's net share of the order total when an order is
 // first marked DELIVERED, regardless of which of the three endpoints performs
 // that transition. Previously only the rider's own endpoint credited anyone,
 // so an order the admin or a vendor set straight to DELIVERED (bypassing the
@@ -98,23 +108,64 @@ export const creditOrderDelivery = async (
   const credits: { userId: string; amount: number }[] = [];
 
   if (order.deliveryPartnerId) {
+    // Pickup point is approximated from the first item whose vendor has a
+    // location on file -- an order can span multiple vendors and there is no
+    // per-vendor delivery leg tracked, so this is the same single-leg
+    // simplification the pre-existing flat deliveryFee already made.
+    const pickup = order.items.map((i) => i.product?.vendor).find((v) => v?.lat != null && v?.lng != null) || null;
+    const { amount: riderAmount } = await resolveRiderPayout(tx, {
+      pickupLat: pickup?.lat ?? null,
+      pickupLng: pickup?.lng ?? null,
+      dropLat: order.address?.lat ?? null,
+      dropLng: order.address?.lng ?? null,
+      deliveredAt: new Date(),
+    });
+
     await tx.deliveryPartner.update({
       where: { id: order.deliveryPartnerId },
-      data: { walletBalance: { increment: order.deliveryFee } },
+      data: { walletBalance: { increment: riderAmount } },
     });
+    // Persisted so a later RETURNED reversal can claw back exactly this
+    // amount even though the formula's inputs (e.g. rainModeActive) can
+    // change between now and then.
+    await tx.order.update({ where: { id: order.id }, data: { riderPayoutAmount: riderAmount } });
     const rider = await tx.deliveryPartner.findUnique({ where: { id: order.deliveryPartnerId }, select: { userId: true } });
-    if (rider) credits.push({ userId: rider.userId, amount: order.deliveryFee });
+    if (rider) credits.push({ userId: rider.userId, amount: riderAmount });
   }
 
   // An order can contain items from multiple vendors under one global status
-  // (schema/architecture unchanged) -- each vendor is credited their own
-  // share, computed from the items actually attributed to them, rather than
-  // crediting one vendor the whole order total.
+  // (schema/architecture unchanged) -- each vendor is credited their own net
+  // share: gross minus the commission that was resolved and snapshotted onto
+  // the item back at order-creation time (see createOrder), not recomputed
+  // now against whatever rate happens to be configured today.
   const shareByVendor = new Map<string, number>();
   for (const item of order.items) {
     const vendorId = item.product?.vendorId;
     if (!vendorId) continue;
-    shareByVendor.set(vendorId, (shareByVendor.get(vendorId) || 0) + item.price * item.quantity);
+
+    const gross = round2(item.price * item.quantity);
+    // Null only for orders placed before this system existed -- those keep
+    // the pre-existing full-amount behaviour rather than retroactively
+    // deducting a rate that was never quoted at sale time.
+    const hasSnapshot = item.commissionAmount != null && item.commissionPercent != null;
+    const commissionAmount = hasSnapshot ? item.commissionAmount! : 0;
+    const commissionPercent = hasSnapshot ? item.commissionPercent! : 0;
+    const net = round2(gross - commissionAmount);
+
+    shareByVendor.set(vendorId, round2((shareByVendor.get(vendorId) || 0) + net));
+
+    if (hasSnapshot) {
+      await recordCommission(tx, {
+        sourceType: 'PRODUCT_ORDER',
+        orderId: order.id,
+        orderItemId: item.id,
+        vendorId,
+        grossAmount: gross,
+        commissionPercent,
+        commissionAmount,
+        netPayoutAmount: net,
+      });
+    }
   }
   for (const [vendorId, share] of shareByVendor) {
     await tx.vendor.update({
@@ -128,6 +179,55 @@ export const creditOrderDelivery = async (
   return credits;
 };
 
+// Reverses creditOrderDelivery: called when a previously-DELIVERED order
+// (already credited above) is marked RETURNED. Claws back the rider's
+// persisted payout and each vendor's net share, and writes a mirrored
+// negative CommissionRecord per original one so Commission Reports reflect
+// the reversal instead of silently over-stating revenue for a sale that was
+// undone. A genuine pre-existing gap -- no clawback existed at all before.
+export const reverseOrderDeliveryCredit = async (
+  tx: Prisma.TransactionClient,
+  order: { id: string; deliveryPartnerId: string | null; riderPayoutAmount: number | null }
+): Promise<{ userId: string; amount: number }[]> => {
+  const debits: { userId: string; amount: number }[] = [];
+
+  if (order.deliveryPartnerId && order.riderPayoutAmount) {
+    await tx.deliveryPartner.update({
+      where: { id: order.deliveryPartnerId },
+      data: { walletBalance: { decrement: order.riderPayoutAmount } },
+    });
+    const rider = await tx.deliveryPartner.findUnique({ where: { id: order.deliveryPartnerId }, select: { userId: true } });
+    if (rider) debits.push({ userId: rider.userId, amount: order.riderPayoutAmount });
+  }
+
+  const originalRecords = await tx.commissionRecord.findMany({
+    where: { orderId: order.id, sourceType: 'PRODUCT_ORDER', reversalOfId: null },
+  });
+  const clawbackByVendor = new Map<string, number>();
+  for (const rec of originalRecords) {
+    if (!rec.vendorId) continue;
+    clawbackByVendor.set(rec.vendorId, round2((clawbackByVendor.get(rec.vendorId) || 0) + rec.netPayoutAmount));
+    await recordCommission(tx, {
+      sourceType: 'PRODUCT_ORDER',
+      orderId: order.id,
+      orderItemId: rec.orderItemId ?? undefined,
+      vendorId: rec.vendorId,
+      grossAmount: -rec.grossAmount,
+      commissionPercent: rec.commissionPercent,
+      commissionAmount: -rec.commissionAmount,
+      netPayoutAmount: -rec.netPayoutAmount,
+      reversalOfId: rec.id,
+    });
+  }
+  for (const [vendorId, share] of clawbackByVendor) {
+    await tx.vendor.update({ where: { id: vendorId }, data: { walletBalance: { decrement: share } } });
+    const vendor = await tx.vendor.findUnique({ where: { id: vendorId }, select: { userId: true } });
+    if (vendor) debits.push({ userId: vendor.userId, amount: share });
+  }
+
+  return debits;
+};
+
 // Fire-and-forget notification for each wallet credit creditOrderDelivery
 // made -- called after the transaction that produced them has committed.
 // notifyUser already swallows its own errors. Exported for
@@ -139,6 +239,18 @@ export const notifyWalletCredits = (credits: { userId: string; amount: number }[
       'Wallet credited',
       `Your wallet was credited ₹${credit.amount.toFixed(2)} for a delivered order.`,
       { amount: credit.amount }
+    );
+  }
+};
+
+// Sibling of notifyWalletCredits for reverseOrderDeliveryCredit's debits.
+export const notifyWalletDebits = (debits: { userId: string; amount: number }[]) => {
+  for (const debit of debits) {
+    notifyUser(
+      debit.userId,
+      'Wallet debited',
+      `₹${debit.amount.toFixed(2)} was deducted from your wallet after an order was marked returned.`,
+      { amount: debit.amount }
     );
   }
 };
@@ -199,7 +311,13 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       }
 
       let subtotal = 0;
-      const validatedItems: { productId: string; quantity: number; price: number }[] = [];
+      const validatedItems: {
+        productId: string;
+        quantity: number;
+        price: number;
+        commissionPercent: number;
+        commissionAmount: number;
+      }[] = [];
       const cartVehicleTypes = new Set<VehicleType>();
 
       // Verify products against real DB and that enough stock exists. Fetched
@@ -234,10 +352,26 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
         const priceToUse = isB2B ? b2bPrice : retailPrice;
         subtotal += priceToUse * quantity;
 
+        // Commission is resolved and snapshotted at order-creation time --
+        // same philosophy as `price` above -- so a later rate change never
+        // retroactively alters an already-placed order. The vendor is
+        // actually credited net-of-commission only once the order reaches
+        // DELIVERED (see creditOrderDelivery), but the rate itself is fixed
+        // now, at the moment of sale.
+        const lineTotal = priceToUse * quantity;
+        const resolvedCommission = await resolveProductCommissionPercent(tx, {
+          productId: product.id,
+          vendorId: product.vendorId,
+          categoryId: product.categoryId,
+        });
+        const commissionAmount = round2((lineTotal * resolvedCommission.percent) / 100);
+
         validatedItems.push({
           productId: product.id,
           quantity,
-          price: priceToUse
+          price: priceToUse,
+          commissionPercent: resolvedCommission.percent,
+          commissionAmount,
         });
       }
 
@@ -551,7 +685,10 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
       return res.status(400).json({ error: `Invalid status "${status}". Must be one of ${Object.values(OrderStatus).join(', ')}.` });
     }
 
-    const existing = await prisma.order.findUnique({ where: { id }, include: { items: { include: { product: true } } } });
+    const existing = await prisma.order.findUnique({
+      where: { id },
+      include: { items: { include: { product: { include: { vendor: true } } } }, address: true },
+    });
     if (!existing) {
       return res.status(404).json({ error: 'Order not found' });
     }
@@ -581,8 +718,11 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
 
     const isBeingClosed = status === 'CANCELLED' || status === 'RETURNED';
     const isBeingDelivered = status === 'DELIVERED' && existing.status !== 'DELIVERED';
+    // A delivered order was already credited by creditOrderDelivery -- moving
+    // it to RETURNED must claw that back, not just restore stock.
+    const isReturnAfterDelivery = status === 'RETURNED' && existing.status === 'DELIVERED';
 
-    const { order, credits } = await prisma.$transaction(async (tx) => {
+    const { order, credits, debits } = await prisma.$transaction(async (tx) => {
       // Atomically claim the transition: only matches if the order's status
       // is still what we just read, re-checked under Postgres's row lock at
       // UPDATE time -- not against the stale `existing.status` read above.
@@ -611,8 +751,9 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
       // rider/vendor wallet credit that normally happens in
       // updateMyDeliveryStatus would just never happen for these orders.
       const credits = isBeingDelivered ? await creditOrderDelivery(tx, existing) : [];
+      const debits = isReturnAfterDelivery ? await reverseOrderDeliveryCredit(tx, existing) : [];
 
-      return { order: await tx.order.findUniqueOrThrow({ where: { id } }), credits };
+      return { order: await tx.order.findUniqueOrThrow({ where: { id } }), credits, debits };
     });
 
     notifyUser(
@@ -622,6 +763,7 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
       { orderId: id, status: order.status }
     );
     notifyWalletCredits(credits);
+    notifyWalletDebits(debits);
 
     res.status(200).json(stripDeliveryOtp(order));
   } catch (error: any) {
@@ -729,7 +871,7 @@ export const updateMyDeliveryStatus = async (req: AuthRequest, res: Response) =>
 
     const order = await prisma.order.findFirst({
       where: { id, deliveryPartnerId: partner.id },
-      include: { payment: true, items: { include: { product: true } } },
+      include: { payment: true, items: { include: { product: { include: { vendor: true } } } }, address: true },
     });
     if (!order) {
       return res.status(404).json({ error: 'Delivery not found or not assigned to you' });

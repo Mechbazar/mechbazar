@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, Alert } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { colors, Typography, Card, Badge, Button, Input, Loader, technicianService } from '@mechbazar/shared';
-import { WalletCards, Building2 } from 'lucide-react-native';
+import { WalletCards, Building2, Clock } from 'lucide-react-native';
 import { Booking, isCompletedBooking, isCompletedToday } from '../utils/bookings';
 import { formatINR } from '../utils/currency';
 
@@ -30,6 +30,14 @@ interface Earnings {
   settlements: Settlement[];
 }
 
+interface AttendanceRow {
+  id: string;
+  date: string;
+  status: string;
+  checkInAt: string | null;
+  checkOutAt: string | null;
+}
+
 const settlementBadge = (status: string) => {
   switch (status) {
     case 'COMPLETED':
@@ -52,6 +60,24 @@ export const EarningsScreen = () => {
   const { data: bookings } = useQuery<Booking[]>({
     queryKey: ['technician-bookings'],
     queryFn: technicianService.getMyBookings,
+  });
+
+  const { data: attendance, isLoading: attendanceLoading } = useQuery<AttendanceRow[]>({
+    queryKey: ['technician-attendance'],
+    queryFn: technicianService.getMyAttendance,
+  });
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const todayAttendance = attendance?.find((a) => a.date.slice(0, 10) === todayKey) || null;
+
+  const checkInMutation = useMutation({
+    mutationFn: technicianService.checkIn,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['technician-attendance'] }),
+    onError: (err: any) => Alert.alert('Error', err.response?.data?.error || err.message),
+  });
+  const checkOutMutation = useMutation({
+    mutationFn: technicianService.checkOut,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['technician-attendance'] }),
+    onError: (err: any) => Alert.alert('Error', err.response?.data?.error || err.message),
   });
 
   const [showPayoutForm, setShowPayoutForm] = useState(false);
@@ -233,6 +259,44 @@ export const EarningsScreen = () => {
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 <Button title="Cancel" variant="outline" onPress={() => setShowBankForm(false)} style={{ flex: 1 }} />
                 <Button title="Save" onPress={handleAddBankAccount} loading={bankMutation.isPending} style={{ flex: 1 }} />
+              </View>
+            </View>
+          )}
+        </Card>
+
+        <Card style={{ marginTop: 12 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Clock color={colors.textSecondary} size={20} />
+            <Typography variant="h3">Today's Attendance</Typography>
+          </View>
+
+          {attendanceLoading ? (
+            <Typography variant="caption" style={{ color: colors.textSecondary, marginTop: 8 }}>Loading…</Typography>
+          ) : (
+            <View style={{ marginTop: 12 }}>
+              <Typography variant="caption" style={{ color: colors.textSecondary }}>
+                {todayAttendance?.checkInAt
+                  ? `Checked in at ${new Date(todayAttendance.checkInAt).toLocaleTimeString()}${
+                      todayAttendance.checkOutAt ? ` • Checked out at ${new Date(todayAttendance.checkOutAt).toLocaleTimeString()}` : ''
+                    }`
+                  : "You haven't checked in today."}
+              </Typography>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                <Button
+                  title="Check In"
+                  onPress={() => checkInMutation.mutate()}
+                  loading={checkInMutation.isPending}
+                  disabled={!!todayAttendance?.checkInAt}
+                  style={{ flex: 1 }}
+                />
+                <Button
+                  title="Check Out"
+                  variant="outline"
+                  onPress={() => checkOutMutation.mutate()}
+                  loading={checkOutMutation.isPending}
+                  disabled={!todayAttendance?.checkInAt || !!todayAttendance?.checkOutAt}
+                  style={{ flex: 1 }}
+                />
               </View>
             </View>
           )}

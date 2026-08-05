@@ -206,6 +206,16 @@ export default function Payouts() {
     },
     { key: 'type', header: 'Type', render: (s) => getTypeBadge(s.type) },
     {
+      key: 'source',
+      header: 'Source',
+      render: (s) => {
+        const source = s.data.type || 'WALLET_PAYOUT';
+        const label = source === 'SALARY' ? 'Salary' : source === 'ADMIN_GENERATED' ? 'Scheduled' : 'Requested';
+        const variant = source === 'SALARY' ? 'info' : source === 'ADMIN_GENERATED' ? 'secondary' : 'neutral';
+        return <Badge variant={variant as any} size="sm">{label}</Badge>;
+      },
+    },
+    {
       key: 'recipient',
       header: 'Recipient',
       render: (s) => (

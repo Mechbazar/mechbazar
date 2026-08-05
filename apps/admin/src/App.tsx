@@ -38,6 +38,7 @@ const MechanicsPage = lazy(() => import('./pages/MechanicsPage'));
 const Payouts = lazy(() => import('./pages/Payouts'));
 const Reports = lazy(() => import('./pages/Reports'));
 const AuditLogs = lazy(() => import('./pages/AuditLogs'));
+const CommissionSettings = lazy(() => import('./pages/CommissionSettings'));
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -55,6 +56,7 @@ function AnimatedRoutes() {
           <Route path="cms" element={<Banners />} />
           <Route path="coupons" element={<Coupons />} />
           <Route path="payouts" element={<Payouts />} />
+          <Route path="commission-settings" element={<CommissionSettings />} />
           <Route path="reports" element={<Reports />} />
           <Route path="audit-logs" element={<AuditLogs />} />
           <Route path="vehicles" element={<Vehicles />} />

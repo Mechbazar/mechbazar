@@ -4,6 +4,7 @@ import { sweepExpiredAssignments } from '../services/dispatch.service';
 import { sweepExpiredOtps } from '../services/jobOtp.service';
 import { sweepOldPings } from '../services/tracking.service';
 import { reconcileStalePendingPayments } from '../services/payment.service';
+import { generateScheduledSettlements } from '../services/settlement.service';
 
 // Background maintenance.
 //
@@ -32,6 +33,10 @@ const DISPATCH_SWEEP_MS = 10_000;
 const PRESENCE_SWEEP_MS = 60_000;
 const RETENTION_SWEEP_MS = 60 * 60_000;
 const PAYMENT_RECONCILE_SWEEP_MS = 5 * 60_000;
+// Cycle granularity is DAILY at its shortest, so an hourly check is more
+// than fine-grained enough -- a settlement generated an hour "late" is not a
+// correctness issue, only ever a delay (see settlement.service.ts).
+const SETTLEMENT_GENERATION_SWEEP_MS = 60 * 60_000;
 
 const timers: NodeJS.Timeout[] = [];
 
@@ -103,8 +108,15 @@ export function startSweepers(): void {
     }
   });
 
+  schedule('settlement-generation', SETTLEMENT_GENERATION_SWEEP_MS, async () => {
+    const result = await generateScheduledSettlements();
+    if (result.vendors || result.riders || result.technicians) {
+      console.log(`[sweeper] settlement-generation: vendors=${result.vendors} riders=${result.riders} technicians=${result.technicians}`);
+    }
+  });
+
   console.log(
-    `[sweeper] started (assignment ${DISPATCH_SWEEP_MS / 1000}s, presence ${PRESENCE_SWEEP_MS / 1000}s, retention ${RETENTION_SWEEP_MS / 60000}m, payment-reconcile ${PAYMENT_RECONCILE_SWEEP_MS / 60000}m)`
+    `[sweeper] started (assignment ${DISPATCH_SWEEP_MS / 1000}s, presence ${PRESENCE_SWEEP_MS / 1000}s, retention ${RETENTION_SWEEP_MS / 60000}m, payment-reconcile ${PAYMENT_RECONCILE_SWEEP_MS / 60000}m, settlement-generation ${SETTLEMENT_GENERATION_SWEEP_MS / 60000}m)`
   );
 }
 

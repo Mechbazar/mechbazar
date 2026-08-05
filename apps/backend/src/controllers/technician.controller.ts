@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { Role, TechnicianStatus } from '@prisma/client';
+import { Role, TechnicianStatus, AttendanceStatus, MechanicType } from '@prisma/client';
 import { transitionSettlement, SettlementAlreadyFinalisedError, SettlementChangedConcurrentlyError } from '../services/settlement.service';
 import { reviewDocument, InvalidDocumentStatusError, DocumentNotFoundError } from '../services/documentVerification.service';
 import { AuthRequest } from '../middlewares/auth';
@@ -1031,6 +1031,11 @@ export const deleteTechnician = async (req: Request, res: Response): Promise<voi
       prisma.jobDispatchOffer.deleteMany({ where: { technicianId: id } }),
       prisma.jobLocationPing.deleteMany({ where: { technicianId: id } }),
       prisma.serviceReview.deleteMany({ where: { technicianId: id } }),
+      // Commission & payout system tables -- same FK-cleanup requirement as
+      // everything else above (no onDelete cascade in the schema).
+      prisma.mechanicPayProfile.deleteMany({ where: { technicianId: id } }),
+      prisma.mechanicAttendance.deleteMany({ where: { technicianId: id } }),
+      prisma.commissionRecord.deleteMany({ where: { technicianId: id } }),
       prisma.serviceTechnician.delete({ where: { id } }),
       prisma.notification.deleteMany({ where: { userId: technician.userId } }),
       prisma.address.deleteMany({ where: { userId: technician.userId } }),
@@ -1088,10 +1093,16 @@ export const updateTechnicianSettlementStatus = async (req: Request, res: Respon
       status,
       transactionId,
       (tx) => tx.technicianSettlement,
-      (tx) => tx.serviceTechnician.update({
-        where: { id: settlement.technicianId },
-        data: { walletBalance: { increment: settlement.amount } },
-      }).then(() => {}),
+      // A SALARY settlement was never funded out of walletBalance (see
+      // payTechnicianSalary below), so a FAILED SALARY settlement must not
+      // credit the wallet -- only WALLET_PAYOUT/ADMIN_GENERATED settlements
+      // (which did decrement it) get that reversal.
+      (tx) => settlement.type === 'SALARY'
+        ? Promise.resolve()
+        : tx.serviceTechnician.update({
+            where: { id: settlement.technicianId },
+            data: { walletBalance: { increment: settlement.amount } },
+          }).then(() => {}),
       async () => (await prisma.serviceTechnician.findUnique({ where: { id: settlement.technicianId }, select: { userId: true } }))?.userId ?? null
     );
 
@@ -1111,5 +1122,289 @@ export const updateTechnicianSettlementStatus = async (req: Request, res: Respon
     }
     console.error('Error updating technician settlement status:', error);
     res.status(500).json({ error: 'Failed to update settlement status' });
+  }
+};
+
+// ============ Mechanic attendance ============
+
+function normalizeDateOnly(dateInput: string | Date): Date {
+  const d = new Date(dateInput);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+export const checkInMyAttendance = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const technician = await getOwnTechnician(req.user!.userId);
+    if (!technician) {
+      res.status(404).json({ error: 'Technician profile not found' });
+      return;
+    }
+
+    const today = normalizeDateOnly(new Date());
+    const existing = await prisma.mechanicAttendance.findUnique({
+      where: { technicianId_date: { technicianId: technician.id, date: today } },
+    });
+    if (existing?.checkInAt) {
+      res.status(400).json({ error: 'Already checked in today' });
+      return;
+    }
+
+    const attendance = await prisma.mechanicAttendance.upsert({
+      where: { technicianId_date: { technicianId: technician.id, date: today } },
+      update: { checkInAt: new Date(), status: 'PRESENT' },
+      create: { technicianId: technician.id, date: today, checkInAt: new Date(), status: 'PRESENT' },
+    });
+
+    res.status(200).json(attendance);
+  } catch (error) {
+    console.error('Error checking in:', error);
+    res.status(500).json({ error: 'Failed to check in' });
+  }
+};
+
+export const checkOutMyAttendance = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const technician = await getOwnTechnician(req.user!.userId);
+    if (!technician) {
+      res.status(404).json({ error: 'Technician profile not found' });
+      return;
+    }
+
+    const today = normalizeDateOnly(new Date());
+    const existing = await prisma.mechanicAttendance.findUnique({
+      where: { technicianId_date: { technicianId: technician.id, date: today } },
+    });
+    if (!existing || !existing.checkInAt) {
+      res.status(400).json({ error: 'You have not checked in today' });
+      return;
+    }
+    if (existing.checkOutAt) {
+      res.status(400).json({ error: 'Already checked out today' });
+      return;
+    }
+
+    const attendance = await prisma.mechanicAttendance.update({
+      where: { id: existing.id },
+      data: { checkOutAt: new Date() },
+    });
+
+    res.status(200).json(attendance);
+  } catch (error) {
+    console.error('Error checking out:', error);
+    res.status(500).json({ error: 'Failed to check out' });
+  }
+};
+
+export const getMyAttendance = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const technician = await getOwnTechnician(req.user!.userId);
+    if (!technician) {
+      res.status(404).json({ error: 'Technician profile not found' });
+      return;
+    }
+
+    const { from, to } = req.query;
+    const records = await prisma.mechanicAttendance.findMany({
+      where: {
+        technicianId: technician.id,
+        ...((from || to) && {
+          date: { ...(from ? { gte: new Date(String(from)) } : {}), ...(to ? { lte: new Date(String(to)) } : {}) },
+        }),
+      },
+      orderBy: { date: 'desc' },
+    });
+    res.status(200).json(records);
+  } catch (error) {
+    console.error('Error fetching own attendance:', error);
+    res.status(500).json({ error: 'Failed to fetch attendance' });
+  }
+};
+
+// ============ Admin: mechanic attendance ============
+
+export const getTechnicianAttendance = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const technicianId = String(req.params.id);
+    const { from, to } = req.query;
+    const records = await prisma.mechanicAttendance.findMany({
+      where: {
+        technicianId,
+        ...((from || to) && {
+          date: { ...(from ? { gte: new Date(String(from)) } : {}), ...(to ? { lte: new Date(String(to)) } : {}) },
+        }),
+      },
+      orderBy: { date: 'desc' },
+    });
+    res.status(200).json(records);
+  } catch (error) {
+    console.error('Error fetching technician attendance:', error);
+    res.status(500).json({ error: 'Failed to fetch attendance' });
+  }
+};
+
+// Admin edit/backfill of a single day -- e.g. marking a mechanic on LEAVE or
+// correcting a missed check-in, rather than only ever reading what the
+// mechanic app itself recorded.
+export const upsertTechnicianAttendance = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const technicianId = String(req.params.id);
+    const date = normalizeDateOnly(String(req.params.date));
+    const { status, note } = req.body;
+
+    if (!status || !Object.values(AttendanceStatus).includes(status)) {
+      res.status(400).json({ error: `status must be one of ${Object.values(AttendanceStatus).join(', ')}` });
+      return;
+    }
+
+    const attendance = await prisma.mechanicAttendance.upsert({
+      where: { technicianId_date: { technicianId, date } },
+      update: { status, note: note ?? undefined },
+      create: { technicianId, date, status, note: note ?? undefined },
+    });
+
+    recordAuditLog({
+      userId: req.user!.userId,
+      action: 'UPDATE_MECHANIC_ATTENDANCE',
+      entity: 'MechanicAttendance',
+      entityId: attendance.id,
+      details: `technician=${technicianId} date=${date.toISOString().slice(0, 10)} status=${status}`,
+      req,
+    });
+
+    res.status(200).json(attendance);
+  } catch (error) {
+    console.error('Error updating technician attendance:', error);
+    res.status(500).json({ error: 'Failed to update attendance' });
+  }
+};
+
+// ============ Admin: mechanic pay profile & salary ============
+
+export const getTechnicianPayProfile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const technicianId = String(req.params.id);
+    const profile = await prisma.mechanicPayProfile.findUnique({ where: { technicianId } });
+    res.status(200).json(profile);
+  } catch (error) {
+    console.error('Error fetching technician pay profile:', error);
+    res.status(500).json({ error: 'Failed to fetch pay profile' });
+  }
+};
+
+// Super-Admin-only (enforced at the route level) -- this is what decides
+// whether a mechanic is paid per-job or by salary, and can set a
+// mechanic-specific commission split.
+export const updateTechnicianPayProfile = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const technicianId = String(req.params.id);
+    const technician = await prisma.serviceTechnician.findUnique({ where: { id: technicianId } });
+    if (!technician) {
+      res.status(404).json({ error: 'Technician not found' });
+      return;
+    }
+
+    const { mechanicType, monthlySalary, joiningDate, employmentStatus, performanceBonus, incentiveRules, commissionPercent, bonusRules } = req.body;
+
+    if (mechanicType && !Object.values(MechanicType).includes(mechanicType)) {
+      res.status(400).json({ error: `mechanicType must be one of ${Object.values(MechanicType).join(', ')}` });
+      return;
+    }
+    if (commissionPercent != null && (isNaN(Number(commissionPercent)) || commissionPercent < 0 || commissionPercent > 100)) {
+      res.status(400).json({ error: 'commissionPercent must be between 0 and 100' });
+      return;
+    }
+
+    const data: any = {
+      ...(mechanicType && { mechanicType }),
+      ...(monthlySalary !== undefined && { monthlySalary: monthlySalary === null ? null : Number(monthlySalary) }),
+      ...(joiningDate !== undefined && { joiningDate: joiningDate ? new Date(joiningDate) : null }),
+      ...(employmentStatus && { employmentStatus }),
+      ...(performanceBonus !== undefined && { performanceBonus: Number(performanceBonus) || 0 }),
+      ...(incentiveRules !== undefined && { incentiveRules }),
+      ...(commissionPercent !== undefined && { commissionPercent: commissionPercent === null ? null : Number(commissionPercent) }),
+      ...(bonusRules !== undefined && { bonusRules }),
+      updatedByUserId: req.user!.userId,
+    };
+
+    const profile = await prisma.mechanicPayProfile.upsert({
+      where: { technicianId },
+      update: data,
+      create: { technicianId, mechanicType: mechanicType || MechanicType.COMMISSION, ...data },
+    });
+
+    recordAuditLog({
+      userId: req.user!.userId,
+      action: 'UPDATE_MECHANIC_PAY_PROFILE',
+      entity: 'MechanicPayProfile',
+      entityId: profile.id,
+      details: JSON.stringify(data),
+      req,
+    });
+
+    res.status(200).json(profile);
+  } catch (error) {
+    console.error('Error updating technician pay profile:', error);
+    res.status(500).json({ error: 'Failed to update pay profile' });
+  }
+};
+
+// Super-Admin-only: initiates an out-of-band salary payout for a SALARY/
+// HYBRID mechanic. Funded independently of walletBalance -- salary is never
+// accrued into the per-job wallet the way COMMISSION/HYBRID job credits are,
+// so this creates the settlement directly rather than decrementing a wallet.
+export const payTechnicianSalary = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const technicianId = String(req.params.id);
+    const technician = await prisma.serviceTechnician.findUnique({ where: { id: technicianId } });
+    if (!technician) {
+      res.status(404).json({ error: 'Technician not found' });
+      return;
+    }
+
+    const profile = await prisma.mechanicPayProfile.findUnique({ where: { technicianId } });
+    if (!profile || profile.mechanicType === MechanicType.COMMISSION) {
+      res.status(400).json({ error: 'This mechanic is not on a SALARY or HYBRID pay model.' });
+      return;
+    }
+
+    const amount = Number(req.body.amount ?? profile.monthlySalary);
+    if (!amount || isNaN(amount) || amount <= 0) {
+      res.status(400).json({ error: "A positive amount is required (defaults to the profile's monthlySalary)." });
+      return;
+    }
+
+    const pendingSalary = await prisma.technicianSettlement.findFirst({
+      where: { technicianId, status: 'PENDING', type: 'SALARY' },
+    });
+    if (pendingSalary) {
+      res.status(400).json({ error: 'A salary payout is already pending for this mechanic.' });
+      return;
+    }
+
+    const settlement = await prisma.technicianSettlement.create({
+      data: { technicianId, amount, status: 'PENDING', type: 'SALARY' },
+    });
+
+    recordAuditLog({
+      userId: req.user!.userId,
+      action: 'PAY_MECHANIC_SALARY',
+      entity: 'TechnicianSettlement',
+      entityId: settlement.id,
+      details: `technician=${technicianId} amount=${amount}`,
+      req,
+    });
+
+    notifyUser(
+      technician.userId,
+      'Salary payout initiated',
+      `A salary payout of ₹${amount.toFixed(2)} has been initiated.`,
+      { settlementId: settlement.id }
+    );
+
+    res.status(201).json(settlement);
+  } catch (error) {
+    console.error('Error paying technician salary:', error);
+    res.status(500).json({ error: 'Failed to initiate salary payout' });
   }
 };

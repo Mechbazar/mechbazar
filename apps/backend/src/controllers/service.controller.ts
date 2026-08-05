@@ -9,6 +9,7 @@ import { haversineKm } from '../utils/geo';
 import { pendingPaymentCreateInput, creditWalletForOnlineRefund } from '../services/payment.service';
 import { broadcastBookingStatus } from '../utils/realtimeBooking';
 import { ASSIGNMENT_RESPONSE_WINDOW_MS } from '../services/jobState';
+import { creditServiceCompletion } from '../services/commission.service';
 
 // Thrown from inside createBooking's $transaction to carry an intended HTTP
 // status (400/404/409) back out, mirroring order.controller.ts's OrderError.
@@ -660,10 +661,9 @@ export const updateMyBookingStatus = async (req: AuthRequest, res: Response) => 
       });
 
       if (status === 'COMPLETED') {
-        await tx.serviceTechnician.update({
-          where: { id: technician.id },
-          data: { walletBalance: { increment: b.finalAmount }, totalJobs: { increment: 1 } },
-        });
+        // Resolves the platform/mechanic commission split instead of paying
+        // the technician the full finalAmount -- see commission.service.ts.
+        await creditServiceCompletion(tx, b, technician.id);
         await generateInvoiceForBooking(tx, b);
       }
 
@@ -1414,10 +1414,10 @@ export const updateAdminBookingStatus = async (req: AuthRequest, res: Response) 
         // without this, a technician who did the job could go unpaid simply
         // because an admin closed the booking administratively instead.
         if (b.technicianId) {
-          await tx.serviceTechnician.update({
-            where: { id: b.technicianId },
-            data: { walletBalance: { increment: b.finalAmount }, totalJobs: { increment: 1 } },
-          });
+          // Resolves the platform/mechanic commission split instead of
+          // paying the technician the full finalAmount -- see
+          // commission.service.ts.
+          await creditServiceCompletion(tx, b, b.technicianId);
         }
         await generateInvoiceForBooking(tx, b);
       }

@@ -155,6 +155,48 @@ enum SettlementStatus {
   FAILED
 }
 
+// Distinguishes a payee-initiated wallet payout (existing requestPayout flow)
+// from an admin/cycle-driven settlement and from a salary payout that isn't
+// funded out of walletBalance at all -- see MechanicPayProfile below.
+enum SettlementType {
+  WALLET_PAYOUT
+  ADMIN_GENERATED
+  SALARY
+}
+
+// Shared by Vendor/ServiceTechnician/DeliveryPartner's settlement cadence and
+// by PlatformCommissionSettings' platform-wide default.
+enum SettlementCycle {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum MechanicType {
+  SALARY
+  COMMISSION
+  HYBRID
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  HALF_DAY
+  LEAVE
+  HOLIDAY
+}
+
+enum CommissionSourceType {
+  PRODUCT_ORDER
+  SERVICE_BOOKING
+}
+
 // Shared by Coupon and Offer.
 enum DiscountType {
   PERCENTAGE
@@ -294,6 +336,10 @@ model Vendor {
   status        VendorStatus @default(PENDING)
   isActive      Boolean      @default(true)
 
+  // Commission & payout config -- see services/commission.service.ts.
+  settlementCycle           SettlementCycle @default(WEEKLY)
+  lastSettlementGeneratedAt DateTime?
+
   // Store address -- previously nonexistent; "location" was written onto the
   // related User's city/state instead (see vendor.controller.ts, which keeps
   // doing that for backward compat). All nullable/additive.
@@ -308,20 +354,22 @@ model Vendor {
   placeId          String?
   formattedAddress String?
 
-  products     Product[]
-  documents    VendorDocument[]
-  bankAccounts VendorBankAccount[]
-  settlements  VendorSettlement[]
+  products           Product[]
+  documents          VendorDocument[]
+  bankAccounts       VendorBankAccount[]
+  settlements        VendorSettlement[]
+  commissionOverride VendorCommission?
+  commissionRecords  CommissionRecord[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 }
 
 model VendorDocument {
-  id       String @id @default(uuid())
-  vendorId String
-  vendor   Vendor @relation(fields: [vendorId], references: [id])
-  type     String // GST, PAN, AADHAAR, SHOP_PHOTO, OWNER_PHOTO, BUSINESS_LICENSE, CANCELLED_CHEQUE
+  id         String                     @id @default(uuid())
+  vendorId   String
+  vendor     Vendor                     @relation(fields: [vendorId], references: [id])
+  type       String // GST, PAN, AADHAAR, SHOP_PHOTO, OWNER_PHOTO, BUSINESS_LICENSE, CANCELLED_CHEQUE
   // Deprecated: the old public Firebase Storage URL. PAN/Aadhaar/GST/
   // business-license/cancelled-cheque are exactly the private KYC content
   // RiderDocument and TechnicianDocument already moved to Postgres-stored
@@ -359,6 +407,7 @@ model VendorSettlement {
   vendor        Vendor           @relation(fields: [vendorId], references: [id])
   amount        Float
   status        SettlementStatus @default(PENDING)
+  type          SettlementType   @default(WALLET_PAYOUT)
   transactionId String?
   date          DateTime         @default(now())
 }
@@ -375,6 +424,10 @@ model DeliveryPartner {
   currentLng    Float?
   expoPushToken String?
   walletBalance Float   @default(0.0)
+
+  // Commission & payout config -- see services/commission.service.ts.
+  settlementCycle           SettlementCycle @default(WEEKLY)
+  lastSettlementGeneratedAt DateTime?
 
   // KYC / registration & verification (app self-registration path; admin
   // quick-created riders default straight to APPROVED, see createRider)
@@ -450,6 +503,7 @@ model RiderSettlement {
   deliveryPartner   DeliveryPartner  @relation(fields: [deliveryPartnerId], references: [id])
   amount            Float
   status            SettlementStatus @default(PENDING)
+  type              SettlementType   @default(WALLET_PAYOUT)
   transactionId     String?
   date              DateTime         @default(now())
 }
@@ -567,16 +621,17 @@ model UserVehicle {
 // =======================
 
 model Category {
-  id          String      @id @default(uuid())
-  name        String
-  image       String?
-  icon        String?     @default("📦")
-  status      String?     @default("Active")
-  vehicleType VehicleType @default(CAR)
-  parentId    String?
-  parent      Category?   @relation("CategoryToCategory", fields: [parentId], references: [id])
-  children    Category[]  @relation("CategoryToCategory")
-  products    Product[]
+  id                 String              @id @default(uuid())
+  name               String
+  image              String?
+  icon               String?             @default("📦")
+  status             String?             @default("Active")
+  vehicleType        VehicleType         @default(CAR)
+  parentId           String?
+  parent             Category?           @relation("CategoryToCategory", fields: [parentId], references: [id])
+  children           Category[]          @relation("CategoryToCategory")
+  products           Product[]
+  commissionOverride CategoryCommission?
 
   @@unique([name, vehicleType])
 }
@@ -630,13 +685,14 @@ model Product {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  compatibilities ProductCompatibility[]
-  orderItems      OrderItem[]
-  reviews         Review[]
-  wishlists       Wishlist[]
-  inventories     Inventory[]
-  stockTransfers  StockTransfer[]
-  poItems         PurchaseOrderItem[]
+  compatibilities    ProductCompatibility[]
+  orderItems         OrderItem[]
+  reviews            Review[]
+  wishlists          Wishlist[]
+  inventories        Inventory[]
+  stockTransfers     StockTransfer[]
+  poItems            PurchaseOrderItem[]
+  commissionOverride ProductCommission?
 
   @@index([vendorId])
   @@index([categoryId])
@@ -689,11 +745,20 @@ model Order {
   deliveryOtp            String?
   deliveryOtpGeneratedAt DateTime?
 
+  // Exact amount credited to the assigned rider's wallet when this order was
+  // marked DELIVERED, computed from PlatformCommissionSettings' rider payout
+  // formula (see commission.service.ts's resolveRiderPayout). Persisted
+  // (not re-derived) so a later RETURNED reversal can claw back precisely
+  // what was paid, even though inputs like rainModeActive can change between
+  // delivery and reversal.
+  riderPayoutAmount Float?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items   OrderItem[]
-  payment Payment?
+  items             OrderItem[]
+  payment           Payment?
+  commissionRecords CommissionRecord[]
 
   @@index([status])
   @@index([userId])
@@ -709,6 +774,14 @@ model OrderItem {
   product   Product @relation(fields: [productId], references: [id])
   quantity  Int
   price     Float
+
+  // Resolved commission %/amount for this line, snapshotted at order-creation
+  // time (same philosophy as `price` above) via
+  // services/commission.service.ts's resolveProductCommissionPercent(), so a
+  // later rate change never retroactively alters an already-placed order.
+  // Null on orders placed before this system existed.
+  commissionPercent Float?
+  commissionAmount  Float?
 
   @@index([productId])
   @@index([orderId])
@@ -1097,6 +1170,10 @@ model ServiceTechnician {
   rating          Float         @default(0)
   totalJobs       Int           @default(0)
 
+  // Commission & payout config -- see services/commission.service.ts.
+  settlementCycle           SettlementCycle @default(WEEKLY)
+  lastSettlementGeneratedAt DateTime?
+
   // KYC / registration & verification -- mirrors DeliveryPartner exactly.
   status                TechnicianStatus @default(PENDING)
   addressLine           String?
@@ -1123,13 +1200,16 @@ model ServiceTechnician {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  bookings       ServiceBooking[]
-  documents      TechnicianDocument[]
-  bankAccounts   TechnicianBankAccount[]
-  settlements    TechnicianSettlement[]
-  reviews        ServiceReview[]
-  dispatchOffers JobDispatchOffer[]
-  locationPings  JobLocationPing[]
+  bookings          ServiceBooking[]
+  documents         TechnicianDocument[]
+  bankAccounts      TechnicianBankAccount[]
+  settlements       TechnicianSettlement[]
+  reviews           ServiceReview[]
+  dispatchOffers    JobDispatchOffer[]
+  locationPings     JobLocationPing[]
+  payProfile        MechanicPayProfile?
+  attendance        MechanicAttendance[]
+  commissionRecords CommissionRecord[]
 
   // Hot path: the dispatch candidate query filters on exactly these columns.
   @@index([isOnline, isActive, status])
@@ -1168,6 +1248,7 @@ model TechnicianSettlement {
   technician    ServiceTechnician @relation(fields: [technicianId], references: [id])
   amount        Float
   status        SettlementStatus  @default(PENDING)
+  type          SettlementType    @default(WALLET_PAYOUT)
   transactionId String?
   date          DateTime          @default(now())
 }
@@ -1185,8 +1266,9 @@ model ServiceCategory {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  packages ServicePackage[]
-  bookings ServiceBooking[]
+  packages           ServicePackage[]
+  bookings           ServiceBooking[]
+  commissionOverride ServiceCategoryCommission?
 
   @@unique([name, vehicleType])
 }
@@ -1211,7 +1293,8 @@ model ServicePackage {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
-  bookings ServiceBooking[]
+  bookings           ServiceBooking[]
+  commissionOverride ServicePackageCommission?
 }
 
 model TimeSlot {
@@ -1358,16 +1441,17 @@ model ServiceBooking {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  images         ServiceImage[]
-  statusHistory  BookingStatusHistory[]
-  messages       ServiceChatMessage[]
-  payment        Payment?
-  review         ServiceReview?
-  invoice        ServiceInvoice?
-  dispatchOffers JobDispatchOffer[]
-  locationPings  JobLocationPing[]
-  otps           JobOtp[]
-  callSessions   CallSession[]
+  images            ServiceImage[]
+  statusHistory     BookingStatusHistory[]
+  messages          ServiceChatMessage[]
+  payment           Payment?
+  review            ServiceReview?
+  invoice           ServiceInvoice?
+  dispatchOffers    JobDispatchOffer[]
+  locationPings     JobLocationPing[]
+  otps              JobOtp[]
+  callSessions      CallSession[]
+  commissionRecords CommissionRecord[]
 
   @@index([userId])
   @@index([technicianId])
@@ -1592,4 +1676,202 @@ model ServiceInvoice {
   totalAmount    Float
   pdfUrl         String?
   createdAt      DateTime       @default(now())
+}
+
+// =======================
+// COMMISSION & PAYOUT SYSTEM
+// =======================
+
+// Singleton row (id is always "GLOBAL") holding every platform-wide default
+// the resolver chain in services/commission.service.ts falls back to once no
+// more specific override exists. Admin-editable via the Commission & Payout
+// Settings page -- nothing here is ever hardcoded in application code.
+model PlatformCommissionSettings {
+  id                          String @id @default("GLOBAL")
+  defaultProductCommissionPct Float  @default(10)
+  defaultServiceCommissionPct Float  @default(20)
+  // Flat assumed payment-gateway fee %, applied to RAZORPAY-paid amounts only
+  // when generating a vendor settlement -- see settlement.service.ts.
+  gatewayFeePercent           Float  @default(0)
+
+  riderBasePickupFee        Float   @default(0)
+  riderPerKmRate            Float   @default(0)
+  riderWaitingChargePerMin  Float   @default(0)
+  riderNightBonus           Float   @default(0)
+  riderRainBonus            Float   @default(0)
+  // Admin-toggled -- no weather API integration exists, so "is it raining" is
+  // a manual switch an ops admin flips during a rain event. While true, every
+  // rider delivery credited via creditOrderDelivery gets riderRainBonus added.
+  rainModeActive            Boolean @default(false)
+  riderWeeklyIncentive      Float   @default(0)
+  riderMonthlyIncentive     Float   @default(0)
+  // Job-count threshold a rider must cross in the period to earn the
+  // corresponding incentive -- see admin.controller.ts's runRiderIncentives.
+  riderWeeklyIncentiveJobs  Int     @default(0)
+  riderMonthlyIncentiveJobs Int     @default(0)
+
+  defaultSettlementCycle SettlementCycle @default(WEEKLY)
+
+  updatedByUserId String?
+  updatedAt       DateTime @updatedAt
+}
+
+// Shared shape (also CategoryCommission / ServiceCategoryCommission /
+// ProductCommission / ServicePackageCommission below): a zero-or-one override
+// per entity, enforced by the unique FK rather than by application code
+// having to prevent duplicate rows. validFrom/validTo are optional -- unset
+// means "always effective while isActive" -- so a promotional or seasonal
+// rate can be scheduled without a dedicated campaign UI; the resolver filters
+// on this window.
+model VendorCommission {
+  id                String    @id @default(uuid())
+  vendorId          String    @unique
+  vendor            Vendor    @relation(fields: [vendorId], references: [id])
+  commissionPercent Float
+  isActive          Boolean   @default(true)
+  validFrom         DateTime?
+  validTo           DateTime?
+  updatedByUserId   String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model CategoryCommission {
+  id                String    @id @default(uuid())
+  categoryId        String    @unique
+  category          Category  @relation(fields: [categoryId], references: [id])
+  commissionPercent Float
+  isActive          Boolean   @default(true)
+  validFrom         DateTime?
+  validTo           DateTime?
+  updatedByUserId   String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model ServiceCategoryCommission {
+  id                String          @id @default(uuid())
+  categoryId        String          @unique
+  category          ServiceCategory @relation(fields: [categoryId], references: [id])
+  commissionPercent Float
+  isActive          Boolean         @default(true)
+  validFrom         DateTime?
+  validTo           DateTime?
+  updatedByUserId   String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+model ProductCommission {
+  id                String    @id @default(uuid())
+  productId         String    @unique
+  product           Product   @relation(fields: [productId], references: [id])
+  commissionPercent Float
+  isActive          Boolean   @default(true)
+  validFrom         DateTime?
+  validTo           DateTime?
+  updatedByUserId   String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model ServicePackageCommission {
+  id                String         @id @default(uuid())
+  packageId         String         @unique
+  package           ServicePackage @relation(fields: [packageId], references: [id])
+  commissionPercent Float
+  isActive          Boolean        @default(true)
+  validFrom         DateTime?
+  validTo           DateTime?
+  updatedByUserId   String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+// Per-mechanic pay model. mechanicType drives resolveMechanicPayout() in
+// commission.service.ts: SALARY mechanics are credited nothing per job (paid
+// out-of-band via a SALARY-type TechnicianSettlement instead); COMMISSION and
+// HYBRID mechanics are credited their own commissionPercent share of each
+// completed job's finalAmount (falling through to the resolved platform
+// service commission % when commissionPercent is null); HYBRID mechanics
+// additionally accrue monthlySalary, paid the same way as SALARY mechanics.
+model MechanicPayProfile {
+  id           String            @id @default(uuid())
+  technicianId String            @unique
+  technician   ServiceTechnician @relation(fields: [technicianId], references: [id])
+  mechanicType MechanicType      @default(COMMISSION)
+
+  // Salary / Hybrid fields. Left null for a pure COMMISSION mechanic.
+  monthlySalary    Float?
+  joiningDate      DateTime?
+  employmentStatus EmploymentStatus @default(ACTIVE)
+  performanceBonus Float            @default(0)
+  // Free-form admin-defined incentive rules, e.g.
+  // [{ "metric": "jobsCompleted", "threshold": 20, "bonus": 500 }]
+  incentiveRules   Json?
+
+  // Commission / Hybrid fields. Null means "fall through to the resolved
+  // platform service commission %" -- see resolveMechanicPayout().
+  commissionPercent Float?
+  bonusRules        Json?
+
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// One row per (mechanic, calendar day). date is normalized to midnight, same
+// convention as ServiceBooking/TimeSlot's day-only scheduling.
+model MechanicAttendance {
+  id           String            @id @default(uuid())
+  technicianId String
+  technician   ServiceTechnician @relation(fields: [technicianId], references: [id])
+  date         DateTime
+  status       AttendanceStatus  @default(PRESENT)
+  checkInAt    DateTime?
+  checkOutAt   DateTime?
+  note         String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@unique([technicianId, date])
+  @@index([technicianId, date])
+}
+
+// One row per commission-bearing event (a product order item credited at
+// delivery, or a service booking credited at completion). Backs every
+// Commission Report query without re-deriving historical rates from
+// Order/OrderItem/ServiceBooking joins, which would drift the moment a rate
+// changes after the fact.
+model CommissionRecord {
+  id         String               @id @default(uuid())
+  sourceType CommissionSourceType
+
+  orderId          String?
+  order            Order?          @relation(fields: [orderId], references: [id])
+  orderItemId      String?
+  serviceBookingId String?
+  serviceBooking   ServiceBooking? @relation(fields: [serviceBookingId], references: [id])
+
+  vendorId     String?
+  vendor       Vendor?            @relation(fields: [vendorId], references: [id])
+  technicianId String?
+  technician   ServiceTechnician? @relation(fields: [technicianId], references: [id])
+
+  grossAmount       Float
+  commissionPercent Float
+  commissionAmount  Float
+  netPayoutAmount   Float
+  // Set on a negative-amount row that reverses an earlier credit -- written
+  // when a DELIVERED order is later marked RETURNED. Positive rows never
+  // carry this.
+  reversalOfId      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([vendorId, createdAt])
+  @@index([technicianId, createdAt])
+  @@index([sourceType, createdAt])
+  @@index([orderId])
+  @@index([serviceBookingId])
 }

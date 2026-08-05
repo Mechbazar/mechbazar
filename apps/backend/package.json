@@ -15,6 +15,7 @@
     "seed:vehicle": "tsx prisma/seed-vehicle-data.ts",
     "seed:services": "tsx prisma/seed-doorstep-services.ts",
     "seed:admin": "tsx prisma/seed-admin.ts",
+    "seed:commission": "tsx prisma/seed-commission-settings.ts",
     "backfill:firebase-users": "tsx prisma/backfill-firebase-users.ts"
   },
   "keywords": [],

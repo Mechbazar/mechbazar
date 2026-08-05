@@ -7,9 +7,9 @@ import { motion } from 'framer-motion';
 import type { RootState } from '../store';
 import {
   Search, Phone, CheckCircle, XCircle, Plus, FileText, Landmark, Eye, FileCheck, MapPin, Star,
-  PauseCircle, PlayCircle, Trash2, ClipboardList, Wallet,
+  PauseCircle, PlayCircle, Trash2, ClipboardList, Wallet, Percent, CalendarDays, Banknote,
 } from 'lucide-react';
-import { Button, Card, Badge, Modal, Input, Checkbox, Loader, StatCard, EmptyState, Icon3D } from '../components/ui';
+import { Button, Card, Badge, Modal, Input, Select, Checkbox, Loader, StatCard, EmptyState, Icon3D } from '../components/ui';
 import { API_URL } from '../config/api';
 import AddressMapPicker from '../components/maps/AddressMapPicker';
 import PlaceAutocompleteField from '../components/maps/PlaceAutocompleteField';
@@ -84,6 +84,19 @@ export default function MechanicsPage() {
   const [earningsModalTechnician, setEarningsModalTechnician] = useState<any>(null);
   const [earnings, setEarnings] = useState<any>(null);
   const [earningsLoading, setEarningsLoading] = useState(false);
+
+  const [payProfileModalTechnician, setPayProfileModalTechnician] = useState<any>(null);
+  const [payProfile, setPayProfile] = useState({
+    mechanicType: 'COMMISSION' as 'SALARY' | 'COMMISSION' | 'HYBRID',
+    monthlySalary: '', commissionPercent: '', employmentStatus: 'ACTIVE', performanceBonus: '',
+  });
+  const [payProfileLoading, setPayProfileLoading] = useState(false);
+  const [payProfileSaving, setPayProfileSaving] = useState(false);
+  const [paySalaryBusy, setPaySalaryBusy] = useState(false);
+
+  const [attendanceModalTechnician, setAttendanceModalTechnician] = useState<any>(null);
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -351,6 +364,81 @@ export default function MechanicsPage() {
     }
   };
 
+  const openPayProfileModal = async (technician: any) => {
+    setPayProfileModalTechnician(technician);
+    setPayProfileLoading(true);
+    try {
+      const res = await axios.get(`${API_URL}/technicians/${technician.technicianProfile.id}/pay-profile`, { headers: { Authorization: `Bearer ${token}` } });
+      const p = res.data;
+      setPayProfile({
+        mechanicType: p?.mechanicType || 'COMMISSION',
+        monthlySalary: p?.monthlySalary != null ? String(p.monthlySalary) : '',
+        commissionPercent: p?.commissionPercent != null ? String(p.commissionPercent) : '',
+        employmentStatus: p?.employmentStatus || 'ACTIVE',
+        performanceBonus: p?.performanceBonus != null ? String(p.performanceBonus) : '',
+      });
+    } catch (error) {
+      console.error('Failed to fetch pay profile', error);
+    } finally {
+      setPayProfileLoading(false);
+    }
+  };
+
+  const handleSavePayProfile = async () => {
+    if (!payProfileModalTechnician) return;
+    setPayProfileSaving(true);
+    try {
+      await axios.put(
+        `${API_URL}/technicians/${payProfileModalTechnician.technicianProfile.id}/pay-profile`,
+        {
+          mechanicType: payProfile.mechanicType,
+          monthlySalary: payProfile.monthlySalary === '' ? null : Number(payProfile.monthlySalary),
+          commissionPercent: payProfile.commissionPercent === '' ? null : Number(payProfile.commissionPercent),
+          employmentStatus: payProfile.employmentStatus,
+          performanceBonus: payProfile.performanceBonus === '' ? 0 : Number(payProfile.performanceBonus),
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success('Pay profile saved');
+      setPayProfileModalTechnician(null);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to save pay profile. Only Super Admins can edit this.');
+    } finally {
+      setPayProfileSaving(false);
+    }
+  };
+
+  const handlePaySalary = async () => {
+    if (!payProfileModalTechnician) return;
+    if (!confirm(`Initiate a salary payout of ₹${payProfile.monthlySalary || '(profile default)'} for ${payProfileModalTechnician.name}?`)) return;
+    setPaySalaryBusy(true);
+    try {
+      await axios.post(
+        `${API_URL}/technicians/${payProfileModalTechnician.technicianProfile.id}/pay-salary`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success('Salary payout initiated -- process it from the Payouts page.');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Failed to initiate salary payout');
+    } finally {
+      setPaySalaryBusy(false);
+    }
+  };
+
+  const openAttendanceModal = async (technician: any) => {
+    setAttendanceModalTechnician(technician);
+    setAttendanceLoading(true);
+    try {
+      const res = await axios.get(`${API_URL}/technicians/${technician.technicianProfile.id}/attendance`, { headers: { Authorization: `Bearer ${token}` } });
+      setAttendanceRecords(res.data);
+    } catch (error) {
+      console.error('Failed to fetch attendance', error);
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
+
   const statCards = [
     { key: 'ALL' as const, label: 'Total', value: stats.total, icon: 'mechanics' as const, gradient: 'red' as const },
     { key: 'ONLINE' as const, label: 'Online', value: stats.online, icon: 'check' as const, gradient: 'green' as const },
@@ -473,6 +561,12 @@ export default function MechanicsPage() {
                 </button>
                 <button onClick={() => openEarningsModal(technician)} className="flex items-center justify-center gap-1 text-xs font-bold text-content-primary hover:text-brand-primary border border-border-default rounded-xl py-2">
                   <Wallet className="w-3.5 h-3.5" /> Earnings
+                </button>
+                <button onClick={() => openPayProfileModal(technician)} className="flex items-center justify-center gap-1 text-xs font-bold text-content-primary hover:text-brand-primary border border-border-default rounded-xl py-2">
+                  <Percent className="w-3.5 h-3.5" /> Pay Profile
+                </button>
+                <button onClick={() => openAttendanceModal(technician)} className="flex items-center justify-center gap-1 text-xs font-bold text-content-primary hover:text-brand-primary border border-border-default rounded-xl py-2">
+                  <CalendarDays className="w-3.5 h-3.5" /> Attendance
                 </button>
                 {technician.technicianProfile?.status === 'SUSPENDED' ? (
                   <button onClick={() => handleActivate(technician)} className="flex items-center justify-center gap-1 text-xs font-bold text-success-600 dark:text-success-400 hover:text-success-500 border border-border-default rounded-xl py-2">
@@ -633,6 +727,81 @@ export default function MechanicsPage() {
             <div className="flex justify-between bg-surface-sunken p-3 rounded-xl border border-border-default"><span className="text-content-muted text-sm">Wallet Balance</span><span className="font-bold text-content-primary">₹{earnings.walletBalance}</span></div>
             <div className="flex justify-between bg-surface-sunken p-3 rounded-xl border border-border-default"><span className="text-content-muted text-sm">Total Earned</span><span className="font-bold text-content-primary">₹{earnings.totalEarned}</span></div>
             <div className="flex justify-between bg-surface-sunken p-3 rounded-xl border border-border-default"><span className="text-content-muted text-sm">Today's Earnings</span><span className="font-bold text-content-primary">₹{earnings.todayEarned}</span></div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={!!payProfileModalTechnician}
+        onClose={() => setPayProfileModalTechnician(null)}
+        title={`Pay Profile — ${payProfileModalTechnician?.name || ''}`}
+        footer={
+          <>
+            {(payProfile.mechanicType === 'SALARY' || payProfile.mechanicType === 'HYBRID') && (
+              <Button variant="secondary" icon={<Banknote size={15} />} isLoading={paySalaryBusy} onClick={handlePaySalary}>
+                Pay Salary Now
+              </Button>
+            )}
+            <Button isLoading={payProfileSaving} onClick={handleSavePayProfile}>Save</Button>
+          </>
+        }
+      >
+        {payProfileLoading ? <Loader /> : (
+          <div className="space-y-4">
+            <Select label="Pay Model" value={payProfile.mechanicType} onChange={(e) => setPayProfile({ ...payProfile, mechanicType: e.target.value as any })}>
+              <option value="COMMISSION">Commission</option>
+              <option value="SALARY">Salary</option>
+              <option value="HYBRID">Hybrid (Salary + Commission)</option>
+            </Select>
+
+            {(payProfile.mechanicType === 'SALARY' || payProfile.mechanicType === 'HYBRID') && (
+              <Input label="Monthly Salary (₹)" type="number" min={0} value={payProfile.monthlySalary}
+                onChange={(e) => setPayProfile({ ...payProfile, monthlySalary: e.target.value })} />
+            )}
+
+            {(payProfile.mechanicType === 'COMMISSION' || payProfile.mechanicType === 'HYBRID') && (
+              <Input label="Commission % (this mechanic's own cut)" type="number" min={0} max={100} value={payProfile.commissionPercent}
+                onChange={(e) => setPayProfile({ ...payProfile, commissionPercent: e.target.value })}
+                helperText="Leave blank to use the platform's resolved service commission rate." />
+            )}
+
+            {payProfile.mechanicType === 'HYBRID' && (
+              <Input label="Performance Bonus (₹)" type="number" min={0} value={payProfile.performanceBonus}
+                onChange={(e) => setPayProfile({ ...payProfile, performanceBonus: e.target.value })} />
+            )}
+
+            <Select label="Employment Status" value={payProfile.employmentStatus} onChange={(e) => setPayProfile({ ...payProfile, employmentStatus: e.target.value })}>
+              <option value="ACTIVE">Active</option>
+              <option value="ON_LEAVE">On Leave</option>
+              <option value="TERMINATED">Terminated</option>
+            </Select>
+
+            {payProfile.mechanicType === 'SALARY' && (
+              <p className="text-xs text-content-muted bg-surface-sunken border border-border-default rounded-xl p-3">
+                Salary mechanics don't receive a per-job wallet credit -- the full job amount goes to platform revenue, and they're paid separately via "Pay Salary Now".
+              </p>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={!!attendanceModalTechnician} onClose={() => setAttendanceModalTechnician(null)} title={`Attendance — ${attendanceModalTechnician?.name || ''}`}>
+        {attendanceLoading ? <Loader /> : attendanceRecords.length === 0 ? (
+          <EmptyState icon="mechanics" title="No attendance recorded yet" description="Records appear once the mechanic checks in from their app, or an admin backfills a day." />
+        ) : (
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {attendanceRecords.map((r) => (
+              <div key={r.id} className="flex justify-between items-center bg-surface-sunken p-3 rounded-xl border border-border-default">
+                <div>
+                  <p className="font-medium text-content-primary text-sm">{new Date(r.date).toLocaleDateString()}</p>
+                  <p className="text-xs text-content-muted">
+                    {r.checkInAt ? `In: ${new Date(r.checkInAt).toLocaleTimeString()}` : 'No check-in'}
+                    {r.checkOutAt ? ` · Out: ${new Date(r.checkOutAt).toLocaleTimeString()}` : ''}
+                  </p>
+                </div>
+                <Badge variant={r.status === 'PRESENT' ? 'success' : r.status === 'ABSENT' ? 'danger' : 'warning'}>{r.status.replace('_', ' ')}</Badge>
+              </div>
+            ))}
           </div>
         )}
       </Modal>

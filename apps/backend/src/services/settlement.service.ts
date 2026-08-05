@@ -1,6 +1,7 @@
-import { SettlementStatus } from '@prisma/client';
+import { SettlementStatus, SettlementCycle } from '@prisma/client';
 import prisma from '../config/prisma';
 import { notifyUser } from '../utils/notify';
+import { getPlatformCommissionSettings, round2 } from './commission.service';
 
 // VendorSettlement, RiderSettlement, and TechnicianSettlement are three
 // otherwise-unrelated payout ledgers (different owning entity, different
@@ -88,4 +89,140 @@ export async function transitionSettlement<T extends SettlementRow>(
     .catch((error) => console.error('transitionSettlement: failed to resolve owner for notification:', error));
 
   return updated;
+}
+
+// =======================
+// Scheduled (admin-cycle-driven) settlement generation
+// =======================
+//
+// Existing requestPayout (vendor/rider/technician-initiated) is untouched --
+// this is the complementary admin-driven path: each payee has a
+// settlementCycle (DAILY/WEEKLY/MONTHLY, default from
+// PlatformCommissionSettings.defaultSettlementCycle) and once that long has
+// passed since their last generated settlement, a PENDING settlement is
+// auto-created for their current wallet balance. Called from the sweeper
+// (jobs/sweeper.ts) on the same "fire regularly, tolerate a missed tick"
+// pattern as its other maintenance sweeps -- a late settlement is a delay,
+// never a correctness problem, so an hourly cadence is more than enough.
+
+const CYCLE_MS: Record<SettlementCycle, number> = {
+  DAILY: 24 * 60 * 60 * 1000,
+  WEEKLY: 7 * 24 * 60 * 60 * 1000,
+  MONTHLY: 30 * 24 * 60 * 60 * 1000,
+};
+
+function isCycleDue(lastGeneratedAt: Date | null, createdAt: Date, cycle: SettlementCycle, now: Date): boolean {
+  const windowStart = lastGeneratedAt ?? createdAt;
+  return now.getTime() - windowStart.getTime() >= CYCLE_MS[cycle];
+}
+
+// Sums the RAZORPAY-paid portion of a payee's net earnings since `sinceDate`
+// (via the CommissionRecord ledger, joined back to the order/booking's own
+// Payment row) and applies gatewayFeePercent to just that portion -- COD
+// orders carry no gateway fee. Returns 0 immediately when the rate is 0 (the
+// common case today: Razorpay exists in code but is unconfigured/inert in
+// production, so this stays a no-op query until it's actually turned on).
+async function computeGatewayFee(
+  entity: { vendorId: string } | { technicianId: string },
+  sinceDate: Date,
+  gatewayFeePercent: number
+): Promise<number> {
+  if (gatewayFeePercent <= 0) return 0;
+
+  const records =
+    'vendorId' in entity
+      ? await prisma.commissionRecord.findMany({
+          where: { vendorId: entity.vendorId, sourceType: 'PRODUCT_ORDER', createdAt: { gte: sinceDate }, netPayoutAmount: { gt: 0 } },
+          select: { netPayoutAmount: true, order: { select: { payment: { select: { method: true, status: true } } } } },
+        })
+      : await prisma.commissionRecord.findMany({
+          where: { technicianId: entity.technicianId, sourceType: 'SERVICE_BOOKING', createdAt: { gte: sinceDate }, netPayoutAmount: { gt: 0 } },
+          select: { netPayoutAmount: true, serviceBooking: { select: { payment: { select: { method: true, status: true } } } } },
+        });
+
+  const razorpayNet = records.reduce((sum, r: any) => {
+    const payment = r.order?.payment ?? r.serviceBooking?.payment;
+    return payment?.method === 'RAZORPAY' && payment?.status === 'SUCCESS' ? sum + r.netPayoutAmount : sum;
+  }, 0);
+
+  return round2((razorpayNet * gatewayFeePercent) / 100);
+}
+
+export type SettlementGenerationSummary = { vendors: number; riders: number; technicians: number };
+
+export async function generateScheduledSettlements(): Promise<SettlementGenerationSummary> {
+  const settings = await getPlatformCommissionSettings();
+  const now = new Date();
+  const summary: SettlementGenerationSummary = { vendors: 0, riders: 0, technicians: 0 };
+
+  const dueVendors = await prisma.vendor.findMany({
+    where: { walletBalance: { gt: 0 }, settlements: { none: { status: 'PENDING' } } },
+    select: { id: true, walletBalance: true, settlementCycle: true, lastSettlementGeneratedAt: true, createdAt: true },
+  });
+  for (const vendor of dueVendors) {
+    if (!isCycleDue(vendor.lastSettlementGeneratedAt, vendor.createdAt, vendor.settlementCycle, now)) continue;
+    const windowStart = vendor.lastSettlementGeneratedAt ?? vendor.createdAt;
+
+    const created = await prisma.$transaction(async (tx) => {
+      const claim = await tx.vendor.updateMany({
+        where: { id: vendor.id, walletBalance: { gte: vendor.walletBalance } },
+        data: { walletBalance: { decrement: vendor.walletBalance }, lastSettlementGeneratedAt: now },
+      });
+      if (claim.count === 0) return false;
+      const gatewayFee = await computeGatewayFee({ vendorId: vendor.id }, windowStart, settings.gatewayFeePercent);
+      const amount = round2(Math.max(0, vendor.walletBalance - gatewayFee));
+      if (amount > 0) {
+        await tx.vendorSettlement.create({ data: { vendorId: vendor.id, amount, status: 'PENDING', type: 'ADMIN_GENERATED' } });
+      }
+      return true;
+    });
+    if (created) summary.vendors++;
+  }
+
+  const dueRiders = await prisma.deliveryPartner.findMany({
+    where: { walletBalance: { gt: 0 }, settlements: { none: { status: 'PENDING' } } },
+    select: { id: true, walletBalance: true, settlementCycle: true, lastSettlementGeneratedAt: true, createdAt: true },
+  });
+  for (const rider of dueRiders) {
+    if (!isCycleDue(rider.lastSettlementGeneratedAt, rider.createdAt, rider.settlementCycle, now)) continue;
+
+    const created = await prisma.$transaction(async (tx) => {
+      const claim = await tx.deliveryPartner.updateMany({
+        where: { id: rider.id, walletBalance: { gte: rider.walletBalance } },
+        data: { walletBalance: { decrement: rider.walletBalance }, lastSettlementGeneratedAt: now },
+      });
+      if (claim.count === 0) return false;
+      // No gateway-fee concept for rider payouts -- there is no commission
+      // split on delivery fees, only on product/service sale amounts.
+      await tx.riderSettlement.create({ data: { deliveryPartnerId: rider.id, amount: rider.walletBalance, status: 'PENDING', type: 'ADMIN_GENERATED' } });
+      return true;
+    });
+    if (created) summary.riders++;
+  }
+
+  const dueTechnicians = await prisma.serviceTechnician.findMany({
+    where: { walletBalance: { gt: 0 }, settlements: { none: { status: 'PENDING' } } },
+    select: { id: true, walletBalance: true, settlementCycle: true, lastSettlementGeneratedAt: true, createdAt: true },
+  });
+  for (const tech of dueTechnicians) {
+    if (!isCycleDue(tech.lastSettlementGeneratedAt, tech.createdAt, tech.settlementCycle, now)) continue;
+    const windowStart = tech.lastSettlementGeneratedAt ?? tech.createdAt;
+
+    const created = await prisma.$transaction(async (tx) => {
+      const claim = await tx.serviceTechnician.updateMany({
+        where: { id: tech.id, walletBalance: { gte: tech.walletBalance } },
+        data: { walletBalance: { decrement: tech.walletBalance }, lastSettlementGeneratedAt: now },
+      });
+      if (claim.count === 0) return false;
+      const gatewayFee = await computeGatewayFee({ technicianId: tech.id }, windowStart, settings.gatewayFeePercent);
+      const amount = round2(Math.max(0, tech.walletBalance - gatewayFee));
+      if (amount > 0) {
+        await tx.technicianSettlement.create({ data: { technicianId: tech.id, amount, status: 'PENDING', type: 'ADMIN_GENERATED' } });
+      }
+      return true;
+    });
+    if (created) summary.technicians++;
+  }
+
+  return summary;
 }

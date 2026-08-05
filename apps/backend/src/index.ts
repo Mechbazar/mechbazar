@@ -16,6 +16,7 @@ import vehicleRoutes from './routes/vehicle.routes';
 import categoryRoutes from './routes/category.routes';
 import warehouseRoutes from './routes/warehouse.routes';
 import adminRoutes from './routes/admin.routes';
+import commissionRoutes from './routes/commission.routes';
 import inventoryRoutes from './routes/inventory.routes';
 import supplierRoutes from './routes/supplier.routes';
 import poRoutes from './routes/po.routes';
@@ -158,6 +159,7 @@ if (env.NODE_ENV !== 'production') {
 app.use('/api/vendors', vendorRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/admin/commission', commissionRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);

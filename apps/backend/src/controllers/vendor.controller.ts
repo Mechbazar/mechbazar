@@ -4,7 +4,7 @@ import { transitionSettlement, SettlementAlreadyFinalisedError, SettlementChange
 import bcrypt from 'bcrypt';
 import { generateToken } from '../utils/jwt';
 import { AuthRequest } from '../middlewares/auth';
-import { restoreOrderStock, creditOrderDelivery, notifyWalletCredits } from './order.controller';
+import { restoreOrderStock, creditOrderDelivery, reverseOrderDeliveryCredit, notifyWalletCredits, notifyWalletDebits } from './order.controller';
 import { notifyUser, notifyAdmins } from '../utils/notify';
 import { sanitizeUser, sanitizeUsers, sanitizeOrders, stripDeliveryOtp, stripDeliveryOtps } from '../utils/sanitizeUser';
 import { recordAuditLog } from '../utils/auditLog';
@@ -721,8 +721,9 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       include: {
         items: {
           where: { product: { vendorId: vendor.id } },
-          include: { product: true }
-        }
+          include: { product: { include: { vendor: true } } }
+        },
+        address: true,
       }
     });
 
@@ -749,8 +750,11 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
 
     const isBeingClosed = status === OrderStatus.CANCELLED || status === OrderStatus.RETURNED;
     const isBeingDelivered = status === OrderStatus.DELIVERED && order.status !== OrderStatus.DELIVERED;
+    // A delivered order was already credited by creditOrderDelivery -- moving
+    // it to RETURNED must claw that back, not just restore stock.
+    const isReturnAfterDelivery = status === OrderStatus.RETURNED && order.status === OrderStatus.DELIVERED;
 
-    const { updatedOrder, credits } = await prisma.$transaction(async (tx) => {
+    const { updatedOrder, credits, debits } = await prisma.$transaction(async (tx) => {
       // Atomically claim the transition -- only matches if the order's status
       // is still what we just read, re-checked under Postgres's row lock at
       // UPDATE time. Closes the race where a concurrent admin/vendor status
@@ -777,8 +781,9 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       // this vendor's own products, so this only ever credits this vendor's
       // own share (plus the assigned rider, if any).
       const credits = isBeingDelivered ? await creditOrderDelivery(tx, order) : [];
+      const debits = isReturnAfterDelivery ? await reverseOrderDeliveryCredit(tx, order) : [];
 
-      return { updatedOrder: await tx.order.findUniqueOrThrow({ where: { id } }), credits };
+      return { updatedOrder: await tx.order.findUniqueOrThrow({ where: { id } }), credits, debits };
     });
 
     notifyUser(
@@ -788,6 +793,7 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
       { orderId: id, status: updatedOrder.status }
     );
     notifyWalletCredits(credits);
+    notifyWalletDebits(debits);
 
     res.status(200).json(stripDeliveryOtp(updatedOrder));
   } catch (error: any) {
@@ -1257,6 +1263,12 @@ export const deleteVendor = async (req: Request, res: Response): Promise<void> =
       prisma.vendorDocument.deleteMany({ where: { vendorId: id } }),
       prisma.vendorBankAccount.deleteMany({ where: { vendorId: id } }),
       prisma.vendorSettlement.deleteMany({ where: { vendorId: id } }),
+      // Commission & payout system tables -- same FK-cleanup requirement as
+      // everything else above (no onDelete cascade in the schema). The
+      // soldCount guard above means commissionRecord rows shouldn't exist,
+      // but a commission override can be set on a vendor with zero sales.
+      prisma.vendorCommission.deleteMany({ where: { vendorId: id } }),
+      prisma.commissionRecord.deleteMany({ where: { vendorId: id } }),
       prisma.vendor.delete({ where: { id } }),
       prisma.notification.deleteMany({ where: { userId: vendor.userId } }),
       prisma.address.deleteMany({ where: { userId: vendor.userId } }),

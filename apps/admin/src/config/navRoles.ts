@@ -30,4 +30,9 @@ export const NAV_ROLES: Record<string, string[]> = {
   '/payouts': ['ADMIN', 'SUPER_ADMIN', 'VENDOR_MANAGER', 'OPERATIONS_MANAGER'],
   '/reports': ['SUPER_ADMIN', 'ADMIN'],
   '/audit-logs': ['SUPER_ADMIN', 'ADMIN'],
+  // Commission settings mutations are Super-Admin-only server-side (see
+  // apps/backend/src/routes/commission.routes.ts) -- the nav item itself is
+  // restricted the same way so a lower-privilege admin isn't shown a page
+  // that immediately 403s on every save.
+  '/commission-settings': ['SUPER_ADMIN'],
 };

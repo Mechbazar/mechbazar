@@ -165,6 +165,21 @@ export const technicianService = {
     return response.data;
   },
 
+  // Attendance -- backs the commission & payout system's mechanic
+  // attendance log (Salary/Hybrid mechanics). One row per calendar day.
+  getMyAttendance: async () => {
+    const response = await apiClient.get('/technicians/me/attendance');
+    return response.data as { id: string; date: string; status: string; checkInAt: string | null; checkOutAt: string | null; note: string | null }[];
+  },
+  checkIn: async () => {
+    const response = await apiClient.post('/technicians/me/attendance/check-in');
+    return response.data;
+  },
+  checkOut: async () => {
+    const response = await apiClient.post('/technicians/me/attendance/check-out');
+    return response.data;
+  },
+
   // Reviews -- previously only the denormalized average rating was visible
   // to the technician; this exposes the individual ServiceReview rows.
   getMyReviews: async (page: number = 1) => {

@@ -58,6 +58,12 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/audit-logs', icon: 'audit', label: 'Audit Logs' },
     ],
   },
+  {
+    label: 'Settings',
+    links: [
+      { to: '/commission-settings', icon: 'gear', label: 'Commission & Payout Settings' },
+    ],
+  },
 ];
 
 const COLLAPSE_KEY = 'admin-sidebar-collapsed';

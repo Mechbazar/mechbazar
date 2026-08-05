@@ -26,6 +26,14 @@ import {
   updateTechnicianSettlementStatus,
   getTechnicianEarnings,
   deleteTechnician,
+  checkInMyAttendance,
+  checkOutMyAttendance,
+  getMyAttendance,
+  getTechnicianAttendance,
+  upsertTechnicianAttendance,
+  getTechnicianPayProfile,
+  updateTechnicianPayProfile,
+  payTechnicianSalary,
 } from '../controllers/technician.controller';
 import {
   updateMyBookingStatus, createBookingApprovalRequest,
@@ -39,6 +47,7 @@ const router = Router();
 
 const admins = [Role.ADMIN, Role.SUPER_ADMIN, Role.OPERATIONS_MANAGER];
 const technicianOnly = [Role.SERVICE_TECHNICIAN];
+const superAdminOnly = [Role.SUPER_ADMIN];
 
 // Public self-registration — no auth yet, this *creates* the account.
 router.post('/register', registerTechnician);
@@ -64,6 +73,9 @@ router.get('/me/earnings', authenticate, authorize(technicianOnly), getMyEarning
 router.get('/me/reviews', authenticate, authorize(technicianOnly), getMyReviews);
 router.post('/me/bank', authenticate, authorize(technicianOnly), addMyBankAccount);
 router.post('/me/wallet/withdraw', authenticate, authorize(technicianOnly), requireApprovedTechnician, requestMyPayout);
+router.get('/me/attendance', authenticate, authorize(technicianOnly), getMyAttendance);
+router.post('/me/attendance/check-in', authenticate, authorize(technicianOnly), requireApprovedTechnician, checkInMyAttendance);
+router.post('/me/attendance/check-out', authenticate, authorize(technicianOnly), requireApprovedTechnician, checkOutMyAttendance);
 
 // Admin payouts — must also be declared before "/:id".
 router.get('/settlements', authenticate, authorize(admins), getAllTechnicianSettlements);
@@ -81,5 +93,14 @@ router.delete('/:id', authenticate, authorize(admins), deleteTechnician);
 router.get('/:id/earnings', authenticate, authorize(admins), getTechnicianEarnings);
 router.patch('/:id/status', authenticate, authorize(admins), updateTechnicianVerificationStatus);
 router.patch('/:id/documents/:documentId/status', authenticate, authorize(admins), updateTechnicianDocumentStatus);
+
+// Commission & payout system -- admin can view; only Super Admin can edit a
+// mechanic's pay model or trigger a salary payout (real money-moving/
+// commission-affecting actions).
+router.get('/:id/attendance', authenticate, authorize(admins), getTechnicianAttendance);
+router.put('/:id/attendance/:date', authenticate, authorize(admins), upsertTechnicianAttendance);
+router.get('/:id/pay-profile', authenticate, authorize(admins), getTechnicianPayProfile);
+router.put('/:id/pay-profile', authenticate, authorize(superAdminOnly), updateTechnicianPayProfile);
+router.post('/:id/pay-salary', authenticate, authorize(superAdminOnly), payTechnicianSalary);
 
 export default router;
