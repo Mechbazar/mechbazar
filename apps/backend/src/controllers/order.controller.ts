@@ -5,6 +5,7 @@ import { AuthRequest } from '../middlewares/auth';
 import { sendExpoPush } from '../utils/expoPush';
 import { resolveCoupon } from './coupon.controller';
 import { notifyUser, notifyAdmins } from '../utils/notify';
+import { broadcastOrderStatus } from '../services/orderState';
 import { sanitizeOrder, sanitizeOrders, stripDeliveryOtp, stripDeliveryOtps } from '../utils/sanitizeUser';
 import { pendingPaymentCreateInput, creditWalletForOnlineRefund } from '../services/payment.service';
 import { resolveProductCommissionPercent, resolveRiderPayout, recordCommission, round2 } from '../services/commission.service';
@@ -238,7 +239,8 @@ export const notifyWalletCredits = (credits: { userId: string; amount: number }[
       credit.userId,
       'Wallet credited',
       `Your wallet was credited ₹${credit.amount.toFixed(2)} for a delivered order.`,
-      { amount: credit.amount }
+      { amount: credit.amount },
+      { type: 'WALLET_CREDIT' }
     );
   }
 };
@@ -250,7 +252,8 @@ export const notifyWalletDebits = (debits: { userId: string; amount: number }[])
       debit.userId,
       'Wallet debited',
       `₹${debit.amount.toFixed(2)} was deducted from your wallet after an order was marked returned.`,
-      { amount: debit.amount }
+      { amount: debit.amount },
+      { type: 'WALLET_DEBIT' }
     );
   }
 };
@@ -487,6 +490,13 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       { orderId: newOrder.id, status: newOrder.status }
     );
 
+    // Seeds OrderStatusHistory with the initial PLACED row -- every later
+    // status write goes through this same helper (see updateAdminOrderStatus,
+    // vendor.controller.ts's updateOrderStatus, rider.controller.ts's
+    // updateDeliveryStatus), so the live order-tracking timeline has a first
+    // entry to build on instead of starting empty.
+    broadcastOrderStatus(newOrder, null);
+
     // Powers the admin Dashboard's live activity feed. socketOnly: high-frequency
     // event -- a persisted Notification row per order would flood the admin
     // notification centre, so this is a live ping only, not an actionable item.
@@ -635,6 +645,8 @@ export const assignRider = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Rider is not an approved, active delivery partner.' });
     }
 
+    const previous = await prisma.order.findUnique({ where: { id }, select: { status: true } });
+
     const order = await prisma.order.update({
       where: { id },
       data: {
@@ -665,6 +677,7 @@ export const assignRider = async (req: Request, res: Response) => {
       `A delivery partner has been assigned to order #${order.id.slice(0, 8)}.`,
       { orderId: order.id }
     );
+    broadcastOrderStatus(order, previous?.status ?? null);
 
     res.status(200).json(stripDeliveryOtp(sanitizeOrder(order)));
   } catch (error: any) {
@@ -764,6 +777,7 @@ export const updateAdminOrderStatus = async (req: AuthRequest, res: Response) =>
     );
     notifyWalletCredits(credits);
     notifyWalletDebits(debits);
+    broadcastOrderStatus(order, existing.status);
 
     res.status(200).json(stripDeliveryOtp(order));
   } catch (error: any) {
@@ -945,6 +959,7 @@ export const updateMyDeliveryStatus = async (req: AuthRequest, res: Response) =>
       { orderId: id, status: updated.status }
     );
     notifyWalletCredits(credits);
+    broadcastOrderStatus(updated, order.status);
 
     res.status(200).json(stripDeliveryOtp(updated));
   } catch (error: any) {

@@ -48,6 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
     links: [
       { to: '/coupons', icon: 'coupons', label: 'Coupons' },
       { to: '/cms', icon: 'banners', label: 'Banners & CMS' },
+      { to: '/broadcast', icon: 'megaphone', label: 'Broadcast' },
     ],
   },
   {
@@ -55,6 +56,7 @@ const NAV_GROUPS: NavGroup[] = [
     links: [
       { to: '/payouts', icon: 'payouts', label: 'Payouts' },
       { to: '/reports', icon: 'reports', label: 'Reports' },
+      { to: '/notification-analytics', icon: 'bell', label: 'Notification Analytics' },
       { to: '/audit-logs', icon: 'audit', label: 'Audit Logs' },
     ],
   },
@@ -62,6 +64,11 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Settings',
     links: [
       { to: '/commission-settings', icon: 'gear', label: 'Commission & Payout Settings' },
+      // No NAV_ROLES entry -- the backend endpoint is open to every
+      // authenticated role (GET/PATCH /customers/notification-preferences
+      // has no role check, unlike commission-settings above), so every
+      // admin-panel login should see this.
+      { to: '/notification-preferences', icon: 'bell', label: 'Notification Preferences' },
     ],
   },
 ];

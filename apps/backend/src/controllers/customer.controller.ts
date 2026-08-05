@@ -3,6 +3,7 @@ import { Prisma, Role, VehicleType } from '@prisma/client';
 import { AuthRequest } from '../middlewares/auth';
 import { sanitizeUser, sanitizeUsers } from '../utils/sanitizeUser';
 import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
+import { typesForDisplayCategory, allClassifiedNotificationTypes, NotificationDisplayCategory } from '../utils/notify';
 import prisma from '../config/prisma';
 import admin from '../config/firebase';
 
@@ -167,15 +168,137 @@ export const updateCustomer = async (req: Request, res: Response): Promise<void>
 
 export const getMyNotifications = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const notifications = await prisma.notification.findMany({
-      where: { userId: req.user!.userId },
+    const userId = req.user!.userId;
+    const { cursor, limit, category, q } = req.query as { cursor?: string; limit?: string; category?: string; q?: string };
+
+    // No pagination/search/filter params -> the exact same plain array this
+    // endpoint has always returned (take 100), so every client that hasn't
+    // been updated to the paginated shape keeps working unchanged.
+    if (!cursor && !limit && !category && !q) {
+      const notifications = await prisma.notification.findMany({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+      });
+      res.status(200).json(notifications);
+      return;
+    }
+
+    const take = Math.min(Math.max(parseInt(limit || '20', 10) || 20, 1), 50);
+    const conditions: Prisma.NotificationWhereInput[] = [{ userId }];
+
+    if (q) {
+      conditions.push({
+        OR: [{ title: { contains: q, mode: 'insensitive' } }, { body: { contains: q, mode: 'insensitive' } }],
+      });
+    }
+    if (category) {
+      const upper = category.toUpperCase() as NotificationDisplayCategory;
+      const mappedTypes = typesForDisplayCategory(upper);
+      // SYSTEM is also the fallback for any type this catalog doesn't
+      // recognise (see classifyNotificationDisplayCategory) -- match that
+      // fallback explicitly, not just the types deliberately mapped to it.
+      conditions.push(
+        upper === 'SYSTEM'
+          ? { OR: [{ type: { in: mappedTypes } }, { type: null }, { type: { notIn: allClassifiedNotificationTypes() } }] }
+          : { type: { in: mappedTypes } }
+      );
+    }
+
+    const rows = await prisma.notification.findMany({
+      where: { AND: conditions },
       orderBy: { createdAt: 'desc' },
-      take: 100,
+      take: take + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
-    res.status(200).json(notifications);
+    const hasMore = rows.length > take;
+    const items = hasMore ? rows.slice(0, take) : rows;
+    res.status(200).json({ items, nextCursor: hasMore ? items[items.length - 1].id : null });
   } catch (error) {
     console.error('Error fetching notifications:', error);
     res.status(500).json({ error: 'Failed to fetch notifications' });
+  }
+};
+
+export const markAllNotificationsRead = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const result = await prisma.notification.updateMany({
+      where: { userId: req.user!.userId, isRead: false },
+      data: { isRead: true },
+    });
+    res.status(200).json({ updated: result.count });
+  } catch (error) {
+    console.error('Error marking all notifications read:', error);
+    res.status(500).json({ error: 'Failed to mark all notifications read' });
+  }
+};
+
+// Set once by the client when a push notification is opened from the OS
+// tray/lock screen -- distinct from markNotificationRead's clickedAt, which
+// covers an in-app tap. First write wins (see the openedAt guard below); a
+// notification opened twice shouldn't overwrite its original open time.
+export const markNotificationOpened = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const id = String(req.params.id);
+    const notification = await prisma.notification.findUnique({ where: { id } });
+    if (!notification || notification.userId !== req.user!.userId) {
+      res.status(404).json({ error: 'Notification not found' });
+      return;
+    }
+    if (!notification.openedAt) {
+      await prisma.notification.update({ where: { id }, data: { openedAt: new Date() } });
+    }
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error marking notification opened:', error);
+    res.status(500).json({ error: 'Failed to mark notification opened' });
+  }
+};
+
+// Preference toggles per category (see utils/notify.ts's PREFERENCE_FIELD_BY_TYPE
+// for which notification types each one actually gates). Transactional
+// notifications never consult this table at all -- see notify.ts's
+// TRANSACTIONAL_TYPES -- so there is no "OTP"/"payments"/"order status" toggle
+// to expose here even though the brief's copy mentions them.
+const DEFAULT_PREFERENCES = {
+  offers: true,
+  promotions: true,
+  serviceUpdates: true,
+  payments: true,
+  wallet: true,
+  mechanicUpdates: true,
+  vendorUpdates: true,
+  reminders: true,
+};
+
+export const getMyNotificationPreferences = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const pref = await prisma.notificationPreference.findUnique({ where: { userId: req.user!.userId } });
+    // No row yet == every category on, matching the default every existing
+    // user effectively has today (nothing gated any push before this system
+    // existed).
+    res.status(200).json(pref || DEFAULT_PREFERENCES);
+  } catch (error) {
+    console.error('Error fetching notification preferences:', error);
+    res.status(500).json({ error: 'Failed to fetch notification preferences' });
+  }
+};
+
+export const updateMyNotificationPreferences = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const updates: Record<string, boolean> = {};
+    for (const key of Object.keys(DEFAULT_PREFERENCES) as (keyof typeof DEFAULT_PREFERENCES)[]) {
+      if (typeof req.body?.[key] === 'boolean') updates[key] = req.body[key];
+    }
+    const pref = await prisma.notificationPreference.upsert({
+      where: { userId: req.user!.userId },
+      update: updates,
+      create: { userId: req.user!.userId, ...DEFAULT_PREFERENCES, ...updates },
+    });
+    res.status(200).json(pref);
+  } catch (error) {
+    console.error('Error updating notification preferences:', error);
+    res.status(500).json({ error: 'Failed to update notification preferences' });
   }
 };
 
@@ -187,7 +310,13 @@ export const markNotificationRead = async (req: AuthRequest, res: Response): Pro
       res.status(404).json({ error: 'Notification not found' });
       return;
     }
-    const updated = await prisma.notification.update({ where: { id }, data: { isRead: true } });
+    // An in-app tap implies both "read" and "clicked" -- first write wins on
+    // clickedAt so re-opening an already-read notification doesn't overwrite
+    // its original click time.
+    const updated = await prisma.notification.update({
+      where: { id },
+      data: { isRead: true, clickedAt: notification.clickedAt ?? new Date() },
+    });
     res.status(200).json(updated);
   } catch (error) {
     console.error('Error marking notification read:', error);

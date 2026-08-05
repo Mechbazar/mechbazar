@@ -288,6 +288,13 @@ model User {
   state              String?
   isBusinessVerified Boolean     @default(false)
 
+  // Broadcast-notification targeting only (see admin.controller.ts's
+  // broadcastNotification) -- not used for any UI copy/localisation today.
+  // Null means "no preference set", which broadcastNotification treats as
+  // matching every language filter so existing accounts aren't silently
+  // excluded from broadcasts the moment this column exists.
+  preferredLanguage String?
+
   avatar        String?
   gender        String?
   dob           String?
@@ -307,20 +314,22 @@ model User {
   deletedAt      DateTime?
   deletionReason String?
 
-  addresses         Address[]
-  userVehicles      UserVehicle[]
-  orders            Order[]
-  reviews           Review[]
-  wishlists         Wishlist[]
-  notifications     Notification[]
-  auditLogs         AuditLog[]
-  supportTickets    SupportTicket[]
-  stockMovements    StockMovement[]
-  vendorProfile     Vendor?
-  deliveryProfile   DeliveryPartner?
-  technicianProfile ServiceTechnician?
-  serviceBookings   ServiceBooking[]
-  serviceReviews    ServiceReview[]
+  addresses              Address[]
+  userVehicles           UserVehicle[]
+  orders                 Order[]
+  reviews                Review[]
+  wishlists              Wishlist[]
+  notifications          Notification[]
+  pushDevices            PushDevice[]
+  notificationPreference NotificationPreference?
+  auditLogs              AuditLog[]
+  supportTickets         SupportTicket[]
+  stockMovements         StockMovement[]
+  vendorProfile          Vendor?
+  deliveryProfile        DeliveryPartner?
+  technicianProfile      ServiceTechnician?
+  serviceBookings        ServiceBooking[]
+  serviceReviews         ServiceReview[]
 }
 
 model Vendor {
@@ -759,6 +768,7 @@ model Order {
   items             OrderItem[]
   payment           Payment?
   commissionRecords CommissionRecord[]
+  statusHistory     OrderStatusHistory[]
 
   @@index([status])
   @@index([userId])
@@ -872,6 +882,28 @@ model Notification {
   // Expo/FCM data field so an in-app notification behaves identically to a
   // push whether or not the push was delivered.
   data Json?
+
+  // Rich notification support (large image + action buttons, e.g. "Call
+  // mechanic" / "Track order"). Both optional -- most notifications remain a
+  // plain title/body.
+  imageUrl String?
+  actions  Json? // [{ label, deepLink }]
+
+  // Delivery/analytics tracking (see utils/notify.ts and the delivery-retry
+  // sweep in jobs/sweeper.ts). deliveryStatus records the outcome per push
+  // channel this notification was attempted on, e.g. { expo: "sent", fcm:
+  // "failed" } -- absent entirely for socketOnly notifications, which never
+  // attempt a push. deliveredAt is best-effort: it marks "accepted by the
+  // push provider", not a delivery receipt (neither Expo nor a bare FCM send
+  // guarantees the latter). openedAt/clickedAt are set client-side.
+  deliveryStatus Json?
+  deliveredAt    DateTime?
+  openedAt       DateTime?
+  clickedAt      DateTime?
+  // Bumped by the delivery-retry sweep (jobs/sweeper.ts) each time it retries
+  // a fully-failed send. Capped at MAX_DELIVERY_RETRIES (utils/notify.ts) so a
+  // permanently-dead token doesn't get retried forever.
+  retryCount     Int       @default(0)
 
   @@index([userId, isRead])
   @@index([createdAt])
@@ -1874,4 +1906,100 @@ model CommissionRecord {
   @@index([sourceType, createdAt])
   @@index([orderId])
   @@index([serviceBookingId])
+}
+
+// =======================
+// Notification system extensions
+// =======================
+// See utils/notify.ts for the fan-out this all feeds into. Everything below
+// is additive to that existing pipeline, not a replacement.
+
+enum PushPlatform {
+  EXPO
+  FCM
+}
+
+// The one canonical push-token store across every role. Always keyed by
+// User.id (every role profile -- Vendor/DeliveryPartner/ServiceTechnician --
+// already has a userId back to User), which is what unifies mechanic/rider
+// push (previously sent via their own profile-table token column, see
+// dispatch.service.ts) with everyone else's (previously User.expoPushToken/
+// fcmToken via notifyUser) onto one path, and adds multi-device support
+// neither had. The legacy single-token columns are left in place and kept in
+// sync on registration for back-compat; notifyUser falls back to them only
+// for a user with zero PushDevice rows (pre-migration devices that haven't
+// re-registered yet).
+model PushDevice {
+  id           String       @id @default(uuid())
+  userId       String
+  user         User         @relation(fields: [userId], references: [id])
+  token        String
+  platform     PushPlatform
+  deviceId     String?
+  lastActiveAt DateTime     @default(now())
+  createdAt    DateTime     @default(now())
+
+  @@unique([userId, token])
+  @@index([userId])
+}
+
+// One row per user. Missing row == all categories on (the default every
+// existing user effectively has today). Transactional notifications (OTP,
+// payment status, order/job status, security) are never gated by this table
+// at all -- see notify.ts's TRANSACTIONAL_TYPES -- so there is deliberately
+// no column here that could turn one off.
+model NotificationPreference {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  offers          Boolean  @default(true)
+  promotions      Boolean  @default(true)
+  serviceUpdates  Boolean  @default(true)
+  payments        Boolean  @default(true)
+  wallet          Boolean  @default(true)
+  mechanicUpdates Boolean  @default(true)
+  vendorUpdates   Boolean  @default(true)
+  reminders       Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
+}
+
+// Order's counterpart to BookingStatusHistory -- same shape, deliberately no
+// back-relation array on Order, matching how BookingStatusHistory relates to
+// ServiceBooking in this schema already.
+model OrderStatusHistory {
+  id              String      @id @default(uuid())
+  orderId         String
+  order           Order       @relation(fields: [orderId], references: [id])
+  status          OrderStatus
+  note            String?
+  changedByUserId String?
+  createdAt       DateTime    @default(now())
+}
+
+enum ScheduledNotificationStatus {
+  PENDING
+  SENT
+  CANCELLED
+  FAILED
+}
+
+// Admin-authored broadcast queued for a future send. Picked up by the
+// scheduled-notification sweep in jobs/sweeper.ts, which sends it through the
+// same audience-resolution/fan-out path as an immediate broadcast.
+model ScheduledNotification {
+  id              String                      @id @default(uuid())
+  title           String
+  body            String
+  // Same filter shape broadcastNotification's request body accepts:
+  // { audience: 'ALL_CUSTOMERS'|..., city?, state?, language? }
+  audience        Json
+  sendAt          DateTime
+  status          ScheduledNotificationStatus @default(PENDING)
+  sentCount       Int?
+  failureReason   String?
+  createdByUserId String?
+  createdAt       DateTime                    @default(now())
+  sentAt          DateTime?
+
+  @@index([status, sendAt])
 }

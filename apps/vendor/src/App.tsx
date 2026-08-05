@@ -8,6 +8,7 @@ import { useSelector } from 'react-redux';
 import type { RootState } from './store';
 import { updateVendorProfile, logout } from './store/slices/authSlice';
 import { auth } from './config/firebase';
+import { registerForWebPushAsync } from './services/webPush';
 import Layout from './components/Layout';
 import PageLoader from './components/PageLoader';
 import { API_URL } from './config/api';
@@ -30,6 +31,7 @@ const Wallet = lazy(() => import('./pages/Wallet'));
 const Profile = lazy(() => import('./pages/Profile'));
 const Coupons = lazy(() => import('./pages/Coupons'));
 const Notifications = lazy(() => import('./pages/Notifications'));
+const NotificationPreferences = lazy(() => import('./pages/NotificationPreferences'));
 const Returns = lazy(() => import('./pages/Returns'));
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -63,6 +65,26 @@ function App() {
     syncVendorProfile();
   }, [token, dispatch]);
 
+  // Browser push -- writes to User.fcmToken (separate from the native apps'
+  // Expo token column), so a vendor who's also logged into a native app
+  // doesn't have one channel's registration overwrite the other's.
+  useEffect(() => {
+    if (!token) return;
+    (async () => {
+      try {
+        const fcmToken = await registerForWebPushAsync();
+        if (!fcmToken) return;
+        await axios.patch(
+          `${API_URL}/auth/push-token`,
+          { token: fcmToken, type: 'fcm' },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+      } catch (e) {
+        console.error('Failed to register web push token:', e);
+      }
+    })();
+  }, [token]);
+
   const Wrapped = (Page: React.ComponentType) => (
     <ProtectedRoute><Layout><Page /></Layout></ProtectedRoute>
   );
@@ -87,6 +109,7 @@ function App() {
           <Route path="/profile" element={Wrapped(Profile)} />
           <Route path="/coupons" element={Wrapped(Coupons)} />
           <Route path="/notifications" element={Wrapped(Notifications)} />
+          <Route path="/notification-preferences" element={Wrapped(NotificationPreferences)} />
           <Route path="/returns" element={Wrapped(Returns)} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

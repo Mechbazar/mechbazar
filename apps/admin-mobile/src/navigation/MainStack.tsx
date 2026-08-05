@@ -27,6 +27,7 @@ import { TechnicianPayoutDetailScreen } from '../screens/TechnicianPayoutDetailS
 import { ServicePackagesScreen } from '../screens/ServicePackagesScreen';
 import { ServiceTimeSlotsScreen } from '../screens/ServiceTimeSlotsScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
+import { NotificationPreferencesScreen } from '../screens/NotificationPreferencesScreen';
 import { InventoryScreen } from '../screens/inventory/InventoryScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { ChangePasswordScreen } from '../screens/ChangePasswordScreen';
@@ -75,6 +76,7 @@ export const MainStack = () => {
       <Stack.Screen name="ServicePackages" component={ServicePackagesScreen} options={{ headerShown: false }} />
       <Stack.Screen name="ServiceTimeSlots" component={ServiceTimeSlotsScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} options={{ headerShown: false }} />
+      <Stack.Screen name="NotificationPreferences" component={NotificationPreferencesScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Inventory" component={InventoryScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ headerShown: false }} />
     </Stack.Navigator>

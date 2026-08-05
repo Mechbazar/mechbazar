@@ -5,6 +5,7 @@ import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/nativ
 import { useSelector } from 'react-redux';
 import { HeaderCartButton } from '../components/HeaderCartButton';
 import { RootState } from '../store';
+import { getSocket, subscribeToOrder, SERVER_EVENTS } from '@mechbazar/shared';
 
 import { API_BASE_URL } from '../services/api';
 import { useBreakpoint } from '../hooks/useBreakpoint';
@@ -99,6 +100,52 @@ export default function DeliveryTrackingScreen() {
     return () => {
       cancelled = true;
       clearInterval(interval);
+    };
+  }, [orderId, token]);
+
+  // Live push: as soon as the backend records a status change (order:status /
+  // order:timeline on this order's room), re-fetch immediately instead of
+  // waiting up to TRACKING_POLL_INTERVAL_MS. The poll above stays as-is: it's
+  // the correctness guarantee if the socket drops, this is purely a latency
+  // improvement -- same relationship apps/mobile's booking tracking has
+  // between ServiceTrackingScreen's poll and job:status.
+  useEffect(() => {
+    if (!orderId || !token) return;
+    let cleanup: (() => void) | undefined;
+    let cancelled = false;
+
+    (async () => {
+      const unsubscribe = await subscribeToOrder(orderId);
+      if (cancelled) {
+        unsubscribe();
+        return;
+      }
+      cleanup = unsubscribe;
+
+      const socket = await getSocket();
+      const onUpdate = () => {
+        fetch(`${API_BASE_URL}/orders/${orderId}`, { headers: { Authorization: `Bearer ${token}` } })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => {
+            if (data) {
+              setOrder(data);
+              if (data.status) setStatus(data.status);
+            }
+          })
+          .catch((error) => console.error('Failed to refresh order after live update', error));
+      };
+      socket.on(SERVER_EVENTS.ORDER_STATUS, onUpdate);
+      socket.on(SERVER_EVENTS.ORDER_TIMELINE, onUpdate);
+      cleanup = () => {
+        socket.off(SERVER_EVENTS.ORDER_STATUS, onUpdate);
+        socket.off(SERVER_EVENTS.ORDER_TIMELINE, onUpdate);
+        unsubscribe();
+      };
+    })();
+
+    return () => {
+      cancelled = true;
+      cleanup?.();
     };
   }, [orderId, token]);
 

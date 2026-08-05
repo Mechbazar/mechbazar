@@ -6,6 +6,7 @@ import { generateToken } from '../utils/jwt';
 import { AuthRequest } from '../middlewares/auth';
 import { restoreOrderStock, creditOrderDelivery, reverseOrderDeliveryCredit, notifyWalletCredits, notifyWalletDebits } from './order.controller';
 import { notifyUser, notifyAdmins } from '../utils/notify';
+import { broadcastOrderStatus } from '../services/orderState';
 import { sanitizeUser, sanitizeUsers, sanitizeOrders, stripDeliveryOtp, stripDeliveryOtps } from '../utils/sanitizeUser';
 import { recordAuditLog } from '../utils/auditLog';
 import { verifyFirebaseIdTokenAndResolveUser, FirebaseAuthError, FirebaseAuthErrorCode } from '../utils/firebaseAuth';
@@ -794,6 +795,7 @@ export const updateOrderStatus = async (req: AuthRequest, res: Response): Promis
     );
     notifyWalletCredits(credits);
     notifyWalletDebits(debits);
+    broadcastOrderStatus(updatedOrder, order.status);
 
     res.status(200).json(stripDeliveryOtp(updatedOrder));
   } catch (error: any) {

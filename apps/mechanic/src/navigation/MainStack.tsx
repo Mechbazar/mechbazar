@@ -6,6 +6,7 @@ import { BookingDetailScreen } from '../screens/BookingDetailScreen';
 import { BookingChatScreen } from '../screens/BookingChatScreen';
 import { ReviewsScreen } from '../screens/ReviewsScreen';
 import { NotificationsScreen } from '../screens/NotificationsScreen';
+import { NotificationPreferencesScreen } from '../screens/NotificationPreferencesScreen';
 import { OfferInboxScreen } from '../screens/OfferInboxScreen';
 import { EmergencyJobScreen } from '../screens/EmergencyJobScreen';
 import { registerForPushNotificationsAsync } from '../services/notifications';
@@ -16,6 +17,7 @@ export type MainStackParamList = {
   BookingChat: { bookingId: string };
   Reviews: undefined;
   Notifications: undefined;
+  NotificationPreferences: undefined;
   OfferInbox: undefined;
   EmergencyJob: { bookingId: string };
 };
@@ -65,6 +67,15 @@ export const MainStack = () => {
         component={NotificationsScreen}
         options={{
           title: 'Notifications',
+          headerStyle: { backgroundColor: colors.card },
+          headerTintColor: colors.text,
+        }}
+      />
+      <Stack.Screen
+        name="NotificationPreferences"
+        component={NotificationPreferencesScreen}
+        options={{
+          title: 'Notification Preferences',
           headerStyle: { backgroundColor: colors.card },
           headerTintColor: colors.text,
         }}

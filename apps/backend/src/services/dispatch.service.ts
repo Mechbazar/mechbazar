@@ -4,6 +4,8 @@ import { haversineKm } from './geocoding.service';
 import { emitToTechnician, isTechnicianOnSocket } from '../realtime/gateway';
 import { SERVER_EVENTS, OfferEvent, OfferClosedEvent } from '../realtime/events';
 import { sendExpoPush } from '../utils/expoPush';
+import { sendFcmPush } from '../utils/fcmPush';
+import { resolvePushDevices } from '../utils/pushDevice';
 import { notifyUser, notifyAdmins, NOTIFY } from '../utils/notify';
 import { transitionJob, JobTransitionError, ACTIVE_JOB_STATUSES } from './jobState';
 import type { DispatchOfferStatus } from '@prisma/client';
@@ -98,13 +100,25 @@ export async function createSingleOffer(bookingId: string, technicianId: string,
 
   const distanceText = offer.distanceKm != null ? `${offer.distanceKm.toFixed(1)} km` : 'nearby';
   const pushBody = `Customer: ${booking.user.name || 'Customer'}\nService: ${booking.package.name}\nDistance: ${distanceText}\nTap to Accept`;
+  const offerPushData = { type: NOTIFY.OFFER_NEW, bookingId, offerId: offer.id, expiresAt: offer.expiresAt.toISOString() };
 
-  if (technician.expoPushToken) {
-    await sendExpoPush(technician.expoPushToken, 'New Service Request', pushBody, {
-      type: NOTIFY.OFFER_NEW, bookingId, offerId: offer.id, expiresAt: offer.expiresAt.toISOString(),
-    });
-    channels.push('EXPO_PUSH');
+  // Every device this mechanic has registered (PushDevice rows if any exist,
+  // else their single legacy ServiceTechnician.expoPushToken) -- see
+  // utils/pushDevice.ts. Distinct from notifyUser's own device resolution
+  // below since this send must never be persisted (see the socketOnly call
+  // right after this).
+  const devices = await resolvePushDevices(technician.userId, { expo: technician.expoPushToken });
+  const sentPlatforms = new Set<string>();
+  for (const device of devices) {
+    if (device.platform === 'FCM') {
+      await sendFcmPush(device.token, 'New Service Request', pushBody, offerPushData);
+      sentPlatforms.add('FCM_PUSH');
+    } else {
+      await sendExpoPush(device.token, 'New Service Request', pushBody, offerPushData);
+      sentPlatforms.add('EXPO_PUSH');
+    }
   }
+  channels.push(...sentPlatforms);
 
   await notifyUser(technician.userId, 'New Service Request', pushBody, { bookingId, offerId: offer.id }, { type: NOTIFY.OFFER_NEW, socketOnly: true });
 

@@ -1,13 +1,16 @@
 import React from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useDispatch } from 'react-redux';
+import { useNavigation } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
 import { colors, Typography, Card, Button, Loader, riderService } from '@mechbazar/shared';
+import { Bell, ChevronRight } from 'lucide-react-native';
 import { logout } from '../store';
 
 export const ProfileScreen = () => {
   const dispatch = useDispatch();
+  const navigation = useNavigation<any>();
 
   const { data: profile, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['rider-profile'],
@@ -70,6 +73,17 @@ export const ProfileScreen = () => {
           </View>
         </Card>
 
+        <TouchableOpacity onPress={() => navigation.getParent()?.navigate('NotificationPreferences')} activeOpacity={0.7}>
+          <Card style={styles.settingsLink}>
+            <Bell color={colors.primary} size={22} />
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Typography variant="body" style={{ fontWeight: '700' }}>Notification Preferences</Typography>
+              <Typography variant="caption">Choose which alerts you want to receive</Typography>
+            </View>
+            <ChevronRight color={colors.textSecondary} size={20} />
+          </Card>
+        </TouchableOpacity>
+
         <Typography variant="caption" style={{ color: colors.textSecondary, marginBottom: 8 }}>
           Document/KYC verification isn't tracked on riders in the backend yet — nothing to show here until that's added.
         </Typography>
@@ -85,4 +99,5 @@ const styles = StyleSheet.create({
   header: { alignItems: 'center', padding: 32, backgroundColor: colors.surfaceHover },
   avatarPlaceholder: { width: 80, height: 80, borderRadius: 40, backgroundColor: colors.primary, justifyContent: 'center', alignItems: 'center' },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+  settingsLink: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, paddingVertical: 16 },
 });

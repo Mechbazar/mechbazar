@@ -89,4 +89,13 @@ export async function subscribeToJob(bookingId: string): Promise<() => void> {
   };
 }
 
+/** Order's counterpart to subscribeToJob -- same pattern, same usage. */
+export async function subscribeToOrder(orderId: string): Promise<() => void> {
+  const s = await getSocket();
+  s.emit('order:subscribe', { orderId });
+  return () => {
+    s.emit('order:unsubscribe', { orderId });
+  };
+}
+
 export type { Socket };

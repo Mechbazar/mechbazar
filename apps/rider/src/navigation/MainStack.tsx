@@ -4,12 +4,16 @@ import { colors } from '@mechbazar/shared';
 import { TabNavigator } from './TabNavigator';
 import { DeliveryDetailScreen } from '../screens/DeliveryDetailScreen';
 import { DeliveryHistoryScreen } from '../screens/DeliveryHistoryScreen';
+import { NotificationsScreen } from '../screens/NotificationsScreen';
+import { NotificationPreferencesScreen } from '../screens/NotificationPreferencesScreen';
 import { registerForPushNotificationsAsync } from '../services/notifications';
 
 export type MainStackParamList = {
   Tabs: undefined;
   DeliveryDetail: { orderId: string };
   DeliveryHistory: undefined;
+  Notifications: undefined;
+  NotificationPreferences: undefined;
 };
 
 const Stack = createNativeStackNavigator<MainStackParamList>();
@@ -39,6 +43,24 @@ export const MainStack = () => {
         component={DeliveryHistoryScreen}
         options={{
           title: 'Delivery History',
+          headerStyle: { backgroundColor: colors.card },
+          headerTintColor: colors.text,
+        }}
+      />
+      <Stack.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{
+          title: 'Notifications',
+          headerStyle: { backgroundColor: colors.card },
+          headerTintColor: colors.text,
+        }}
+      />
+      <Stack.Screen
+        name="NotificationPreferences"
+        component={NotificationPreferencesScreen}
+        options={{
+          title: 'Notification Preferences',
           headerStyle: { backgroundColor: colors.card },
           headerTintColor: colors.text,
         }}

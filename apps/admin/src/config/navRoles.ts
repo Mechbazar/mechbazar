@@ -29,7 +29,12 @@ export const NAV_ROLES: Record<string, string[]> = {
   // OPERATIONS_MANAGER-only) -- union of both so neither role loses access.
   '/payouts': ['ADMIN', 'SUPER_ADMIN', 'VENDOR_MANAGER', 'OPERATIONS_MANAGER'],
   '/reports': ['SUPER_ADMIN', 'ADMIN'],
+  '/notification-analytics': ['SUPER_ADMIN', 'ADMIN'],
   '/audit-logs': ['SUPER_ADMIN', 'ADMIN'],
+  // Matches admin.routes.ts's `admins` gate on /admin/notifications/* --
+  // broadcasting to a whole role/city/state is a step above the
+  // notification-preferences page below, which every admin login can reach.
+  '/broadcast': ['SUPER_ADMIN', 'ADMIN'],
   // Commission settings mutations are Super-Admin-only server-side (see
   // apps/backend/src/routes/commission.routes.ts) -- the nav item itself is
   // restricted the same way so a lower-privilege admin isn't shown a page

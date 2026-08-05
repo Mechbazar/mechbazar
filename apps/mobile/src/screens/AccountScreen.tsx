@@ -880,6 +880,11 @@ export default function AccountScreen() {
                 />
               </View>
 
+              <TouchableOpacity style={styles.collapsibleItem} onPress={() => navigation.navigate('NotificationPreferences')}>
+                <Ionicons name="options-outline" size={16} color={colors.secondary} />
+                <Text style={styles.collapsibleItemText}>Notification Categories</Text>
+              </TouchableOpacity>
+
               <TouchableOpacity style={styles.collapsibleItem} onPress={() => setIsLanguageModalVisible(true)}>
                 <Ionicons name="globe-outline" size={16} color={colors.secondary} />
                 <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>

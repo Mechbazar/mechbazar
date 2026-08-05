@@ -43,6 +43,8 @@ export interface SocketIdentity {
   role: string;
   /** ServiceTechnician.id, present only for SERVICE_TECHNICIAN sockets. */
   technicianId?: string;
+  /** DeliveryPartner.id, present only for DELIVERY_PARTNER sockets -- used by canAccessOrder. */
+  deliveryPartnerId?: string;
 }
 
 type AuthedSocket = Socket & { identity: SocketIdentity };
@@ -79,6 +81,25 @@ export async function canAccessJob(identity: SocketIdentity, bookingId: string):
     });
     if (openOffer) return true;
   }
+  return false;
+}
+
+/**
+ * Order's counterpart to canAccessJob: its customer, its assigned rider, or an
+ * admin. No open-offer case -- orders are assigned by admin/vendor action, not
+ * a live multi-candidate offer the way jobs are.
+ */
+export async function canAccessOrder(identity: SocketIdentity, orderId: string): Promise<boolean> {
+  if (ADMIN_ROLES.has(identity.role)) return true;
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    select: { userId: true, deliveryPartnerId: true },
+  });
+  if (!order) return false;
+
+  if (order.userId === identity.userId) return true;
+  if (identity.deliveryPartnerId && order.deliveryPartnerId === identity.deliveryPartnerId) return true;
   return false;
 }
 
@@ -128,7 +149,13 @@ export async function initRealtime(httpServer: HttpServer): Promise<IOServer> {
 
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
-        select: { id: true, role: true, deletedAt: true, technicianProfile: { select: { id: true } } },
+        select: {
+          id: true,
+          role: true,
+          deletedAt: true,
+          technicianProfile: { select: { id: true } },
+          deliveryProfile: { select: { id: true } },
+        },
       });
       if (!user || user.deletedAt) return next(new Error('UNAUTHORIZED'));
 
@@ -136,6 +163,7 @@ export async function initRealtime(httpServer: HttpServer): Promise<IOServer> {
         userId: user.id,
         role: user.role,
         technicianId: user.technicianProfile?.id,
+        deliveryPartnerId: user.deliveryProfile?.id,
       };
       next();
     } catch {
@@ -223,6 +251,21 @@ function onConnection(socket: AuthedSocket) {
     ack?.({ ok: true });
   });
 
+  socket.on(CLIENT_EVENTS.ORDER_SUBSCRIBE, async (payload: { orderId?: string }, ack?: (r: unknown) => void) => {
+    const orderId = typeof payload?.orderId === 'string' ? payload.orderId : null;
+    if (!orderId) return ack?.({ ok: false, error: 'orderId is required' });
+    if (!(await canAccessOrder(identity, orderId))) {
+      return ack?.({ ok: false, error: 'FORBIDDEN' });
+    }
+    await socket.join(ROOMS.order(orderId));
+    ack?.({ ok: true });
+  });
+
+  socket.on(CLIENT_EVENTS.ORDER_UNSUBSCRIBE, async (payload: { orderId?: string }, ack?: (r: unknown) => void) => {
+    if (typeof payload?.orderId === 'string') await socket.leave(ROOMS.order(payload.orderId));
+    ack?.({ ok: true });
+  });
+
   socket.on(CLIENT_EVENTS.ADMIN_WATCH_LIVE_MAP, async (_p: unknown, ack?: (r: unknown) => void) => {
     if (!ADMIN_ROLES.has(identity.role)) return ack?.({ ok: false, error: 'FORBIDDEN' });
     await socket.join(ROOMS.adminLiveMap);
@@ -258,6 +301,10 @@ export function setLocationHandler(handler: (socket: Socket & { identity: Socket
 
 export function emitToJob(bookingId: string, event: string, payload: unknown): void {
   io?.to(ROOMS.job(bookingId)).emit(event, payload);
+}
+
+export function emitToOrder(orderId: string, event: string, payload: unknown): void {
+  io?.to(ROOMS.order(orderId)).emit(event, payload);
 }
 
 export function emitToUser(userId: string, event: string, payload: unknown): void {

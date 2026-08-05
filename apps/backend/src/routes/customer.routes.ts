@@ -2,6 +2,8 @@ import { Router } from 'express';
 import {
   getCustomers, getCustomerById, updateCustomer, deleteCustomer,
   getMyNotifications, markNotificationRead, deleteMyNotification,
+  markAllNotificationsRead, markNotificationOpened,
+  getMyNotificationPreferences, updateMyNotificationPreferences,
   getMyAddresses, createMyAddress, updateMyAddress, deleteMyAddress,
   getMyProfile, updateMyProfile,
   confirmPhoneChange,
@@ -21,8 +23,15 @@ router.patch('/:id', authenticate, authorize(admins), updateCustomer);
 
 // Self-service, any authenticated role -- not admin-gated like the routes above.
 router.get('/notifications', authenticate, getMyNotifications);
+router.patch('/notifications/read-all', authenticate, markAllNotificationsRead);
 router.patch('/notifications/:id/read', authenticate, markNotificationRead);
+router.post('/notifications/:id/opened', authenticate, markNotificationOpened);
 router.delete('/notifications/:id', authenticate, deleteMyNotification);
+// Registered before '/notifications/:id' would ever matter since the path
+// literal differs, but kept alongside the other notification routes for
+// discoverability.
+router.get('/notification-preferences', authenticate, getMyNotificationPreferences);
+router.patch('/notification-preferences', authenticate, updateMyNotificationPreferences);
 
 router.get('/me/addresses', authenticate, getMyAddresses);
 router.post('/me/addresses', authenticate, createMyAddress);

@@ -2,10 +2,11 @@ import React from 'react';
 import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { colors, Typography } from '@mechbazar/shared';
-import { Layers, Store, Users, Navigation, Car, Tag, Image, CreditCard, Warehouse, Settings, ChevronRight, Wrench, ClipboardList, Clock3, Package, Bell, Bike } from 'lucide-react-native';
+import { Layers, Store, Users, Navigation, Car, Tag, Image, CreditCard, Warehouse, Settings, ChevronRight, Wrench, ClipboardList, Clock3, Package, Bell, Bike, SlidersHorizontal } from 'lucide-react-native';
 
 const MENU = [
   { label: 'Notifications', screen: 'Notifications', icon: Bell },
+  { label: 'Notification Preferences', screen: 'NotificationPreferences', icon: SlidersHorizontal },
   { label: 'Categories', screen: 'Categories', icon: Layers },
   { label: 'Service Bookings', screen: 'ServiceBookings', icon: ClipboardList },
   { label: 'Service Categories', screen: 'ServiceCategories', icon: Layers },
