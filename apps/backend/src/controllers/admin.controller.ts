@@ -608,6 +608,18 @@ async function allocateStaffPhone(): Promise<string> {
   throw new Error('Could not allocate a unique staff phone after 10 attempts');
 }
 
+// Swaps only the staff-role portion of an identity's `roles` array, leaving
+// every other role (CUSTOMER, or in principle VENDOR/DELIVERY_PARTNER/
+// SERVICE_TECHNICIAN on a shared identity -- see the User model's own
+// comment on why one phone can hold several role profiles) untouched.
+// Setting `roles` to just `[newRole]` outright -- an earlier version of this
+// -- silently stripped CUSTOMER from every admin account on any role change
+// or deactivate/reactivate.
+function withStaffRole(existingRoles: Role[], newRole: Role | null): Role[] {
+  const nonStaff = existingRoles.filter((r) => !STAFF_ROLES.includes(r));
+  return newRole ? [...nonStaff, newRole] : nonStaff;
+}
+
 export const createStaffUser = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { name, email, role } = req.body as { name?: string; email?: string; role?: Role };
@@ -716,7 +728,7 @@ export const updateStaffRole = async (req: AuthRequest, res: Response): Promise<
     const wasActive = target.roles.includes(target.role);
     const updated = await prisma.user.update({
       where: { id },
-      data: { role, roles: wasActive ? [role] : [] },
+      data: { role, roles: withStaffRole(target.roles, wasActive ? role : null) },
     });
 
     await prisma.auditLog.create({
@@ -773,7 +785,7 @@ export const setStaffActive = async (req: AuthRequest, res: Response): Promise<v
     // role rather than requiring it to be picked again.
     const updated = await prisma.user.update({
       where: { id },
-      data: { roles: isActive ? [target.role] : [] },
+      data: { roles: withStaffRole(target.roles, isActive ? target.role : null) },
     });
 
     await prisma.auditLog.create({
