@@ -4,13 +4,19 @@ import axios from 'axios';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import { Trash2 } from 'lucide-react';
-import { Button, Card, DataTable, EmptyState, Modal, Input, Select, Icon3D } from '../components/ui';
-import type { Column } from '../components/ui';
+import { Button, Card, DataTable, EmptyState, Modal, Input, Select, Icon3D, Tabs } from '../components/ui';
+import type { Column, TabItem } from '../components/ui';
 import type { RootState } from '../store';
 import { API_URL } from '../config/api';
 import { fadeInUp } from '../utils/motion';
+import BrandMaster from '../components/vehicles/BrandMaster';
 
 const NEW = '__new__';
+
+const VEHICLE_TABS: TabItem[] = [
+  { id: 'VEHICLES', label: 'Vehicles' },
+  { id: 'BRANDS', label: 'Brand Master' },
+];
 
 const emptyForm = {
   type: 'CAR' as 'CAR' | 'BIKE',
@@ -23,12 +29,14 @@ const emptyForm = {
   fuelTypeId: '',
   newFuelTypeName: '',
   year: '',
+  engineCc: '',
 };
 
 export default function Vehicles() {
   const { token } = useSelector((state: RootState) => state.auth);
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
 
+  const [section, setSection] = useState<'VEHICLES' | 'BRANDS'>('VEHICLES');
   const [vehicles, setVehicles] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -103,6 +111,7 @@ export default function Vehicles() {
       variantId: vehicle.variantId || '',
       fuelTypeId: vehicle.fuelTypeId,
       year: String(vehicle.year),
+      engineCc: vehicle.engineCc != null ? String(vehicle.engineCc) : '',
     });
     setIsModalOpen(true);
     await fetchManufacturers(vehicle.manufacturer.type);
@@ -191,7 +200,10 @@ export default function Vehicles() {
         fuelTypeId = res.data.id;
       }
 
-      const payload = { manufacturerId, modelId, variantId, fuelTypeId, year: Number(form.year) };
+      const payload = {
+        manufacturerId, modelId, variantId, fuelTypeId, year: Number(form.year),
+        engineCc: form.engineCc.trim() ? Number(form.engineCc) : null,
+      };
       if (editingId) {
         await axios.put(`${API_URL}/vehicles/${editingId}`, payload, authHeaders);
       } else {
@@ -212,6 +224,7 @@ export default function Vehicles() {
     { key: 'variant', header: 'Variant', render: (v) => <span className="text-content-secondary">{v.variant?.name || '—'}</span> },
     { key: 'year', header: 'Year', render: (v) => <span className="text-content-primary">{v.year}</span> },
     { key: 'fuel', header: 'Fuel', render: (v) => <span className="text-content-secondary">{v.fuelType.name}</span> },
+    { key: 'engine', header: 'Engine', render: (v) => <span className="text-content-secondary">{v.engineCc ? `${v.engineCc} cc` : '—'}</span> },
     {
       key: 'actions',
       header: 'Actions',
@@ -228,29 +241,44 @@ export default function Vehicles() {
 
   return (
     <motion.div variants={fadeInUp} initial="hidden" animate="visible">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-content-primary flex items-center gap-3">
-          <Icon3D name="vehicles" size={30} eager /> Vehicle Master Management
-        </h2>
-        <Button icon={<span className="text-base leading-none">+</span>} onClick={openAddModal}>Add New Vehicle</Button>
+      <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-content-primary flex items-center gap-3">
+            <Icon3D name="vehicles" size={30} eager /> Vehicle Master Management
+          </h2>
+          <p className="text-content-secondary mt-1 text-sm">Manage the make/model/variant/fuel taxonomy used across the app's vehicle dropdowns.</p>
+        </div>
+        {section === 'VEHICLES' && (
+          <Button icon={<span className="text-base leading-none">+</span>} onClick={openAddModal}>Add New Vehicle</Button>
+        )}
       </div>
 
-      {loadError && (
-        <div className="mb-4 rounded-xl border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-600 dark:text-danger-400">
-          {loadError}
-        </div>
-      )}
+      <div className="mb-5">
+        <Tabs tabs={VEHICLE_TABS} value={section} onChange={(id) => setSection(id as 'VEHICLES' | 'BRANDS')} layoutId="vehicles-tab" />
+      </div>
 
-      <Card padding="none">
-        <DataTable
-          columns={columns}
-          data={vehicles}
-          rowKey={(v) => v.id}
-          loading={loading}
-          pageSize={10}
-          emptyState={<EmptyState icon="vehicles" title="No vehicles yet" description={'Click "Add New Vehicle" to add your first make/model/variant combination.'} action={<Button onClick={openAddModal}>Add New Vehicle</Button>} />}
-        />
-      </Card>
+      {section === 'BRANDS' ? (
+        <BrandMaster token={token} />
+      ) : (
+        <>
+          {loadError && (
+            <div className="mb-4 rounded-xl border border-danger-500/30 bg-danger-500/10 px-4 py-3 text-sm text-danger-600 dark:text-danger-400">
+              {loadError}
+            </div>
+          )}
+
+          <Card padding="none">
+            <DataTable
+              columns={columns}
+              data={vehicles}
+              rowKey={(v) => v.id}
+              loading={loading}
+              pageSize={10}
+              emptyState={<EmptyState icon="vehicles" title="No vehicles yet" description={'Click "Add New Vehicle" to add your first make/model/variant combination.'} action={<Button onClick={openAddModal}>Add New Vehicle</Button>} />}
+            />
+          </Card>
+        </>
+      )}
 
       <Modal isOpen={isModalOpen} onClose={closeModal} title={editingId ? 'Edit Vehicle' : 'Add Vehicle'}>
         <div className="space-y-4">
@@ -348,6 +376,14 @@ export default function Vehicles() {
               onChange={(e) => setForm((f) => ({ ...f, year: e.target.value }))}
             />
           </div>
+
+          <Input
+            label="Engine Size (cc, optional)"
+            type="number"
+            placeholder="e.g., 1197"
+            value={form.engineCc}
+            onChange={(e) => setForm((f) => ({ ...f, engineCc: e.target.value }))}
+          />
 
           <div className="flex justify-end gap-3 mt-4">
             <Button variant="ghost" onClick={closeModal}>Cancel</Button>

@@ -125,6 +125,79 @@ export const createManufacturer = async (req: Request, res: Response) => {
   }
 };
 
+// Admin-only listing for the Vehicle Brand Master page -- same rows as the
+// public getManufacturers above, but with model/vehicle counts so the admin
+// can see at a glance which brands are actually in use before renaming or
+// deleting one.
+export const getManufacturersAdmin = async (req: Request, res: Response) => {
+  try {
+    const { type } = req.query;
+    const vehicleType = typeof type === 'string' ? type.toUpperCase() : undefined;
+    if (vehicleType && vehicleType !== 'CAR' && vehicleType !== 'BIKE') {
+      return res.status(400).json({ error: 'type must be CAR or BIKE' });
+    }
+    const manufacturers = await prisma.manufacturer.findMany({
+      where: vehicleType ? { type: vehicleType as 'CAR' | 'BIKE' } : undefined,
+      include: { _count: { select: { models: true, vehicles: true } } },
+      orderBy: [{ type: 'asc' }, { name: 'asc' }],
+    });
+    res.json(manufacturers);
+  } catch (error) {
+    console.error('Error fetching manufacturers (admin):', error);
+    res.status(500).json({ error: 'Failed to fetch manufacturers' });
+  }
+};
+
+export const updateManufacturer = async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const { name } = req.body;
+    if (!name || !String(name).trim()) {
+      return res.status(400).json({ error: 'name is required' });
+    }
+    const manufacturer = await prisma.manufacturer.findUnique({ where: { id } });
+    if (!manufacturer) {
+      return res.status(404).json({ error: 'Manufacturer not found' });
+    }
+    const trimmed = String(name).trim();
+    const duplicate = await prisma.manufacturer.findFirst({
+      where: { type: manufacturer.type, name: { equals: trimmed, mode: 'insensitive' }, id: { not: id } },
+    });
+    if (duplicate) {
+      return res.status(409).json({ error: `Another ${manufacturer.type.toLowerCase()} brand is already named "${trimmed}"` });
+    }
+    const updated = await prisma.manufacturer.update({ where: { id }, data: { name: trimmed } });
+    res.json(updated);
+  } catch (error) {
+    console.error('Error updating manufacturer:', error);
+    res.status(500).json({ error: 'Failed to update manufacturer' });
+  }
+};
+
+export const deleteManufacturer = async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const manufacturer = await prisma.manufacturer.findUnique({ where: { id } });
+    if (!manufacturer) {
+      return res.status(404).json({ error: 'Manufacturer not found' });
+    }
+    const [modelCount, vehicleCount] = await Promise.all([
+      prisma.model.count({ where: { manufacturerId: id } }),
+      prisma.vehicle.count({ where: { manufacturerId: id } }),
+    ]);
+    if (modelCount > 0 || vehicleCount > 0) {
+      return res.status(400).json({
+        error: `Cannot delete: this brand has ${modelCount} model(s) and ${vehicleCount} vehicle combination(s). Remove those first.`,
+      });
+    }
+    await prisma.manufacturer.delete({ where: { id } });
+    res.status(200).json({ message: 'Brand deleted' });
+  } catch (error) {
+    console.error('Error deleting manufacturer:', error);
+    res.status(500).json({ error: 'Failed to delete manufacturer' });
+  }
+};
+
 export const createModel = async (req: Request, res: Response) => {
   try {
     const { manufacturerId, name } = req.body;
@@ -195,13 +268,20 @@ export const createFuelType = async (req: Request, res: Response) => {
 };
 
 const parseVehiclePayload = (body: any) => {
-  const { manufacturerId, modelId, variantId, fuelTypeId, year } = body;
+  const { manufacturerId, modelId, variantId, fuelTypeId, year, engineCc } = body;
   if (!manufacturerId || !modelId || !fuelTypeId || !year) {
     return { error: 'manufacturerId, modelId, fuelTypeId and year are required' };
   }
   const yearNum = Number(year);
   if (!Number.isInteger(yearNum) || yearNum < 1980 || yearNum > new Date().getFullYear() + 1) {
     return { error: 'year is invalid' };
+  }
+  let engineCcNum: number | null = null;
+  if (engineCc !== undefined && engineCc !== null && engineCc !== '') {
+    engineCcNum = Number(engineCc);
+    if (!Number.isInteger(engineCcNum) || engineCcNum <= 0) {
+      return { error: 'engineCc must be a positive whole number' };
+    }
   }
   return {
     data: {
@@ -210,6 +290,7 @@ const parseVehiclePayload = (body: any) => {
       variantId: variantId ? String(variantId) : null,
       fuelTypeId: String(fuelTypeId),
       year: yearNum,
+      engineCc: engineCcNum,
     },
   };
 };
