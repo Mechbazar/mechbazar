@@ -48,3 +48,9 @@ apps/mobile/build-output/
 
 # Built APKs (local Gradle/EAS output) -- large binaries, never commit
 build-output/
+# Catches stray builds left outside build-output/ too (e.g. a `--output`
+# flag pointed elsewhere) -- one of these got swept into a commit via a
+# broad `git add` despite the rule above, since it didn't live in
+# build-output/. See docs/LOCAL_BUILDS.md.
+*.apk
+*.aab
