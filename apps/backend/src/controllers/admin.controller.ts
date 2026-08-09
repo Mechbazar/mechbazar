@@ -4,6 +4,9 @@ import prisma from '../config/prisma';
 import { AuthRequest } from '../middlewares/auth';
 import { notifyUser, classifyNotificationDisplayCategory } from '../utils/notify';
 import { isBroadcastAudience, sendBroadcast, BroadcastFilters } from '../services/broadcast.service';
+import { sanitizeUser } from '../utils/sanitizeUser';
+import { ensureFirebaseAccount, sendFirebasePasswordResetEmail } from '../utils/firebasePassword';
+import { isEmailConfigured } from '../config/env';
 
 export const getDashboardStats = async (req: Request, res: Response) => {
   try {
@@ -556,5 +559,237 @@ export const getNotificationAnalytics = async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error computing notification analytics:', error);
     res.status(500).json({ error: 'Failed to compute notification analytics' });
+  }
+};
+
+// ============ Staff / administrator account management ============
+// "Staff" means any User whose role sits in STAFF_ROLES -- everyone who can
+// sign into this admin panel. Managed separately from /customers (which only
+// ever touches Role.CUSTOMER rows) even though both live on the same User
+// table. Mirrors the role set auth.controller.ts's adminLogin already treats
+// as admin-panel-eligible.
+const STAFF_ROLES: Role[] = [
+  Role.SUPER_ADMIN,
+  Role.ADMIN,
+  Role.OPERATIONS_MANAGER,
+  Role.INVENTORY_MANAGER,
+  Role.VENDOR_MANAGER,
+  Role.FINANCE_MANAGER,
+  Role.CUSTOMER_SUPPORT,
+];
+
+export const getStaffUsers = async (req: Request, res: Response) => {
+  try {
+    const staff = await prisma.user.findMany({
+      where: { role: { in: STAFF_ROLES }, deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(
+      staff.map((s) => ({ ...sanitizeUser(s), isActive: s.roles.includes(s.role) }))
+    );
+  } catch (error) {
+    console.error('Error fetching staff users:', error);
+    res.status(500).json({ error: 'Failed to fetch administrators' });
+  }
+};
+
+// Allocates a synthetic, never-dialable phone number for a staff account --
+// User.phone is required + unique, but staff sign in with email/password, not
+// OTP, so they have no real phone. A '0'-prefixed number can never collide
+// with a real Indian mobile number (which always starts 6-9), matching the
+// convention seed-admin.ts (0000000000) and product.controller.ts's house
+// vendor (0000000002) already established.
+async function allocateStaffPhone(): Promise<string> {
+  for (let i = 0; i < 10; i++) {
+    const candidate = '0' + String(Math.floor(Math.random() * 1e9)).padStart(9, '0');
+    const existing = await prisma.user.findUnique({ where: { phone: candidate }, select: { id: true } });
+    if (!existing) return candidate;
+  }
+  throw new Error('Could not allocate a unique staff phone after 10 attempts');
+}
+
+export const createStaffUser = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { name, email, role } = req.body as { name?: string; email?: string; role?: Role };
+    if (!name || !String(name).trim()) {
+      res.status(400).json({ error: 'Name is required.' });
+      return;
+    }
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({ error: 'A valid email is required.' });
+      return;
+    }
+    if (!role || !STAFF_ROLES.includes(role)) {
+      res.status(400).json({ error: `role must be one of: ${STAFF_ROLES.join(', ')}` });
+      return;
+    }
+    if (!isEmailConfigured()) {
+      res.status(503).json({ error: 'Email delivery is not configured, so a new administrator cannot be invited right now.' });
+      return;
+    }
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      res.status(400).json({ error: 'An account with this email already exists.' });
+      return;
+    }
+
+    const phone = await allocateStaffPhone();
+    const user = await prisma.user.create({
+      data: { name: name.trim(), email, phone, role, roles: [role] },
+    });
+
+    // No password is set here -- ensureFirebaseAccount creates the Firebase
+    // Auth record with none, and the reset email below is how the new admin
+    // sets their own first password, same trust model as seed-admin.ts minus
+    // needing the creator to know or transmit a password at all.
+    const firebaseUid = await ensureFirebaseAccount(user.id, email, null);
+    if (!firebaseUid) {
+      await prisma.user.delete({ where: { id: user.id } });
+      res.status(502).json({ error: 'Failed to create the account in Firebase Auth. Nothing was saved -- try again.' });
+      return;
+    }
+
+    const emailSent = await sendFirebasePasswordResetEmail(email);
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'STAFF_CREATE',
+        entity: 'User',
+        entityId: user.id,
+        details: `Added administrator ${name} (${email}) with role ${role}`,
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.status(201).json({
+      ...sanitizeUser(user),
+      isActive: true,
+      emailSent,
+      message: emailSent
+        ? 'Administrator created. A password-setup email has been sent to them.'
+        : 'Administrator created, but the invite email could not be sent -- ask them to use "Forgot password" on the login screen.',
+    });
+  } catch (error) {
+    console.error('Error creating staff user:', error);
+    res.status(500).json({ error: 'Failed to create administrator' });
+  }
+};
+
+export const updateStaffRole = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const id = String(req.params.id);
+    const { role } = req.body as { role?: Role };
+    if (!role || !STAFF_ROLES.includes(role)) {
+      res.status(400).json({ error: `role must be one of: ${STAFF_ROLES.join(', ')}` });
+      return;
+    }
+
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target || !STAFF_ROLES.includes(target.role)) {
+      res.status(404).json({ error: 'Administrator not found' });
+      return;
+    }
+
+    // This endpoint is Super-Admin-gated, so reaching this point means the
+    // caller IS a Super Admin -- this specifically blocks a Super Admin from
+    // demoting themselves (accidentally or otherwise) and locking every
+    // Super Admin out at once.
+    if (target.id === req.user!.userId && role !== Role.SUPER_ADMIN) {
+      res.status(400).json({ error: 'You cannot change your own role away from Super Admin.' });
+      return;
+    }
+
+    if (target.role === Role.SUPER_ADMIN && role !== Role.SUPER_ADMIN) {
+      const otherSuperAdmins = await prisma.user.count({
+        where: { role: Role.SUPER_ADMIN, deletedAt: null, id: { not: id } },
+      });
+      if (otherSuperAdmins === 0) {
+        res.status(400).json({ error: 'At least one Super Admin must remain.' });
+        return;
+      }
+    }
+
+    // Preserve deactivated state across a role change -- editing the role of
+    // a deactivated admin shouldn't silently reactivate them.
+    const wasActive = target.roles.includes(target.role);
+    const updated = await prisma.user.update({
+      where: { id },
+      data: { role, roles: wasActive ? [role] : [] },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: 'STAFF_ROLE_UPDATE',
+        entity: 'User',
+        entityId: id,
+        details: `Changed ${target.name || target.email}'s role from ${target.role} to ${role}`,
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({ ...sanitizeUser(updated), isActive: wasActive });
+  } catch (error) {
+    console.error('Error updating staff role:', error);
+    res.status(500).json({ error: 'Failed to update administrator' });
+  }
+};
+
+export const setStaffActive = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const id = String(req.params.id);
+    const { isActive } = req.body as { isActive?: boolean };
+    if (typeof isActive !== 'boolean') {
+      res.status(400).json({ error: 'isActive (boolean) is required.' });
+      return;
+    }
+
+    const target = await prisma.user.findUnique({ where: { id } });
+    if (!target || !STAFF_ROLES.includes(target.role)) {
+      res.status(404).json({ error: 'Administrator not found' });
+      return;
+    }
+    if (target.id === req.user!.userId) {
+      res.status(400).json({ error: 'You cannot deactivate your own account.' });
+      return;
+    }
+    if (!isActive && target.role === Role.SUPER_ADMIN) {
+      const otherSuperAdmins = await prisma.user.count({
+        where: { role: Role.SUPER_ADMIN, deletedAt: null, id: { not: id } },
+      });
+      if (otherSuperAdmins === 0) {
+        res.status(400).json({ error: 'At least one Super Admin must remain.' });
+        return;
+      }
+    }
+
+    // Deactivation revokes every admin-panel privilege by dropping the role
+    // from `roles` -- authenticate() (middlewares/auth.ts) checks that array
+    // on every request, so this locks out an already-issued session
+    // immediately rather than waiting up to 7 days for the JWT to expire.
+    // `role` itself is left untouched so reactivating restores the exact same
+    // role rather than requiring it to be picked again.
+    const updated = await prisma.user.update({
+      where: { id },
+      data: { roles: isActive ? [target.role] : [] },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: req.user!.userId,
+        action: isActive ? 'STAFF_REACTIVATE' : 'STAFF_DEACTIVATE',
+        entity: 'User',
+        entityId: id,
+        details: `${isActive ? 'Reactivated' : 'Deactivated'} administrator ${target.name || target.email}`,
+        ipAddress: req.ip || null,
+      },
+    });
+
+    res.json({ ...sanitizeUser(updated), isActive });
+  } catch (error) {
+    console.error('Error updating staff status:', error);
+    res.status(500).json({ error: 'Failed to update administrator status' });
   }
 };

@@ -44,10 +44,15 @@ const authSlice = createSlice({
       localStorage.removeItem('adminToken');
       localStorage.removeItem('adminUser');
     },
+    updateUser: (state, action: PayloadAction<Partial<AuthState['user']>>) => {
+      if (!state.user) return;
+      state.user = { ...state.user, ...action.payload };
+      localStorage.setItem('adminUser', JSON.stringify(state.user));
+    },
   },
 });
 
-export const { loginSuccess, logout } = authSlice.actions;
+export const { loginSuccess, logout, updateUser } = authSlice.actions;
 
 export const store = configureStore({
   reducer: {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Menu, Search, Sun, Moon, History, Settings, KeyRound, LogOut, ChevronDown } from 'lucide-react';
+import { Menu, Search, Sun, Moon, History, Settings, KeyRound, LogOut, ChevronDown, UserCircle } from 'lucide-react';
 import type { RootState } from '../../store';
 import { useTheme } from '../../hooks/useTheme';
 import { SearchCommandPalette } from '../ui/SearchCommandPalette';
@@ -130,6 +130,12 @@ export function Topbar({ onOpenMobileMenu, onChangePassword, onLogout }: TopbarP
               transition={{ duration: 0.15 }}
               className="absolute right-0 mt-2 w-56 rounded-2xl border border-border-default bg-surface-overlay shadow-popover overflow-hidden z-50"
             >
+              <button
+                onClick={() => { setMenuOpen(false); navigate('/profile'); }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-content-primary hover:bg-surface-hover transition-colors"
+              >
+                <UserCircle size={15} /> My Profile
+              </button>
               <button
                 onClick={() => { setMenuOpen(false); onChangePassword(); }}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-content-primary hover:bg-surface-hover transition-colors"

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Menu, X, KeyRound, LogOut, ChevronDown } from 'lucide-react';
+import { Menu, X, KeyRound, LogOut, ChevronDown, UserCircle } from 'lucide-react';
 import type { RootState } from '../../store';
 import { NAV_ROLES } from '../../config/navRoles';
 import { useTheme } from '../../hooks/useTheme';
@@ -64,6 +64,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Settings',
     links: [
       { to: '/commission-settings', icon: 'gear', label: 'Commission & Payout Settings' },
+      { to: '/admin-management', icon: 'shield', label: 'Administrators' },
       // No NAV_ROLES entry -- the backend endpoint is open to every
       // authenticated role (GET/PATCH /customers/notification-preferences
       // has no role check, unlike commission-settings above), so every
@@ -187,6 +188,13 @@ export function Sidebar({ mobileOpen, onMobileClose, onChangePassword, onLogout 
                 transition={{ duration: 0.15 }}
                 className="absolute bottom-full left-2.5 right-2.5 mb-2 rounded-2xl border border-border-default bg-surface-overlay shadow-popover overflow-hidden"
               >
+                <Link
+                  to="/profile"
+                  onClick={() => setProfileOpen(false)}
+                  className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-content-primary hover:bg-surface-hover transition-colors"
+                >
+                  <UserCircle size={15} /> My Profile
+                </Link>
                 <button
                   onClick={() => { setProfileOpen(false); onChangePassword(); }}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-content-primary hover:bg-surface-hover transition-colors"

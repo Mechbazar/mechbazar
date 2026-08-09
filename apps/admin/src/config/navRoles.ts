@@ -40,4 +40,9 @@ export const NAV_ROLES: Record<string, string[]> = {
   // restricted the same way so a lower-privilege admin isn't shown a page
   // that immediately 403s on every save.
   '/commission-settings': ['SUPER_ADMIN'],
+  // Matches admin.routes.ts's superAdminOnly gate on the mutating /admin/staff/*
+  // endpoints -- GET is open to ADMIN too, but the nav entry (which leads to
+  // create/re-role/deactivate actions) is Super-Admin-only like Commission
+  // Settings above.
+  '/admin-management': ['SUPER_ADMIN'],
 };
