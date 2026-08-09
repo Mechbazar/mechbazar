@@ -69,6 +69,19 @@ export const ACTIVE_JOB_STATUSES: BookingStatus[] = [
 ];
 
 /**
+ * Statuses in which a specific technicianId "owns" a job -- i.e. a booking row
+ * whose technicianId points at them and hasn't finished. Used to stop an
+ * admin from assigning a new job to a mechanic who already has one of these:
+ * a mechanic can only physically be at one job at a time. Excludes REJECTED
+ * (they declined/timed out -- no longer theirs) and PENDING_ADMIN_ASSIGNMENT
+ * (no technician set yet), unlike ACTIVE_JOB_STATUSES above which tracks the
+ * job's own lifecycle rather than a particular technician's workload.
+ */
+export const TECHNICIAN_ACTIVE_STATUSES: BookingStatus[] = [
+  'MECHANIC_ASSIGNED', 'MECHANIC_ACCEPTED', 'MECHANIC_ON_THE_WAY', 'ARRIVED', 'WORK_STARTED',
+];
+
+/**
  * The two transitions the OTP gate owns. Nothing else -- not an admin, not a
  * support agent -- may produce them, because reaching them by any other route
  * would mean a job records `verifiedByCustomer` semantics it never earned.

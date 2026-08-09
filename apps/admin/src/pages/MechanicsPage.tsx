@@ -47,7 +47,7 @@ export default function MechanicsPage() {
   const [formData, setFormData] = useState({
     id: '', name: '', phone: '', email: '', city: '', state: '',
     specializations: ['CAR', 'BIKE'] as string[], skills: '', experienceYears: '',
-    isActive: true, isOnline: false,
+    isActive: true,
     addressLine: '', pincode: '', country: '',
     lat: null as number | null, lng: null as number | null,
     placeId: '', formattedAddress: '',
@@ -157,11 +157,16 @@ export default function MechanicsPage() {
         email: technician.email || '',
         city: tp.city || technician.city || '',
         state: tp.state || technician.state || '',
-        specializations: tp.specializations || [],
+        // Technicians who self-registered through the app (as opposed to
+        // being added here by an admin) start with specializations: [] until
+        // they finish their own KYC wizard -- seeding the edit form with that
+        // empty array left both checkboxes unchecked, so validateForm's "at
+        // least one" rule silently blocked every save with no network call
+        // and no visible error. Same fallback Create already uses below.
+        specializations: tp.specializations?.length ? tp.specializations : ['CAR', 'BIKE'],
         skills: (tp.skills || []).join(', '),
         experienceYears: tp.experienceYears != null ? String(tp.experienceYears) : '',
         isActive: tp.isActive ?? true,
-        isOnline: tp.isOnline ?? false,
         addressLine: tp.addressLine || '',
         pincode: tp.pincode || '',
         country: tp.country || '',
@@ -174,7 +179,7 @@ export default function MechanicsPage() {
       setIsEditing(false);
       setFormData({
         id: '', name: '', phone: '', email: '', city: '', state: '',
-        specializations: ['CAR', 'BIKE'], skills: '', experienceYears: '', isActive: true, isOnline: false,
+        specializations: ['CAR', 'BIKE'], skills: '', experienceYears: '', isActive: true,
         addressLine: '', pincode: '', country: '', lat: null, lng: null, placeId: '', formattedAddress: '',
       });
     }
@@ -228,7 +233,14 @@ export default function MechanicsPage() {
     e.preventDefault();
     setFormError('');
     const payload = validateForm();
-    if (!payload) return;
+    if (!payload) {
+      // Otherwise a validation failure (e.g. no vehicle specialization
+      // checked) leaves the modal just sitting there with no network call and
+      // only a small red line under the relevant field -- easy to miss below
+      // the KYC address/map section. A toast makes the block visible.
+      toast.error('Please fix the highlighted fields before saving.');
+      return;
+    }
 
     try {
       if (isEditing) {
@@ -244,10 +256,10 @@ export default function MechanicsPage() {
     }
   };
 
-  // Sends the full technician record with only the active flag flipped -- the
-  // backend's partial-update for name/phone/email/city/state isn't
-  // undefined-guarded, so a payload with only { isActive } would null out the
-  // technician's email. Mirrors Riders.tsx's handleToggleStatus exactly.
+  // Sends the full technician record with only the active flag flipped.
+  // Mirrors Riders.tsx's handleToggleStatus. isOnline is deliberately omitted
+  // -- the backend no longer accepts it from this endpoint at all (it's
+  // derived from the mechanic's own app activity, not admin-settable).
   const handleToggleStatus = async (technician: any) => {
     try {
       await axios.put(`${API_URL}/technicians/${technician.id}`, {
@@ -255,7 +267,6 @@ export default function MechanicsPage() {
         specializations: technician.technicianProfile?.specializations,
         skills: technician.technicianProfile?.skills,
         experienceYears: technician.technicianProfile?.experienceYears,
-        isOnline: technician.technicianProfile?.isOnline,
         isActive: !technician.technicianProfile?.isActive,
       }, { headers: { Authorization: `Bearer ${token}` } });
       fetchTechnicians();
@@ -858,7 +869,11 @@ export default function MechanicsPage() {
           {isEditing && (
             <div className="flex flex-col space-y-3 pt-2">
               <Checkbox label="Account is Active" checked={formData.isActive} onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })} />
-              <Checkbox label="Mark as Online" checked={formData.isOnline} onChange={(e) => setFormData({ ...formData, isOnline: e.target.checked })} />
+              {/* No "Mark as Online" toggle here on purpose -- online status
+                  reflects the mechanic's own app activity (their go-online
+                  toggle + live location pings, auto-corrected offline by the
+                  presence sweeper when it goes stale), not something an admin
+                  hand-sets. See technician.controller.ts's updateTechnician. */}
             </div>
           )}
 

@@ -8,7 +8,7 @@ import { sanitizeBooking, sanitizeBookings } from '../utils/sanitizeUser';
 import { haversineKm } from '../utils/geo';
 import { pendingPaymentCreateInput, creditWalletForOnlineRefund } from '../services/payment.service';
 import { broadcastBookingStatus } from '../utils/realtimeBooking';
-import { ASSIGNMENT_RESPONSE_WINDOW_MS } from '../services/jobState';
+import { ASSIGNMENT_RESPONSE_WINDOW_MS, TECHNICIAN_ACTIVE_STATUSES } from '../services/jobState';
 import { creditServiceCompletion } from '../services/commission.service';
 
 // Thrown from inside createBooking's $transaction to carry an intended HTTP
@@ -1231,7 +1231,7 @@ export const getAssignableTechnicians = async (req: Request, res: Response) => {
       by: ['technicianId'],
       where: {
         technicianId: { in: candidates.map((c) => c.id) },
-        status: { notIn: ['COMPLETED', 'CANCELLED', 'REJECTED'] },
+        status: { in: TECHNICIAN_ACTIVE_STATUSES },
       },
       _count: { _all: true },
     });
@@ -1258,7 +1258,16 @@ export const getAssignableTechnicians = async (req: Request, res: Response) => {
       };
     });
 
+    // "Available" mechanics first (online and not already on a job), then by
+    // distance -- previously this only sorted by distance, so a genuinely free
+    // mechanic two streets away could be buried under an offline one further
+    // down the list, and admins had no quick way to see who could actually
+    // take the job right now.
     enriched.sort((a, b) => {
+      const aAvailable = a.isOnline && !a.isBusy;
+      const bAvailable = b.isOnline && !b.isBusy;
+      if (aAvailable !== bAvailable) return aAvailable ? -1 : 1;
+      if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
       if (a.distanceKm == null) return 1;
       if (b.distanceKm == null) return -1;
       return a.distanceKm - b.distanceKm;
@@ -1322,6 +1331,17 @@ export const assignTechnician = async (req: AuthRequest, res: Response) => {
     // offer card for a job someone else was just handed.
     if (booking.isEmergency) {
       return res.status(400).json({ error: 'This is an emergency job -- use POST /api/jobs/admin/:id/assign instead.' });
+    }
+
+    // A mechanic can only physically be at one job at a time -- block handing
+    // them a second one while they still hold an unfinished one. Excludes this
+    // same booking (id: { not: id }) so re-assigning/confirming the booking
+    // they're already on doesn't trip its own guard.
+    const activeElsewhere = await prisma.serviceBooking.count({
+      where: { technicianId, id: { not: id }, status: { in: TECHNICIAN_ACTIVE_STATUSES } },
+    });
+    if (activeElsewhere > 0) {
+      return res.status(400).json({ error: 'This mechanic already has an active job. Wait for them to finish it, or choose another mechanic.' });
     }
 
     const assignmentExpiresAt = new Date(Date.now() + ASSIGNMENT_RESPONSE_WINDOW_MS);

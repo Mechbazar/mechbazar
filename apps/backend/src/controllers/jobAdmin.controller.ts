@@ -5,7 +5,7 @@ import { env } from '../config/env';
 import { AuthRequest } from '../middlewares/auth';
 import {
   transitionJob, JobTransitionError, buildTimeline, ACTIVE_JOB_STATUSES, LIVE_TRACKING_STATUSES,
-  ASSIGNMENT_RESPONSE_WINDOW_MS,
+  ASSIGNMENT_RESPONSE_WINDOW_MS, TECHNICIAN_ACTIVE_STATUSES,
 } from '../services/jobState';
 import { closeOpenOffers, createSingleOffer } from '../services/dispatch.service';
 import { getJobTrail } from '../services/tracking.service';
@@ -293,6 +293,17 @@ export const adminAssign = async (req: AuthRequest, res: Response) => {
 
     const job = await prisma.serviceBooking.findUnique({ where: { id }, select: { status: true, bookingNumber: true, userId: true } });
     if (!job) return res.status(404).json({ error: 'Job not found' });
+
+    // A mechanic can only physically be at one job at a time -- block handing
+    // them a second one while they still hold an unfinished one. Excludes this
+    // same job (id: { not: id }) so redispatching/re-offering the job they're
+    // already on doesn't trip its own guard.
+    const activeElsewhere = await prisma.serviceBooking.count({
+      where: { technicianId, id: { not: id }, status: { in: TECHNICIAN_ACTIVE_STATUSES } },
+    });
+    if (activeElsewhere > 0) {
+      return res.status(400).json({ error: 'This mechanic already has an active job. Wait for them to finish it, or choose another mechanic.' });
+    }
 
     const assignmentExpiresAt = new Date(Date.now() + ASSIGNMENT_RESPONSE_WINDOW_MS);
 

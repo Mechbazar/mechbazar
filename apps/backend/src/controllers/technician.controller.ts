@@ -171,9 +171,15 @@ export const updateTechnician = async (req: Request, res: Response): Promise<voi
   try {
     const id = String(req.params.id);
     const {
-      name, phone, email, city, state, specializations, skills, experienceYears, isActive, isOnline,
+      name, phone, email, city, state, specializations, skills, experienceYears, isActive,
       addressLine, pincode, country, lat, lng, placeId, formattedAddress,
     } = req.body;
+    // isOnline is intentionally NOT accepted here -- it must reflect the
+    // mechanic's own real presence (their app's own PATCH /technicians/me/
+    // availability toggle, corrected by the presence sweeper in jobs/sweeper.ts
+    // when their GPS goes stale), not something an admin can hand-set from
+    // this form. Silently ignored rather than 400ing so old cached frontend
+    // bundles that still send it don't start failing this endpoint outright.
 
     const existingUser = await prisma.user.findUnique({ where: { id } });
     if (!existingUser) {
@@ -184,18 +190,23 @@ export const updateTechnician = async (req: Request, res: Response): Promise<voi
     const technician = await prisma.user.update({
       where: { id },
       data: {
-        name,
-        phone,
-        email: email || null,
-        city,
-        state,
+        // Guarded the same way the nested technicianProfile.update below
+        // already is -- an unconditional `email: email || null` meant ANY
+        // caller that omitted email (a partial-update payload, e.g. a future
+        // "toggle isActive only" request) would silently wipe it, same class
+        // of bug the frontend's handleToggleStatus comment already works
+        // around by always spreading the full technician object.
+        ...(name !== undefined && { name }),
+        ...(phone !== undefined && { phone }),
+        ...(email !== undefined && { email: email || null }),
+        ...(city !== undefined && { city }),
+        ...(state !== undefined && { state }),
         technicianProfile: {
           update: {
             ...(specializations !== undefined && { specializations }),
             ...(skills !== undefined && { skills }),
             ...(experienceYears !== undefined && { experienceYears }),
             ...(isActive !== undefined && { isActive }),
-            ...(isOnline !== undefined && { isOnline }),
             // Admin-side KYC address editing (Phase 4 Maps integration) --
             // same fields/conditional-update pattern as the technician's own
             // updateMyRegistration above, just reachable from the admin panel.
