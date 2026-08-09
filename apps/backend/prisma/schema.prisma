@@ -422,17 +422,24 @@ model VendorSettlement {
 }
 
 model DeliveryPartner {
-  id            String  @id @default(uuid())
-  userId        String  @unique
-  user          User    @relation(fields: [userId], references: [id])
-  vehicleType   String
-  licenseNumber String
-  isActive      Boolean @default(false)
-  isOnline      Boolean @default(false)
-  currentLat    Float?
-  currentLng    Float?
-  expoPushToken String?
-  walletBalance Float   @default(0.0)
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id])
+  vehicleType    String
+  licenseNumber  String
+  isActive       Boolean   @default(false)
+  isOnline       Boolean   @default(false)
+  currentLat     Float?
+  currentLng     Float?
+  // Freshness guard for presence, mirroring ServiceTechnician.lastLocationAt --
+  // set on every updateMyLocation ping. Without it, isOnline could only ever
+  // go true (the rider's own toggle) or false (the rider's own toggle) with
+  // no automatic correction, so a rider whose app crashed or lost network
+  // while online would show as "Online" in the admin panel indefinitely. See
+  // the presence sweeper in jobs/sweeper.ts.
+  lastLocationAt DateTime?
+  expoPushToken  String?
+  walletBalance  Float     @default(0.0)
 
   // Commission & payout config -- see services/commission.service.ts.
   settlementCycle           SettlementCycle @default(WEEKLY)

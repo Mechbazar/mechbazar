@@ -22,8 +22,8 @@ import { retryFailedNotificationDeliveries } from '../utils/notify';
 //    finds. This is the real "60 second countdown" enforcement -- an
 //    unanswered MECHANIC_ASSIGNED booking is flipped back to REJECTED here,
 //    not by any client-side timer.
-//  * MECHANIC PRESENCE (60s) -- a phone that died still shows as "online" in
-//    the admin's assign-a-mechanic picker.
+//  * MECHANIC/RIDER PRESENCE (60s) -- a phone that died still shows as
+//    "online" in the admin's assign-a-mechanic picker or rider list.
 //  * RETENTION (hourly) -- deleting old breadcrumbs and spent OTPs. Deliberately
 //    the slowest and the only one that issues DELETEs at volume.
 //  * PAYMENT RECONCILE (5m) -- catches a Razorpay payment whose webhook never
@@ -104,6 +104,23 @@ export function startSweepers(): void {
       data: { isOnline: false },
     });
     if (count > 0) console.log(`[sweeper] presence: marked ${count} stale mechanic(s) offline`);
+
+    // Same correction for riders, mirroring the mechanic sweep above -- a
+    // rider whose app died/lost network mid-delivery previously stayed
+    // "Online" in the admin panel forever, since nothing but their own
+    // (now-unreachable) app could ever flip it back.
+    const { count: riderCount } = await prisma.deliveryPartner.updateMany({
+      where: {
+        isOnline: true,
+        // A rider actively on a delivery is left alone even if their GPS
+        // drops -- forcing them offline mid-delivery would strip them from
+        // the ops view at the exact moment ops most needs to see them.
+        orders: { none: { status: { in: ['ACCEPTED', 'PACKING', 'PICKUP', 'ON_THE_WAY'] } } },
+        OR: [{ lastLocationAt: { lt: cutoff } }, { lastLocationAt: null }],
+      },
+      data: { isOnline: false },
+    });
+    if (riderCount > 0) console.log(`[sweeper] presence: marked ${riderCount} stale rider(s) offline`);
   });
 
   schedule('retention', RETENTION_SWEEP_MS, async () => {

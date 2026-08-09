@@ -165,8 +165,12 @@ export const createRider = async (req: Request, res: Response): Promise<void> =>
 export const updateRider = async (req: Request, res: Response): Promise<void> => {
   try {
     const id = String(req.params.id);
-    const { name, phone, email, city, state, vehicleType, licenseNumber, isActive, isOnline } = req.body;
-    
+    // isOnline is intentionally NOT accepted here -- it must reflect the
+    // rider's own real presence (their app's own PATCH /riders/me/availability
+    // toggle, corrected by the presence sweeper in jobs/sweeper.ts when their
+    // GPS goes stale), not something an admin can hand-set from this form.
+    const { name, phone, email, city, state, vehicleType, licenseNumber, isActive } = req.body;
+
     // Check if user exists
     const existingUser = await prisma.user.findUnique({ where: { id } });
     if (!existingUser) {
@@ -174,21 +178,23 @@ export const updateRider = async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    // Update user and delivery profile
+    // Update user and delivery profile. Every field is undefined-guarded --
+    // an earlier version set all of these unconditionally, so a caller that
+    // omitted e.g. email (a partial-update payload) would silently null it
+    // out rather than leave it alone.
     const rider = await prisma.user.update({
       where: { id },
       data: {
-        name,
-        phone,
-        email: email || null,
-        city,
-        state,
+        ...(name !== undefined && { name }),
+        ...(phone !== undefined && { phone }),
+        ...(email !== undefined && { email: email || null }),
+        ...(city !== undefined && { city }),
+        ...(state !== undefined && { state }),
         deliveryProfile: {
           update: {
-            vehicleType,
-            licenseNumber,
-            isActive,
-            isOnline
+            ...(vehicleType !== undefined && { vehicleType }),
+            ...(licenseNumber !== undefined && { licenseNumber }),
+            ...(isActive !== undefined && { isActive }),
           }
         }
       },
@@ -673,7 +679,7 @@ export const updateMyLocation = async (req: AuthRequest, res: Response): Promise
     }
     const updated = await prisma.deliveryPartner.update({
       where: { id: partner.id },
-      data: { currentLat: lat, currentLng: lng },
+      data: { currentLat: lat, currentLng: lng, lastLocationAt: new Date() },
     });
     res.status(200).json(updated);
   } catch (error) {

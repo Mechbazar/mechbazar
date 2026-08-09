@@ -52,8 +52,7 @@ export default function Riders() {
     state: '',
     vehicleType: 'BIKE',
     licenseNumber: '',
-    isActive: true,
-    isOnline: false
+    isActive: true
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState('');
@@ -118,13 +117,12 @@ export default function Riders() {
         state: rider.state || '',
         vehicleType: rider.deliveryProfile?.vehicleType || 'BIKE',
         licenseNumber: rider.deliveryProfile?.licenseNumber || '',
-        isActive: rider.deliveryProfile?.isActive ?? true,
-        isOnline: rider.deliveryProfile?.isOnline ?? false
+        isActive: rider.deliveryProfile?.isActive ?? true
       });
     } else {
       setIsEditing(false);
       setFormData({
-        id: '', name: '', phone: '', email: '', city: '', state: '', vehicleType: 'BIKE', licenseNumber: '', isActive: true, isOnline: false
+        id: '', name: '', phone: '', email: '', city: '', state: '', vehicleType: 'BIKE', licenseNumber: '', isActive: true
       });
     }
     setShowModal(true);
@@ -215,7 +213,6 @@ export default function Riders() {
         ...rider,
         vehicleType: rider.deliveryProfile?.vehicleType,
         licenseNumber: rider.deliveryProfile?.licenseNumber,
-        isOnline: rider.deliveryProfile?.isOnline,
         isActive: !rider.deliveryProfile?.isActive
       }, {
         headers: { Authorization: `Bearer ${token}` }
@@ -606,11 +603,11 @@ export default function Riders() {
                 checked={formData.isActive}
                 onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
               />
-              <Checkbox
-                label="Mark as Online"
-                checked={formData.isOnline}
-                onChange={(e) => setFormData({ ...formData, isOnline: e.target.checked })}
-              />
+              {/* No "Mark as Online" toggle here on purpose -- online status
+                  reflects the rider's own app activity (their go-online
+                  toggle + live location pings, auto-corrected offline by the
+                  presence sweeper when it goes stale), not something an admin
+                  hand-sets. See rider.controller.ts's updateRider. */}
             </div>
           )}
 
