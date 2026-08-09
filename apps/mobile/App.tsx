@@ -3,7 +3,7 @@ import { View, ActivityIndicator, StyleSheet, Platform, Appearance, Animated } f
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import * as SplashScreen from 'expo-splash-screen';
-import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
+import { NavigationContainer, LinkingOptions, createNavigationContainerRef, CommonActions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,7 +17,8 @@ import { hydrateGarage, setVehicleTypeHydrated, loadVehicleType } from './src/st
 import { setThemePreferenceHydrated, loadThemePreference, systemSchemeChanged } from './src/store/themeSlice';
 import './src/services/sessionGuard';
 import ErrorBoundary from './src/components/shared/ErrorBoundary';
-import { registerForPushNotificationsAsync } from './src/services/notifications';
+import { registerForPushNotificationsAsync, addNotificationTapListener } from './src/services/notifications';
+import { resolveNotificationRoute } from './src/utils/notificationDeepLink';
 import { registerForWebPushAsync } from './src/services/webPush';
 import { API_BASE_URL } from './src/services/api';
 import { initAppCheck } from './src/services/appCheck';
@@ -66,6 +67,10 @@ import StaticPageScreen from './src/screens/StaticPageScreen';
 // a hook body executes, expo-splash-screen may already have auto-hidden. Not
 // awaited, per Expo's docs -- awaiting it here would reintroduce the race.
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Module-level so the notification-tap listener (which fires outside the
+// component tree) can navigate without threading a ref through props.
+const navigationRef = createNavigationContainerRef();
 
 // Same key App.js already used for its session cache -- reusing it means an
 // already-logged-in user isn't logged out by this rewrite. Cart and garage get
@@ -458,6 +463,20 @@ function RootNavigator() {
     })();
   }, [token]);
 
+  // Deep-link a tapped push notification straight to its order/booking
+  // screen (system tray, not just the in-app Notifications list, which
+  // already navigates on tap in NotificationsScreen.tsx). Registered once,
+  // independent of login state -- a tap can arrive before `token` is set.
+  useEffect(() => {
+    const unsubscribe = addNotificationTapListener((data) => {
+      const target = resolveNotificationRoute({ data });
+      if (target && navigationRef.isReady()) {
+        navigationRef.dispatch(CommonActions.navigate({ name: target.screen, params: target.params }));
+      }
+    });
+    return unsubscribe;
+  }, []);
+
   // Browser push (web build only -- see services/webPush.ts). Separate from
   // the Expo push token above: writes to User.fcmToken instead of
   // expoPushToken, so both channels can be registered for the same account
@@ -534,7 +553,7 @@ function RootNavigator() {
   return (
     <>
       <OfflineBanner />
-      <NavigationContainer linking={linking}>
+      <NavigationContainer ref={navigationRef} linking={linking}>
       <DesktopAppShell>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {token ? (

@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import type { NotificationItem, NotificationPage } from './notificationTypes';
 
 // Mirrors apps/admin (web) exactly — one method per backend endpoint the
 // Admin Panel calls. The web panel hardcodes two different ports across its
@@ -302,11 +303,27 @@ export const adminService = {
   // keyed on the authenticated admin's own user id via the JWT.
   getNotifications: async () => {
     const response = await apiClient.get('/customers/notifications');
-    return response.data;
+    return response.data as NotificationItem[];
+  },
+  // Paginated/search/filter variant -- omitting all params returns the same
+  // plain array as getNotifications above (see customer.controller.ts).
+  getNotificationsPage: async (params: { cursor?: string; limit?: number; category?: string; q?: string }) => {
+    const response = await apiClient.get('/customers/notifications', { params });
+    return response.data as NotificationPage;
   },
   markNotificationRead: async (id: string) => {
     const response = await apiClient.patch(`/customers/notifications/${id}/read`, {});
     return response.data;
+  },
+  markAllNotificationsRead: async () => {
+    const response = await apiClient.patch('/customers/notifications/read-all');
+    return response.data as { updated: number };
+  },
+  markNotificationOpened: async (id: string) => {
+    await apiClient.post(`/customers/notifications/${id}/opened`);
+  },
+  deleteNotification: async (id: string) => {
+    await apiClient.delete(`/customers/notifications/${id}`);
   },
 
   // Inventory

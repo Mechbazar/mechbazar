@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import { Bell, Package, Store, UserPlus, Megaphone, Wrench, Sparkles, CheckCheck } from 'lucide-react';
 import type { RootState } from '../../store';
 import { API_URL } from '../../config/api';
 import { getAdminSocket } from '../../services/adminRealtime';
 import { EmptyState } from './EmptyState';
+import { resolveNotificationRoute } from '../../utils/notificationDeepLink';
 
 const POLL_INTERVAL_MS = 20000;
 
@@ -33,6 +35,7 @@ function categorize(type: string | null): Category {
 
 export function NotificationCenter() {
   const { token } = useSelector((state: RootState) => state.auth);
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -89,6 +92,16 @@ export function NotificationCenter() {
     await Promise.all(ids.map((id) => axios.patch(`${API_URL}/customers/notifications/${id}/read`, {}, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {})));
   };
 
+  const openNotification = (n: any) => {
+    markRead(n.id);
+    axios.post(`${API_URL}/customers/notifications/${n.id}/opened`, {}, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
+    const target = resolveNotificationRoute(n);
+    if (target) {
+      setOpen(false);
+      navigate(target.path);
+    }
+  };
+
   const grouped = notifications.slice(0, 40).reduce<Record<Category, any[]>>((acc, n) => {
     const cat = categorize(n.type);
     (acc[cat] ||= []).push(n);
@@ -141,7 +154,7 @@ export function NotificationCenter() {
                     {grouped[cat].map((n) => (
                       <button
                         key={n.id}
-                        onClick={() => markRead(n.id)}
+                        onClick={() => openNotification(n)}
                         className={`w-full text-left flex gap-3 px-4 py-2.5 hover:bg-surface-hover transition-colors ${n.isRead ? 'opacity-55' : ''}`}
                       >
                         <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${meta.color}`}>
@@ -153,6 +166,7 @@ export function NotificationCenter() {
                             {!n.isRead && <span className="h-1.5 w-1.5 rounded-full bg-brand-primary shrink-0" />}
                           </span>
                           <span className="block truncate text-xs text-content-secondary">{n.body}</span>
+                          {!!n.imageUrl && <img src={n.imageUrl} alt="" className="mt-1.5 rounded-lg max-h-24 w-full object-cover" />}
                           <span className="block text-[11px] text-content-muted mt-0.5">{new Date(n.createdAt).toLocaleString()}</span>
                         </span>
                       </button>

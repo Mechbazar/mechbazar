@@ -1,6 +1,8 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef, CommonActions } from '@react-navigation/native';
+import { addNotificationTapListener } from '../services/notifications';
+import { resolveNotificationRoute } from '../utils/notificationDeepLink';
 import { useDispatch, useSelector } from 'react-redux';
 import { View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
@@ -12,6 +14,10 @@ import { ForgotPasswordScreen } from '../screens/ForgotPasswordScreen';
 import { MainStack } from './MainStack';
 
 const Stack = createNativeStackNavigator();
+
+// Module-level so the notification-tap listener (which fires outside the
+// component tree) can navigate without threading a ref through props.
+const navigationRef = createNavigationContainerRef();
 const ADMIN_ROLES = new Set(['SUPER_ADMIN', 'ADMIN', 'OPERATIONS_MANAGER', 'INVENTORY_MANAGER', 'VENDOR_MANAGER', 'FINANCE_MANAGER', 'CUSTOMER_SUPPORT']);
 
 const decodeBase64Url = (input: string): string | null => {
@@ -69,6 +75,19 @@ export const RootNavigator = () => {
     restoreToken();
   }, [dispatch]);
 
+  // Deep-link a tapped push notification straight to its order/vendor/rider/
+  // customer/technician detail screen (system tray, not just an in-app
+  // list). Registered once, independent of auth state -- a tap can arrive
+  // before login finishes restoring.
+  React.useEffect(() => {
+    const unsubscribe = addNotificationTapListener((data) => {
+      const target = resolveNotificationRoute({ data });
+      if (target && navigationRef.isReady()) {
+        navigationRef.dispatch(CommonActions.navigate({ name: target.screen, params: target.params }));
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   // Hold the native splash until the token restore above has resolved. Without
   // this, expo-splash-screen auto-hides the moment the JS bundle mounts, which
@@ -88,7 +107,7 @@ export const RootNavigator = () => {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {isAuthenticated ? (
           <Stack.Screen name="Main" component={MainStack} />

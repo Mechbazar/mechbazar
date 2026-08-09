@@ -1,4 +1,5 @@
 import { apiClient } from './client';
+import type { NotificationItem, NotificationPage } from './notificationTypes';
 
 export const technicianService = {
   // Auth is Firebase-only. The app runs Firebase Phone Auth client-side
@@ -198,11 +199,24 @@ export const technicianService = {
   // (scoped by the authenticated user's own id server-side, not by role).
   getNotifications: async () => {
     const response = await apiClient.get('/customers/notifications');
-    return response.data as { id: string; title: string; body: string; isRead: boolean; createdAt: string }[];
+    return response.data as NotificationItem[];
+  },
+  // Paginated/search/filter variant -- omitting all params returns the same
+  // plain array as getNotifications above (see customer.controller.ts).
+  getNotificationsPage: async (params: { cursor?: string; limit?: number; category?: string; q?: string }) => {
+    const response = await apiClient.get('/customers/notifications', { params });
+    return response.data as NotificationPage;
   },
   markNotificationRead: async (id: string) => {
     const response = await apiClient.patch(`/customers/notifications/${id}/read`);
     return response.data;
+  },
+  markAllNotificationsRead: async () => {
+    const response = await apiClient.patch('/customers/notifications/read-all');
+    return response.data as { updated: number };
+  },
+  markNotificationOpened: async (id: string) => {
+    await apiClient.post(`/customers/notifications/${id}/opened`);
   },
   deleteNotification: async (id: string) => {
     await apiClient.delete(`/customers/notifications/${id}`);

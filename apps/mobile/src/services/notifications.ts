@@ -71,6 +71,26 @@ export async function registerForPushNotificationsAsync() {
   return token;
 }
 
+// Fires when the user taps a notification -- whether it arrived while the
+// app was foregrounded, backgrounded, or fully killed (in the killed case,
+// expo-notifications replays the tap that launched the app once the JS
+// runtime is up). Returns an unsubscribe function; no-ops inside Expo Go
+// like the rest of this file.
+export function addNotificationTapListener(callback: (data: Record<string, unknown>) => void): () => void {
+  if (isExpoGo) return () => {};
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Notifications = require('expo-notifications');
+    const sub = Notifications.addNotificationResponseReceivedListener((response: any) => {
+      callback(response?.notification?.request?.content?.data ?? {});
+    });
+    return () => sub.remove();
+  } catch (error) {
+    console.log('Failed to attach notification tap listener:', error);
+    return () => {};
+  }
+}
+
 // Helper to simulate a local notification for testing on emulators
 export async function sendLocalNotification(title: string, body: string) {
   if (isExpoGo) {

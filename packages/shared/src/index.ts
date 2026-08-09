@@ -1,4 +1,5 @@
 export * from './api/client';
+export * from './api/notificationTypes';
 export * from './api/vendorService';
 export * from './api/riderService';
 export * from './api/technicianService';
