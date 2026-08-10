@@ -1,12 +1,38 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Product } from '../types/product';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { addToCart } from '../store';
+import { RootState } from '../store';
 import { NO_IMAGE_PLACEHOLDER } from '../services/product.service';
+import { useIsDarkMode } from '../theme/useThemeColors';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = (width - 48) / 2; // 2 columns with 16 padding on edges and middle
+
+const LIGHT_COLORS = {
+  surface: '#FFFFFF',
+  border: '#E3E6EA',
+  textDark: '#1B1B1B',
+  textMuted: '#6B7480',
+  primary: '#DA3830',
+  white: '#FFFFFF',
+  success: '#1E9E5A',
+  warning: '#F5A300',
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  surface: '#1E1E1E',
+  border: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  primary: '#FF5A4E',
+  white: '#FFFFFF',
+  success: '#4FE092',
+  warning: '#F5B94D',
+};
 
 interface ProductGridCardProps {
   product: Product;
@@ -17,16 +43,29 @@ interface ProductGridCardProps {
 
 export const ProductGridCard: React.FC<ProductGridCardProps> = ({ product, onPress, isWishlisted, onToggleWishlist }) => {
   const dispatch = useDispatch();
+  const { t } = useTranslation();
+  const navigation = useNavigation<NavigationProp<any>>();
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [imageFailed, setImageFailed] = useState(false);
+  // The desktop equivalent (ProductRail.tsx) already reacts to cart state; this
+  // card didn't, so "ADD TO CART" stayed on screen forever even after the item
+  // was added -- no feedback that it worked, and no way back to the cart short
+  // of the header icon.
+  const inCart = useSelector((state: RootState) => state.cart.items.some((i) => i.id === product.id));
 
-  const handleAddToCart = () => {
-    dispatch(addToCart({ 
-      id: product.id, 
-      name: product.name, 
-      price: product.price, 
-      originalPrice: product.originalPrice, 
-      image: product.image, 
-      isB2B: product.isB2B 
+  const handleAddButtonPress = () => {
+    if (inCart) {
+      navigation.navigate('Cart');
+      return;
+    }
+    dispatch(addToCart({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      originalPrice: product.originalPrice,
+      image: product.image,
+      isB2B: product.isB2B,
     }));
   };
 
@@ -40,7 +79,7 @@ export const ProductGridCard: React.FC<ProductGridCardProps> = ({ product, onPre
         />
         {!!product.discountPercentage && (
           <View style={styles.discountBadge}>
-            <Text style={styles.discountText}>{product.discountPercentage}% OFF</Text>
+            <Text style={styles.discountText}>{t('home.percentOff', { percent: product.discountPercentage })}</Text>
           </View>
         )}
         <TouchableOpacity style={styles.wishlistBtn} onPress={() => onToggleWishlist?.(product)}>
@@ -57,22 +96,22 @@ export const ProductGridCard: React.FC<ProductGridCardProps> = ({ product, onPre
           <Text style={styles.originalPrice}>₹{product.originalPrice}</Text>
         </View>
 
-        <Text style={[styles.stockText, { color: product.stockStatus === 'In Stock' ? '#1E9E5A' : product.stockStatus === 'Limited Stock' ? '#F5A300' : '#DA3830' }]}>
+        <Text style={[styles.stockText, { color: product.stockStatus === 'In Stock' ? colors.success : product.stockStatus === 'Limited Stock' ? colors.warning : colors.primary }]}>
           {product.stockStatus}
         </Text>
         <Text style={styles.deliveryText}>⏱ {product.time}</Text>
       </View>
-      <TouchableOpacity style={styles.addButton} onPress={handleAddToCart}>
-        <Text style={styles.addButtonText}>ADD TO CART</Text>
+      <TouchableOpacity style={styles.addButton} onPress={handleAddButtonPress}>
+        <Text style={styles.addButtonText}>{inCart ? t('productGridCard.goToCart') : t('productGridCard.addToCart')}</Text>
       </TouchableOpacity>
     </TouchableOpacity>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   card: {
     width: CARD_WIDTH,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 14,
     marginBottom: 10,
     shadowColor: '#000',
@@ -81,14 +120,14 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#E3E6EA',
+    borderColor: colors.border,
     overflow: 'hidden',
     padding: 14,
   },
   imageContainer: {
     width: '100%',
     height: 100,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     position: 'relative',
     marginBottom: 10,
   },
@@ -101,7 +140,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    backgroundColor: '#DA3830',
+    backgroundColor: colors.primary,
     paddingHorizontal: 6,
     paddingVertical: 4,
     borderRadius: 4,
@@ -111,6 +150,9 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: 'bold',
   },
+  // Sits on top of the product photo, not the card surface -- product images
+  // are photographed on a plain white background regardless of app theme, so
+  // this stays a fixed translucent white in both themes rather than flipping.
   wishlistBtn: {
     position: 'absolute',
     top: 0,
@@ -128,7 +170,7 @@ const styles = StyleSheet.create({
   },
   brand: {
     fontSize: 11,
-    color: '#6B7480',
+    color: colors.textMuted,
     fontWeight: '600',
     marginBottom: 2,
     textTransform: 'uppercase',
@@ -136,7 +178,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1B1B1B',
+    color: colors.textDark,
     height: 36, // max 2 lines
     lineHeight: 18,
     marginBottom: 6,
@@ -149,12 +191,12 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#1B1B1B',
+    color: colors.textDark,
     marginRight: 6,
   },
   originalPrice: {
     fontSize: 11,
-    color: '#6B7480',
+    color: colors.textMuted,
     textDecorationLine: 'line-through',
   },
   stockText: {
@@ -164,18 +206,18 @@ const styles = StyleSheet.create({
   },
   deliveryText: {
     fontSize: 11,
-    color: '#6B7480',
+    color: colors.textMuted,
     marginBottom: 12,
   },
   addButton: {
-    backgroundColor: '#DA3830',
+    backgroundColor: colors.primary,
     paddingVertical: 13,
     borderRadius: 10,
     alignItems: 'center',
     width: '100%',
   },
   addButtonText: {
-    color: '#FFFFFF',
+    color: colors.white,
     fontSize: 12,
     fontWeight: 'bold',
     letterSpacing: 0.5,

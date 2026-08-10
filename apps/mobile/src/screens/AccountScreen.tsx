@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -20,43 +20,67 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
+import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { RootState } from '../store';
 import { logout, updateUserSuccess } from '../store/authSlice';
 import { setThemePreference } from '../store/themeSlice';
+import { setLanguage, LanguageCode, LANGUAGE_LABELS } from '../store/languageSlice';
 import { API_BASE_URL, SERVER_ORIGIN } from '../services/api';
 import { fetchMyBookings, cancelServiceBooking } from '../services/service.service';
 import { sendPhoneOtp, confirmPhoneOtp, watchForAutoVerification } from '../services/phoneAuth';
+import { SUPPORT_PHONE_E164, buildSupportWhatsAppUrl } from '../config/support';
 
 const { width } = Dimensions.get('window');
 
 // Backed by StaticPageKey / STATIC_PAGES in src/data/staticPages.ts, rendered
-// by the StaticPage route registered in App.tsx.
-const LEGAL_PAGES: { key: string; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: 'privacy', label: 'Privacy Policy', icon: 'lock-closed-outline' },
-  { key: 'terms', label: 'Terms of Service', icon: 'reader-outline' },
-  { key: 'shipping', label: 'Shipping & Delivery Policy', icon: 'cube-outline' },
-  { key: 'cancellation', label: 'Cancellation Policy', icon: 'close-circle-outline' },
-  { key: 'returns', label: 'Return & Replacement Policy', icon: 'swap-horizontal-outline' },
-  { key: 'refund', label: 'Refund Policy', icon: 'cash-outline' },
-  { key: 'account-deletion', label: 'Account Deletion Policy', icon: 'trash-outline' },
-  { key: 'contact', label: 'Contact Us', icon: 'call-outline' },
-  { key: 'about', label: 'About MechBazar', icon: 'information-circle-outline' },
+// by the StaticPage route registered in App.tsx. `labelKey` is resolved via
+// t() at render time (module scope can't react to a language change).
+const LEGAL_PAGES: { key: string; labelKey: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: 'privacy', labelKey: 'account.legal.privacy', icon: 'lock-closed-outline' },
+  { key: 'terms', labelKey: 'account.legal.terms', icon: 'reader-outline' },
+  { key: 'shipping', labelKey: 'account.legal.shipping', icon: 'cube-outline' },
+  { key: 'cancellation', labelKey: 'account.legal.cancellation', icon: 'close-circle-outline' },
+  { key: 'returns', labelKey: 'account.legal.returns', icon: 'swap-horizontal-outline' },
+  { key: 'refund', labelKey: 'account.legal.refund', icon: 'cash-outline' },
+  { key: 'account-deletion', labelKey: 'account.legal.accountDeletion', icon: 'trash-outline' },
+  { key: 'contact', labelKey: 'account.legal.contact', icon: 'call-outline' },
+  { key: 'about', labelKey: 'account.legal.about', icon: 'information-circle-outline' },
 ];
 
-const colors = {
+// `white` stays pure white in both themes -- it's used for text/icons on
+// permanently-colored surfaces (the dark profile-header gradient, the red
+// primary buttons), not for card backgrounds. `surface` is the actual
+// card/modal background and is the one that inverts in dark mode.
+const LIGHT_COLORS = {
   primary: '#E53935',     // Brand Red
   primaryLight: '#FF573C',
   secondary: '#1C1C1E',   // Dark Steel
   darkInk: '#111112',
   white: '#FFFFFF',
+  surface: '#FFFFFF',
   pageBg: '#F8F9FA',      // Cream Clean Bg
   borderLight: '#E8ECEF',
   textMuted: '#8E8E93',
   lightGray: '#F2F2F7',
   success: '#34C759',
   warning: '#FF9500'
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  primaryLight: '#FF8A75',
+  secondary: '#F1F2F4',
+  darkInk: '#F8F9FA',
+  white: '#FFFFFF',
+  surface: '#1E1E1E',
+  pageBg: '#121212',
+  borderLight: '#2E2E2E',
+  textMuted: '#A6ACB5',
+  lightGray: '#1E1E1E',
+  success: '#4FE092',
+  warning: '#F5B94D'
 };
 
 const HeaderBackground = () => (
@@ -76,8 +100,12 @@ const HeaderBackground = () => (
 export default function AccountScreen() {
   const navigation = useNavigation<any>();
   const dispatch = useDispatch();
+  const { t } = useTranslation();
   const { user, token } = useSelector((state: RootState) => state.auth);
   const isDarkMode = useSelector((state: RootState) => state.theme.resolvedScheme === 'dark');
+  const languageCode = useSelector((state: RootState) => state.language.code);
+  const colors = isDarkMode ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const activeVehicleId = useSelector((state: RootState) => state.app.activeVehicleId);
   const myGarage = useSelector((state: RootState) => state.app.myGarage);
   const activeVehicle = myGarage.find(v => v.id === activeVehicleId);
@@ -96,7 +124,6 @@ export default function AccountScreen() {
   const [offers, setOffers] = useState<{ id: string; title: string; description?: string }[]>([]);
   const [isLoadingOffers, setIsLoadingOffers] = useState(false);
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
-  const [selectedLanguage, setSelectedLanguage] = useState('English');
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
   const [isAboutModalVisible, setIsAboutModalVisible] = useState(false);
   const [isChangePasswordModalVisible, setIsChangePasswordModalVisible] = useState(false);
@@ -124,16 +151,13 @@ export default function AccountScreen() {
   const [isLegalExpanded, setIsLegalExpanded] = useState(false);
 
   useEffect(() => {
-    // Hydrate application settings from cache
+    // Hydrate application settings from cache. Language is hydrated globally
+    // in App.tsx's boot effect (languageSlice) instead -- not per-screen here.
     const hydrateSettings = async () => {
       try {
         const savedNotifications = await AsyncStorage.getItem('@mechbazar_notifications');
         if (savedNotifications !== null) {
           setIsNotificationsEnabled(savedNotifications === 'true');
-        }
-        const savedLanguage = await AsyncStorage.getItem('@mechbazar_language');
-        if (savedLanguage !== null) {
-          setSelectedLanguage(savedLanguage);
         }
       } catch (e) {
         console.error(e);
@@ -156,15 +180,9 @@ export default function AccountScreen() {
     }
   };
 
-  const handleSelectLanguage = async (lang: string) => {
-    setSelectedLanguage(lang);
+  const handleSelectLanguage = (code: LanguageCode) => {
+    dispatch(setLanguage(code));
     setIsLanguageModalVisible(false);
-    try {
-      await AsyncStorage.setItem('@mechbazar_language', lang);
-      Alert.alert('Language', `App language updated to ${lang}.`);
-    } catch (e) {
-      console.error(e);
-    }
   };
 
   const handleChangePassword = async () => {
@@ -540,13 +558,13 @@ export default function AccountScreen() {
             <View style={styles.infoWrapper}>
               <Text style={styles.profileName}>{user?.name || 'Customer User'}</Text>
               <Text style={styles.profilePhone}>{user?.phone || 'No phone on file'}</Text>
-              <Text style={styles.profileCustId}>Cust ID: MB-CUST{user?.id ? user.id.slice(0, 5).toUpperCase() : '847'}</Text>
-              
+              <Text style={styles.profileCustId}>{t('account.custId', { id: `MB-CUST${user?.id ? user.id.slice(0, 5).toUpperCase() : '847'}` })}</Text>
+
               {/* Badge tier */}
               <View style={styles.badgeRow}>
                 <View style={styles.membershipBadge}>
                   <Text style={styles.membershipText}>
-                    {user?.accountType === 'WHOLESALE' ? 'PLATINUM WHOLESALE' : 'GOLD RETAIL'}
+                    {user?.accountType === 'WHOLESALE' ? t('account.platinumWholesale') : t('account.goldRetail')}
                   </Text>
                 </View>
               </View>
@@ -560,7 +578,7 @@ export default function AccountScreen() {
           <View style={styles.loyaltyRow}>
             <View style={styles.progressBoxFull}>
               <View style={styles.progressLabelRow}>
-                <Text style={styles.progressLabel}>Profile Completion</Text>
+                <Text style={styles.progressLabel}>{t('account.profileCompletion')}</Text>
                 <Text style={styles.progressVal}>{profileCompletion}%</Text>
               </View>
               <View style={styles.progressTrack}>
@@ -577,42 +595,42 @@ export default function AccountScreen() {
               <View style={[styles.quickActionIconCircle, { backgroundColor: '#FFECEB' }]}>
                 <Ionicons name="person-outline" size={20} color={colors.primary} />
               </View>
-              <Text style={styles.quickActionLabel}>Edit Profile</Text>
+              <Text style={styles.quickActionLabel}>{t('account.editProfile')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('Garage')}>
               <View style={[styles.quickActionIconCircle, { backgroundColor: '#EBFBEE' }]}>
                 <Ionicons name="car-outline" size={20} color="#2B8A3E" />
               </View>
-              <Text style={styles.quickActionLabel}>My Garage</Text>
+              <Text style={styles.quickActionLabel}>{t('account.myGarage')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('Wishlist')}>
               <View style={[styles.quickActionIconCircle, { backgroundColor: '#E8F7FF' }]}>
                 <Ionicons name="heart-outline" size={20} color="#1C7ED6" />
               </View>
-              <Text style={styles.quickActionLabel}>Wishlist</Text>
+              <Text style={styles.quickActionLabel}>{t('account.wishlist')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('AddressManagement')}>
               <View style={[styles.quickActionIconCircle, { backgroundColor: '#FFF9DB' }]}>
                 <Ionicons name="location-outline" size={20} color="#F59F00" />
               </View>
-              <Text style={styles.quickActionLabel}>Addresses ({addressCount})</Text>
+              <Text style={styles.quickActionLabel}>{t('account.addresses', { count: addressCount })}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.quickActionBtn} onPress={() => navigation.navigate('Notifications')}>
               <View style={[styles.quickActionIconCircle, { backgroundColor: '#F8F0FC' }]}>
                 <Ionicons name="notifications-outline" size={20} color="#9C36B5" />
               </View>
-              <Text style={styles.quickActionLabel}>Alerts ({notificationCount})</Text>
+              <Text style={styles.quickActionLabel}>{t('account.alerts', { count: notificationCount })}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickActionBtn} onPress={() => Alert.alert('Wallet', `Your ledger balance: ₹${user?.wallet || '0.00'}`)}>
+            <TouchableOpacity style={styles.quickActionBtn} onPress={() => Alert.alert(t('account.wallet'), `Your ledger balance: ₹${user?.wallet || '0.00'}`)}>
               <View style={[styles.quickActionIconCircle, { backgroundColor: '#FFF0F6' }]}>
                 <Ionicons name="wallet-outline" size={20} color="#D6336C" />
               </View>
-              <Text style={styles.quickActionLabel}>Wallet</Text>
+              <Text style={styles.quickActionLabel}>{t('account.wallet')}</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
@@ -621,13 +639,13 @@ export default function AccountScreen() {
         {isLoadingData && (
           <View style={{ paddingVertical: 12, alignItems: 'center' }}>
             <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 4 }}>Syncing database...</Text>
+            <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 4 }}>{t('account.syncingDatabase')}</Text>
           </View>
         )}
 
         {/* MY VEHICLES SECTION */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>My Vehicles</Text>
+          <Text style={styles.sectionTitle}>{t('account.myVehicles')}</Text>
           {myGarage.length > 0 ? (
             myGarage.map((veh) => (
               <View key={veh.id} style={styles.vehicleCard}>
@@ -637,16 +655,16 @@ export default function AccountScreen() {
                   </View>
                   <View style={{ marginLeft: 12, flex: 1 }}>
                     <Text style={styles.vehicleName}>{veh.brand} {veh.model}</Text>
-                    <Text style={styles.vehicleMeta}>{veh.year} • {veh.fuelType || 'Petrol'}</Text>
-                    <Text style={styles.vehicleReg}>Reg Number: {veh.registrationNumber || 'Not registered'}</Text>
+                    <Text style={styles.vehicleMeta}>{veh.year} • {veh.fuelType || t('account.petrol')}</Text>
+                    <Text style={styles.vehicleReg}>{t('account.regNumber', { reg: veh.registrationNumber || t('account.notRegistered') })}</Text>
                   </View>
                 </View>
                 <View style={styles.vehicleBtnRow}>
-                  <TouchableOpacity style={styles.vehicleSecondaryBtn} onPress={() => Alert.alert('Vehicle Specifications', `Specs: Brand ${veh.brand}, Model ${veh.model}, Fuel ${veh.fuelType || 'Petrol'}.`)}>
-                    <Text style={styles.vehicleSecondaryBtnText}>View Details</Text>
+                  <TouchableOpacity style={styles.vehicleSecondaryBtn} onPress={() => Alert.alert(t('account.vehicleSpecs'), t('account.vehicleSpecsMsg', { brand: veh.brand, model: veh.model, fuel: veh.fuelType || t('account.petrol') }))}>
+                    <Text style={styles.vehicleSecondaryBtnText}>{t('account.viewDetails')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.vehiclePrimaryBtn} onPress={() => navigation.navigate('Services')}>
-                    <Text style={styles.vehiclePrimaryBtnText}>Book Service</Text>
+                    <Text style={styles.vehiclePrimaryBtnText}>{t('account.bookService')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -654,9 +672,9 @@ export default function AccountScreen() {
           ) : (
             <View style={styles.emptyVehCard}>
               <Ionicons name="car-outline" size={32} color={colors.textMuted} />
-              <Text style={styles.emptyVehText}>No vehicles saved in your garage.</Text>
+              <Text style={styles.emptyVehText}>{t('account.noVehicles')}</Text>
               <TouchableOpacity style={styles.addVehOutlineBtn} onPress={() => navigation.navigate('Garage')}>
-                <Text style={styles.addVehOutlineText}>+ Add Vehicle</Text>
+                <Text style={styles.addVehOutlineText}>{t('account.addVehicle')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -664,7 +682,7 @@ export default function AccountScreen() {
 
         {/* SERVICE BOOKINGS */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Service Bookings</Text>
+          <Text style={styles.sectionTitle}>{t('account.serviceBookings')}</Text>
           {bookings.length > 0 ? (
             bookings.map((booking) => (
               <View key={booking.id} style={styles.bookingCard}>
@@ -672,16 +690,16 @@ export default function AccountScreen() {
                   <View style={styles.bookingTitleBox}>
                     <Ionicons name="construct-outline" size={20} color={colors.primary} />
                     <View style={{ marginLeft: 10 }}>
-                      <Text style={styles.bookingService}>{booking.package?.name || booking.category?.name || 'General Inspection'}</Text>
+                      <Text style={styles.bookingService}>{booking.package?.name || booking.category?.name || t('account.generalInspection')}</Text>
                       <Text style={styles.bookingVehicle}>{booking.vehicleBrand} {booking.vehicleModel}</Text>
                     </View>
                   </View>
                   <View style={[
-                    styles.statusTag, 
+                    styles.statusTag,
                     { backgroundColor: booking.status === 'COMPLETED' ? '#EBFBEE' : '#E8F7FF' }
                   ]}>
                     <Text style={[
-                      styles.statusTagText, 
+                      styles.statusTagText,
                       { color: booking.status === 'COMPLETED' ? '#2B8A3E' : '#1C7ED6' }
                     ]}>
                       {booking.status}
@@ -690,46 +708,46 @@ export default function AccountScreen() {
                 </View>
                 <View style={styles.bookingDetailsRow}>
                   <View style={styles.bookingMetaCol}>
-                    <Text style={styles.bookingLabel}>APPOINTMENT DATE</Text>
+                    <Text style={styles.bookingLabel}>{t('account.appointmentDate')}</Text>
                     <Text style={styles.bookingValue}>{new Date(booking.scheduledDate).toLocaleDateString()}</Text>
                   </View>
                   <View style={styles.bookingMetaCol}>
-                    <Text style={styles.bookingLabel}>ASSIGNED MECHANIC</Text>
-                    <Text style={styles.bookingValue}>{booking.technician?.user?.name || 'Assigning soon...'}</Text>
+                    <Text style={styles.bookingLabel}>{t('account.assignedMechanic')}</Text>
+                    <Text style={styles.bookingValue}>{booking.technician?.user?.name || t('account.assigningSoon')}</Text>
                   </View>
                 </View>
                 <View style={styles.bookingCardBtnRow}>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.bookingCallBtn}
                     onPress={() => {
                       if (booking.technician?.user?.phone) {
                         Linking.openURL(`tel:${booking.technician.user.phone}`).catch(() =>
-                          Alert.alert('Error', 'Could not open the phone dialer.')
+                          Alert.alert(t('common.error'), t('account.couldNotOpenDialer'))
                         );
                       } else {
-                        Alert.alert('Not Assigned', 'A doorstep mechanic will be assigned to your booking shortly.');
+                        Alert.alert(t('account.notAssignedTitle'), t('account.notAssignedMsg'));
                       }
                     }}
                   >
                     <Ionicons name="call-outline" size={15} color={colors.secondary} />
-                    <Text style={styles.bookingCallText}>Call</Text>
+                    <Text style={styles.bookingCallText}>{t('account.call')}</Text>
                   </TouchableOpacity>
-                  
+
                   {booking.status !== 'COMPLETED' && booking.status !== 'CANCELLED' ? (
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.bookingVideoBtn}
                       onPress={() => handleCancelBooking(booking.id)}
                     >
                       <Ionicons name="close-circle-outline" size={15} color={colors.primary} />
-                      <Text style={styles.bookingVideoText}>Cancel</Text>
+                      <Text style={styles.bookingVideoText}>{t('account.cancelBooking')}</Text>
                     </TouchableOpacity>
                   ) : (
-                    <TouchableOpacity 
+                    <TouchableOpacity
                       style={styles.bookingVideoBtn}
                       onPress={() => navigation.navigate('Services')}
                     >
                       <Ionicons name="refresh-outline" size={15} color={colors.primary} />
-                      <Text style={styles.bookingVideoText}>Book Again</Text>
+                      <Text style={styles.bookingVideoText}>{t('account.bookAgain')}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -737,29 +755,29 @@ export default function AccountScreen() {
             ))
           ) : (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>You have no service bookings yet.</Text>
+              <Text style={styles.emptyText}>{t('account.noBookings')}</Text>
             </View>
           )}
         </View>
 
         {/* WALLET & REWARDS */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Wallet & Rewards</Text>
+          <Text style={styles.sectionTitle}>{t('account.walletRewards')}</Text>
           <View style={styles.walletCard}>
             <View style={styles.walletHeaderRow}>
               <View style={styles.walletHeaderCol}>
-                <Text style={styles.walletLabel}>WALLET BALANCE</Text>
+                <Text style={styles.walletLabel}>{t('account.walletBalance')}</Text>
                 <Text style={styles.walletAmount}>₹{user?.wallet ? user.wallet.toFixed(2) : '0.00'}</Text>
               </View>
             </View>
             <View style={styles.walletBtnRow}>
               <TouchableOpacity style={[styles.walletBtn, { width: '100%' }]} onPress={handleShareReferral}>
                 <Ionicons name="share-social-outline" size={16} color={colors.primary} style={{ marginRight: 6 }} />
-                <Text style={styles.walletBtnText}>Refer & Earn</Text>
+                <Text style={styles.walletBtnText}>{t('account.referEarn')}</Text>
               </TouchableOpacity>
             </View>
             <TouchableOpacity style={styles.couponsFullBtn} onPress={handleShowCoupons}>
-              <Text style={styles.couponsFullBtnText}>View Available Coupons ➔</Text>
+              <Text style={styles.couponsFullBtnText}>{t('account.viewCoupons')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -767,7 +785,7 @@ export default function AccountScreen() {
         {/* PROMOTIONAL OFFERS */}
         {(isLoadingOffers || offers.length > 0) && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Promotions & Offers</Text>
+            <Text style={styles.sectionTitle}>{t('account.promotionsOffers')}</Text>
             {isLoadingOffers ? (
               <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 16 }} />
             ) : (
@@ -801,38 +819,36 @@ export default function AccountScreen() {
           >
             <View style={styles.collapsibleTitleRow}>
               <Ionicons name="help-buoy-outline" size={20} color={colors.primary} />
-              <Text style={styles.collapsibleTitle}>Support & Help Center</Text>
+              <Text style={styles.collapsibleTitle}>{t('account.supportHelpCenter')}</Text>
             </View>
             <Ionicons name={isSupportExpanded ? "chevron-up" : "chevron-down"} size={18} color={colors.textMuted} />
           </TouchableOpacity>
-          
+
           {isSupportExpanded && (
             <View style={styles.collapsibleContent}>
               <TouchableOpacity style={styles.collapsibleItem} onPress={() => navigation.navigate('HelpCenter')}>
                 <Ionicons name="help-buoy-outline" size={16} color={colors.secondary} />
-                <Text style={styles.collapsibleItemText}>FAQs & Articles</Text>
+                <Text style={styles.collapsibleItemText}>{t('account.faqsArticles')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.collapsibleItem} onPress={() => {
-                const message = 'Hello Mech Bazar Support, I need help with my account.';
-                const url = `https://wa.me/919876543210?text=${encodeURIComponent(message)}`;
-                Linking.openURL(url).catch(() => Alert.alert('Error', 'Could not open WhatsApp support.'));
+                const url = buildSupportWhatsAppUrl('Hello Mech Bazar Support, I need help with my account.');
+                Linking.openURL(url).catch(() => Alert.alert(t('common.error'), t('account.couldNotOpenWhatsApp')));
               }}>
                 <Ionicons name="chatbox-ellipses-outline" size={16} color={colors.secondary} />
-                <Text style={styles.collapsibleItemText}>Start Live Chat</Text>
+                <Text style={styles.collapsibleItemText}>{t('account.startLiveChat')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.collapsibleItem} onPress={() => {
-                const message = 'Hello Mech Bazar Support, I need help with my bookings.';
-                const url = `https://wa.me/919876543210?text=${encodeURIComponent(message)}`;
-                Linking.openURL(url).catch(() => Alert.alert('Error', 'Could not launch WhatsApp.'));
+                const url = buildSupportWhatsAppUrl('Hello Mech Bazar Support, I need help with my bookings.');
+                Linking.openURL(url).catch(() => Alert.alert(t('common.error'), t('account.couldNotLaunchWhatsApp')));
               }}>
                 <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
-                <Text style={styles.collapsibleItemText}>WhatsApp Support</Text>
+                <Text style={styles.collapsibleItemText}>{t('account.whatsappSupport')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.collapsibleItem} onPress={() => {
-                Linking.openURL('tel:1800123456').catch(() => Alert.alert('Error', 'Call support is not available on this device.'));
+                Linking.openURL(`tel:${SUPPORT_PHONE_E164}`).catch(() => Alert.alert(t('common.error'), t('account.callSupportUnavailable')));
               }}>
                 <Ionicons name="call-outline" size={16} color={colors.secondary} />
-                <Text style={styles.collapsibleItemText}>Call Support</Text>
+                <Text style={styles.collapsibleItemText}>{t('account.callSupport')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -840,24 +856,24 @@ export default function AccountScreen() {
 
         {/* SETTINGS COLLAPSIBLE CARD */}
         <View style={styles.collapsibleCard}>
-          <TouchableOpacity 
-            style={styles.collapsibleHeader} 
+          <TouchableOpacity
+            style={styles.collapsibleHeader}
             onPress={() => setIsSettingsExpanded(!isSettingsExpanded)}
             activeOpacity={0.7}
           >
             <View style={styles.collapsibleTitleRow}>
               <Ionicons name="settings-outline" size={20} color={colors.primary} />
-              <Text style={styles.collapsibleTitle}>Application Settings</Text>
+              <Text style={styles.collapsibleTitle}>{t('account.applicationSettings')}</Text>
             </View>
             <Ionicons name={isSettingsExpanded ? "chevron-up" : "chevron-down"} size={18} color={colors.textMuted} />
           </TouchableOpacity>
-          
+
           {isSettingsExpanded && (
             <View style={styles.collapsibleContent}>
               <View style={styles.collapsibleToggleItem}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Ionicons name="moon-outline" size={16} color={colors.secondary} />
-                  <Text style={styles.collapsibleItemText}>Force Dark Mode</Text>
+                  <Text style={styles.collapsibleItemText}>{t('account.forceDarkMode')}</Text>
                 </View>
                 <Switch
                   value={isDarkMode}
@@ -870,7 +886,7 @@ export default function AccountScreen() {
               <View style={styles.collapsibleToggleItem}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Ionicons name="notifications-outline" size={16} color={colors.secondary} />
-                  <Text style={styles.collapsibleItemText}>Push Notifications</Text>
+                  <Text style={styles.collapsibleItemText}>{t('account.pushNotifications')}</Text>
                 </View>
                 <Switch
                   value={isNotificationsEnabled}
@@ -882,20 +898,20 @@ export default function AccountScreen() {
 
               <TouchableOpacity style={styles.collapsibleItem} onPress={() => navigation.navigate('NotificationPreferences')}>
                 <Ionicons name="options-outline" size={16} color={colors.secondary} />
-                <Text style={styles.collapsibleItemText}>Notification Categories</Text>
+                <Text style={styles.collapsibleItemText}>{t('account.notificationCategories')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.collapsibleItem} onPress={() => setIsLanguageModalVisible(true)}>
                 <Ionicons name="globe-outline" size={16} color={colors.secondary} />
                 <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={styles.collapsibleItemText}>App Language</Text>
-                  <Text style={{ fontSize: 12, color: colors.textMuted, marginRight: 8 }}>{selectedLanguage}</Text>
+                  <Text style={styles.collapsibleItemText}>{t('account.appLanguage')}</Text>
+                  <Text style={{ fontSize: 12, color: colors.textMuted, marginRight: 8 }}>{LANGUAGE_LABELS[languageCode]}</Text>
                 </View>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.collapsibleItem} onPress={() => setIsAboutModalVisible(true)}>
                 <Ionicons name="information-circle-outline" size={16} color={colors.secondary} />
-                <Text style={styles.collapsibleItemText}>About Application</Text>
+                <Text style={styles.collapsibleItemText}>{t('account.aboutApplication')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -903,28 +919,28 @@ export default function AccountScreen() {
 
         {/* SECURITY COLLAPSIBLE CARD */}
         <View style={styles.collapsibleCard}>
-          <TouchableOpacity 
-            style={styles.collapsibleHeader} 
+          <TouchableOpacity
+            style={styles.collapsibleHeader}
             onPress={() => setIsSecurityExpanded(!isSecurityExpanded)}
             activeOpacity={0.7}
           >
             <View style={styles.collapsibleTitleRow}>
               <Ionicons name="shield-checkmark-outline" size={20} color={colors.primary} />
-              <Text style={styles.collapsibleTitle}>Security & Privacy</Text>
+              <Text style={styles.collapsibleTitle}>{t('account.securityPrivacy')}</Text>
             </View>
             <Ionicons name={isSecurityExpanded ? "chevron-up" : "chevron-down"} size={18} color={colors.textMuted} />
           </TouchableOpacity>
-          
+
           {isSecurityExpanded && (
             <View style={styles.collapsibleContent}>
               <TouchableOpacity style={styles.collapsibleItem} onPress={() => setIsChangePasswordModalVisible(true)}>
                 <Ionicons name="key-outline" size={16} color={colors.secondary} />
-                <Text style={styles.collapsibleItemText}>Change Password</Text>
+                <Text style={styles.collapsibleItemText}>{t('account.changePassword')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.collapsibleItem} onPress={() => setIsChangePhoneModalVisible(true)}>
                 <Ionicons name="phone-portrait-outline" size={16} color={colors.secondary} />
-                <Text style={styles.collapsibleItemText}>Change Phone Number</Text>
+                <Text style={styles.collapsibleItemText}>{t('account.changePhoneNumber')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -938,7 +954,7 @@ export default function AccountScreen() {
                   <Ionicons name="trash-outline" size={16} color={colors.primary} />
                 )}
                 <Text style={[styles.collapsibleItemText, { color: colors.primary }]}>
-                  {isDeletingAccount ? 'Deleting Account…' : 'Delete Account'}
+                  {isDeletingAccount ? t('account.deletingAccount') : t('account.deleteAccount')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -958,21 +974,21 @@ export default function AccountScreen() {
           >
             <View style={styles.collapsibleTitleRow}>
               <Ionicons name="document-text-outline" size={20} color={colors.primary} />
-              <Text style={styles.collapsibleTitle}>Legal & Policies</Text>
+              <Text style={styles.collapsibleTitle}>{t('account.legalPolicies')}</Text>
             </View>
             <Ionicons name={isLegalExpanded ? 'chevron-up' : 'chevron-down'} size={18} color={colors.textMuted} />
           </TouchableOpacity>
 
           {isLegalExpanded && (
             <View style={styles.collapsibleContent}>
-              {LEGAL_PAGES.map(({ key, label, icon }) => (
+              {LEGAL_PAGES.map(({ key, labelKey, icon }) => (
                 <TouchableOpacity
                   key={key}
                   style={styles.collapsibleItem}
                   onPress={() => navigation.navigate('StaticPage', { page: key })}
                 >
                   <Ionicons name={icon} size={16} color={colors.secondary} />
-                  <Text style={styles.collapsibleItemText}>{label}</Text>
+                  <Text style={styles.collapsibleItemText}>{t(labelKey)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -982,7 +998,7 @@ export default function AccountScreen() {
         {/* LOGOUT OUTLINE ACTION BUTTON */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
           <Ionicons name="log-out-outline" size={18} color={colors.primary} style={{ marginRight: 8 }} />
-          <Text style={styles.logoutText}>Log Out</Text>
+          <Text style={styles.logoutText}>{t('account.logOut')}</Text>
         </TouchableOpacity>
 
       </ScrollView>
@@ -996,13 +1012,13 @@ export default function AccountScreen() {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Available Coupons</Text>
-            <Text style={styles.modalDesc}>Enter these codes on checkout to save on spares and services.</Text>
+            <Text style={styles.modalTitle}>{t('account.availableCoupons')}</Text>
+            <Text style={styles.modalDesc}>{t('account.couponsDesc')}</Text>
 
             {isLoadingCoupons ? (
-              <Text style={styles.couponDesc}>Loading...</Text>
+              <Text style={styles.couponDesc}>{t('account.loadingCoupons')}</Text>
             ) : activeCoupons.length === 0 ? (
-              <Text style={styles.couponDesc}>No coupons available right now. Check back soon!</Text>
+              <Text style={styles.couponDesc}>{t('account.noCoupons')}</Text>
             ) : (
               activeCoupons.map((coupon) => (
                 <View key={coupon.code} style={styles.couponRow}>
@@ -1010,16 +1026,16 @@ export default function AccountScreen() {
                     <Text style={styles.couponCodeText}>{coupon.code}</Text>
                   </View>
                   <Text style={styles.couponDesc}>
-                    {coupon.discountType === 'PERCENTAGE' ? `${coupon.discountValue}% off` : `₹${coupon.discountValue} off`}
-                    {coupon.minOrderValue > 0 ? ` on orders above ₹${coupon.minOrderValue}` : ''}
-                    {coupon.vehicleType ? ` (${coupon.vehicleType === 'CAR' ? 'Car' : 'Bike'} only)` : ''}
+                    {coupon.discountType === 'PERCENTAGE' ? t('account.offPercentage', { value: coupon.discountValue }) : t('account.offAmount', { value: coupon.discountValue })}
+                    {coupon.minOrderValue > 0 ? t('account.onOrdersAbove', { value: coupon.minOrderValue }) : ''}
+                    {coupon.vehicleType ? (coupon.vehicleType === 'CAR' ? t('account.carOnly') : t('account.bikeOnly')) : ''}
                   </Text>
                 </View>
               ))
             )}
 
             <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsCouponsVisible(false)}>
-              <Text style={styles.modalCloseBtnText}>Close</Text>
+              <Text style={styles.modalCloseBtnText}>{t('common.close')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1035,28 +1051,26 @@ export default function AccountScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={styles.modalTitle}>Select App Language</Text>
+              <Text style={styles.modalTitle}>{t('account.selectAppLanguage')}</Text>
               <TouchableOpacity onPress={() => setIsLanguageModalVisible(false)}>
                 <Ionicons name="close" size={24} color={colors.darkInk} />
               </TouchableOpacity>
             </View>
 
-            {[
-              'English',
-              'Hindi (हिन्दी)',
-              'Tamil (தமிழ்)',
-              'Telugu (తెలుగు)',
-              'Bengali (বাংলা)'
-            ].map((lang) => (
-              <TouchableOpacity 
-                key={lang} 
+            {/* Only languages with a real translation bundle (see
+                src/i18n/locales/) -- listing Tamil/Telugu/Bengali here would
+                just recreate the original bug (a selectable option that
+                changes nothing) for three more languages. */}
+            {(Object.keys(LANGUAGE_LABELS) as LanguageCode[]).map((code) => (
+              <TouchableOpacity
+                key={code}
                 style={styles.langRow}
-                onPress={() => handleSelectLanguage(lang)}
+                onPress={() => handleSelectLanguage(code)}
               >
-                <Text style={[styles.langText, selectedLanguage === lang && styles.langTextActive]}>
-                  {lang}
+                <Text style={[styles.langText, languageCode === code && styles.langTextActive]}>
+                  {LANGUAGE_LABELS[code]}
                 </Text>
-                {selectedLanguage === lang && (
+                {languageCode === code && (
                   <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
                 )}
               </TouchableOpacity>
@@ -1076,31 +1090,31 @@ export default function AccountScreen() {
           <View style={styles.modalCard}>
             <View style={{ alignItems: 'center', marginVertical: 20 }}>
               <Ionicons name="settings" size={48} color={colors.primary} style={{ marginBottom: 12 }} />
-              <Text style={styles.modalTitle}>Mech Bazar</Text>
-              <Text style={styles.aboutVersion}>Version 2.4.0 (Build 902)</Text>
-              <Text style={styles.aboutSub}>Everything Your Vehicle Needs, Delivered to Your Doorstep.</Text>
+              <Text style={styles.modalTitle}>{t('account.mechBazar')}</Text>
+              <Text style={styles.aboutVersion}>{t('account.appVersion')}</Text>
+              <Text style={styles.aboutSub}>{t('account.appTagline')}</Text>
             </View>
 
             <View style={styles.aboutInfoSection}>
               <View style={styles.aboutInfoRow}>
-                <Text style={styles.aboutInfoLabel}>Developer</Text>
-                <Text style={styles.aboutInfoVal}>Mech Bazar Team</Text>
+                <Text style={styles.aboutInfoLabel}>{t('account.developer')}</Text>
+                <Text style={styles.aboutInfoVal}>{t('account.developerName')}</Text>
               </View>
               <View style={styles.aboutInfoRow}>
-                <Text style={styles.aboutInfoLabel}>Server Status</Text>
-                <Text style={[styles.aboutInfoVal, { color: colors.success }]}>Online</Text>
+                <Text style={styles.aboutInfoLabel}>{t('account.serverStatus')}</Text>
+                <Text style={[styles.aboutInfoVal, { color: colors.success }]}>{t('account.online')}</Text>
               </View>
             </View>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.aboutUpdateBtn}
-              onPress={() => Alert.alert('Check for Updates', 'You are running the latest version!')}
+              onPress={() => Alert.alert(t('account.checkForUpdates'), t('account.latestVersionMsg'))}
             >
-              <Text style={styles.aboutUpdateBtnText}>Check for Updates</Text>
+              <Text style={styles.aboutUpdateBtnText}>{t('account.checkForUpdates')}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsAboutModalVisible(false)}>
-              <Text style={styles.modalCloseBtnText}>Close</Text>
+              <Text style={styles.modalCloseBtnText}>{t('common.close')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1116,7 +1130,7 @@ export default function AccountScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={styles.modalTitle}>Change Password</Text>
+              <Text style={styles.modalTitle}>{t('account.changePassword')}</Text>
               <TouchableOpacity onPress={() => setIsChangePasswordModalVisible(false)}>
                 <Ionicons name="close" size={24} color={colors.darkInk} />
               </TouchableOpacity>
@@ -1124,9 +1138,10 @@ export default function AccountScreen() {
 
             <View style={styles.modalForm}>
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalInputLabel}>CURRENT PASSWORD</Text>
-                <TextInput 
+                <Text style={styles.modalInputLabel}>{t('account.currentPassword')}</Text>
+                <TextInput
                   style={styles.modalTextInput}
+                  placeholderTextColor={colors.textMuted}
                   secureTextEntry
                   value={currentPassword}
                   onChangeText={setCurrentPassword}
@@ -1135,20 +1150,22 @@ export default function AccountScreen() {
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalInputLabel}>NEW PASSWORD</Text>
-                <TextInput 
+                <Text style={styles.modalInputLabel}>{t('account.newPassword')}</Text>
+                <TextInput
                   style={styles.modalTextInput}
+                  placeholderTextColor={colors.textMuted}
                   secureTextEntry
                   value={newPassword}
                   onChangeText={setNewPassword}
-                  placeholder="Minimum 6 characters"
+                  placeholder={t('account.minSixChars') as string}
                 />
               </View>
 
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalInputLabel}>CONFIRM NEW PASSWORD</Text>
-                <TextInput 
+                <Text style={styles.modalInputLabel}>{t('account.confirmNewPassword')}</Text>
+                <TextInput
                   style={styles.modalTextInput}
+                  placeholderTextColor={colors.textMuted}
                   secureTextEntry
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
@@ -1157,7 +1174,7 @@ export default function AccountScreen() {
               </View>
 
               <TouchableOpacity style={styles.modalSaveBtn} onPress={handleChangePassword}>
-                <Text style={styles.modalSaveBtnText}>Update Password</Text>
+                <Text style={styles.modalSaveBtnText}>{t('account.updatePassword')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1174,7 +1191,7 @@ export default function AccountScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={styles.modalTitle}>Change Phone Number</Text>
+              <Text style={styles.modalTitle}>{t('account.changePhoneNumber')}</Text>
               <TouchableOpacity onPress={() => setIsChangePhoneModalVisible(false)}>
                 <Ionicons name="close" size={24} color={colors.darkInk} />
               </TouchableOpacity>
@@ -1182,9 +1199,10 @@ export default function AccountScreen() {
 
             <View style={styles.modalForm}>
               <View style={styles.modalInputGroup}>
-                <Text style={styles.modalInputLabel}>NEW MOBILE NUMBER</Text>
-                <TextInput 
+                <Text style={styles.modalInputLabel}>{t('account.newMobileNumber')}</Text>
+                <TextInput
                   style={styles.modalTextInput}
+                  placeholderTextColor={colors.textMuted}
                   keyboardType="numeric"
                   value={newPhone}
                   onChangeText={setNewPhone}
@@ -1195,9 +1213,10 @@ export default function AccountScreen() {
 
               {isOtpSent && (
                 <View style={styles.modalInputGroup}>
-                  <Text style={styles.modalInputLabel}>ENTER 6-DIGIT OTP</Text>
-                  <TextInput 
+                  <Text style={styles.modalInputLabel}>{t('account.enterOtp')}</Text>
+                  <TextInput
                     style={styles.modalTextInput}
+                    placeholderTextColor={colors.textMuted}
                     keyboardType="numeric"
                     value={otpCode}
                     onChangeText={setOtpCode}
@@ -1209,13 +1228,13 @@ export default function AccountScreen() {
               {isOtpSent ? (
                 <TouchableOpacity style={styles.modalSaveBtn} onPress={handleVerifyAndUpdatePhone} disabled={isVerifyingPhone}>
                   <Text style={styles.modalSaveBtnText}>
-                    {isVerifyingPhone ? 'Verifying...' : 'Verify & Update Number'}
+                    {isVerifyingPhone ? t('account.verifying') : t('account.verifyUpdateNumber')}
                   </Text>
                 </TouchableOpacity>
               ) : (
                 <TouchableOpacity style={styles.modalSaveBtn} onPress={handleSendPhoneOtp} disabled={isVerifyingPhone}>
                   <Text style={styles.modalSaveBtnText}>
-                    {isVerifyingPhone ? 'Sending...' : 'Send Verification OTP'}
+                    {isVerifyingPhone ? t('account.sending') : t('account.sendVerificationOtp')}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -1228,8 +1247,8 @@ export default function AccountScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { 
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
+  container: {
     flex: 1, 
     backgroundColor: colors.pageBg 
   },
@@ -1437,7 +1456,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.25,
   },
   vehicleCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.borderLight,
@@ -1528,7 +1547,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   emptyVehCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.borderLight,
@@ -1553,7 +1572,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   orderCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.borderLight,
@@ -1637,7 +1656,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   emptyCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
     alignItems: 'center',
@@ -1649,7 +1668,7 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   bookingCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.borderLight,
@@ -1734,7 +1753,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   walletCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.borderLight,
@@ -1822,7 +1841,7 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
   collapsibleCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.borderLight,
@@ -1876,7 +1895,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1.5,
@@ -1899,7 +1918,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 20,
     borderWidth: 1,
@@ -1943,7 +1962,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalCloseBtn: {
-    backgroundColor: colors.secondary,
+    // Fixed dark neutral, not `colors.secondary` -- that flips to a light
+    // color in dark mode for body text elsewhere, which would make this
+    // button's white label illegible against it.
+    backgroundColor: '#1C1C1E',
     borderRadius: 8,
     paddingVertical: 10,
     alignItems: 'center',

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,14 +10,48 @@ import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
-import { colors } from './theme';
+import { useIsDarkMode } from '../../theme/useThemeColors';
 
 type ParamList = { ServiceCategory: { categoryId: string; categoryName: string } };
+
+// File-local copy of screens/services/theme.ts's shared `colors` export,
+// trimmed to the keys this screen actually uses -- theme.ts itself stays
+// untouched (it's a static, light-only palette consumed by several other
+// screens/components that haven't been converted yet).
+// `white` stays pure white in both themes -- it's used for text/icons on the
+// permanently-dark header bar and on colored buttons/badges, never as a card
+// background here. `surface` is the actual package-card background, the one
+// that inverts. `darkInk` is used ONLY for the fixed dark header bar in this
+// file (not for any body text), so it is intentionally left untouched below
+// -- see the header style using LIGHT_COLORS.darkInk directly.
+const LIGHT_COLORS = {
+  primary: '#DA3830',
+  darkInk: '#1B1B1B',
+  pageBg: '#F8F9FA',
+  white: '#FFFFFF',
+  borderLight: '#E3E6EA',
+  textDark: '#1B1B1B',
+  textMuted: '#6B7480',
+  surface: '#FFFFFF',
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  darkInk: '#F1F2F4',
+  pageBg: '#121212',
+  white: '#FFFFFF',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  surface: '#1E1E1E',
+};
 
 export default function ServiceCategoryScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<ParamList, 'ServiceCategory'>>();
   const { categoryId, categoryName } = route.params;
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [packages, setPackages] = useState<ServicePackage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,17 +176,21 @@ export default function ServiceCategoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   flexFill: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.darkInk },
+  // Permanently-dark branded header bar -- pinned to the fixed light-mode
+  // value rather than the dynamic `colors.darkInk` (which flips to
+  // near-white elsewhere) so it never inverts and its white title/icon stay
+  // legible in both themes.
+  header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: LIGHT_COLORS.darkInk },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: colors.white, fontWeight: 'bold' },
   headerTitle: { fontSize: 18, fontWeight: '800', color: colors.white },
   headerSubtitle: { fontSize: 13, color: '#9AA5B1', marginTop: 2 },
 
   listContent: { padding: 14 },
-  packageCard: { flexDirection: 'row', backgroundColor: colors.white, borderRadius: 14, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight },
+  packageCard: { flexDirection: 'row', backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight },
   packageImageWrap: { width: 64, height: 64, borderRadius: 10, overflow: 'hidden', marginRight: 12, backgroundColor: colors.pageBg, position: 'relative' },
   packageImage: { width: '100%', height: '100%', resizeMode: 'cover' },
   packageImageFallback: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },

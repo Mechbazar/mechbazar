@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -23,11 +23,25 @@ import { useBreakpoint } from '../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
+import { useIsDarkMode } from '../theme/useThemeColors';
+import { useTranslation } from 'react-i18next';
 
-const colors = {
+const GENDER_OPTIONS = [
+  { value: 'Male', labelKey: 'editProfile.male' },
+  { value: 'Female', labelKey: 'editProfile.female' },
+  { value: 'Other', labelKey: 'editProfile.other' },
+];
+
+// `secondary` (the header bar) and `white` (text/icons drawn on that header,
+// on the red avatar circle, and on the red save button) are fixed -- they
+// never invert. `surface` is the actual card/gender-chip background and is
+// the one that goes dark in dark mode; it's a new key split out from what
+// used to be `colors.white` doing double duty as both roles.
+const LIGHT_COLORS = {
   primary: '#E53935',
   secondary: '#1C1C1E',
   white: '#FFFFFF',
+  surface: '#FFFFFF',
   pageBg: '#F8F9FA',
   borderLight: '#E8ECEF',
   textDark: '#111112',
@@ -35,10 +49,25 @@ const colors = {
   lightGray: '#F2F2F7',
 };
 
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  secondary: '#1C1C1E',
+  white: '#FFFFFF',
+  surface: '#1E1E1E',
+  pageBg: '#121212',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  lightGray: '#1E1E1E',
+};
+
 export default function EditProfileScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const dispatch = useDispatch();
   const { user, token } = useSelector((state: RootState) => state.auth);
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   // States
   const [name, setName] = useState(user?.name || '');
@@ -141,7 +170,7 @@ export default function EditProfileScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
+        <Text style={styles.headerTitle}>{t('account.editProfile')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -161,25 +190,25 @@ export default function EditProfileScreen() {
             onPress={handleChangePhoto}
             disabled={uploadingPhoto}
           >
-            <Text style={styles.changePhotoText}>{uploadingPhoto ? 'Uploading...' : 'Change Profile Photo'}</Text>
+            <Text style={styles.changePhotoText}>{uploadingPhoto ? t('editProfile.uploading') : t('editProfile.changeProfilePhoto')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Form Fields */}
         <View style={styles.formCard}>
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>FULL NAME</Text>
-            <TextInput 
+            <Text style={styles.inputLabel}>{t('editProfile.fullName')}</Text>
+            <TextInput
               style={styles.input}
               value={name}
               onChangeText={setName}
-              placeholder="Enter your full name"
+              placeholder={t('editProfile.enterFullName')}
               placeholderTextColor={colors.textMuted}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
+            <Text style={styles.inputLabel}>{t('editProfile.emailAddress')}</Text>
             <TextInput 
               style={styles.input}
               value={email}
@@ -192,28 +221,28 @@ export default function EditProfileScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>MOBILE NUMBER</Text>
+            <Text style={styles.inputLabel}>{t('editProfile.mobileNumber')}</Text>
             <TextInput
               style={[styles.input, styles.inputDisabled]}
               value={phone}
               editable={false}
               placeholderTextColor={colors.textMuted}
             />
-            <Text style={styles.helperText}>Your mobile number is your verified login and can't be changed here.</Text>
+            <Text style={styles.helperText}>{t('editProfile.mobileNumberHelper')}</Text>
           </View>
 
           {/* Gender */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>GENDER</Text>
+            <Text style={styles.inputLabel}>{t('editProfile.gender')}</Text>
             <View style={styles.genderRow}>
-              {['Male', 'Female', 'Other'].map((item) => (
+              {GENDER_OPTIONS.map((item) => (
                 <TouchableOpacity
-                  key={item}
-                  style={[styles.genderOption, gender === item && styles.genderOptionSelected]}
-                  onPress={() => setGender(item)}
+                  key={item.value}
+                  style={[styles.genderOption, gender === item.value && styles.genderOptionSelected]}
+                  onPress={() => setGender(item.value)}
                 >
-                  <Text style={[styles.genderText, gender === item && styles.genderTextSelected]}>
-                    {item}
+                  <Text style={[styles.genderText, gender === item.value && styles.genderTextSelected]}>
+                    {t(item.labelKey)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -222,7 +251,7 @@ export default function EditProfileScreen() {
 
           {/* Date of Birth */}
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>DATE OF BIRTH (YYYY-MM-DD)</Text>
+            <Text style={styles.inputLabel}>{t('editProfile.dateOfBirth')}</Text>
             <TextInput 
               style={styles.input}
               value={dob}
@@ -240,7 +269,7 @@ export default function EditProfileScreen() {
           activeOpacity={0.8}
         >
           <Text style={styles.saveBtnText}>
-            {saving ? 'Saving...' : 'Save Profile Details'}
+            {saving ? t('address.saving') : t('editProfile.saveProfileDetails')}
           </Text>
         </TouchableOpacity>
         <MinimalFooter />
@@ -250,7 +279,7 @@ export default function EditProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   flexFill: { flex: 1 },
   header: {
@@ -284,7 +313,7 @@ const styles = StyleSheet.create({
   changePhotoBtn: { marginTop: 12 },
   changePhotoText: { color: colors.primary, fontWeight: 'bold', fontSize: 13 },
   formCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.borderLight,
@@ -313,7 +342,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingVertical: 10,
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
   },
   genderOptionSelected: {
     borderColor: colors.primary,

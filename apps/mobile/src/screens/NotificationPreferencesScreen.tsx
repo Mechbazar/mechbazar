@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Switch, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -6,36 +6,56 @@ import { useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { RootState } from '../store';
 import { API_BASE_URL } from '../services/api';
+import { useIsDarkMode } from '../theme/useThemeColors';
+import { useTranslation } from 'react-i18next';
 
-const colors = {
+// `secondary` (header bar) and `white` (text/icon on that header) are fixed
+// -- never invert. `surface` is the actual preference-row card background,
+// split out from what used to be `colors.white` doing double duty.
+const LIGHT_COLORS = {
   primary: '#E53935',
   secondary: '#1C1C1E',
   white: '#FFFFFF',
+  surface: '#FFFFFF',
   pageBg: '#F8F9FA',
   borderLight: '#E8ECEF',
   textDark: '#111112',
   textMuted: '#8E8E93',
 };
 
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  secondary: '#1C1C1E',
+  white: '#FFFFFF',
+  surface: '#1E1E1E',
+  pageBg: '#121212',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+};
+
 // Column names match NotificationPreference in prisma/schema.prisma exactly
 // -- keep this list in sync with backend/src/controllers/customer.controller.ts's
 // DEFAULT_PREFERENCES.
-const CATEGORIES: { key: string; label: string; description: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { key: 'offers', label: 'Offers', description: 'Price drops and deals on items you follow', icon: 'pricetag-outline' },
-  { key: 'promotions', label: 'Promotions', description: 'Festival sales and marketing announcements', icon: 'megaphone-outline' },
-  { key: 'serviceUpdates', label: 'Service Updates', description: 'Chat messages and service milestones', icon: 'construct-outline' },
-  { key: 'payments', label: 'Payments', description: 'Non-critical payment notices', icon: 'card-outline' },
-  { key: 'wallet', label: 'Wallet', description: 'Wallet credits and debits', icon: 'wallet-outline' },
-  { key: 'mechanicUpdates', label: 'Mechanic Updates', description: 'Updates about your assigned mechanic', icon: 'build-outline' },
-  { key: 'vendorUpdates', label: 'Vendor Updates', description: 'Updates from stores you order from', icon: 'storefront-outline' },
-  { key: 'reminders', label: 'Reminders', description: 'Review reminders and follow-ups', icon: 'alarm-outline' },
+const CATEGORIES: { key: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { key: 'offers', icon: 'pricetag-outline' },
+  { key: 'promotions', icon: 'megaphone-outline' },
+  { key: 'serviceUpdates', icon: 'construct-outline' },
+  { key: 'payments', icon: 'card-outline' },
+  { key: 'wallet', icon: 'wallet-outline' },
+  { key: 'mechanicUpdates', icon: 'build-outline' },
+  { key: 'vendorUpdates', icon: 'storefront-outline' },
+  { key: 'reminders', icon: 'alarm-outline' },
 ];
 
 type Preferences = Record<string, boolean>;
 
 export default function NotificationPreferencesScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const { token } = useSelector((state: RootState) => state.auth);
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [prefs, setPrefs] = useState<Preferences>({});
   const [loading, setLoading] = useState(true);
   const [savingKey, setSavingKey] = useState<string | null>(null);
@@ -81,7 +101,7 @@ export default function NotificationPreferencesScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notification Preferences</Text>
+        <Text style={styles.headerTitle}>{t('notificationPreferences.title')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -92,8 +112,7 @@ export default function NotificationPreferencesScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.listContent}>
           <Text style={styles.note}>
-            Order status, OTPs, payment confirmations, and account/security alerts always stay on, no matter what
-            you turn off below.
+            {t('notificationPreferences.note')}
           </Text>
           {CATEGORIES.map((cat) => (
             <View key={cat.key} style={styles.row}>
@@ -101,8 +120,8 @@ export default function NotificationPreferencesScreen() {
                 <Ionicons name={cat.icon} size={18} color={colors.primary} />
               </View>
               <View style={styles.rowText}>
-                <Text style={styles.rowLabel}>{cat.label}</Text>
-                <Text style={styles.rowDescription}>{cat.description}</Text>
+                <Text style={styles.rowLabel}>{t(`notificationPreferences.categories.${cat.key}.label`)}</Text>
+                <Text style={styles.rowDescription}>{t(`notificationPreferences.categories.${cat.key}.description`)}</Text>
               </View>
               {savingKey === cat.key ? (
                 <ActivityIndicator size="small" color={colors.primary} />
@@ -122,7 +141,7 @@ export default function NotificationPreferencesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   header: {
     flexDirection: 'row',
@@ -139,7 +158,7 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.borderLight,

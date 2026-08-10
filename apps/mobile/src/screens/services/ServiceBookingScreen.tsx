@@ -12,9 +12,48 @@ import { AddressPickerSheet } from '../../components/services/AddressPickerSheet
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
-import { colors } from './theme';
+import { useIsDarkMode } from '../../theme/useThemeColors';
+import { useTranslation } from 'react-i18next';
 
 type ParamList = { ServiceBooking: { packageId: string; categoryId: string } };
+
+// File-local copy of screens/services/theme.ts's shared `colors` export,
+// trimmed to the keys this screen actually uses -- theme.ts itself stays
+// untouched (it's a static, light-only palette consumed by several other
+// screens/components that haven't been converted yet).
+// `white` stays pure white in both themes -- text/icons on the permanently-
+// dark header bar and on colored buttons, never a card background here.
+// `surface` is the actual input/card background (vehicle cards, text
+// inputs, day/slot chips, summary cards, footer) and is the one that
+// inverts. `primaryTint` is the pale "selected vehicle card" tint -- it was
+// a hardcoded '#FFF4F1' that never changed, which would have left near-
+// white ink text illegible against it in dark mode, so it's now a real
+// dynamic token instead.
+const LIGHT_COLORS = {
+  primary: '#DA3830',
+  darkInk: '#1B1B1B',
+  pageBg: '#F8F9FA',
+  white: '#FFFFFF',
+  borderLight: '#E3E6EA',
+  textDark: '#1B1B1B',
+  textMuted: '#6B7480',
+  danger: '#D32F2F',
+  surface: '#FFFFFF',
+  primaryTint: '#FFF4F1',
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  darkInk: '#F1F2F4',
+  pageBg: '#121212',
+  white: '#FFFFFF',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  danger: '#FF6B6B',
+  surface: '#1E1E1E',
+  primaryTint: '#3A2420',
+};
 type Step = 'VEHICLE' | 'ISSUE' | 'ADDRESS' | 'SCHEDULE' | 'REVIEW';
 const STEPS: Step[] = ['VEHICLE', 'ISSUE', 'ADDRESS', 'SCHEDULE', 'REVIEW'];
 
@@ -35,11 +74,14 @@ const nextDays = (count: number) => {
 export default function ServiceBookingScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<ParamList, 'ServiceBooking'>>();
+  const { t } = useTranslation();
   const { packageId } = route.params;
 
   const { token } = useSelector((state: RootState) => state.auth);
   const myGarage = useSelector((state: RootState) => state.app.myGarage);
   const activeVehicleId = useSelector((state: RootState) => state.app.activeVehicleId);
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [step, setStep] = useState<Step>('VEHICLE');
   const [pkg, setPkg] = useState<ServicePackage | null>(null);
@@ -169,7 +211,7 @@ export default function ServiceBookingScreen() {
     });
 
     if (err || !booking) {
-      setError(err || 'Failed to create booking');
+      setError(err || t('serviceBooking.failedToCreateBooking'));
       setSubmitting(false);
       return;
     }
@@ -192,8 +234,8 @@ export default function ServiceBookingScreen() {
         <Text style={styles.backIcon}>←</Text>
       </TouchableOpacity>
       <View style={{ flex: 1 }}>
-        <Text style={styles.headerTitle}>{pkg?.name || 'Book Service'}</Text>
-        <Text style={styles.headerSubtitle}>Step {stepIndex + 1} of {STEPS.length}</Text>
+        <Text style={styles.headerTitle}>{pkg?.name || t('serviceBooking.bookService')}</Text>
+        <Text style={styles.headerSubtitle}>{t('serviceBooking.stepOf', { current: stepIndex + 1, total: STEPS.length })}</Text>
       </View>
     </View>
   );
@@ -211,9 +253,9 @@ export default function ServiceBookingScreen() {
   const renderVehicleStep = () => (
     <CompactBookingShell style={styles.flexFill}>
     <ScrollView contentContainerStyle={styles.stepContent}>
-      <Text style={styles.stepTitle}>Which vehicle needs service?</Text>
+      <Text style={styles.stepTitle}>{t('serviceBooking.whichVehicle')}</Text>
       {myGarage.length === 0 ? (
-        <Text style={styles.helperText}>You haven't added a vehicle yet.</Text>
+        <Text style={styles.helperText}>{t('serviceBooking.noVehicleYet')}</Text>
       ) : (
         myGarage.map((v) => (
           <TouchableOpacity
@@ -233,18 +275,18 @@ export default function ServiceBookingScreen() {
 
       {vehicleTypeMismatch && (
         <Text style={styles.errorText}>
-          This service is for {category?.vehicleType === VehicleType.CAR ? 'cars' : 'bikes'} — pick a matching vehicle.
+          {t('serviceBooking.serviceForMismatch', { type: category?.vehicleType === VehicleType.CAR ? t('serviceBooking.serviceForCars') : t('serviceBooking.serviceForBikes') })}
         </Text>
       )}
 
       <TouchableOpacity style={styles.addVehicleBtn} onPress={() => navigation.navigate('VehicleSelection')}>
-        <Text style={styles.addVehicleBtnText}>+ Add New Vehicle</Text>
+        <Text style={styles.addVehicleBtnText}>{t('serviceBooking.addNewVehicle')}</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.fieldLabel, { marginTop: 20 }]}>Registration Number (optional)</Text>
+      <Text style={[styles.fieldLabel, { marginTop: 20 }]}>{t('serviceBooking.registrationNumberOptional')}</Text>
       <TextInput
         style={styles.input}
-        placeholder="e.g. MH12AB1234"
+        placeholder={t('serviceBooking.regNumberPlaceholder')}
         placeholderTextColor={colors.textMuted}
         value={registrationNumber}
         onChangeText={setRegistrationNumber}
@@ -257,11 +299,11 @@ export default function ServiceBookingScreen() {
   const renderIssueStep = () => (
     <CompactBookingShell style={styles.flexFill}>
     <ScrollView contentContainerStyle={styles.stepContent}>
-      <Text style={styles.stepTitle}>Describe the issue</Text>
-      <Text style={styles.helperText}>Help your mechanic prepare — what's wrong with your vehicle?</Text>
+      <Text style={styles.stepTitle}>{t('serviceBooking.describeIssue')}</Text>
+      <Text style={styles.helperText}>{t('serviceBooking.describeIssueHelper')}</Text>
       <TextInput
         style={styles.textArea}
-        placeholder="e.g. Car doesn't start in the morning, battery seems weak..."
+        placeholder={t('serviceBooking.issuePlaceholder')}
         placeholderTextColor={colors.textMuted}
         value={issueDescription}
         onChangeText={setIssueDescription}
@@ -270,7 +312,7 @@ export default function ServiceBookingScreen() {
         textAlignVertical="top"
       />
 
-      <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Photos (optional)</Text>
+      <Text style={[styles.fieldLabel, { marginTop: 16 }]}>{t('serviceBooking.photosOptional')}</Text>
       <View style={styles.imageRow}>
         {images.map((uri, i) => (
           <View key={uri} style={styles.imageThumbWrap}>
@@ -293,7 +335,7 @@ export default function ServiceBookingScreen() {
   const renderAddressStep = () => (
     <CompactBookingShell style={styles.flexFill}>
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Where should the mechanic come?</Text>
+      <Text style={styles.stepTitle}>{t('serviceBooking.whereShouldMechanicCome')}</Text>
       {selectedAddress ? (
         <TouchableOpacity style={styles.selectedAddressCard} onPress={() => setShowAddressSheet(true)}>
           <View style={{ flex: 1 }}>
@@ -302,11 +344,11 @@ export default function ServiceBookingScreen() {
               {selectedAddress.line1}, {selectedAddress.city}, {selectedAddress.state} {selectedAddress.pincode}
             </Text>
           </View>
-          <Text style={styles.changeText}>Change</Text>
+          <Text style={styles.changeText}>{t('cart.change')}</Text>
         </TouchableOpacity>
       ) : (
         <TouchableOpacity style={styles.addVehicleBtn} onPress={() => setShowAddressSheet(true)}>
-          <Text style={styles.addVehicleBtnText}>Select Saved Address or Add New</Text>
+          <Text style={styles.addVehicleBtnText}>{t('serviceBooking.selectSavedAddressOrAddNew')}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -316,7 +358,7 @@ export default function ServiceBookingScreen() {
   const renderScheduleStep = () => (
     <CompactBookingShell style={styles.flexFill}>
     <ScrollView contentContainerStyle={styles.stepContent}>
-      <Text style={styles.stepTitle}>Pick a date & time</Text>
+      <Text style={styles.stepTitle}>{t('serviceBooking.pickDateTime')}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
         {days.map((d) => (
           <TouchableOpacity
@@ -330,7 +372,7 @@ export default function ServiceBookingScreen() {
         ))}
       </ScrollView>
 
-      <Text style={styles.fieldLabel}>Available Time Slots</Text>
+      <Text style={styles.fieldLabel}>{t('serviceBooking.availableTimeSlots')}</Text>
       {loadingSlots ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: 20 }} />
       ) : (
@@ -355,7 +397,7 @@ export default function ServiceBookingScreen() {
               </Text>
             </TouchableOpacity>
           ))}
-          {timeSlots.length === 0 && <Text style={styles.helperText}>No time slots configured yet.</Text>}
+          {timeSlots.length === 0 && <Text style={styles.helperText}>{t('serviceBooking.noTimeSlotsConfigured')}</Text>}
         </View>
       )}
     </ScrollView>
@@ -365,31 +407,31 @@ export default function ServiceBookingScreen() {
   const renderReviewStep = () => (
     <CompactBookingShell style={styles.flexFill}>
     <ScrollView contentContainerStyle={styles.stepContent}>
-      <Text style={styles.stepTitle}>Review & Pay</Text>
+      <Text style={styles.stepTitle}>{t('serviceBooking.reviewAndPay')}</Text>
 
       <View style={styles.summaryCard}>
-        <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Service</Text><Text style={styles.summaryValue}>{pkg?.name}</Text></View>
-        <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Vehicle</Text><Text style={styles.summaryValue}>{selectedGarageVehicle?.brand} {selectedGarageVehicle?.model}</Text></View>
-        <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Address</Text><Text style={styles.summaryValue} numberOfLines={1}>{selectedAddress?.line1}</Text></View>
+        <View style={styles.summaryRow}><Text style={styles.summaryLabel}>{t('serviceBooking.service')}</Text><Text style={styles.summaryValue}>{pkg?.name}</Text></View>
+        <View style={styles.summaryRow}><Text style={styles.summaryLabel}>{t('serviceBooking.vehicle')}</Text><Text style={styles.summaryValue}>{selectedGarageVehicle?.brand} {selectedGarageVehicle?.model}</Text></View>
+        <View style={styles.summaryRow}><Text style={styles.summaryLabel}>{t('serviceBooking.address')}</Text><Text style={styles.summaryValue} numberOfLines={1}>{selectedAddress?.line1}</Text></View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Slot</Text>
+          <Text style={styles.summaryLabel}>{t('serviceBooking.slot')}</Text>
           <Text style={styles.summaryValue}>{selectedDate} · {timeSlots.find((s) => s.id === selectedSlotId)?.label}</Text>
         </View>
       </View>
 
       <View style={styles.summaryCard}>
-        <Text style={styles.fieldLabel}>Estimated Cost</Text>
+        <Text style={styles.fieldLabel}>{t('serviceBooking.estimatedCost')}</Text>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>{pkg?.name}</Text>
           <Text style={styles.summaryValue}>₹{finalCost}</Text>
         </View>
-        <Text style={styles.helperText}>Final cost may change if the mechanic finds additional work — you'll be asked to approve it first.</Text>
+        <Text style={styles.helperText}>{t('serviceBooking.finalCostMayChange')}</Text>
       </View>
 
-      <Text style={styles.fieldLabel}>Payment Method</Text>
+      <Text style={styles.fieldLabel}>{t('serviceBooking.paymentMethod')}</Text>
       <View style={[styles.paymentRow, styles.paymentRowActive]}>
         <View style={[styles.radioCircle, styles.radioCircleActive]}><View style={styles.radioDot} /></View>
-        <Text style={styles.paymentText}>Cash on Service Completion</Text>
+        <Text style={styles.paymentText}>{t('serviceBooking.cashOnServiceCompletion')}</Text>
       </View>
       {/* MechBazar is Cash on Delivery only -- no payment gateway is
           integrated. A greyed-out "Pay Online (UPI / Card / Net Banking)" row
@@ -397,8 +439,7 @@ export default function ServiceBookingScreen() {
           which both stores treat as misleading functionality and which
           contradicts every published policy page. */}
       <Text style={styles.helperText}>
-        MechBazar currently accepts Cash on Delivery only. You pay the mechanic in cash once the
-        service is complete — nothing is charged in advance.
+        {t('serviceBooking.codOnlyNotice')}
       </Text>
 
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -422,7 +463,7 @@ export default function ServiceBookingScreen() {
         {renderHeader()}
         <View style={styles.emptyState}>
           <Text style={styles.emptyEmoji}>😕</Text>
-          <Text style={styles.stepTitle}>Service not found</Text>
+          <Text style={styles.stepTitle}>{t('serviceBooking.serviceNotFound')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -447,7 +488,7 @@ export default function ServiceBookingScreen() {
             onPress={step === 'REVIEW' ? handleSubmit : goNext}
           >
             <Text style={styles.continueBtnText}>
-              {submitting ? 'Placing booking...' : step === 'REVIEW' ? `Confirm Booking · ₹${finalCost}` : 'Continue'}
+              {submitting ? t('serviceBooking.placingBooking') : step === 'REVIEW' ? t('serviceBooking.confirmBooking', { cost: finalCost }) : t('common.continue')}
             </Text>
           </TouchableOpacity>
         </CompactBookingShell>
@@ -465,14 +506,15 @@ export default function ServiceBookingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   // Passed as CompactBookingShell's `style` prop so its desktop-only wrapper
   // View keeps filling the available height (matching what the ScrollView/
   // View it wraps would have gotten as a direct flex sibling) while also
   // gaining the horizontal max-width cap + centering.
   flexFill: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.darkInk },
+  // Permanently-dark branded header bar -- pinned fixed (see ServiceCategoryScreen).
+  header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: LIGHT_COLORS.darkInk },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: colors.white, fontWeight: 'bold' },
   headerTitle: { fontSize: 16, fontWeight: '800', color: colors.white },
@@ -487,8 +529,8 @@ const styles = StyleSheet.create({
   helperText: { fontSize: 13, color: colors.textMuted, marginBottom: 12, lineHeight: 18 },
   fieldLabel: { fontSize: 13, fontWeight: '700', color: colors.textDark, marginBottom: 10 },
 
-  vehicleCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1.5, borderColor: colors.borderLight },
-  vehicleCardActive: { borderColor: colors.primary, backgroundColor: '#FFF4F1' },
+  vehicleCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1.5, borderColor: colors.borderLight },
+  vehicleCardActive: { borderColor: colors.primary, backgroundColor: colors.primaryTint },
   vehicleIcon: { fontSize: 26, marginRight: 12 },
   vehicleName: { fontSize: 14, fontWeight: '700', color: colors.textDark, marginBottom: 3 },
   vehicleMeta: { fontSize: 12, color: colors.textMuted },
@@ -496,8 +538,8 @@ const styles = StyleSheet.create({
   addVehicleBtn: { borderWidth: 1.5, borderColor: colors.primary, borderStyle: 'dashed', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 6 },
   addVehicleBtnText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
 
-  input: { backgroundColor: colors.white, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: colors.textDark, borderWidth: 1, borderColor: colors.borderLight },
-  textArea: { backgroundColor: colors.white, borderRadius: 12, padding: 14, fontSize: 14, color: colors.textDark, borderWidth: 1, borderColor: colors.borderLight, minHeight: 110 },
+  input: { backgroundColor: colors.surface, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: colors.textDark, borderWidth: 1, borderColor: colors.borderLight },
+  textArea: { backgroundColor: colors.surface, borderRadius: 12, padding: 14, fontSize: 14, color: colors.textDark, borderWidth: 1, borderColor: colors.borderLight, minHeight: 110 },
 
   imageRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   imageThumbWrap: { position: 'relative' },
@@ -507,29 +549,29 @@ const styles = StyleSheet.create({
   addImageBtn: { width: 72, height: 72, borderRadius: 10, borderWidth: 1.5, borderColor: colors.borderLight, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   addImageIcon: { fontSize: 24, color: colors.textMuted },
 
-  selectedAddressCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.borderLight },
+  selectedAddressCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.borderLight },
   changeText: { fontSize: 13, fontWeight: '700', color: colors.primary },
 
-  dayChip: { width: 56, alignItems: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: colors.white, marginRight: 10, borderWidth: 1, borderColor: colors.borderLight },
+  dayChip: { width: 56, alignItems: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: colors.surface, marginRight: 10, borderWidth: 1, borderColor: colors.borderLight },
   dayChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   dayChipWeekday: { fontSize: 11, color: colors.textMuted, marginBottom: 4, fontWeight: '600' },
   dayChipDate: { fontSize: 16, color: colors.textDark, fontWeight: '800' },
   dayChipTextActive: { color: colors.white },
 
   slotGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  slotChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.white, borderWidth: 1, borderColor: colors.borderLight },
+  slotChip: { paddingHorizontal: 14, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.borderLight },
   slotChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   slotChipDisabled: { opacity: 0.4 },
   slotChipText: { fontSize: 13, fontWeight: '600', color: colors.textDark },
   slotChipTextActive: { color: colors.white },
   slotChipTextDisabled: { color: colors.textMuted },
 
-  summaryCard: { backgroundColor: colors.white, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight },
+  summaryCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   summaryLabel: { fontSize: 13, color: colors.textMuted, flex: 1 },
   summaryValue: { fontSize: 13, color: colors.textDark, fontWeight: '700', flex: 1.4, textAlign: 'right' },
 
-  paymentRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1.5, borderColor: colors.borderLight },
+  paymentRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1.5, borderColor: colors.borderLight },
   paymentRowActive: { borderColor: colors.primary },
   radioCircle: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.borderLight, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   radioCircleActive: { borderColor: colors.primary },
@@ -539,7 +581,7 @@ const styles = StyleSheet.create({
 
   errorText: { color: colors.danger, fontSize: 13, marginTop: 8, marginBottom: 4 },
 
-  footer: { padding: 16, paddingBottom: 28, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.borderLight },
+  footer: { padding: 16, paddingBottom: 28, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.borderLight },
   continueBtn: { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
   continueBtnDisabled: { backgroundColor: '#F0B2A5' },
   continueBtnText: { color: colors.white, fontWeight: '800', fontSize: 14 },

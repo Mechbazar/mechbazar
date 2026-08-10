@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,11 +21,23 @@ import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScr
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 import { resolveNotificationRoute } from '../utils/notificationDeepLink';
+import { useIsDarkMode } from '../theme/useThemeColors';
+import { useTranslation } from 'react-i18next';
 
-const colors = {
+// `secondary` (header bar) and `white` (text/icons on that header, and on
+// the red active-chip) are fixed -- never invert. `surface` is the actual
+// search-bar/card background, which does invert. `unreadTint` is split out
+// separately from a literal '#FFFDFD' that used to sit directly in
+// cardUnread's style: that background never inverted, but it's stacked under
+// cardTitle's dynamic textDark color, which DOES turn near-white in dark
+// mode -- unread titles would have gone invisible (near-white on
+// still-near-white) without giving this its own dark-mode value.
+const LIGHT_COLORS = {
   primary: '#E53935',
   secondary: '#1C1C1E',
   white: '#FFFFFF',
+  surface: '#FFFFFF',
+  unreadTint: '#FFFDFD',
   pageBg: '#F8F9FA',
   borderLight: '#E8ECEF',
   textDark: '#111112',
@@ -33,18 +45,31 @@ const colors = {
   lightGray: '#F2F2F7',
 };
 
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  secondary: '#1C1C1E',
+  white: '#FFFFFF',
+  surface: '#1E1E1E',
+  unreadTint: '#242424',
+  pageBg: '#121212',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  lightGray: '#1E1E1E',
+};
+
 // Subset of the backend's 10 display categories that can actually appear on
 // a customer account -- MECHANIC_UPDATES/RIDER_UPDATES/VENDOR_UPDATES never
 // notify a customer, so they're left out of this app's filter chips.
-const CATEGORIES: { key: string; label: string }[] = [
-  { key: 'ALL', label: 'All' },
-  { key: 'ORDERS', label: 'Orders' },
-  { key: 'SERVICES', label: 'Services' },
-  { key: 'PAYMENTS', label: 'Payments' },
-  { key: 'OFFERS', label: 'Offers' },
-  { key: 'COUPONS', label: 'Coupons' },
-  { key: 'ACCOUNT', label: 'Account' },
-  { key: 'SYSTEM', label: 'System' },
+const CATEGORIES: { key: string; labelKey: string }[] = [
+  { key: 'ALL', labelKey: 'notifications.categories.all' },
+  { key: 'ORDERS', labelKey: 'notifications.categories.orders' },
+  { key: 'SERVICES', labelKey: 'notifications.categories.services' },
+  { key: 'PAYMENTS', labelKey: 'notifications.categories.payments' },
+  { key: 'OFFERS', labelKey: 'notifications.categories.offers' },
+  { key: 'COUPONS', labelKey: 'notifications.categories.coupons' },
+  { key: 'ACCOUNT', labelKey: 'notifications.categories.account' },
+  { key: 'SYSTEM', labelKey: 'notifications.categories.system' },
 ];
 
 interface NotificationItem {
@@ -61,7 +86,10 @@ interface NotificationItem {
 
 export default function NotificationsScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const { token } = useSelector((state: RootState) => state.auth);
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -205,7 +233,7 @@ export default function NotificationsScreen() {
         <View style={styles.headerLabelRow}>
           {!item.isRead && <View style={styles.unreadDot} />}
           <Text style={[styles.cardTitle, !item.isRead && styles.textBold]}>
-            {item.title || 'Notification'}
+            {item.title || t('notifications.notificationFallback')}
           </Text>
         </View>
         <TouchableOpacity onPress={() => handleDelete(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -231,7 +259,7 @@ export default function NotificationsScreen() {
         <Text style={styles.cardTime}>{new Date(item.createdAt).toLocaleDateString()}</Text>
         {!item.isRead && (
           <TouchableOpacity onPress={() => handleMarkAsRead(item.id)}>
-            <Text style={styles.markReadText}>Mark as read</Text>
+            <Text style={styles.markReadText}>{t('notifications.markAsRead')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -244,9 +272,9 @@ export default function NotificationsScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
+        <Text style={styles.headerTitle}>{t('notifications.title')}</Text>
         <TouchableOpacity onPress={handleMarkAllRead} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={styles.markAllText}>Mark all read</Text>
+          <Text style={styles.markAllText}>{t('notifications.markAllRead')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -256,7 +284,7 @@ export default function NotificationsScreen() {
           <TextInput
             value={search}
             onChangeText={onSearchChange}
-            placeholder="Search notifications"
+            placeholder={t('notifications.searchNotifications')}
             placeholderTextColor={colors.textMuted}
             style={styles.searchInput}
           />
@@ -274,7 +302,7 @@ export default function NotificationsScreen() {
               onPress={() => setCategory(c.key)}
               style={[styles.chip, category === c.key && styles.chipActive]}
             >
-              <Text style={[styles.chipText, category === c.key && styles.chipTextActive]}>{c.label}</Text>
+              <Text style={[styles.chipText, category === c.key && styles.chipTextActive]}>{t(c.labelKey)}</Text>
             </TouchableOpacity>
           )}
         />
@@ -299,8 +327,8 @@ export default function NotificationsScreen() {
             !loading ? (
               <View style={styles.emptyState}>
                 <Ionicons name="notifications-off-outline" size={48} color={colors.textMuted} />
-                <Text style={styles.emptyTitle}>All caught up!</Text>
-                <Text style={styles.emptySubtitle}>You have no notifications at the moment.</Text>
+                <Text style={styles.emptyTitle}>{t('notifications.allCaughtUp')}</Text>
+                <Text style={styles.emptySubtitle}>{t('notifications.noNotificationsAtMoment')}</Text>
               </View>
             ) : null
           }
@@ -313,7 +341,7 @@ export default function NotificationsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   flexFill: { flex: 1 },
   header: {
@@ -329,7 +357,7 @@ const styles = StyleSheet.create({
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.borderLight,
@@ -353,7 +381,7 @@ const styles = StyleSheet.create({
   centerLoader: { padding: 16 },
   listContent: { padding: 16 },
   card: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.borderLight,
@@ -362,7 +390,7 @@ const styles = StyleSheet.create({
   },
   cardUnread: {
     borderColor: colors.primary,
-    backgroundColor: '#FFFDFD',
+    backgroundColor: colors.unreadTint,
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   headerLabelRow: { flexDirection: 'row', alignItems: 'center' },

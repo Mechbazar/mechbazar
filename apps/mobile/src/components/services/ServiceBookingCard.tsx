@@ -1,9 +1,40 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Linking } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { ServiceBooking, BookingStatus } from '../../types/service';
 import { cancelServiceBooking, fetchTechnicianPhotoDataUri } from '../../services/service.service';
-import { colors } from '../../screens/services/theme';
+import { useIsDarkMode } from '../../theme/useThemeColors';
+
+// File-local copy of screens/services/theme.ts's palette (that file stays a
+// static light-only export for its other, not-yet-converted consumers) --
+// `surface` is split from `white`, which theme.ts uses both as text-on-
+// colored-button (stays fixed) and as this component's card backgrounds
+// (needs to invert).
+const LIGHT_COLORS = {
+  primary: '#DA3830',
+  pageBg: '#F8F9FA',
+  white: '#FFFFFF',
+  surface: '#FFFFFF',
+  borderLight: '#E3E6EA',
+  textDark: '#1B1B1B',
+  textMuted: '#6B7480',
+  success: '#1E9E5A',
+  warning: '#F5A300',
+  danger: '#D32F2F',
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  pageBg: '#121212',
+  white: '#FFFFFF',
+  surface: '#1E1E1E',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  success: '#4FE092',
+  warning: '#F5B94D',
+  danger: '#FF6B6B',
+};
 
 // Customer-facing labels -- PENDING/CONFIRMED and ASSIGNED/ACCEPTED collapse
 // into single steps for the same reason as ServiceTrackingScreen's timeline.
@@ -21,18 +52,22 @@ const STATUS_LABEL: Record<BookingStatus, string> = {
   REJECTED: 'Finding a Mechanic',
 };
 
+// Module scope -- these badges sit on a fixed light pastel background that
+// doesn't invert with the theme (decorative status accent), so their
+// border/text are pinned to LIGHT_COLORS rather than the dynamic per-render
+// `colors`, which isn't available at module scope anyway.
 const STATUS_STYLE: Record<BookingStatus, { bg: string; border: string; text: string }> = {
-  PENDING: { bg: '#FFF8E1', border: colors.warning, text: colors.warning },
-  CONFIRMED: { bg: '#FFF8E1', border: colors.warning, text: colors.warning },
-  PENDING_ADMIN_ASSIGNMENT: { bg: '#FFF8E1', border: colors.warning, text: colors.warning },
-  MECHANIC_ASSIGNED: { bg: '#FFF8E1', border: colors.warning, text: colors.warning },
-  MECHANIC_ACCEPTED: { bg: '#FFF8E1', border: colors.warning, text: colors.warning },
-  MECHANIC_ON_THE_WAY: { bg: '#EEF2FF', border: colors.primary, text: colors.primary },
-  ARRIVED: { bg: '#EEF2FF', border: colors.primary, text: colors.primary },
-  WORK_STARTED: { bg: '#EEF2FF', border: colors.primary, text: colors.primary },
-  COMPLETED: { bg: '#F0FDF4', border: colors.success, text: colors.success },
-  CANCELLED: { bg: '#FEF2F2', border: colors.danger, text: colors.danger },
-  REJECTED: { bg: '#FFF8E1', border: colors.warning, text: colors.warning },
+  PENDING: { bg: '#FFF8E1', border: LIGHT_COLORS.warning, text: LIGHT_COLORS.warning },
+  CONFIRMED: { bg: '#FFF8E1', border: LIGHT_COLORS.warning, text: LIGHT_COLORS.warning },
+  PENDING_ADMIN_ASSIGNMENT: { bg: '#FFF8E1', border: LIGHT_COLORS.warning, text: LIGHT_COLORS.warning },
+  MECHANIC_ASSIGNED: { bg: '#FFF8E1', border: LIGHT_COLORS.warning, text: LIGHT_COLORS.warning },
+  MECHANIC_ACCEPTED: { bg: '#FFF8E1', border: LIGHT_COLORS.warning, text: LIGHT_COLORS.warning },
+  MECHANIC_ON_THE_WAY: { bg: '#EEF2FF', border: LIGHT_COLORS.primary, text: LIGHT_COLORS.primary },
+  ARRIVED: { bg: '#EEF2FF', border: LIGHT_COLORS.primary, text: LIGHT_COLORS.primary },
+  WORK_STARTED: { bg: '#EEF2FF', border: LIGHT_COLORS.primary, text: LIGHT_COLORS.primary },
+  COMPLETED: { bg: '#F0FDF4', border: LIGHT_COLORS.success, text: LIGHT_COLORS.success },
+  CANCELLED: { bg: '#FEF2F2', border: LIGHT_COLORS.danger, text: LIGHT_COLORS.danger },
+  REJECTED: { bg: '#FFF8E1', border: LIGHT_COLORS.warning, text: LIGHT_COLORS.warning },
 };
 
 // Mirrors CANCELLABLE_STATUSES in service.controller.ts -- once the mechanic
@@ -67,6 +102,8 @@ interface Props {
 
 export default function ServiceBookingCard({ booking, token, onChanged }: Props) {
   const navigation = useNavigation<any>();
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [photoUri, setPhotoUri] = useState<string | null>(photoCache.get(booking.id) ?? null);
   const [cancelling, setCancelling] = useState(false);
 
@@ -266,8 +303,8 @@ export default function ServiceBookingCard({ booking, token, onChanged }: Props)
   );
 }
 
-const styles = StyleSheet.create({
-  card: { backgroundColor: colors.white, borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight },
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
+  card: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   bookingId: { fontSize: 14, fontWeight: '900', color: colors.textDark },
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },
@@ -276,19 +313,22 @@ const styles = StyleSheet.create({
   meta: { fontSize: 12, color: colors.textMuted, marginBottom: 3 },
 
   mechanicRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.pageBg, borderRadius: 10, padding: 10, marginTop: 8 },
-  mechanicAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', marginRight: 10, overflow: 'hidden' },
+  mechanicAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', marginRight: 10, overflow: 'hidden' },
   mechanicPhoto: { width: 38, height: 38, borderRadius: 19 },
   mechanicName: { fontSize: 13, fontWeight: '800', color: colors.textDark },
   mechanicMeta: { fontSize: 11, color: colors.textMuted, marginTop: 2 },
-  iconBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', marginLeft: 6, borderWidth: 1, borderColor: colors.borderLight },
+  iconBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', marginLeft: 6, borderWidth: 1, borderColor: colors.borderLight },
 
+  // liveRow/otpRow sit on a fixed light-indigo pastel (doesn't invert), so
+  // their ink text is pinned to LIGHT_COLORS -- colors.textDark would turn
+  // near-white in dark mode and disappear against this still-light bg.
   liveRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EEF2FF', borderRadius: 10, padding: 10, marginTop: 8 },
   liveDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.danger, marginRight: 8 },
-  liveText: { flex: 1, fontSize: 12, fontWeight: '700', color: colors.textDark },
+  liveText: { flex: 1, fontSize: 12, fontWeight: '700', color: LIGHT_COLORS.textDark },
   liveArrow: { fontSize: 18, color: colors.textMuted, marginLeft: 4 },
 
   otpRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#EEF2FF', borderRadius: 10, padding: 10, marginTop: 8, borderWidth: 1, borderColor: colors.primary },
-  otpLabel: { fontSize: 12, fontWeight: '700', color: colors.textDark },
+  otpLabel: { fontSize: 12, fontWeight: '700', color: LIGHT_COLORS.textDark },
   otpCode: { fontSize: 18, fontWeight: '900', color: colors.primary, letterSpacing: 3 },
 
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },

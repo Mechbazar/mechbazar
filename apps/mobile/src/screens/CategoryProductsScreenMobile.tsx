@@ -2,7 +2,7 @@
 // Deliberate byte-for-byte duplicate of CategoryProductsScreen.tsx's original
 // content -- kept separate so this screen's native/mobile-web behavior can
 // never be affected by desktop catalog changes. Mirror behavior changes here.
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -22,6 +22,34 @@ import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../services/
 import { ProductGridCard } from '../components/ProductGridCard';
 import { FilterSortSheet } from '../components/FilterSortSheet';
 import { HeaderCartButton } from '../components/HeaderCartButton';
+import { useIsDarkMode } from '../theme/useThemeColors';
+import { useTranslation } from 'react-i18next';
+
+const LIGHT_COLORS = {
+  pageBg: '#F8F9FA',
+  surface: '#FFFFFF',
+  border: '#EEEEEE',
+  textDark: '#111111',
+  textMuted: '#666666',
+  icon: '#333333',
+  primary: '#DA3830',
+  danger: '#D32F2F',
+  cartIconColor: '#1C1C1C',
+  cartIconBg: 'rgba(0,0,0,0.05)',
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  pageBg: '#121212',
+  surface: '#1E1E1E',
+  border: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  icon: '#F1F2F4',
+  primary: '#FF5A4E',
+  danger: '#FF6B6B',
+  cartIconColor: '#FFFFFF',
+  cartIconBg: 'rgba(255,255,255,0.12)',
+};
 
 type ParamList = {
   CategoryProducts: {
@@ -33,12 +61,27 @@ type ParamList = {
   };
 };
 
+// Route params carry a handful of literal English strings used both as
+// display labels and as sentinel values compared elsewhere in this file
+// (e.g. categoryName === 'Search Results') -- translate only at display time
+// via this map, so the underlying value stays stable for that comparison
+// and for real (backend) category names, which pass through untouched.
+const CATEGORY_NAME_KEYS: Record<string, string> = {
+  'Search Results': 'categoryProducts.searchResultsTitle',
+  'All Products': 'categoryProducts.allProductsTitle',
+  'Products': 'categoryProducts.defaultTitle',
+};
+
 export default function CategoryProductsScreen() {
   const route = useRoute<RouteProp<ParamList, 'CategoryProducts'>>();
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const vehicleType = useSelector((state: RootState) => state.app.vehicleType);
   const { token } = useSelector((state: RootState) => state.auth);
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { categoryName = 'Products', brandId, modelId, year, initialSearchQuery } = route.params || {};
+  const displayCategoryName = CATEGORY_NAME_KEYS[categoryName] ? t(CATEGORY_NAME_KEYS[categoryName]) : categoryName;
 
   const [products, setProducts] = useState<Product[]>([]);
   const [wishlistedIds, setWishlistedIds] = useState<Set<string>>(new Set());
@@ -136,8 +179,8 @@ export default function CategoryProductsScreen() {
     return (
       <View style={styles.emptyContainer}>
         <Text style={{ fontSize: 40, marginBottom: 12 }}>🔍</Text>
-        <Text style={styles.emptyText}>No products found in {categoryName}</Text>
-        <Text style={styles.emptySub}>Try adjusting your filters or search query.</Text>
+        <Text style={styles.emptyText}>{t('categoryProducts.noProductsFoundIn', { category: displayCategoryName })}</Text>
+        <Text style={styles.emptySub}>{t('categoryProducts.tryAdjusting')}</Text>
       </View>
     );
   };
@@ -148,16 +191,17 @@ export default function CategoryProductsScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { flex: 1, textAlign: 'center' }]}>{categoryName}</Text>
-        <HeaderCartButton color="#1C1C1C" backgroundColor="rgba(0,0,0,0.05)" />
+        <Text style={[styles.headerTitle, { flex: 1, textAlign: 'center' }]}>{displayCategoryName}</Text>
+        <HeaderCartButton color={colors.cartIconColor} backgroundColor={colors.cartIconBg} />
       </View>
 
       <View style={styles.searchSection}>
         <View style={styles.searchBar}>
           <Text style={{ marginRight: 8, fontSize: 16 }}>🔍</Text>
-          <TextInput 
+          <TextInput
             style={styles.searchInput}
-            placeholder="Search in this category..."
+            placeholder={t('categoryProducts.searchInThisCategory')}
+            placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
             returnKeyType="search"
@@ -174,17 +218,17 @@ export default function CategoryProductsScreen() {
       </View>
 
       <View style={styles.filterSummary}>
-        <Text style={styles.resultsText}>{products.length} Results</Text>
+        <Text style={styles.resultsText}>{t('categoryProducts.results', { count: products.length })}</Text>
         {(filters.inStockOnly || filters.sortBy !== 'popular') && (
           <TouchableOpacity onPress={() => setFilters({ sortBy: 'popular', brands: [], inStockOnly: false })}>
-            <Text style={styles.clearFiltersText}>Clear Filters</Text>
+            <Text style={styles.clearFiltersText}>{t('categoryProducts.clearFilters')}</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {loading && !loadingMore ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#DA3830" />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
@@ -204,7 +248,7 @@ export default function CategoryProductsScreen() {
           ListEmptyComponent={renderEmpty}
           onEndReached={() => fetchProducts(true)}
           onEndReachedThreshold={0.5}
-          ListFooterComponent={loadingMore ? <ActivityIndicator style={{ margin: 20 }} color="#DA3830" /> : null}
+          ListFooterComponent={loadingMore ? <ActivityIndicator style={{ margin: 20 }} color={colors.primary} /> : null}
         />
       )}
 
@@ -219,59 +263,59 @@ export default function CategoryProductsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8F9FA' },
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.pageBg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderColor: '#eee',
+    borderColor: colors.border,
   },
   backBtn: { width: 40, height: 40, justifyContent: 'center' },
-  backText: { fontSize: 24, color: '#333' },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#111' },
+  backText: { fontSize: 24, color: colors.icon },
+  headerTitle: { fontSize: 18, fontWeight: '700', color: colors.textDark },
   searchSection: {
     flexDirection: 'row',
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     alignItems: 'center',
   },
   searchBar: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F2F5',
+    backgroundColor: colors.pageBg,
     borderRadius: 8,
     paddingHorizontal: 12,
     height: 44,
     marginRight: 12,
   },
-  searchInput: { flex: 1, height: '100%', fontSize: 15 },
+  searchInput: { flex: 1, height: '100%', fontSize: 15, color: colors.textDark },
   filterBtn: {
     width: 44,
     height: 44,
-    backgroundColor: '#F0F2F5',
+    backgroundColor: colors.pageBg,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  filterBtnIcon: { fontSize: 20, color: '#333' },
+  filterBtnIcon: { fontSize: 20, color: colors.icon },
   filterSummary: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  resultsText: { fontSize: 13, color: '#666', fontWeight: '500' },
-  clearFiltersText: { fontSize: 13, color: '#D32F2F', fontWeight: '500' },
+  resultsText: { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
+  clearFiltersText: { fontSize: 13, color: colors.danger, fontWeight: '500' },
   listContent: { padding: 16, paddingBottom: 100 },
   columnWrapper: { justifyContent: 'space-between' },
   loaderContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: 100 },
-  emptyText: { fontSize: 16, fontWeight: '600', color: '#333', marginBottom: 8 },
-  emptySub: { fontSize: 14, color: '#666' }
+  emptyText: { fontSize: 16, fontWeight: '600', color: colors.textDark, marginBottom: 8 },
+  emptySub: { fontSize: 14, color: colors.textMuted }
 });

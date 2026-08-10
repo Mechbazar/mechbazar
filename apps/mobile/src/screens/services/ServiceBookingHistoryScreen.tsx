@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -7,23 +7,69 @@ import { RootState } from '../../store';
 import { ServiceBooking, BookingStatus } from '../../types/service';
 import { fetchMyBookings } from '../../services/service.service';
 import { HeaderCartButton } from '../../components/HeaderCartButton';
-import { colors } from './theme';
+import { useIsDarkMode } from '../../theme/useThemeColors';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
+import { useTranslation } from 'react-i18next';
 
+// File-local copy of screens/services/theme.ts's shared `colors` export --
+// theme.ts itself stays untouched (it's a static, light-only palette
+// consumed by several other screens/components that haven't been converted
+// yet). `white` stays pure white in both themes -- text/icons on the
+// permanently-dark header bar and on colored buttons, never a card
+// background here. `surface` is the actual booking-card background, the
+// one that inverts.
+const LIGHT_COLORS = {
+  primary: '#DA3830',
+  darkInk: '#1B1B1B',
+  pageBg: '#F8F9FA',
+  white: '#FFFFFF',
+  borderLight: '#E3E6EA',
+  textDark: '#1B1B1B',
+  textMuted: '#6B7480',
+  success: '#1E9E5A',
+  warning: '#F5A300',
+  danger: '#D32F2F',
+  surface: '#FFFFFF',
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  darkInk: '#F1F2F4',
+  pageBg: '#121212',
+  white: '#FFFFFF',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  success: '#4FE092',
+  warning: '#F5B94D',
+  danger: '#FF6B6B',
+  surface: '#1E1E1E',
+};
+
+// These status badges use fixed pale pastel backgrounds (bg) that are NOT
+// theme-derived and deliberately never invert (a status pill floating over
+// the card, not a general surface). Their border/text are therefore pinned
+// to the LIGHT_COLORS values too -- if they used the dynamic `colors`
+// object instead, dark mode would swap in the brighter dark-mode
+// success/danger/warning shades (tuned for dark backgrounds) on top of this
+// still-pale bg, which is illegible (light-on-light).
 const STATUS_COLORS: Partial<Record<BookingStatus, { bg: string; border: string; text: string }>> = {
-  COMPLETED: { bg: '#F0FDF4', border: colors.success, text: colors.success },
-  CANCELLED: { bg: '#FEF2F2', border: colors.danger, text: colors.danger },
-  REJECTED: { bg: '#FEF2F2', border: colors.danger, text: colors.danger },
-  MECHANIC_ASSIGNED: { bg: '#FFF8E1', border: colors.warning, text: colors.warning },
-  MECHANIC_ACCEPTED: { bg: '#FFF8E1', border: colors.warning, text: colors.warning },
+  COMPLETED: { bg: '#F0FDF4', border: LIGHT_COLORS.success, text: LIGHT_COLORS.success },
+  CANCELLED: { bg: '#FEF2F2', border: LIGHT_COLORS.danger, text: LIGHT_COLORS.danger },
+  REJECTED: { bg: '#FEF2F2', border: LIGHT_COLORS.danger, text: LIGHT_COLORS.danger },
+  MECHANIC_ASSIGNED: { bg: '#FFF8E1', border: LIGHT_COLORS.warning, text: LIGHT_COLORS.warning },
+  MECHANIC_ACCEPTED: { bg: '#FFF8E1', border: LIGHT_COLORS.warning, text: LIGHT_COLORS.warning },
 };
 
 export default function ServiceBookingHistoryScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const { token } = useSelector((state: RootState) => state.auth);
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [bookings, setBookings] = useState<ServiceBooking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,8 +98,8 @@ export default function ServiceBookingHistoryScreen() {
         <Text style={styles.backIcon}>←</Text>
       </TouchableOpacity>
       <View style={{ flex: 1 }}>
-        <Text style={styles.headerTitle}>My Bookings</Text>
-        <Text style={styles.headerSubtitle}>Service history and active jobs</Text>
+        <Text style={styles.headerTitle}>{t('serviceBookingHistory.myBookings')}</Text>
+        <Text style={styles.headerSubtitle}>{t('serviceBookingHistory.serviceHistoryAndActiveJobs')}</Text>
       </View>
       <HeaderCartButton color="#FFFFFF" backgroundColor="rgba(255,255,255,0.15)" />
     </View>
@@ -73,7 +119,7 @@ export default function ServiceBookingHistoryScreen() {
             <Text style={[styles.badgeText, { color: badge.text }]}>{item.status.replace(/_/g, ' ')}</Text>
           </View>
         </View>
-        <Text style={styles.serviceName}>{item.package?.name || 'Service'}</Text>
+        <Text style={styles.serviceName}>{item.package?.name || t('serviceBooking.service')}</Text>
         <Text style={styles.meta}>{item.vehicleBrand} {item.vehicleModel} · {new Date(item.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</Text>
 
         <View style={styles.cardFooter}>
@@ -81,11 +127,11 @@ export default function ServiceBookingHistoryScreen() {
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {item.status === 'COMPLETED' && (
               <TouchableOpacity style={styles.actionBtnOutline} onPress={() => rebook(item)}>
-                <Text style={styles.actionBtnOutlineText}>Rebook</Text>
+                <Text style={styles.actionBtnOutlineText}>{t('serviceBookingHistory.rebook')}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity style={styles.actionBtn} onPress={() => navigation.navigate('ServiceTracking', { bookingId: item.id })}>
-              <Text style={styles.actionBtnText}>{item.status === 'COMPLETED' ? 'View' : 'Track'}</Text>
+              <Text style={styles.actionBtnText}>{item.status === 'COMPLETED' ? t('serviceBookingHistory.view') : t('serviceBookingHistory.track')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -111,8 +157,8 @@ export default function ServiceBookingHistoryScreen() {
       {bookings.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyEmoji}>🛠️</Text>
-          <Text style={styles.emptyTitle}>No service bookings yet</Text>
-          <Text style={styles.emptySubtitle}>Book a doorstep service and it'll show up here.</Text>
+          <Text style={styles.emptyTitle}>{t('orderHistory.noServiceBookingsYet')}</Text>
+          <Text style={styles.emptySubtitle}>{t('serviceBookingHistory.bookDoorstepServiceShowUp')}</Text>
         </View>
       ) : (
         <FlatList
@@ -131,17 +177,18 @@ export default function ServiceBookingHistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   flexFill: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.darkInk },
+  // Permanently-dark branded header bar -- pinned fixed (see ServiceCategoryScreen).
+  header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: LIGHT_COLORS.darkInk },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: colors.white, fontWeight: 'bold' },
   headerTitle: { fontSize: 18, fontWeight: '800', color: colors.white },
   headerSubtitle: { fontSize: 13, color: '#9AA5B1', marginTop: 2 },
 
   listContent: { padding: 14 },
-  card: { backgroundColor: colors.white, borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight },
+  card: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   bookingId: { fontSize: 14, fontWeight: '900', color: colors.textDark },
   badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1 },

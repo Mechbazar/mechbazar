@@ -1,11 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store';
 import { openRazorpayCheckout, verifyRazorpayPayment } from '../services/payment.service';
-import { colors } from './services/theme';
+import { useIsDarkMode } from '../theme/useThemeColors';
+import { useTranslation } from 'react-i18next';
+
+// Local copy of the (subset of the) shared services/theme.ts palette used by
+// this screen -- see PaymentSuccessScreen.tsx for the same note. No
+// full-bleed colored background here; `white` stays fixed (retry button's
+// spinner/label sit on the always-red primary button in both themes).
+const LIGHT_COLORS = {
+  primary: '#DA3830',
+  pageBg: '#F8F9FA',
+  white: '#FFFFFF',
+  textDark: '#1B1B1B',
+  textMuted: '#6B7480',
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  pageBg: '#121212',
+  white: '#FFFFFF',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+};
 
 type ParamList = {
   PaymentCancelled: {
@@ -27,10 +48,13 @@ type ParamList = {
 export default function PaymentCancelledScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<ParamList, 'PaymentCancelled'>>();
+  const { t } = useTranslation();
   const { orderId, amount, razorpayOrderId, razorpayKeyId } = route.params;
   const shortId = orderId.split('-')[0].toUpperCase();
   const { token, user } = useSelector((state: RootState) => state.auth);
   const [retrying, setRetrying] = useState(false);
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const handleRetry = async () => {
     setRetrying(true);
@@ -72,30 +96,29 @@ export default function PaymentCancelledScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.emoji}>🚫</Text>
-        <Text style={styles.title}>Payment Cancelled</Text>
+        <Text style={styles.title}>{t('payment.cancelled.title')}</Text>
         <Text style={styles.subtitle}>
-          Order #{shortId} for ₹{amount} is placed but not yet paid. You can try paying online again, or pay the
-          rider in cash when your order arrives.
+          {t('payment.cancelled.subtitle', { shortId, amount })}
         </Text>
         <TouchableOpacity style={styles.primaryBtn} onPress={handleRetry} disabled={retrying}>
           {retrying ? (
             <ActivityIndicator size="small" color={colors.white} />
           ) : (
-            <Text style={styles.primaryBtnText}>Retry Online Payment</Text>
+            <Text style={styles.primaryBtnText}>{t('payment.cancelled.retryOnlinePayment')}</Text>
           )}
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.secondaryBtn}
           onPress={() => navigation.navigate('MainTabs', { screen: 'Orders' })}
         >
-          <Text style={styles.secondaryBtnText}>Continue with Cash on Delivery</Text>
+          <Text style={styles.secondaryBtnText}>{t('payment.cancelled.continueWithCod')}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   content: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
   emoji: { fontSize: 72, marginBottom: 20 },

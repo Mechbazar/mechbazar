@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -8,7 +8,8 @@ import {
 } from '@mechbazar/shared';
 import LiveTrackingMap from '../../components/shared/maps/LiveTrackingMap';
 import AssignmentWaitingCard from '../../components/services/AssignmentWaitingCard';
-import { colors } from './theme';
+import { useIsDarkMode } from '../../theme/useThemeColors';
+import { useTranslation } from 'react-i18next';
 
 // Live emergency job tracking. Distinct from ServiceTrackingScreen (the
 // scheduled-booking tracker, which polls every 10s) because "instant" only
@@ -27,14 +28,14 @@ import { colors } from './theme';
 type ParamList = { EmergencyTracking: { bookingId: string } };
 const POLL_FALLBACK_MS = 20000;
 
-const STATUS_STEPS: { statuses: string[]; title: string; icon: string }[] = [
-  { statuses: ['PENDING', 'CONFIRMED', 'PENDING_ADMIN_ASSIGNMENT'], title: 'Request Received', icon: '📝' },
-  { statuses: ['MECHANIC_ASSIGNED'], title: 'Mechanic Assigned', icon: '👨‍🔧' },
-  { statuses: ['MECHANIC_ACCEPTED'], title: 'Mechanic Accepted', icon: '✅' },
-  { statuses: ['MECHANIC_ON_THE_WAY'], title: 'Mechanic En Route', icon: '🚗' },
-  { statuses: ['ARRIVED'], title: 'Mechanic Arrived', icon: '📍' },
-  { statuses: ['WORK_STARTED'], title: 'Work Started', icon: '🛠️' },
-  { statuses: ['COMPLETED'], title: 'Work Completed', icon: '🎉' },
+const STATUS_STEPS: { statuses: string[]; titleKey: string; icon: string }[] = [
+  { statuses: ['PENDING', 'CONFIRMED', 'PENDING_ADMIN_ASSIGNMENT'], titleKey: 'tracking.requestReceived', icon: '📝' },
+  { statuses: ['MECHANIC_ASSIGNED'], titleKey: 'tracking.mechanicAssigned', icon: '👨‍🔧' },
+  { statuses: ['MECHANIC_ACCEPTED'], titleKey: 'tracking.mechanicAccepted', icon: '✅' },
+  { statuses: ['MECHANIC_ON_THE_WAY'], titleKey: 'tracking.mechanicEnRoute', icon: '🚗' },
+  { statuses: ['ARRIVED'], titleKey: 'tracking.mechanicArrived', icon: '📍' },
+  { statuses: ['WORK_STARTED'], titleKey: 'tracking.workStarted', icon: '🛠️' },
+  { statuses: ['COMPLETED'], titleKey: 'tracking.workCompleted', icon: '🎉' },
 ];
 const STATUS_WEIGHT: Record<string, number> = {
   PENDING: 1, CONFIRMED: 1, PENDING_ADMIN_ASSIGNMENT: 1, SEARCHING: 1, MECHANIC_ASSIGNED: 2, MECHANIC_ACCEPTED: 3,
@@ -51,6 +52,7 @@ function formatEta(seconds: number | null): string {
 export default function EmergencyTrackingScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<ParamList, 'EmergencyTracking'>>();
+  const { t } = useTranslation();
   const { bookingId } = route.params;
 
   const [job, setJob] = useState<Job | null>(null);
@@ -62,6 +64,9 @@ export default function EmergencyTrackingScreen() {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [submittingRating, setSubmittingRating] = useState(false);
+
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const refresh = useCallback(async () => {
     const data = await jobService.getJob(bookingId);
@@ -200,7 +205,7 @@ export default function EmergencyTrackingScreen() {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ color: colors.textMuted }}>Loading your request...</Text>
+          <Text style={{ color: colors.textMuted }}>{t('tracking.loadingRequest')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -227,7 +232,7 @@ export default function EmergencyTrackingScreen() {
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>🚨 Emergency Assistance</Text>
+          <Text style={styles.headerTitle}>{t('tracking.emergencyAssistance')}</Text>
           <Text style={styles.headerSubtitle}>#{job.bookingNumber}</Text>
         </View>
       </View>
@@ -236,7 +241,7 @@ export default function EmergencyTrackingScreen() {
         {isCancelled ? (
           <View style={styles.bannerBlock}>
             <Text style={styles.bannerIcon}>✕</Text>
-            <Text style={styles.bannerTitle}>Request Cancelled</Text>
+            <Text style={styles.bannerTitle}>{t('tracking.requestCancelled')}</Text>
             {!!job.cancelReason && <Text style={styles.bannerText}>{job.cancelReason}</Text>}
           </View>
         ) : isWaiting ? (
@@ -256,16 +261,16 @@ export default function EmergencyTrackingScreen() {
                 height={220}
                 routePolyline={isLive ? job.tracking.routePolyline : null}
                 markers={[
-                  { latitude: mechanicLat, longitude: mechanicLng, title: 'Your mechanic', color: colors.primary },
+                  { latitude: mechanicLat, longitude: mechanicLng, title: t('tracking.yourMechanic'), color: colors.primary },
                   ...(job.location.lat != null && job.location.lng != null
-                    ? [{ latitude: job.location.lat, longitude: job.location.lng, title: 'You', color: colors.success }]
+                    ? [{ latitude: job.location.lat, longitude: job.location.lng, title: t('tracking.you'), color: colors.success }]
                     : []),
                 ]}
               />
             ) : (
               <View style={styles.mapPlaceholder}>
                 <Text style={styles.mapEmoji}>📍</Text>
-                <Text style={styles.mapText}>Waiting for mechanic location...</Text>
+                <Text style={styles.mapText}>{t('tracking.waitingForMechanicLocation')}</Text>
               </View>
             )}
 
@@ -277,12 +282,12 @@ export default function EmergencyTrackingScreen() {
                   onError={() => {}}
                 />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.technicianName}>{job.technician.name || 'Your Mechanic'}</Text>
-                  <Text style={styles.technicianMeta}>⭐ {job.technician.rating.toFixed(1)} · {job.technician.totalJobs} jobs</Text>
+                  <Text style={styles.technicianName}>{job.technician.name || t('tracking.yourMechanicFallback')}</Text>
+                  <Text style={styles.technicianMeta}>⭐ {job.technician.rating.toFixed(1)} · {t('tracking.jobsSuffix', { count: job.technician.totalJobs })}</Text>
                   {isLive && job.tracking.etaSeconds != null && (
                     <Text style={styles.technicianMeta}>
-                      ETA {formatEta(job.tracking.etaSeconds)}
-                      {job.tracking.distanceRemainingM != null && ` · ${(job.tracking.distanceRemainingM / 1000).toFixed(1)} km away`}
+                      {t('tracking.etaLabel', { eta: formatEta(job.tracking.etaSeconds) })}
+                      {job.tracking.distanceRemainingM != null && t('tracking.kmAway', { km: (job.tracking.distanceRemainingM / 1000).toFixed(1) })}
                     </Text>
                   )}
                 </View>
@@ -304,29 +309,29 @@ export default function EmergencyTrackingScreen() {
 
             {otp && (job.status === 'ARRIVED' || job.status === 'WORK_STARTED') && (
               <View style={styles.otpCard}>
-                <Text style={styles.otpTitle}>{otp.purpose === 'START' ? 'Start Code' : 'Completion Code'}</Text>
+                <Text style={styles.otpTitle}>{otp.purpose === 'START' ? t('tracking.startCode') : t('tracking.completionCode')}</Text>
                 <Text style={styles.otpCode}>{otp.code}</Text>
                 <Text style={styles.otpHint}>
                   {otp.purpose === 'START'
-                    ? 'Read this code to your mechanic to let them begin work.'
-                    : 'Read this code to your mechanic once you\'re happy the job is done.'}
+                    ? t('tracking.startCodeHint')
+                    : t('tracking.completionCodeHint')}
                 </Text>
               </View>
             )}
             {job.status === 'WORK_STARTED' && !otp && (
               <TouchableOpacity style={styles.refreshOtpBtn} onPress={() => loadOtp('COMPLETION')}>
-                <Text style={styles.refreshOtpText}>Get Completion Code</Text>
+                <Text style={styles.refreshOtpText}>{t('tracking.getCompletionCode')}</Text>
               </TouchableOpacity>
             )}
 
             <View style={styles.trackingCard}>
-              <Text style={styles.trackingTitle}>Status</Text>
+              <Text style={styles.trackingTitle}>{t('tracking.status')}</Text>
               {STATUS_STEPS.map((s, i) => {
                 const isActive = s.statuses.includes(job.status);
                 const isPast = currentWeight > STATUS_WEIGHT[s.statuses[0]];
                 const isLast = i === STATUS_STEPS.length - 1;
                 return (
-                  <View key={s.title} style={styles.timelineNode}>
+                  <View key={s.titleKey} style={styles.timelineNode}>
                     <View style={styles.nodeColumn}>
                       <View style={[styles.nodeCircle, (isActive || isPast) && styles.nodeCircleActive]}>
                         <Text style={styles.nodeIcon}>{(isActive || isPast) ? '✓' : ''}</Text>
@@ -335,7 +340,7 @@ export default function EmergencyTrackingScreen() {
                     </View>
                     <View style={styles.nodeContent}>
                       <Text style={styles.nodeEmoji}>{s.icon}</Text>
-                      <Text style={[styles.nodeTitle, (isActive || isPast) && styles.nodeTitleActive]}>{s.title}</Text>
+                      <Text style={[styles.nodeTitle, (isActive || isPast) && styles.nodeTitleActive]}>{t(s.titleKey)}</Text>
                     </View>
                   </View>
                 );
@@ -346,7 +351,7 @@ export default function EmergencyTrackingScreen() {
 
         {isCompleted && !job.review && (
           <View style={styles.ratingCard}>
-            <Text style={styles.ratingTitle}>How was your service?</Text>
+            <Text style={styles.ratingTitle}>{t('tracking.howWasYourService')}</Text>
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map((i) => (
                 <TouchableOpacity key={i} onPress={() => setRating(i)}>
@@ -356,29 +361,29 @@ export default function EmergencyTrackingScreen() {
             </View>
             <View style={styles.commentInputWrap}>
               <TouchableOpacity style={styles.ratingSubmitBtn} disabled={rating === 0 || submittingRating} onPress={handleRate}>
-                <Text style={styles.ratingSubmitText}>{submittingRating ? 'Submitting...' : 'Submit Rating'}</Text>
+                <Text style={styles.ratingSubmitText}>{submittingRating ? t('tracking.submittingRating') : t('tracking.submitRating')}</Text>
               </TouchableOpacity>
             </View>
           </View>
         )}
         {isCompleted && job.review && (
           <View style={styles.ratingCard}>
-            <Text style={styles.ratingTitle}>Your Rating</Text>
+            <Text style={styles.ratingTitle}>{t('tracking.yourRating')}</Text>
             <Text style={styles.reportStars}>{'★'.repeat(job.review.rating)}{'☆'.repeat(Math.max(0, 5 - job.review.rating))}</Text>
             {!!job.review.comment && <Text style={styles.bannerText}>"{job.review.comment}"</Text>}
           </View>
         )}
 
         <View style={styles.summaryCard}>
-          <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Service</Text><Text style={styles.summaryValue}>{job.package.name}</Text></View>
-          <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Vehicle</Text><Text style={styles.summaryValue}>{job.vehicle.brand} {job.vehicle.model}</Text></View>
-          <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Total</Text><Text style={styles.summaryValue}>₹{job.pricing.finalAmount}</Text></View>
+          <View style={styles.summaryRow}><Text style={styles.summaryLabel}>{t('tracking.service')}</Text><Text style={styles.summaryValue}>{job.package.name}</Text></View>
+          <View style={styles.summaryRow}><Text style={styles.summaryLabel}>{t('tracking.vehicle')}</Text><Text style={styles.summaryValue}>{job.vehicle.brand} {job.vehicle.model}</Text></View>
+          <View style={styles.summaryRow}><Text style={styles.summaryLabel}>{t('tracking.total')}</Text><Text style={styles.summaryValue}>₹{job.pricing.finalAmount}</Text></View>
         </View>
 
         <View style={{ paddingHorizontal: 16, gap: 10 }}>
           {!isCancelled && !isCompleted && !isWaiting && job.status !== 'WORK_STARTED' && (
             <TouchableOpacity style={styles.cancelOutlineBtn} disabled={cancelling} onPress={handleCancel}>
-              <Text style={styles.cancelOutlineBtnText}>{cancelling ? 'Cancelling...' : 'Cancel Request'}</Text>
+              <Text style={styles.cancelOutlineBtnText}>{cancelling ? t('tracking.cancellingRequest') : t('tracking.cancelRequest')}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -387,9 +392,48 @@ export default function EmergencyTrackingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// `white` (icon/label text on colored buttons and status pills) stays
+// literal white in both themes; `surface` is the actual card/header
+// background and inverts along with the `textDark`/`textMuted` text drawn
+// on it. `infoTint` backs the OTP card -- it holds dynamic `textDark`/
+// `textMuted` text, so (unlike a purely decorative pastel accent) it must
+// invert to a muted dark tint rather than stay a fixed light blue, or that
+// text goes near-white-on-still-light-blue in dark mode. The neutral grays
+// (`#D1D5DB` / `#9CA3AF`) used for the *inactive* timeline nodes/stars are
+// deliberately left as literal, un-themed values -- they're single-role
+// "unfilled state" chrome with no text ever drawn on top of them, and they
+// stay legibly muted against both a light and a near-black page background.
+const LIGHT_COLORS = {
+  primary: '#DA3830',
+  danger: '#D32F2F',
+  pageBg: '#F8F9FA',
+  white: '#FFFFFF',
+  surface: '#FFFFFF',
+  borderLight: '#E3E6EA',
+  textDark: '#1B1B1B',
+  textMuted: '#6B7480',
+  success: '#1E9E5A',
+  warning: '#F5A300',
+  infoTint: '#EEF2FF',
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  danger: '#FF6B6B',
+  pageBg: '#121212',
+  white: '#FFFFFF',
+  surface: '#1E1E1E',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  success: '#4FE092',
+  warning: '#F5B94D',
+  infoTint: '#1E2340',
+};
+
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
-  header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.white },
+  header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.surface },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: colors.textDark, fontWeight: 'bold' },
   headerTitle: { fontSize: 18, fontWeight: '800', color: colors.textDark },
@@ -406,14 +450,14 @@ const styles = StyleSheet.create({
 
   technicianPhoto: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.pageBg },
 
-  otpCard: { backgroundColor: '#EEF2FF', margin: 14, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: colors.primary, alignItems: 'center' },
+  otpCard: { backgroundColor: colors.infoTint, margin: 14, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: colors.primary, alignItems: 'center' },
   otpTitle: { fontSize: 13, fontWeight: '700', color: colors.textDark },
   otpCode: { fontSize: 30, fontWeight: '900', color: colors.primary, letterSpacing: 6, marginVertical: 6 },
   otpHint: { fontSize: 12, color: colors.textMuted, textAlign: 'center' },
   refreshOtpBtn: { alignSelf: 'center', marginTop: 10, marginBottom: 4 },
   refreshOtpText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
 
-  technicianCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, marginHorizontal: 14, marginTop: 14, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: colors.borderLight },
+  technicianCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, marginHorizontal: 14, marginTop: 14, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: colors.borderLight },
   technicianName: { fontSize: 14, fontWeight: '800', color: colors.textDark, marginBottom: 3 },
   technicianMeta: { fontSize: 12, color: colors.textMuted },
   iconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.pageBg, justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
@@ -421,12 +465,12 @@ const styles = StyleSheet.create({
   callToast: { backgroundColor: colors.success, marginHorizontal: 14, marginTop: 10, borderRadius: 10, padding: 10, alignItems: 'center' },
   callToastText: { color: colors.white, fontWeight: '700', fontSize: 12 },
 
-  trackingCard: { backgroundColor: colors.white, borderRadius: 20, padding: 20, margin: 14 },
+  trackingCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, margin: 14 },
   trackingTitle: { fontSize: 16, fontWeight: '800', color: colors.textDark, marginBottom: 16 },
 
   timelineNode: { flexDirection: 'row', minHeight: 56 },
   nodeColumn: { alignItems: 'center', width: 26, marginRight: 14 },
-  nodeCircle: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#D1D5DB', backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center' },
+  nodeCircle: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#D1D5DB', backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center' },
   nodeCircleActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   nodeIcon: { color: colors.white, fontSize: 9, fontWeight: 'bold' },
   nodeLine: { width: 2, flex: 1, backgroundColor: '#D1D5DB', marginVertical: -2 },
@@ -436,7 +480,7 @@ const styles = StyleSheet.create({
   nodeTitle: { fontSize: 13, fontWeight: '600', color: '#9CA3AF' },
   nodeTitleActive: { color: colors.textDark, fontWeight: '700' },
 
-  ratingCard: { backgroundColor: colors.white, borderRadius: 14, padding: 16, marginHorizontal: 14, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight, alignItems: 'center' },
+  ratingCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginHorizontal: 14, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight, alignItems: 'center' },
   ratingTitle: { fontSize: 15, fontWeight: '800', color: colors.textDark, marginBottom: 12 },
   starsRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
   star: { fontSize: 34, color: '#D1D5DB' },
@@ -446,7 +490,7 @@ const styles = StyleSheet.create({
   ratingSubmitText: { color: colors.white, fontWeight: '800', fontSize: 14 },
   reportStars: { fontSize: 20, color: colors.warning, marginBottom: 6 },
 
-  summaryCard: { backgroundColor: colors.white, borderRadius: 14, padding: 16, marginHorizontal: 14, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight },
+  summaryCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginHorizontal: 14, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   summaryLabel: { fontSize: 13, color: colors.textMuted },
   summaryValue: { fontSize: 13, color: colors.textDark, fontWeight: '700' },

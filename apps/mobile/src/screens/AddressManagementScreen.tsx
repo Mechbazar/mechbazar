@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -24,7 +24,8 @@ import {
   fetchMyAddresses,
   createMyAddress,
   updateMyAddress,
-  deleteMyAddress
+  deleteMyAddress,
+  checkPincodeServiceable
 } from '../services/address.service';
 import { locationService } from '../services/location.service';
 import { reverseGeocode, GeocodeSuccess } from '../services/geocode.service';
@@ -32,22 +33,46 @@ import { useBreakpoint } from '../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
+import { useIsDarkMode } from '../theme/useThemeColors';
+import { useTranslation } from 'react-i18next';
 
-const colors = {
+// `secondary` is a fixed dark header/button bar (already dark in light mode),
+// deliberately unchanged in dark mode. `white` is text-on-that-bar blended
+// with card backgrounds -- `surface` is the one that actually inverts.
+const LIGHT_COLORS = {
   primary: '#E53935',
   secondary: '#1C1C1E',
   white: '#FFFFFF',
+  surface: '#FFFFFF',
   pageBg: '#F8F9FA',
   borderLight: '#E8ECEF',
   textDark: '#111112',
   textMuted: '#8E8E93',
   lightGray: '#F2F2F7',
   success: '#34C759',
+  warning: '#F5A300',
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  secondary: '#1C1C1E',
+  white: '#FFFFFF',
+  surface: '#1E1E1E',
+  pageBg: '#121212',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  lightGray: '#1E1E1E',
+  success: '#4FE092',
+  warning: '#F5B94D',
 };
 
 export default function AddressManagementScreen() {
   const navigation = useNavigation<any>();
+  const { t } = useTranslation();
   const { token } = useSelector((state: RootState) => state.auth);
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   // States
   const [addresses, setAddresses] = useState<any[]>([]);
@@ -69,6 +94,9 @@ export default function AddressManagementScreen() {
   const [formattedAddress, setFormattedAddress] = useState<string | null>(null);
   const [isDefault, setIsDefault] = useState(false);
   const [fetchingGPS, setFetchingGPS] = useState(false);
+  // null = not checked yet (or check failed/inconclusive) -- only ever shows
+  // the warning on a confirmed `false`, never blocks typing or saving.
+  const [pincodeServiceable, setPincodeServiceable] = useState<boolean | null>(null);
   // Kept separate from `loading` (which drives the list spinner) so the modal's
   // save button reflects only the save request -- and so an in-flight save can
   // actually disable the button instead of just relabelling it.
@@ -95,6 +123,24 @@ export default function AddressManagementScreen() {
     loadAddresses();
   }, [token]);
 
+  // Non-blocking heads-up only -- saving and checkout both still work
+  // regardless; this just tells the customer up front instead of them only
+  // finding out at "Place Order" that the pincode isn't covered yet. Debounced
+  // so it doesn't fire a request per keystroke, and only ever fires on a
+  // complete 6-digit pincode.
+  useEffect(() => {
+    if (!/^\d{6}$/.test(pincode)) {
+      setPincodeServiceable(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const result = await checkPincodeServiceable(pincode);
+      if (!cancelled) setPincodeServiceable(result);
+    }, 500);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [pincode]);
+
   const handleOpenAddModal = () => {
     setEditingAddress(null);
     setTitle('Home');
@@ -109,6 +155,7 @@ export default function AddressManagementScreen() {
     setPlaceId(null);
     setFormattedAddress(null);
     setIsDefault(false);
+    setPincodeServiceable(null);
     setModalVisible(true);
   };
 
@@ -120,6 +167,7 @@ export default function AddressManagementScreen() {
     setCity(addr.city);
     setState(addr.state);
     setPincode(addr.pincode);
+    setPincodeServiceable(null);
     setCountry(addr.country ?? null);
     setLat(addr.lat ?? null);
     setLng(addr.lng ?? null);
@@ -300,7 +348,7 @@ export default function AddressManagementScreen() {
           <Text style={styles.addressTitle}>{item.title}</Text>
           {item.isDefault && (
             <View style={styles.defaultBadge}>
-              <Text style={styles.defaultBadgeText}>★ Default</Text>
+              <Text style={styles.defaultBadgeText}>{t('address.default')}</Text>
             </View>
           )}
         </View>
@@ -320,7 +368,7 @@ export default function AddressManagementScreen() {
 
       {!item.isDefault && (
         <TouchableOpacity style={styles.setDefaultBtn} onPress={() => handleSetDefault(item)}>
-          <Text style={styles.setDefaultText}>Set as default</Text>
+          <Text style={styles.setDefaultText}>{t('address.setAsDefault')}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -332,7 +380,7 @@ export default function AddressManagementScreen() {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Saved Addresses</Text>
+        <Text style={styles.headerTitle}>{t('address.savedAddresses')}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -352,8 +400,8 @@ export default function AddressManagementScreen() {
             !loading ? (
               <View style={styles.emptyState}>
                 <Ionicons name="location-outline" size={48} color={colors.textMuted} />
-                <Text style={styles.emptyTitle}>No saved addresses found</Text>
-                <Text style={styles.emptySubtitle}>Save your home, work, or garage locations for easy doorstep visits.</Text>
+                <Text style={styles.emptyTitle}>{t('address.noSavedAddresses')}</Text>
+                <Text style={styles.emptySubtitle}>{t('address.noSavedAddressesSubtitle')}</Text>
               </View>
             ) : null
           }
@@ -362,7 +410,7 @@ export default function AddressManagementScreen() {
 
       <CompactBookingShell maxWidth={880}>
         <TouchableOpacity style={styles.addButton} onPress={handleOpenAddModal}>
-          <Text style={styles.addButtonText}>+ Add New Address</Text>
+          <Text style={styles.addButtonText}>{t('address.addNewAddress')}</Text>
         </TouchableOpacity>
         <MinimalFooter />
       </CompactBookingShell>
@@ -374,7 +422,7 @@ export default function AddressManagementScreen() {
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>
-                  {editingAddress ? 'Edit Address' : 'New Address'}
+                  {editingAddress ? t('address.editAddress') : t('address.newAddress')}
                 </Text>
                 <TouchableOpacity onPress={() => setModalVisible(false)}>
                   <Ionicons name="close" size={24} color={colors.textDark} />
@@ -389,13 +437,13 @@ export default function AddressManagementScreen() {
               >
                 <Ionicons name="locate-outline" size={16} color={colors.white} />
                 <Text style={styles.gpsDetectText}>
-                  {fetchingGPS ? 'Locating...' : 'Get Current GPS Location'}
+                  {fetchingGPS ? t('address.locating') : t('address.getCurrentGpsLocation')}
                 </Text>
               </TouchableOpacity>
 
               {token && (
                 <View style={{ marginTop: 4, marginBottom: 12 }}>
-                  <PlaceAutocompleteField token={token} onSelect={handleAutocompleteSelect} placeholder="Search for an address" />
+                  <PlaceAutocompleteField token={token} onSelect={handleAutocompleteSelect} placeholder={t('address.searchForAddress')} />
                 </View>
               )}
 
@@ -408,9 +456,10 @@ export default function AddressManagementScreen() {
 
               <View style={styles.form}>
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>ADDRESS LABEL (e.g. Home, Work)</Text>
-                  <TextInput 
+                  <Text style={styles.label}>{t('address.addressLabel')}</Text>
+                  <TextInput
                     style={styles.input}
+                    placeholderTextColor={colors.textMuted}
                     value={title}
                     onChangeText={setTitle}
                     placeholder="Home"
@@ -418,39 +467,43 @@ export default function AddressManagementScreen() {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>FLAT / STREET NAME (Line 1)</Text>
-                  <TextInput 
+                  <Text style={styles.label}>{t('address.flatStreetName')}</Text>
+                  <TextInput
                     style={styles.input}
+                    placeholderTextColor={colors.textMuted}
                     value={line1}
                     onChangeText={setLine1}
-                    placeholder="House No, Apartment name, Street"
+                    placeholder={t('address.placeholderLine1')}
                   />
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>LANDMARK / LOCALITY (Line 2)</Text>
-                  <TextInput 
+                  <Text style={styles.label}>{t('address.landmarkLocality')}</Text>
+                  <TextInput
                     style={styles.input}
+                    placeholderTextColor={colors.textMuted}
                     value={line2}
                     onChangeText={setLine2}
-                    placeholder="Near main road, hospital"
+                    placeholder={t('address.placeholderLine2')}
                   />
                 </View>
 
                 <View style={styles.rowInputs}>
                   <View style={[styles.inputGroup, { width: '48%' }]}>
-                    <Text style={styles.label}>CITY</Text>
-                    <TextInput 
+                    <Text style={styles.label}>{t('address.city')}</Text>
+                    <TextInput
                       style={styles.input}
+                      placeholderTextColor={colors.textMuted}
                       value={city}
                       onChangeText={setCity}
                       placeholder="New Delhi"
                     />
                   </View>
                   <View style={[styles.inputGroup, { width: '48%' }]}>
-                    <Text style={styles.label}>STATE</Text>
-                    <TextInput 
+                    <Text style={styles.label}>{t('address.state')}</Text>
+                    <TextInput
                       style={styles.input}
+                      placeholderTextColor={colors.textMuted}
                       value={state}
                       onChangeText={setState}
                       placeholder="Delhi"
@@ -459,18 +512,24 @@ export default function AddressManagementScreen() {
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text style={styles.label}>PINCODE</Text>
-                  <TextInput 
+                  <Text style={styles.label}>{t('address.pincode')}</Text>
+                  <TextInput
                     style={styles.input}
+                    placeholderTextColor={colors.textMuted}
                     value={pincode}
-                    onChangeText={setPincode}
+                    onChangeText={(v) => setPincode(v.replace(/\D/g, '').slice(0, 6))}
                     placeholder="110001"
                     keyboardType="numeric"
                   />
+                  {pincodeServiceable === false && (
+                    <Text style={styles.serviceabilityWarning}>
+                      {t('address.serviceabilityWarning')}
+                    </Text>
+                  )}
                 </View>
 
                 <View style={styles.switchRow}>
-                  <Text style={styles.switchLabel}>Set as Default Address</Text>
+                  <Text style={styles.switchLabel}>{t('address.setAsDefaultAddress')}</Text>
                   <Switch value={isDefault} onValueChange={setIsDefault} />
                 </View>
 
@@ -480,7 +539,7 @@ export default function AddressManagementScreen() {
                   disabled={saving}
                 >
                   <Text style={styles.modalSaveText}>
-                    {saving ? 'Saving...' : 'Save Address'}
+                    {saving ? t('address.saving') : t('address.saveAddress')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -492,7 +551,7 @@ export default function AddressManagementScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   flexFill: { flex: 1 },
   header: { 
@@ -507,7 +566,7 @@ const styles = StyleSheet.create({
   listContent: { padding: 16 },
   centerLoader: { padding: 16, alignItems: 'center' },
   card: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.borderLight,
@@ -542,7 +601,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
@@ -563,6 +622,7 @@ const styles = StyleSheet.create({
   form: { marginTop: 8 },
   inputGroup: { marginBottom: 14 },
   label: { fontSize: 9, fontWeight: 'bold', color: colors.textMuted, marginBottom: 4 },
+  serviceabilityWarning: { fontSize: 11, color: colors.warning, marginTop: 6, lineHeight: 15 },
   input: {
     borderWidth: 1.5,
     borderColor: colors.borderLight,

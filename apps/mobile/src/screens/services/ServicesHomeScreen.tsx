@@ -13,7 +13,7 @@ import { fetchServiceCategories, fetchMyBookings } from '../../services/service.
 import { jobService, Job } from '@mechbazar/shared';
 import { HeaderCartButton } from '../../components/HeaderCartButton';
 import { Icon3D } from '../../components/shared/Icon3D';
-import { colors } from './theme';
+import { useIsDarkMode } from '../../theme/useThemeColors';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
@@ -21,11 +21,43 @@ import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
 
 type PkgWithCategory = ServicePackage & { category?: ServiceCategory };
 
+// File-local copy of screens/services/theme.ts's shared `colors` export,
+// trimmed to the keys this screen actually uses -- theme.ts itself stays
+// untouched (it's a static, light-only palette consumed by several other
+// screens/components that haven't been converted yet).
+// `white` stays pure white in both themes -- used only for text/icons on
+// permanently-colored surfaces (primary/success banners, badges, buttons).
+// `surface` is the actual floating-card background (header card, package
+// cards, recent-booking rows) and is the one that inverts in dark mode.
+const LIGHT_COLORS = {
+  primary: '#DA3830',
+  darkInk: '#1B1B1B',
+  pageBg: '#F8F9FA',
+  white: '#FFFFFF',
+  borderLight: '#E3E6EA',
+  textMuted: '#6B7480',
+  success: '#1E9E5A',
+  surface: '#FFFFFF',
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  darkInk: '#F1F2F4',
+  pageBg: '#121212',
+  white: '#FFFFFF',
+  borderLight: '#2E2E2E',
+  textMuted: '#A6ACB5',
+  success: '#4FE092',
+  surface: '#1E1E1E',
+};
+
 // Same "gradient fill on select" pill Home's Cars/Bikes selector uses --
 // kept as a local copy (not exported from HomeScreen) so this screen's
 // vehicle toggle reads as the same premium control instead of the old flat
 // dark pill it replaced.
 function ServiceVehiclePill({ label, emoji, active, onPress }: { label: string; emoji: string; active: boolean; onPress: () => void }) {
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const scale = useRef(new Animated.Value(active ? 1.03 : 1)).current;
   useEffect(() => {
     Animated.spring(scale, { toValue: active ? 1.03 : 1, useNativeDriver: true, bounciness: 8 }).start();
@@ -60,6 +92,8 @@ export default function ServicesHomeScreen({ navigation }: any) {
   const dispatch = useDispatch();
   const vehicleType = useSelector((state: RootState) => state.app.vehicleType);
   const { token } = useSelector((state: RootState) => state.auth);
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [categories, setCategories] = useState<ServiceCategory[] | null>(null);
@@ -463,12 +497,12 @@ export default function ServicesHomeScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   flexFill: { flex: 1 },
   headerWrap: { backgroundColor: colors.pageBg, paddingHorizontal: 12, paddingTop: 10 },
   headerCard: {
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 24,
     paddingHorizontal: 16,
     paddingTop: 14,
@@ -506,7 +540,7 @@ const styles = StyleSheet.create({
   packageGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', paddingHorizontal: 14 },
   packageCard: {
     width: 170,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 18,
     marginRight: 10,
     marginBottom: 12,
@@ -545,7 +579,7 @@ const styles = StyleSheet.create({
   packageOriginalPrice: { fontSize: 11, color: colors.textMuted, textDecorationLine: 'line-through', marginRight: 6 },
   packagePrice: { fontSize: 15, fontWeight: '800', color: colors.darkInk },
 
-  recentBookingCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, marginHorizontal: 14, marginBottom: 10, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.borderLight },
+  recentBookingCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, marginHorizontal: 14, marginBottom: 10, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.borderLight },
   recentBookingName: { fontSize: 14, fontWeight: '700', color: colors.darkInk, marginBottom: 3 },
   recentBookingMeta: { fontSize: 12, color: colors.textMuted, textTransform: 'capitalize' },
 

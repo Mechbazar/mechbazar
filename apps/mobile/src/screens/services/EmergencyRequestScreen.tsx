@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Image, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -10,7 +10,8 @@ import { VehicleType } from '../../types/product';
 import { ServicePackage, ServiceCategory, ServiceAddress } from '../../types/service';
 import { fetchServicePackageById } from '../../services/service.service';
 import { AddressPickerSheet } from '../../components/services/AddressPickerSheet';
-import { colors } from './theme';
+import { useIsDarkMode } from '../../theme/useThemeColors';
+import { useTranslation } from 'react-i18next';
 
 // Instant emergency request. Deliberately NOT a variant of ServiceBookingScreen
 // -- that screen's SCHEDULE step (date + time slot) has no meaning here: this
@@ -28,6 +29,7 @@ const STEPS: Step[] = ['VEHICLE', 'ISSUE', 'ADDRESS', 'REVIEW'];
 export default function EmergencyRequestScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<ParamList, 'EmergencyRequest'>>();
+  const { t } = useTranslation();
   const { packageId } = route.params;
 
   const { token } = useSelector((state: RootState) => state.auth);
@@ -51,6 +53,9 @@ export default function EmergencyRequestScreen() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   useEffect(() => {
     fetchServicePackageById(packageId).then((p) => {
@@ -123,7 +128,7 @@ export default function EmergencyRequestScreen() {
     });
 
     if (err || !job) {
-      setError(err || 'Failed to send your request. Please try again.');
+      setError(err || t('emergencyRequest.failedToSendRequest'));
       setSubmitting(false);
       return;
     }
@@ -147,8 +152,8 @@ export default function EmergencyRequestScreen() {
         <Text style={styles.backIcon}>←</Text>
       </TouchableOpacity>
       <View style={{ flex: 1 }}>
-        <Text style={styles.headerTitle}>🚨 {pkg?.name || 'Emergency Assistance'}</Text>
-        <Text style={styles.headerSubtitle}>Step {stepIndex + 1} of {STEPS.length}</Text>
+        <Text style={styles.headerTitle}>🚨 {pkg?.name || t('emergencyRequest.emergencyAssistance')}</Text>
+        <Text style={styles.headerSubtitle}>{t('serviceBooking.stepOf', { current: stepIndex + 1, total: STEPS.length })}</Text>
       </View>
     </View>
   );
@@ -163,9 +168,9 @@ export default function EmergencyRequestScreen() {
 
   const renderVehicleStep = () => (
     <ScrollView contentContainerStyle={styles.stepContent}>
-      <Text style={styles.stepTitle}>Which vehicle broke down?</Text>
+      <Text style={styles.stepTitle}>{t('emergencyRequest.whichVehicleBrokeDown')}</Text>
       {myGarage.length === 0 ? (
-        <Text style={styles.helperText}>You haven't added a vehicle yet.</Text>
+        <Text style={styles.helperText}>{t('serviceBooking.noVehicleYet')}</Text>
       ) : (
         myGarage.map((v) => (
           <TouchableOpacity
@@ -185,18 +190,18 @@ export default function EmergencyRequestScreen() {
 
       {vehicleTypeMismatch && (
         <Text style={styles.errorText}>
-          This service is for {category?.vehicleType === VehicleType.CAR ? 'cars' : 'bikes'} — pick a matching vehicle.
+          {t('serviceBooking.serviceForMismatch', { type: category?.vehicleType === VehicleType.CAR ? t('serviceBooking.serviceForCars') : t('serviceBooking.serviceForBikes') })}
         </Text>
       )}
 
       <TouchableOpacity style={styles.addVehicleBtn} onPress={() => navigation.navigate('VehicleSelection')}>
-        <Text style={styles.addVehicleBtnText}>+ Add New Vehicle</Text>
+        <Text style={styles.addVehicleBtnText}>{t('serviceBooking.addNewVehicle')}</Text>
       </TouchableOpacity>
 
-      <Text style={[styles.fieldLabel, { marginTop: 20 }]}>Registration Number (optional)</Text>
+      <Text style={[styles.fieldLabel, { marginTop: 20 }]}>{t('serviceBooking.registrationNumberOptional')}</Text>
       <TextInput
         style={styles.input}
-        placeholder="e.g. MH12AB1234"
+        placeholder={t('serviceBooking.regNumberPlaceholder')}
         placeholderTextColor={colors.textMuted}
         value={registrationNumber}
         onChangeText={setRegistrationNumber}
@@ -207,11 +212,11 @@ export default function EmergencyRequestScreen() {
 
   const renderIssueStep = () => (
     <ScrollView contentContainerStyle={styles.stepContent}>
-      <Text style={styles.stepTitle}>What's wrong?</Text>
-      <Text style={styles.helperText}>A quick description helps your mechanic arrive prepared with the right tools.</Text>
+      <Text style={styles.stepTitle}>{t('emergencyRequest.whatsWrong')}</Text>
+      <Text style={styles.helperText}>{t('emergencyRequest.whatsWrongHelper')}</Text>
       <TextInput
         style={styles.textArea}
-        placeholder="e.g. Flat tyre on the highway, car won't start..."
+        placeholder={t('emergencyRequest.issuePlaceholder')}
         placeholderTextColor={colors.textMuted}
         value={issueDescription}
         onChangeText={setIssueDescription}
@@ -220,16 +225,16 @@ export default function EmergencyRequestScreen() {
         textAlignVertical="top"
       />
 
-      <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Nearby landmark (optional)</Text>
+      <Text style={[styles.fieldLabel, { marginTop: 16 }]}>{t('emergencyRequest.nearbyLandmarkOptional')}</Text>
       <TextInput
         style={styles.input}
-        placeholder="e.g. Opposite City Mall, near the flyover"
+        placeholder={t('emergencyRequest.landmarkPlaceholder')}
         placeholderTextColor={colors.textMuted}
         value={landmark}
         onChangeText={setLandmark}
       />
 
-      <Text style={[styles.fieldLabel, { marginTop: 16 }]}>Photos (optional)</Text>
+      <Text style={[styles.fieldLabel, { marginTop: 16 }]}>{t('serviceBooking.photosOptional')}</Text>
       <View style={styles.imageRow}>
         {images.map((uri, i) => (
           <View key={uri} style={styles.imageThumbWrap}>
@@ -250,8 +255,8 @@ export default function EmergencyRequestScreen() {
 
   const renderAddressStep = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>Where are you stuck?</Text>
-      <Text style={styles.helperText}>Drop a pin or pick a saved address -- your mechanic is dispatched to this exact spot.</Text>
+      <Text style={styles.stepTitle}>{t('emergencyRequest.whereAreYouStuck')}</Text>
+      <Text style={styles.helperText}>{t('emergencyRequest.dropPinHelper')}</Text>
       {selectedAddress ? (
         <TouchableOpacity style={styles.selectedAddressCard} onPress={() => setShowAddressSheet(true)}>
           <View style={{ flex: 1 }}>
@@ -260,11 +265,11 @@ export default function EmergencyRequestScreen() {
               {selectedAddress.line1}, {selectedAddress.city}, {selectedAddress.state} {selectedAddress.pincode}
             </Text>
           </View>
-          <Text style={styles.changeText}>Change</Text>
+          <Text style={styles.changeText}>{t('cart.change')}</Text>
         </TouchableOpacity>
       ) : (
         <TouchableOpacity style={styles.addVehicleBtn} onPress={() => setShowAddressSheet(true)}>
-          <Text style={styles.addVehicleBtnText}>Use My Location or Pick on Map</Text>
+          <Text style={styles.addVehicleBtnText}>{t('emergencyRequest.useMyLocationOrPickOnMap')}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -274,27 +279,26 @@ export default function EmergencyRequestScreen() {
     <ScrollView contentContainerStyle={styles.stepContent}>
       <View style={styles.urgentBanner}>
         <Text style={styles.urgentIcon}>🚨</Text>
-        <Text style={styles.urgentText}>Our team will assign the nearest available mechanic to your request right away.</Text>
+        <Text style={styles.urgentText}>{t('emergencyRequest.teamWillAssign')}</Text>
       </View>
 
       <View style={styles.summaryCard}>
-        <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Service</Text><Text style={styles.summaryValue}>{pkg?.name}</Text></View>
-        <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Vehicle</Text><Text style={styles.summaryValue}>{selectedGarageVehicle?.brand} {selectedGarageVehicle?.model}</Text></View>
-        <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Location</Text><Text style={styles.summaryValue} numberOfLines={1}>{selectedAddress?.line1}</Text></View>
+        <View style={styles.summaryRow}><Text style={styles.summaryLabel}>{t('serviceBooking.service')}</Text><Text style={styles.summaryValue}>{pkg?.name}</Text></View>
+        <View style={styles.summaryRow}><Text style={styles.summaryLabel}>{t('serviceBooking.vehicle')}</Text><Text style={styles.summaryValue}>{selectedGarageVehicle?.brand} {selectedGarageVehicle?.model}</Text></View>
+        <View style={styles.summaryRow}><Text style={styles.summaryLabel}>{t('emergencyRequest.location')}</Text><Text style={styles.summaryValue} numberOfLines={1}>{selectedAddress?.line1}</Text></View>
       </View>
 
       <View style={styles.summaryCard}>
-        <Text style={styles.fieldLabel}>Estimated Cost</Text>
+        <Text style={styles.fieldLabel}>{t('serviceBooking.estimatedCost')}</Text>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>{pkg?.name}</Text>
           <Text style={styles.summaryValue}>₹{estimatedCost}</Text>
         </View>
-        <Text style={styles.helperText}>Final cost may change if your mechanic finds additional work -- you'll be asked to approve it first.</Text>
+        <Text style={styles.helperText}>{t('emergencyRequest.finalCostMayChange')}</Text>
       </View>
 
       <Text style={styles.helperText}>
-        MechBazar is Cash on Service Completion only. You pay your mechanic in cash once the job is
-        done and verified -- nothing is charged in advance.
+        {t('emergencyRequest.codOnlyNotice')}
       </Text>
 
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -328,7 +332,7 @@ export default function EmergencyRequestScreen() {
           onPress={step === 'REVIEW' ? handleSubmit : goNext}
         >
           <Text style={styles.continueBtnText}>
-            {submitting ? 'Sending request...' : step === 'REVIEW' ? '🚨 Request Assistance Now' : 'Continue'}
+            {submitting ? t('emergencyRequest.sendingRequest') : step === 'REVIEW' ? t('emergencyRequest.requestAssistanceNow') : t('common.continue')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -345,7 +349,43 @@ export default function EmergencyRequestScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// `white` (icon/label text on the brand-red header and on filled buttons)
+// stays literal white in both themes; `surface` is the actual card/input
+// background and inverts. `primaryTint`/`dangerTint` back the "selected
+// vehicle" card and the urgent-notice banner -- both hold dynamic
+// `textDark`/`textMuted` text, so unlike a typical decorative pastel accent
+// these two DO need to invert (to a muted dark tint) rather than stay fixed,
+// otherwise that text goes near-white-on-still-light-pink in dark mode.
+// `continueBtnDisabled`'s wash-out tint is left as a fixed literal since its
+// label text is *always* fixed white regardless of theme, so it never risks
+// becoming illegible.
+const LIGHT_COLORS = {
+  primary: '#DA3830',
+  danger: '#D32F2F',
+  pageBg: '#F8F9FA',
+  white: '#FFFFFF',
+  surface: '#FFFFFF',
+  borderLight: '#E3E6EA',
+  textDark: '#1B1B1B',
+  textMuted: '#6B7480',
+  primaryTint: '#FFF4F1',
+  dangerTint: '#FFF1F0',
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  danger: '#FF6B6B',
+  pageBg: '#121212',
+  white: '#FFFFFF',
+  surface: '#1E1E1E',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  primaryTint: '#3A2420',
+  dangerTint: '#3D2220',
+};
+
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.danger },
   backButton: { marginRight: 16, padding: 4 },
@@ -362,12 +402,12 @@ const styles = StyleSheet.create({
   helperText: { fontSize: 13, color: colors.textMuted, marginBottom: 12, lineHeight: 18 },
   fieldLabel: { fontSize: 13, fontWeight: '700', color: colors.textDark, marginBottom: 10 },
 
-  urgentBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF1F0', borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: colors.danger },
+  urgentBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.dangerTint, borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: colors.danger },
   urgentIcon: { fontSize: 22, marginRight: 10 },
   urgentText: { flex: 1, fontSize: 13, color: colors.textDark, fontWeight: '600', lineHeight: 18 },
 
-  vehicleCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1.5, borderColor: colors.borderLight },
-  vehicleCardActive: { borderColor: colors.primary, backgroundColor: '#FFF4F1' },
+  vehicleCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1.5, borderColor: colors.borderLight },
+  vehicleCardActive: { borderColor: colors.primary, backgroundColor: colors.primaryTint },
   vehicleIcon: { fontSize: 26, marginRight: 12 },
   vehicleName: { fontSize: 14, fontWeight: '700', color: colors.textDark, marginBottom: 3 },
   vehicleMeta: { fontSize: 12, color: colors.textMuted },
@@ -375,8 +415,8 @@ const styles = StyleSheet.create({
   addVehicleBtn: { borderWidth: 1.5, borderColor: colors.primary, borderStyle: 'dashed', borderRadius: 12, padding: 14, alignItems: 'center', marginTop: 6 },
   addVehicleBtnText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
 
-  input: { backgroundColor: colors.white, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: colors.textDark, borderWidth: 1, borderColor: colors.borderLight },
-  textArea: { backgroundColor: colors.white, borderRadius: 12, padding: 14, fontSize: 14, color: colors.textDark, borderWidth: 1, borderColor: colors.borderLight, minHeight: 100 },
+  input: { backgroundColor: colors.surface, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: colors.textDark, borderWidth: 1, borderColor: colors.borderLight },
+  textArea: { backgroundColor: colors.surface, borderRadius: 12, padding: 14, fontSize: 14, color: colors.textDark, borderWidth: 1, borderColor: colors.borderLight, minHeight: 100 },
 
   imageRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   imageThumbWrap: { position: 'relative' },
@@ -386,17 +426,17 @@ const styles = StyleSheet.create({
   addImageBtn: { width: 72, height: 72, borderRadius: 10, borderWidth: 1.5, borderColor: colors.borderLight, borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center' },
   addImageIcon: { fontSize: 24, color: colors.textMuted },
 
-  selectedAddressCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.borderLight },
+  selectedAddressCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 12, padding: 14, borderWidth: 1, borderColor: colors.borderLight },
   changeText: { fontSize: 13, fontWeight: '700', color: colors.primary },
 
-  summaryCard: { backgroundColor: colors.white, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight },
+  summaryCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.borderLight },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   summaryLabel: { fontSize: 13, color: colors.textMuted, flex: 1 },
   summaryValue: { fontSize: 13, color: colors.textDark, fontWeight: '700', flex: 1.4, textAlign: 'right' },
 
   errorText: { color: colors.danger, fontSize: 13, marginTop: 8, marginBottom: 4 },
 
-  footer: { padding: 16, paddingBottom: 28, backgroundColor: colors.white, borderTopWidth: 1, borderTopColor: colors.borderLight },
+  footer: { padding: 16, paddingBottom: 28, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.borderLight },
   continueBtn: { backgroundColor: colors.danger, borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
   continueBtnDisabled: { backgroundColor: '#F0B2A5' },
   continueBtnText: { color: colors.white, fontWeight: '800', fontSize: 14 },

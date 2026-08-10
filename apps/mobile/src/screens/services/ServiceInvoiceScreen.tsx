@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
@@ -10,7 +10,7 @@ import { Logo, logoSvgMarkup } from '@mechbazar/shared';
 import { RootState } from '../../store';
 import { ServiceInvoice, ServiceBooking } from '../../types/service';
 import { fetchBookingInvoice, fetchBookingById } from '../../services/service.service';
-import { colors } from './theme';
+import { useIsDarkMode } from '../../theme/useThemeColors';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
@@ -54,6 +54,9 @@ export default function ServiceInvoiceScreen() {
   const [loading, setLoading] = useState(true);
   const [sharing, setSharing] = useState(false);
   const [downloading, setDownloading] = useState(false);
+
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const { isDesktopUp } = useBreakpoint();
   useFocusEffect(
@@ -200,7 +203,34 @@ export default function ServiceInvoiceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// `darkInk` is a fixed brand-dark header bar that's already dark in light
+// mode -- deliberately unchanged in dark mode too, unlike `white`, which is
+// card backgrounds (-> `surface`, inverts) blended with text-on-colored-
+// surface (header icon/title, button label -- stays literal white in both
+// themes since it always sits on a permanently-dark or brand-red surface).
+const LIGHT_COLORS = {
+  primary: '#DA3830',
+  darkInk: '#1B1B1B',
+  pageBg: '#F8F9FA',
+  white: '#FFFFFF',
+  surface: '#FFFFFF',
+  borderLight: '#E3E6EA',
+  textDark: '#1B1B1B',
+  textMuted: '#6B7480',
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  darkInk: '#1B1B1B',
+  pageBg: '#121212',
+  white: '#FFFFFF',
+  surface: '#1E1E1E',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+};
+
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   flexFill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.darkInk },
@@ -208,7 +238,7 @@ const styles = StyleSheet.create({
   backIcon: { fontSize: 24, color: colors.white, fontWeight: 'bold' },
   headerTitle: { fontSize: 18, fontWeight: '800', color: colors.white },
 
-  invoiceCard: { backgroundColor: colors.white, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: colors.borderLight },
+  invoiceCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: colors.borderLight },
   invoiceNumber: { fontSize: 13, color: colors.textDark, fontWeight: '700', marginTop: 6 },
   invoiceDate: { fontSize: 12, color: colors.textMuted, marginTop: 2 },
 
@@ -223,7 +253,7 @@ const styles = StyleSheet.create({
 
   actionsRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
   actionBtn: { flex: 1, borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
-  downloadBtn: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.primary },
+  downloadBtn: { backgroundColor: colors.surface, borderWidth: 1.5, borderColor: colors.primary },
   shareBtn: { backgroundColor: colors.primary },
   actionBtnText: { fontWeight: '800', fontSize: 14, color: colors.white },
   downloadBtnText: { color: colors.primary },

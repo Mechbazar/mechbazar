@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Loader } from '@mechbazar/shared';
@@ -14,12 +14,15 @@ import { AddressPickerSheet } from '../components/services/AddressPickerSheet';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
+import { useIsDarkMode } from '../theme/useThemeColors';
+import { useTranslation } from 'react-i18next';
 
 type PaymentMethod = 'COD' | 'RAZORPAY';
 
 export default function CartScreen() {
   const navigation = useNavigation();
   const dispatch = useDispatch();
+  const { t } = useTranslation();
   const [couponCode, setCouponCode] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<ServiceAddress | null>(null);
@@ -32,6 +35,8 @@ export default function CartScreen() {
   const cartItems = useSelector((state: RootState) => state.cart.items);
   const deliveryFee = useSelector((state: RootState) => state.cart.deliveryFee);
   const { user, token } = useSelector((state: RootState) => state.auth);
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const { isDesktopUp } = useBreakpoint();
   useFocusEffect(
@@ -66,19 +71,6 @@ export default function CartScreen() {
 
   const handleChangeAddress = () => {
     setShowAddressSheet(true);
-  };
-
-  // MechBazar Brand Colors (New Design System)
-  const colors = {
-    primary: '#DA3830',
-    darkInk: '#1B1B1B',
-    steel: '#242C35',
-    pageBg: '#F8F9FA',
-    white: '#FFFFFF',
-    borderLight: '#E3E6EA',
-    textDark: '#1B1B1B',
-    textMuted: '#6B7480',
-    success: '#1E9E5A',
   };
 
   const subtotal = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
@@ -190,7 +182,7 @@ export default function CartScreen() {
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
         <Text style={styles.backIcon}>←</Text>
       </TouchableOpacity>
-      <Text style={styles.headerTitle}>Checkout</Text>
+      <Text style={styles.headerTitle}>{t('cart.checkout')}</Text>
     </View>
   );
 
@@ -199,8 +191,8 @@ export default function CartScreen() {
       <View style={styles.deliveryHeader}>
         <Text style={styles.deliveryIcon}>⏱️</Text>
         <View style={styles.deliveryTextContainer}>
-          <Text style={styles.deliveryTitle}>Delivery in 10-15 mins</Text>
-          <Text style={styles.deliverySubtitle}>Shipment of {cartItems.length} items</Text>
+          <Text style={styles.deliveryTitle}>{t('cart.deliveryIn')}</Text>
+          <Text style={styles.deliverySubtitle}>{t('cart.shipmentOf', { count: cartItems.length })}</Text>
         </View>
       </View>
     </View>
@@ -219,12 +211,12 @@ export default function CartScreen() {
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                 {item.vehicleType && (
                   <View style={[styles.b2bBadge, { backgroundColor: item.vehicleType === 'CAR' ? '#DA3830' : '#BF3617' }]}>
-                    <Text style={styles.b2bText}>{item.vehicleType === 'CAR' ? '🚗 CAR PART' : '🏍️ BIKE PART'}</Text>
+                    <Text style={styles.b2bText}>{item.vehicleType === 'CAR' ? t('cart.carPart') : t('cart.bikePart')}</Text>
                   </View>
                 )}
                 {item.isB2B && (
                   <View style={styles.b2bBadge}>
-                    <Text style={styles.b2bText}>B2B BULK</Text>
+                    <Text style={styles.b2bText}>{t('cart.b2bBulk')}</Text>
                   </View>
                 )}
               </View>
@@ -264,7 +256,7 @@ export default function CartScreen() {
       <Text style={styles.couponIcon}>🎟️</Text>
       <TextInput
         style={styles.couponInput}
-        placeholder="Enter Coupon Code"
+        placeholder={t('cart.enterCouponCode')}
         value={couponCode}
         onChangeText={setCouponCode}
         placeholderTextColor={colors.textMuted}
@@ -277,7 +269,7 @@ export default function CartScreen() {
         {isApplyingCoupon ? (
           <Loader size="small" color={colors.white} />
         ) : (
-          <Text style={styles.applyBtnText}>Apply</Text>
+          <Text style={styles.applyBtnText}>{t('cart.apply')}</Text>
         )}
       </TouchableOpacity>
     </View>
@@ -285,35 +277,35 @@ export default function CartScreen() {
 
   const renderBillDetails = () => (
     <View style={styles.billCard}>
-      <Text style={styles.billTitle}>Bill Details</Text>
-      
+      <Text style={styles.billTitle}>{t('cart.billDetails')}</Text>
+
       <View style={styles.billRow}>
-        <Text style={styles.billText}>Item Total</Text>
+        <Text style={styles.billText}>{t('cart.itemTotal')}</Text>
         <Text style={styles.billValue}>₹{subtotal}</Text>
       </View>
-      
+
       <View style={styles.billRow}>
-        <Text style={styles.billText}>Delivery Fee</Text>
+        <Text style={styles.billText}>{t('cart.deliveryFee')}</Text>
         <Text style={styles.billValue}>₹{deliveryFee}</Text>
       </View>
 
       {discount > 0 && (
         <View style={styles.billRow}>
-          <Text style={[styles.billText, { color: colors.success }]}>Promo Discount</Text>
+          <Text style={[styles.billText, { color: colors.success }]}>{t('cart.promoDiscount')}</Text>
           <Text style={[styles.billValue, { color: colors.success }]}>-₹{discount}</Text>
         </View>
       )}
 
       <View style={styles.dashedDivider} />
-      
+
       <View style={styles.billRow}>
-        <Text style={styles.grandTotalText}>Grand Total</Text>
+        <Text style={styles.grandTotalText}>{t('cart.grandTotal')}</Text>
         <Text style={styles.grandTotalValue}>₹{grandTotal}</Text>
       </View>
-      
+
       {totalSavings > 0 && (
         <View style={styles.savingsBanner}>
-          <Text style={styles.savingsText}>You are saving ₹{totalSavings} on this order!</Text>
+          <Text style={styles.savingsText}>{t('cart.youAreSaving', { amount: totalSavings })}</Text>
         </View>
       )}
     </View>
@@ -322,9 +314,9 @@ export default function CartScreen() {
   const renderAddressSelection = () => (
     <View style={styles.addressCard}>
       <View style={styles.addressHeader}>
-        <Text style={styles.addressTitle}>Delivery Address</Text>
+        <Text style={styles.addressTitle}>{t('cart.deliveryAddress')}</Text>
         <TouchableOpacity onPress={handleChangeAddress}>
-          <Text style={styles.changeText}>{selectedAddress ? 'Change' : 'Select'}</Text>
+          <Text style={styles.changeText}>{selectedAddress ? t('cart.change') : t('cart.select')}</Text>
         </TouchableOpacity>
       </View>
       {isLoadingAddress ? (
@@ -338,7 +330,7 @@ export default function CartScreen() {
         </View>
       ) : (
         <TouchableOpacity style={styles.stackedInput} onPress={handleChangeAddress}>
-          <Text style={[styles.addressText, { color: colors.primary, fontWeight: '700' }]}>+ Add a delivery address to continue</Text>
+          <Text style={[styles.addressText, { color: colors.primary, fontWeight: '700' }]}>{t('cart.addAddressToContinue')}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -361,9 +353,9 @@ export default function CartScreen() {
 
   const renderPaymentSelection = () => (
     <View style={styles.addressCard}>
-      <Text style={styles.addressTitle}>Payment</Text>
-      {renderPaymentOption('COD', 'Cash on Delivery')}
-      {razorpayEnabled && renderPaymentOption('RAZORPAY', 'Pay Online (Cards, UPI, Netbanking)')}
+      <Text style={styles.addressTitle}>{t('cart.payment')}</Text>
+      {renderPaymentOption('COD', t('cart.cashOnDelivery'))}
+      {razorpayEnabled && renderPaymentOption('RAZORPAY', t('cart.payOnline'))}
     </View>
   );
 
@@ -373,13 +365,13 @@ export default function CartScreen() {
         {renderHeader()}
         <View style={styles.emptyContainer}>
           <Text style={styles.emptyEmoji}>🛒</Text>
-          <Text style={styles.emptyTitle}>Your cart is empty</Text>
-          <Text style={styles.emptySubtitle}>Looks like you haven't added any parts or accessories to your cart yet.</Text>
-          <TouchableOpacity 
+          <Text style={styles.emptyTitle}>{t('cart.emptyCart')}</Text>
+          <Text style={styles.emptySubtitle}>{t('cart.emptyCartSubtitle')}</Text>
+          <TouchableOpacity
             style={styles.continueShoppingBtn}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.continueShoppingText}>Continue Shopping</Text>
+            <Text style={styles.continueShoppingText}>{t('cart.continueShopping')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -403,7 +395,7 @@ export default function CartScreen() {
       <View style={styles.footer}>
         <CompactBookingShell maxWidth={960}>
           <View style={styles.footerTotal}>
-            <Text style={styles.footerTotalLabel}>Total to pay</Text>
+            <Text style={styles.footerTotalLabel}>{t('cart.totalToPay')}</Text>
             <Text style={styles.footerTotalValue}>₹{grandTotal}</Text>
           </View>
           <TouchableOpacity
@@ -412,7 +404,7 @@ export default function CartScreen() {
             disabled={isProcessing || !selectedAddress}
           >
             <Text style={styles.checkoutText}>
-              {isProcessing ? 'PROCESSING...' : !selectedAddress ? 'SELECT AN ADDRESS' : `PLACE ORDER · ₹${grandTotal}`}
+              {isProcessing ? t('cart.processing') : !selectedAddress ? t('cart.selectAnAddress') : t('cart.placeOrder', { amount: grandTotal })}
             </Text>
           </TouchableOpacity>
         </CompactBookingShell>
@@ -430,19 +422,37 @@ export default function CartScreen() {
   );
 }
 
-const colors = {
+// `darkInk` is a fixed brand-dark bar (header/apply-button) that's already
+// dark in light mode -- deliberately unchanged in dark mode too, unlike
+// `white`, which is card backgrounds (-> `surface`, inverts) blended with
+// text-on-colored-surface (stays literal white in both themes).
+const LIGHT_COLORS = {
   primary: '#DA3830',
   darkInk: '#1B1B1B',
   steel: '#242C35',
   pageBg: '#F8F9FA',
   white: '#FFFFFF',
+  surface: '#FFFFFF',
   borderLight: '#E3E6EA',
   textDark: '#1B1B1B',
   textMuted: '#6B7480',
   success: '#1E9E5A',
 };
 
-const styles = StyleSheet.create({
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  darkInk: '#1B1B1B',
+  steel: '#242C35',
+  pageBg: '#121212',
+  white: '#FFFFFF',
+  surface: '#1E1E1E',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  success: '#4FE092',
+};
+
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   flexFill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.darkInk, borderBottomWidth: 1, borderBottomColor: colors.darkInk },
@@ -453,7 +463,7 @@ const styles = StyleSheet.create({
   scrollContent: { padding: 14, paddingBottom: 40 },
   
   // Delivery Info
-  deliveryCard: { backgroundColor: colors.white, borderRadius: 14, padding: 14, marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: colors.borderLight },
+  deliveryCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: colors.borderLight },
   deliveryHeader: { flexDirection: 'row', alignItems: 'center' },
   deliveryIcon: { fontSize: 32, marginRight: 14 },
   deliveryTextContainer: { flex: 1 },
@@ -461,7 +471,7 @@ const styles = StyleSheet.create({
   deliverySubtitle: { fontSize: 13, color: colors.textMuted, fontWeight: '500' },
   
   // Cart Items
-  itemsCard: { backgroundColor: colors.white, borderRadius: 14, padding: 14, marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: colors.borderLight },
+  itemsCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: colors.borderLight },
   cartItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
   itemImage: { width: 70, height: 70, borderRadius: 8, marginRight: 12, borderWidth: 1, borderColor: colors.borderLight, resizeMode: 'contain' },
   itemDetails: { flex: 1 },
@@ -473,20 +483,20 @@ const styles = StyleSheet.create({
   itemPrice: { fontSize: 16, fontWeight: 'bold', color: colors.textDark },
   
   qtyControl: { flexDirection: 'row', alignItems: 'center' },
-  qtyBtn: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: colors.borderLight, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.white },
+  qtyBtn: { width: 30, height: 30, borderRadius: 8, borderWidth: 1, borderColor: colors.borderLight, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.surface },
   qtyBtnText: { color: colors.textDark, fontWeight: 'bold', fontSize: 16 },
   qtyValue: { color: colors.textDark, fontWeight: 'bold', fontSize: 14, marginHorizontal: 12 },
   divider: { height: 1, backgroundColor: colors.borderLight, marginVertical: 12 },
 
   // Coupon
-  couponCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight, borderStyle: 'dashed' },
+  couponCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 10, padding: 12, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight, borderStyle: 'dashed' },
   couponIcon: { fontSize: 20, marginRight: 12 },
   couponInput: { flex: 1, fontSize: 14, color: colors.textDark, fontWeight: '500' },
   applyBtn: { backgroundColor: colors.darkInk, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
   applyBtnText: { color: colors.white, fontWeight: 'bold', fontSize: 12 },
 
   // Bill Details
-  billCard: { backgroundColor: colors.white, borderRadius: 14, padding: 14, marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: colors.borderLight },
+  billCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: colors.borderLight },
   billTitle: { fontSize: 16, fontWeight: 'bold', color: colors.textDark, marginBottom: 16 },
   billRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   billText: { fontSize: 14, color: colors.textMuted, fontWeight: '500' },
@@ -494,11 +504,14 @@ const styles = StyleSheet.create({
   dashedDivider: { height: 1, borderColor: colors.borderLight, borderWidth: 1, borderStyle: 'dashed', marginVertical: 12 },
   grandTotalText: { fontSize: 16, fontWeight: 'bold', color: colors.textDark },
   grandTotalValue: { fontSize: 18, fontWeight: 'bold', color: colors.textDark },
+  // Fixed light-green banner (doesn't invert with the theme) -- its text is
+  // pinned to the light-mode success color too, not the dynamic one, which
+  // would turn near-white in dark mode and wash out against this bg.
   savingsBanner: { backgroundColor: '#E8F5E9', padding: 10, borderRadius: 8, marginTop: 16, alignItems: 'center' },
-  savingsText: { color: colors.success, fontSize: 12, fontWeight: '600' },
+  savingsText: { color: LIGHT_COLORS.success, fontSize: 12, fontWeight: '600' },
 
   // Address Selection
-  addressCard: { backgroundColor: colors.white, borderRadius: 14, padding: 14, marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: colors.borderLight },
+  addressCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, marginBottom: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2, borderWidth: 1, borderColor: colors.borderLight },
   addressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   addressTitle: { fontSize: 16, fontWeight: 'bold', color: colors.textDark },
   changeText: { fontSize: 14, fontWeight: 'bold', color: colors.primary },
@@ -514,7 +527,7 @@ const styles = StyleSheet.create({
   paymentText: { fontSize: 14, fontWeight: '600', color: colors.textDark },
 
   // Footer
-  footer: { backgroundColor: colors.white, padding: 14, borderTopWidth: 1, borderTopColor: colors.borderLight, paddingBottom: 32 },
+  footer: { backgroundColor: colors.surface, padding: 14, borderTopWidth: 1, borderTopColor: colors.borderLight, paddingBottom: 32 },
   footerTotal: { display: 'none' },
   footerTotalLabel: { fontSize: 12, color: colors.textMuted, fontWeight: '500', marginBottom: 2 },
   footerTotalValue: { fontSize: 18, fontWeight: 'bold', color: colors.textDark },

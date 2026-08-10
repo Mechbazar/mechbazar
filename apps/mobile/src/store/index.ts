@@ -3,6 +3,7 @@ import authReducer from './authSlice';
 import cartReducer from './cartSlice';
 import appReducer from './appSlice';
 import themeReducer from './themeSlice';
+import languageReducer from './languageSlice';
 
 export const store = configureStore({
   reducer: {
@@ -10,6 +11,7 @@ export const store = configureStore({
     cart: cartReducer,
     app: appReducer,
     theme: themeReducer,
+    language: languageReducer,
   },
 });
 
@@ -20,3 +22,4 @@ export * from './cartSlice';
 export * from './authSlice';
 export * from './appSlice';
 export * from './themeSlice';
+export * from './languageSlice';

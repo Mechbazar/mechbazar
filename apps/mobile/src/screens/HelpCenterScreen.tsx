@@ -16,6 +16,7 @@ import { useBreakpoint } from '../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
+import { SUPPORT_PHONE_E164, buildSupportWhatsAppUrl } from '../config/support';
 
 const colors = {
   primary: '#E53935',
@@ -95,7 +96,7 @@ export default function HelpCenterScreen() {
   );
 
   const handleCallSupport = () => {
-    const phoneNumber = 'tel:1800123456';
+    const phoneNumber = `tel:${SUPPORT_PHONE_E164}`;
     Linking.canOpenURL(phoneNumber)
       .then(supported => {
         if (supported) {
@@ -108,10 +109,9 @@ export default function HelpCenterScreen() {
   };
 
   const handleWhatsAppSupport = () => {
-    const message = 'Hello Mech Bazar Support, I need help with my account.';
-    const url = `https://wa.me/919876543210?text=${encodeURIComponent(message)}`;
+    const url = buildSupportWhatsAppUrl('Hello Mech Bazar Support, I need help with my account.');
     Linking.openURL(url).catch(() => {
-      Alert.alert('Error', 'Failed to open WhatsApp. Please save +91 9876543210 to chat.');
+      Alert.alert('Error', `Failed to open WhatsApp. Please save ${SUPPORT_PHONE_E164} to chat.`);
     });
   };
 
@@ -143,8 +143,8 @@ export default function HelpCenterScreen() {
             <View style={[styles.iconCircle, { backgroundColor: '#EBFBEE' }]}>
               <Ionicons name="call-outline" size={24} color="#2B8A3E" />
             </View>
-            <Text style={styles.cardTitle}>Call Hotline</Text>
-            <Text style={styles.cardSub}>Toll-Free 24/7 Support</Text>
+            <Text style={styles.cardTitle}>Call Support</Text>
+            <Text style={styles.cardSub}>Speak to our team directly</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.helpCard} onPress={handleWhatsAppSupport}>

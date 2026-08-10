@@ -33,6 +33,7 @@ import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPage
 import Container from '../../components/desktop/shared/Container';
 import { spacing, typography, radius, shadows, darkColors, colors as brandColors } from '../../theme/tokens';
 import { useIsDarkMode } from '../../theme/useThemeColors';
+import { useTranslation } from 'react-i18next';
 
 // Premium light-first palette per the redesign brief, wired through the
 // app's real dark-mode system (useIsDarkMode) instead of a fixed theme --
@@ -494,10 +495,13 @@ function ApiSettingsModal({
 // DesktopFooter in favor of the compact one rendered here.
 function DesktopWelcomeLayout({
   colors: c, logoTone, mobile, otp, isOtpSent, isLoading, phoneError, resendCooldown, autoVerifiedReady,
-  mobileFocusAnim, otpFocusAnim, animateFocus,
+  mobileFocusAnim, otpFocusAnim, nameFocusAnim, emailFocusAnim, animateFocus,
   handlePhoneChange, setOtp, handleSendOtp, handleLogin,
+  needsRegistration, regName, setRegName, regEmail, setRegEmail, regNameError, setRegNameError,
+  handleCompleteRegistration, handleCancelRegistration,
   onOpenSettings, navigation,
 }: any) {
+  const { t } = useTranslation();
   const s = useMemo(() => createDesktopStyles(c), [c]);
   return (
     <View style={s.page}>
@@ -525,97 +529,154 @@ function DesktopWelcomeLayout({
                 <Logo tone={logoTone} height={22} />
               </View>
 
-              <Text style={s.inputLabel}>Mobile Number</Text>
-              <AnimatedInputRow colors={c} focusAnim={mobileFocusAnim} error={!!phoneError} style={s.inputRow}>
-                <View style={s.flagBox}>
-                  <Text style={s.flagText}>🇮🇳</Text>
-                  <Text style={s.countryCode}>+91</Text>
-                  <View style={s.verticalDivider} />
-                </View>
-                <TextInput
-                  style={s.mobileInput}
-                  placeholder="Enter 10-digit number"
-                  placeholderTextColor={c.textMuted}
-                  keyboardType="numeric"
-                  maxLength={10}
-                  value={mobile}
-                  onChangeText={handlePhoneChange}
-                  editable={!isOtpSent && !isLoading}
-                  onFocus={() => animateFocus(mobileFocusAnim, 1)}
-                  onBlur={() => animateFocus(mobileFocusAnim, 0)}
-                />
-              </AnimatedInputRow>
-              {!!phoneError && (
-                <View style={s.errorRow}>
-                  <Ionicons name="alert-circle" size={13} color={c.danger} />
-                  <Text style={s.errorText}>{phoneError}</Text>
-                </View>
-              )}
+              {needsRegistration ? (
+                <>
+                  <Text style={s.regTitle}>{t('auth.completeProfileTitle')}</Text>
+                  <Text style={s.regSubtitle}>{t('auth.completeProfileSubtitle', { mobile })}</Text>
 
-              {isOtpSent && (
-                <View style={s.otpSection}>
-                  {autoVerifiedReady ? (
-                    <View style={s.autoVerifiedRow}>
-                      <Ionicons name="checkmark-circle" size={18} color={c.success} />
-                      <Text style={s.autoVerifiedText}>Number verified automatically. Tap below to continue.</Text>
+                  <Text style={s.inputLabel}>{t('auth.fullName')}</Text>
+                  <AnimatedInputRow colors={c} focusAnim={nameFocusAnim} error={!!regNameError} style={s.inputRow}>
+                    <Ionicons name="person-outline" size={17} color={c.textMuted} style={s.inputIcon} />
+                    <TextInput
+                      style={s.mobileInput}
+                      placeholder={t('auth.fullNamePlaceholder')}
+                      placeholderTextColor={c.textMuted}
+                      value={regName}
+                      onChangeText={(v: string) => { setRegName(v); if (regNameError) setRegNameError(''); }}
+                      editable={!isLoading}
+                      onFocus={() => animateFocus(nameFocusAnim, 1)}
+                      onBlur={() => animateFocus(nameFocusAnim, 0)}
+                    />
+                  </AnimatedInputRow>
+                  {!!regNameError && (
+                    <View style={s.errorRow}>
+                      <Ionicons name="alert-circle" size={13} color={c.danger} />
+                      <Text style={s.errorText}>{regNameError}</Text>
                     </View>
-                  ) : (
-                    <>
-                      <View style={s.otpSectionHeader}>
-                        <Text style={s.inputLabel}>Enter OTP</Text>
-                        <Text style={s.sentToText}>Sent to +91 {mobile}</Text>
-                      </View>
-                      <AnimatedInputRow colors={c} focusAnim={otpFocusAnim} style={s.inputRow}>
-                        <Ionicons name="lock-closed-outline" size={17} color={c.textMuted} style={{ marginRight: 10 }} />
-                        <TextInput
-                          style={s.mobileInput}
-                          placeholder="Enter 6-digit OTP"
-                          placeholderTextColor={c.textMuted}
-                          keyboardType="numeric"
-                          maxLength={6}
-                          value={otp}
-                          onChangeText={setOtp}
-                          editable={!isLoading}
-                          onFocus={() => animateFocus(otpFocusAnim, 1)}
-                          onBlur={() => animateFocus(otpFocusAnim, 0)}
-                        />
-                      </AnimatedInputRow>
-                      <TouchableOpacity
-                        onPress={() => handleSendOtp(true)}
-                        disabled={resendCooldown > 0 || isLoading}
-                        style={s.resendBtn}
-                      >
-                        <Text style={[s.resendText, (resendCooldown > 0 || isLoading) && s.resendTextDisabled]}>
-                          {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
-                        </Text>
-                      </TouchableOpacity>
-                    </>
                   )}
-                </View>
+
+                  <Text style={[s.inputLabel, { marginTop: spacing.md }]}>{t('auth.emailOptional')}</Text>
+                  <AnimatedInputRow colors={c} focusAnim={emailFocusAnim} style={s.inputRow}>
+                    <Ionicons name="mail-outline" size={17} color={c.textMuted} style={s.inputIcon} />
+                    <TextInput
+                      style={s.mobileInput}
+                      placeholder={t('auth.emailPlaceholder')}
+                      placeholderTextColor={c.textMuted}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={regEmail}
+                      onChangeText={setRegEmail}
+                      editable={!isLoading}
+                      onFocus={() => animateFocus(emailFocusAnim, 1)}
+                      onBlur={() => animateFocus(emailFocusAnim, 0)}
+                    />
+                  </AnimatedInputRow>
+
+                  <GradientButton onPress={handleCompleteRegistration} isLoading={isLoading} colors={c}>
+                    <Text style={s.primaryBtnText}>{t('auth.createAccount')}</Text>
+                    <Ionicons name="arrow-forward" size={18} color={c.white} />
+                  </GradientButton>
+
+                  <Pressable style={s.wholesaleBtn} onPress={handleCancelRegistration} disabled={isLoading}>
+                    <Text style={s.wholesaleBtnText}>{t('auth.useDifferentNumber')}</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <>
+                  <Text style={s.inputLabel}>{t('auth.mobileNumber')}</Text>
+                  <AnimatedInputRow colors={c} focusAnim={mobileFocusAnim} error={!!phoneError} style={s.inputRow}>
+                    <View style={s.flagBox}>
+                      <Text style={s.flagText}>🇮🇳</Text>
+                      <Text style={s.countryCode}>+91</Text>
+                      <View style={s.verticalDivider} />
+                    </View>
+                    <TextInput
+                      style={s.mobileInput}
+                      placeholder={t('auth.enterMobileNumberPlaceholder')}
+                      placeholderTextColor={c.textMuted}
+                      keyboardType="numeric"
+                      maxLength={10}
+                      value={mobile}
+                      onChangeText={handlePhoneChange}
+                      editable={!isOtpSent && !isLoading}
+                      onFocus={() => animateFocus(mobileFocusAnim, 1)}
+                      onBlur={() => animateFocus(mobileFocusAnim, 0)}
+                    />
+                  </AnimatedInputRow>
+                  {!!phoneError && (
+                    <View style={s.errorRow}>
+                      <Ionicons name="alert-circle" size={13} color={c.danger} />
+                      <Text style={s.errorText}>{phoneError}</Text>
+                    </View>
+                  )}
+
+                  {isOtpSent && (
+                    <View style={s.otpSection}>
+                      {autoVerifiedReady ? (
+                        <View style={s.autoVerifiedRow}>
+                          <Ionicons name="checkmark-circle" size={18} color={c.success} />
+                          <Text style={s.autoVerifiedText}>{t('auth.numberVerifiedAuto')}</Text>
+                        </View>
+                      ) : (
+                        <>
+                          <View style={s.otpSectionHeader}>
+                            <Text style={s.inputLabel}>{t('auth.enterOtp')}</Text>
+                            <Text style={s.sentToText}>{t('auth.sentTo', { mobile })}</Text>
+                          </View>
+                          <AnimatedInputRow colors={c} focusAnim={otpFocusAnim} style={s.inputRow}>
+                            <Ionicons name="lock-closed-outline" size={17} color={c.textMuted} style={{ marginRight: 10 }} />
+                            <TextInput
+                              style={s.mobileInput}
+                              placeholder={t('auth.enterOtpPlaceholder')}
+                              placeholderTextColor={c.textMuted}
+                              keyboardType="numeric"
+                              maxLength={6}
+                              value={otp}
+                              onChangeText={setOtp}
+                              editable={!isLoading}
+                              onFocus={() => animateFocus(otpFocusAnim, 1)}
+                              onBlur={() => animateFocus(otpFocusAnim, 0)}
+                            />
+                          </AnimatedInputRow>
+                          <TouchableOpacity
+                            onPress={() => handleSendOtp(true)}
+                            disabled={resendCooldown > 0 || isLoading}
+                            style={s.resendBtn}
+                          >
+                            <Text style={[s.resendText, (resendCooldown > 0 || isLoading) && s.resendTextDisabled]}>
+                              {resendCooldown > 0 ? t('auth.resendOtpIn', { seconds: resendCooldown }) : t('auth.resendOtp')}
+                            </Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </View>
+                  )}
+
+                  <GradientButton
+                    onPress={isOtpSent ? handleLogin : () => handleSendOtp(false)}
+                    isLoading={isLoading}
+                    disabled={mobile.length < 10}
+                    colors={c}
+                  >
+                    <Text style={s.primaryBtnText}>{isOtpSent ? (autoVerifiedReady ? t('common.continue') : t('auth.verifyAndLogin')) : t('auth.sendOtp')}</Text>
+                    <Ionicons name="arrow-forward" size={18} color={c.white} />
+                  </GradientButton>
+
+                  <View style={s.securityNote}>
+                    <Ionicons name="shield-checkmark-outline" size={14} color={c.textMuted} />
+                    <Text style={s.securityNoteText}>{t('auth.secureOtpLogin')}</Text>
+                  </View>
+
+                  <Pressable
+                    style={s.wholesaleBtn}
+                    onPress={() => navigation.navigate('WholesaleRegistration')}
+                    accessibilityRole="button"
+                  >
+                    <Text style={s.wholesaleBtnText}>{t('auth.createWholesaleAccount')}</Text>
+                  </Pressable>
+                </>
               )}
-
-              <GradientButton
-                onPress={isOtpSent ? handleLogin : () => handleSendOtp(false)}
-                isLoading={isLoading}
-                disabled={mobile.length < 10}
-                colors={c}
-              >
-                <Text style={s.primaryBtnText}>{isOtpSent ? (autoVerifiedReady ? 'Continue' : 'Verify & Login') : 'Send OTP'}</Text>
-                <Ionicons name="arrow-forward" size={18} color={c.white} />
-              </GradientButton>
-
-              <View style={s.securityNote}>
-                <Ionicons name="shield-checkmark-outline" size={14} color={c.textMuted} />
-                <Text style={s.securityNoteText}>Secure OTP Login</Text>
-              </View>
-
-              <Pressable
-                style={s.wholesaleBtn}
-                onPress={() => navigation.navigate('WholesaleRegistration')}
-                accessibilityRole="button"
-              >
-                <Text style={s.wholesaleBtnText}>Create Wholesale Account</Text>
-              </Pressable>
             </View>
           </View>
         </View>
@@ -623,14 +684,14 @@ function DesktopWelcomeLayout({
 
       <View style={s.footer}>
         <Container style={s.footerRow}>
-          <Text style={s.footerCopy}>© {new Date().getFullYear()} MechBazar. All rights reserved.</Text>
+          <Text style={s.footerCopy}>{t('auth.footerCopyright', { year: new Date().getFullYear() })}</Text>
           <View style={s.footerLinks}>
-            <Text style={s.footerStatic}>Privacy Policy</Text>
+            <Text style={s.footerStatic}>{t('account.legal.privacy')}</Text>
             <Text style={s.footerDot}>•</Text>
-            <Text style={s.footerStatic}>Terms</Text>
+            <Text style={s.footerStatic}>{t('auth.terms')}</Text>
             <Text style={s.footerDot}>•</Text>
             <Pressable onPress={() => navigation.navigate('HelpCenter')}>
-              <Text style={s.footerLink}>Contact</Text>
+              <Text style={s.footerLink}>{t('auth.contact')}</Text>
             </Pressable>
           </View>
         </Container>
@@ -641,6 +702,7 @@ function DesktopWelcomeLayout({
 
 export default function WelcomeScreen() {
   const dispatch = useDispatch();
+  const { t } = useTranslation();
   const navigation = useNavigation<any>();
   const isDark = useIsDarkMode();
   const c = isDark ? DARK_PALETTE : LIGHT_PALETTE;
@@ -683,6 +745,22 @@ export default function WelcomeScreen() {
   const [tempBaseUrl, setTempBaseUrl] = useState(API_BASE_URL);
   const { isDesktopUp } = useBreakpoint();
 
+  // True once /auth/login has come back "User not found" for a
+  // Firebase-verified number -- the phone/OTP form is swapped for a short
+  // name-capture step instead of silently creating the account as "Customer
+  // User" (the old behaviour, which left every new signup's name wrong until
+  // they happened to find Edit Profile).
+  const [needsRegistration, setNeedsRegistration] = useState(false);
+  const [regName, setRegName] = useState('');
+  const [regEmail, setRegEmail] = useState('');
+  const [regNameError, setRegNameError] = useState('');
+  // The Firebase ID token that proved phone ownership. Held here (not
+  // consumed immediately) so it can be replayed into /auth/register once the
+  // user submits their name -- verifyIdToken on the backend is a stateless
+  // check, so reusing the same token across the login-then-register calls is
+  // safe as long as it hasn't expired.
+  const pendingIdTokenRef = useRef<string | null>(null);
+
   useFocusEffect(React.useCallback(() => {
     setDesktopFullPageScreenActive(true);
     return () => setDesktopFullPageScreenActive(false);
@@ -692,9 +770,12 @@ export default function WelcomeScreen() {
   const logoFadeAnim = useRef(new Animated.Value(0)).current;
   const heroSlideAnim = useRef(new Animated.Value(30)).current;
   const inputFadeAnim = useRef(new Animated.Value(0)).current;
-  // Border-color/glow animations for the two input rows (mobile number, OTP).
+  // Border-color/glow animations for each input row (mobile number, OTP,
+  // and the name/email pair shown during the name-capture step).
   const mobileFocusAnim = useRef(new Animated.Value(0)).current;
   const otpFocusAnim = useRef(new Animated.Value(0)).current;
+  const nameFocusAnim = useRef(new Animated.Value(0)).current;
+  const emailFocusAnim = useRef(new Animated.Value(0)).current;
 
   const animateFocus = (anim: Animated.Value, toValue: number) => {
     Animated.timing(anim, { toValue, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
@@ -723,7 +804,7 @@ export default function WelcomeScreen() {
     const numeric = text.replace(/[^0-9]/g, '');
     setMobile(numeric);
     if (numeric.length > 0 && numeric.length < 10) {
-      setPhoneError('Mobile number must be exactly 10 digits.');
+      setPhoneError(t('auth.phoneErrorExactDigits'));
     } else {
       setPhoneError('');
     }
@@ -739,26 +820,20 @@ export default function WelcomeScreen() {
     setIsOtpSent(false);
     setIsLoading(true);
     try {
-      let res = await fetch(`${activeBaseUrl}/auth/login`, {
+      const res = await fetch(`${activeBaseUrl}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: mobile, otp: idToken })
       });
 
-      let data = await res.json();
+      const data = await res.json();
 
       if (res.status === 401 && data.error?.includes('User not found')) {
-        res = await fetch(`${activeBaseUrl}/auth/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: mobile,
-            otp: idToken,
-            name: 'Customer User',
-            accountType: 'RETAIL'
-          })
-        });
-        data = await res.json();
+        // No account for this number yet -- hold the verified token and ask
+        // for a name instead of registering silently as "Customer User".
+        pendingIdTokenRef.current = idToken;
+        setNeedsRegistration(true);
+        return;
       }
 
       if (res.ok) {
@@ -776,6 +851,65 @@ export default function WelcomeScreen() {
       completingRef.current = false;
       setIsLoading(false);
     }
+  };
+
+  // Submits the name (and optional email) the user just typed together with
+  // the Firebase token already proven in completeLogin, finishing the
+  // registration that step deferred.
+  const handleCompleteRegistration = async () => {
+    const trimmedName = regName.trim();
+    if (trimmedName.length < 2) {
+      setRegNameError(t('auth.nameRequiredError'));
+      return;
+    }
+    if (!pendingIdTokenRef.current) {
+      // Token expired or was cleared (e.g. app backgrounded a long time) --
+      // there is nothing to replay, so send the user back to re-verify.
+      notify('Session Expired', 'Please verify your mobile number again.');
+      setNeedsRegistration(false);
+      return;
+    }
+    setRegNameError('');
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${activeBaseUrl}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: mobile,
+          otp: pendingIdTokenRef.current,
+          name: trimmedName,
+          email: regEmail.trim() || undefined,
+          accountType: 'RETAIL',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        pendingIdTokenRef.current = null;
+        dispatch(loginSuccess({ user: data.user, token: data.token }));
+      } else {
+        notify('Registration Failed', data.error || 'Failed to create your account.');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      notify('Network Error', `Failed to create your account: ${message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Lets the user back out of the name-capture step to re-enter a different
+  // number rather than being stuck if they mistyped it.
+  const handleCancelRegistration = () => {
+    pendingIdTokenRef.current = null;
+    setNeedsRegistration(false);
+    setRegName('');
+    setRegEmail('');
+    setRegNameError('');
+    setMobile('');
+    setOtp('');
+    setIsOtpSent(false);
+    setAutoVerifiedReady(false);
   };
 
   // Covers the auto-verification that arrives LATE: the SMS lands a few
@@ -797,7 +931,7 @@ export default function WelcomeScreen() {
 
   const handleSendOtp = async (isResend = false) => {
     if (mobile.length < 10) {
-      setPhoneError('Please enter a valid 10-digit mobile number.');
+      setPhoneError(t('auth.phoneErrorValid10Digit'));
       return;
     }
     // A resend is only allowed once the 60s cooldown has elapsed.
@@ -914,11 +1048,22 @@ export default function WelcomeScreen() {
           autoVerifiedReady={autoVerifiedReady}
           mobileFocusAnim={mobileFocusAnim}
           otpFocusAnim={otpFocusAnim}
+          nameFocusAnim={nameFocusAnim}
+          emailFocusAnim={emailFocusAnim}
           animateFocus={animateFocus}
           handlePhoneChange={handlePhoneChange}
           setOtp={setOtp}
           handleSendOtp={handleSendOtp}
           handleLogin={handleLogin}
+          needsRegistration={needsRegistration}
+          regName={regName}
+          setRegName={setRegName}
+          regEmail={regEmail}
+          setRegEmail={setRegEmail}
+          regNameError={regNameError}
+          setRegNameError={setRegNameError}
+          handleCompleteRegistration={handleCompleteRegistration}
+          handleCancelRegistration={handleCancelRegistration}
           navigation={navigation}
           onOpenSettings={openSettings}
         />
@@ -967,99 +1112,157 @@ export default function WelcomeScreen() {
                 <Logo tone={logoTone} height={22} />
               </View>
 
-              <Text style={styles.inputLabel}>Mobile Number</Text>
-              <AnimatedInputRow colors={c} focusAnim={mobileFocusAnim} error={!!phoneError} style={styles.inputRow}>
-                <View style={styles.flagBox}>
-                  <Text style={styles.flagText}>🇮🇳</Text>
-                  <Text style={styles.countryCode}>+91</Text>
-                  <View style={styles.verticalDivider} />
-                </View>
-                <TextInput
-                  style={styles.mobileInput}
-                  placeholder="Enter 10-digit number"
-                  placeholderTextColor={c.textMuted}
-                  keyboardType="numeric"
-                  maxLength={10}
-                  value={mobile}
-                  onChangeText={handlePhoneChange}
-                  editable={!isOtpSent && !isLoading}
-                  autoFocus={true}
-                  onFocus={() => animateFocus(mobileFocusAnim, 1)}
-                  onBlur={() => animateFocus(mobileFocusAnim, 0)}
-                />
-              </AnimatedInputRow>
-              {!!phoneError && (
-                <View style={styles.errorRow}>
-                  <Ionicons name="alert-circle" size={13} color={c.danger} />
-                  <Text style={styles.errorText}>{phoneError}</Text>
-                </View>
-              )}
+              {needsRegistration ? (
+                <>
+                  <Text style={styles.regTitle}>{t('auth.completeProfileTitle')}</Text>
+                  <Text style={styles.regSubtitle}>{t('auth.completeProfileSubtitle', { mobile })}</Text>
 
-              {isOtpSent && (
-                <View style={styles.otpSection}>
-                  {autoVerifiedReady ? (
-                    <View style={styles.autoVerifiedRow}>
-                      <Ionicons name="checkmark-circle" size={18} color={c.success} />
-                      <Text style={styles.autoVerifiedText}>Number verified automatically. Tap below to continue.</Text>
+                  <Text style={styles.inputLabel}>{t('auth.fullName')}</Text>
+                  <AnimatedInputRow colors={c} focusAnim={nameFocusAnim} error={!!regNameError} style={styles.inputRow}>
+                    <Ionicons name="person-outline" size={18} color={c.textMuted} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.mobileInput}
+                      placeholder={t('auth.fullNamePlaceholder')}
+                      placeholderTextColor={c.textMuted}
+                      value={regName}
+                      onChangeText={(v) => { setRegName(v); if (regNameError) setRegNameError(''); }}
+                      editable={!isLoading}
+                      autoFocus={true}
+                      onFocus={() => animateFocus(nameFocusAnim, 1)}
+                      onBlur={() => animateFocus(nameFocusAnim, 0)}
+                    />
+                  </AnimatedInputRow>
+                  {!!regNameError && (
+                    <View style={styles.errorRow}>
+                      <Ionicons name="alert-circle" size={13} color={c.danger} />
+                      <Text style={styles.errorText}>{regNameError}</Text>
                     </View>
-                  ) : (
-                    <>
-                      <View style={styles.otpSectionHeader}>
-                        <Text style={styles.inputLabel}>Enter OTP</Text>
-                        <Text style={styles.sentToText}>Sent to +91 {mobile}</Text>
-                      </View>
-                      <AnimatedInputRow colors={c} focusAnim={otpFocusAnim} style={styles.otpInputRow}>
-                        <Ionicons name="lock-closed-outline" size={20} color={c.textMuted} style={styles.inputIcon} />
-                        <TextInput
-                          style={styles.otpInput}
-                          placeholder="Enter 6-digit OTP"
-                          placeholderTextColor={c.textMuted}
-                          keyboardType="numeric"
-                          maxLength={6}
-                          value={otp}
-                          onChangeText={setOtp}
-                          editable={!isLoading}
-                          autoFocus={true}
-                          onFocus={() => animateFocus(otpFocusAnim, 1)}
-                          onBlur={() => animateFocus(otpFocusAnim, 0)}
-                        />
-                      </AnimatedInputRow>
-                      <TouchableOpacity
-                        onPress={() => handleSendOtp(true)}
-                        disabled={resendCooldown > 0 || isLoading}
-                        style={styles.resendBtn}
-                      >
-                        <Text style={[styles.resendText, (resendCooldown > 0 || isLoading) && styles.resendTextDisabled]}>
-                          {resendCooldown > 0 ? `Resend OTP in ${resendCooldown}s` : 'Resend OTP'}
-                        </Text>
-                      </TouchableOpacity>
-                    </>
                   )}
-                </View>
+
+                  <Text style={[styles.inputLabel, { marginTop: spacing.md }]}>{t('auth.emailOptional')}</Text>
+                  <AnimatedInputRow colors={c} focusAnim={emailFocusAnim} style={styles.inputRow}>
+                    <Ionicons name="mail-outline" size={18} color={c.textMuted} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.mobileInput}
+                      placeholder={t('auth.emailPlaceholder')}
+                      placeholderTextColor={c.textMuted}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={regEmail}
+                      onChangeText={setRegEmail}
+                      editable={!isLoading}
+                      onFocus={() => animateFocus(emailFocusAnim, 1)}
+                      onBlur={() => animateFocus(emailFocusAnim, 0)}
+                    />
+                  </AnimatedInputRow>
+
+                  <GradientButton onPress={handleCompleteRegistration} isLoading={isLoading} colors={c}>
+                    <Text style={styles.primaryBtnText}>{t('auth.createAccount')}</Text>
+                    <Ionicons name="arrow-forward" size={18} color={c.white} />
+                  </GradientButton>
+
+                  <TouchableOpacity onPress={handleCancelRegistration} disabled={isLoading} style={styles.regCancelBtn}>
+                    <Text style={styles.regCancelText}>{t('auth.useDifferentNumber')}</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.inputLabel}>{t('auth.mobileNumber')}</Text>
+                  <AnimatedInputRow colors={c} focusAnim={mobileFocusAnim} error={!!phoneError} style={styles.inputRow}>
+                    <View style={styles.flagBox}>
+                      <Text style={styles.flagText}>🇮🇳</Text>
+                      <Text style={styles.countryCode}>+91</Text>
+                      <View style={styles.verticalDivider} />
+                    </View>
+                    <TextInput
+                      style={styles.mobileInput}
+                      placeholder={t('auth.enterMobileNumberPlaceholder')}
+                      placeholderTextColor={c.textMuted}
+                      keyboardType="numeric"
+                      maxLength={10}
+                      value={mobile}
+                      onChangeText={handlePhoneChange}
+                      editable={!isOtpSent && !isLoading}
+                      autoFocus={true}
+                      onFocus={() => animateFocus(mobileFocusAnim, 1)}
+                      onBlur={() => animateFocus(mobileFocusAnim, 0)}
+                    />
+                  </AnimatedInputRow>
+                  {!!phoneError && (
+                    <View style={styles.errorRow}>
+                      <Ionicons name="alert-circle" size={13} color={c.danger} />
+                      <Text style={styles.errorText}>{phoneError}</Text>
+                    </View>
+                  )}
+
+                  {isOtpSent && (
+                    <View style={styles.otpSection}>
+                      {autoVerifiedReady ? (
+                        <View style={styles.autoVerifiedRow}>
+                          <Ionicons name="checkmark-circle" size={18} color={c.success} />
+                          <Text style={styles.autoVerifiedText}>{t('auth.numberVerifiedAuto')}</Text>
+                        </View>
+                      ) : (
+                        <>
+                          <View style={styles.otpSectionHeader}>
+                            <Text style={styles.inputLabel}>{t('auth.enterOtp')}</Text>
+                            <Text style={styles.sentToText}>{t('auth.sentTo', { mobile })}</Text>
+                          </View>
+                          <AnimatedInputRow colors={c} focusAnim={otpFocusAnim} style={styles.otpInputRow}>
+                            <Ionicons name="lock-closed-outline" size={20} color={c.textMuted} style={styles.inputIcon} />
+                            <TextInput
+                              style={styles.otpInput}
+                              placeholder={t('auth.enterOtpPlaceholder')}
+                              placeholderTextColor={c.textMuted}
+                              keyboardType="numeric"
+                              maxLength={6}
+                              value={otp}
+                              onChangeText={setOtp}
+                              editable={!isLoading}
+                              autoFocus={true}
+                              onFocus={() => animateFocus(otpFocusAnim, 1)}
+                              onBlur={() => animateFocus(otpFocusAnim, 0)}
+                            />
+                          </AnimatedInputRow>
+                          <TouchableOpacity
+                            onPress={() => handleSendOtp(true)}
+                            disabled={resendCooldown > 0 || isLoading}
+                            style={styles.resendBtn}
+                          >
+                            <Text style={[styles.resendText, (resendCooldown > 0 || isLoading) && styles.resendTextDisabled]}>
+                              {resendCooldown > 0 ? t('auth.resendOtpIn', { seconds: resendCooldown }) : t('auth.resendOtp')}
+                            </Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </View>
+                  )}
+
+                  <GradientButton
+                    onPress={isOtpSent ? handleLogin : () => handleSendOtp(false)}
+                    isLoading={isLoading}
+                    disabled={mobile.length < 10}
+                    colors={c}
+                  >
+                    <Text style={styles.primaryBtnText}>
+                      {isOtpSent ? (autoVerifiedReady ? t('common.continue') : t('auth.verifyAndLogin')) : t('auth.sendOtp')}
+                    </Text>
+                    <Ionicons name="arrow-forward" size={18} color={c.white} />
+                  </GradientButton>
+
+                  <View style={styles.securityNote}>
+                    <Ionicons name="shield-checkmark-outline" size={14} color={c.textMuted} />
+                    <Text style={styles.securityNoteText}>{t('auth.secureOtpLogin')}</Text>
+                  </View>
+                </>
               )}
-
-              <GradientButton
-                onPress={isOtpSent ? handleLogin : () => handleSendOtp(false)}
-                isLoading={isLoading}
-                disabled={mobile.length < 10}
-                colors={c}
-              >
-                <Text style={styles.primaryBtnText}>
-                  {isOtpSent ? (autoVerifiedReady ? 'Continue' : 'Verify & Login') : 'Send OTP'}
-                </Text>
-                <Ionicons name="arrow-forward" size={18} color={c.white} />
-              </GradientButton>
-
-              <View style={styles.securityNote}>
-                <Ionicons name="shield-checkmark-outline" size={14} color={c.textMuted} />
-                <Text style={styles.securityNoteText}>Secure OTP Login</Text>
-              </View>
             </Animated.View>
           </View>
 
           <View style={styles.footerContainer}>
             <TouchableOpacity onPress={() => navigation.navigate('WholesaleRegistration')} activeOpacity={0.7}>
-              <Text style={styles.linkText}>Create Wholesale Account</Text>
+              <Text style={styles.linkText}>{t('auth.createWholesaleAccount')}</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
@@ -1129,6 +1332,28 @@ function createStyles(c: Palette) {
     cardLogoRow: {
       alignItems: 'center',
       marginBottom: spacing.lg,
+    },
+    regTitle: {
+      ...typography.h4,
+      color: c.textPrimary,
+      textAlign: 'center',
+      marginBottom: spacing.xs,
+    },
+    regSubtitle: {
+      ...typography.bodySmall,
+      color: c.textMuted,
+      textAlign: 'center',
+      marginBottom: spacing.lg,
+    },
+    regCancelBtn: {
+      alignSelf: 'center',
+      marginTop: spacing.md,
+      paddingVertical: 4,
+    },
+    regCancelText: {
+      color: c.textMuted,
+      fontSize: 13,
+      fontWeight: '600',
     },
     inputLabel: {
       ...typography.bodySmall,
@@ -1371,6 +1596,10 @@ function createDesktopStyles(c: Palette) {
       elevation: 10,
     },
     cardLogoRow: { alignItems: 'center', marginBottom: spacing.lg },
+    regTitle: { ...typography.h4, color: c.textPrimary, textAlign: 'center', marginBottom: spacing.xs },
+    regSubtitle: { ...typography.bodySmall, color: c.textMuted, textAlign: 'center', marginBottom: spacing.lg },
+    regCancelBtn: { alignSelf: 'center', marginTop: spacing.md, paddingVertical: 4 },
+    regCancelText: { color: c.textMuted, fontSize: 13, fontWeight: '600' },
     inputLabel: { ...typography.bodySmall, fontWeight: '600', color: c.textPrimary, marginBottom: spacing.sm },
     inputRow: {
       flexDirection: 'row',
@@ -1385,6 +1614,7 @@ function createDesktopStyles(c: Palette) {
     flagText: { fontSize: 17 },
     countryCode: { fontSize: 15, fontWeight: '700', color: c.textPrimary, marginLeft: spacing.xs + 2 },
     verticalDivider: { width: 1, height: 22, backgroundColor: c.border, marginHorizontal: spacing.sm },
+    inputIcon: { marginRight: spacing.sm },
     mobileInput: { flex: 1, fontSize: 15, color: c.textPrimary, outlineStyle: 'none' as any },
     errorRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: spacing.xs },
     errorText: { ...typography.caption, color: c.danger },

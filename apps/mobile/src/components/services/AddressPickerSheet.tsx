@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { ServiceAddress } from '../../types/service';
 import { fetchMyAddresses, createMyAddress } from '../../services/address.service';
@@ -6,7 +6,34 @@ import { locationService } from '../../services/location.service';
 import { reverseGeocode, GeocodeSuccess } from '../../services/geocode.service';
 import AddressMapPicker from '../shared/maps/AddressMapPicker';
 import PlaceAutocompleteField from '../shared/PlaceAutocompleteField';
-import { colors } from '../../screens/services/theme';
+import { useIsDarkMode } from '../../theme/useThemeColors';
+
+// File-local copy of screens/services/theme.ts's palette (that file stays a
+// static light-only export for its other, not-yet-converted consumers) --
+// `surface` is split from `white`, which theme.ts uses both as text-on-
+// colored-button (stays fixed) and as this sheet's card backgrounds (needs
+// to invert).
+const LIGHT_COLORS = {
+  primary: '#DA3830',
+  pageBg: '#F8F9FA',
+  white: '#FFFFFF',
+  surface: '#FFFFFF',
+  borderLight: '#E3E6EA',
+  textDark: '#1B1B1B',
+  textMuted: '#6B7480',
+  danger: '#D32F2F',
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  pageBg: '#121212',
+  white: '#FFFFFF',
+  surface: '#1E1E1E',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  danger: '#FF6B6B',
+};
 
 interface AddressPickerSheetProps {
   visible: boolean;
@@ -18,6 +45,8 @@ interface AddressPickerSheetProps {
 const emptyForm = { title: '', line1: '', line2: '', city: '', state: '', pincode: '', country: null as string | null };
 
 export const AddressPickerSheet: React.FC<AddressPickerSheetProps> = ({ visible, token, onClose, onSelect }) => {
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [addresses, setAddresses] = useState<ServiceAddress[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -196,16 +225,16 @@ export const AddressPickerSheet: React.FC<AddressPickerSheetProps> = ({ visible,
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.white, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '85%', paddingBottom: 24 },
+  sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '85%', paddingBottom: 24 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderColor: colors.borderLight },
   title: { fontSize: 18, fontWeight: '800', color: colors.textDark },
   closeBtn: { fontSize: 20, color: colors.textMuted },
   body: { padding: 20 },
 
   addressCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.pageBg, borderRadius: 12, padding: 14, marginBottom: 12 },
-  addressIconBox: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+  addressIconBox: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   addressTitle: { fontSize: 14, fontWeight: '700', color: colors.textDark, marginBottom: 4 },
   addressText: { fontSize: 13, color: colors.textMuted, lineHeight: 18 },
   emptyText: { fontSize: 14, color: colors.textMuted, textAlign: 'center', marginVertical: 20 },

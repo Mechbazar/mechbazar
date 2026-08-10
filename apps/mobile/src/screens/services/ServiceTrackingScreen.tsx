@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Linking, Alert, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
@@ -14,9 +14,43 @@ import CompactBookingShell from '../../components/desktop/shared/CompactBookingS
 import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
 import LiveTrackingMap from '../../components/shared/maps/LiveTrackingMap';
 import AssignmentWaitingCard from '../../components/services/AssignmentWaitingCard';
-import { colors } from './theme';
+import { useIsDarkMode } from '../../theme/useThemeColors';
 
 type ParamList = { ServiceTracking: { bookingId: string } };
+
+// File-local copy of screens/services/theme.ts's shared `colors` export,
+// trimmed to the keys this screen actually uses -- theme.ts itself stays
+// untouched (it's a static, light-only palette consumed by several other
+// screens/components that haven't been converted yet).
+// `white` stays pure white in both themes -- text/icons on colored buttons
+// (nodeIcon, approvalAcceptText), never a card background here. `surface`
+// is the actual card background (header, technician card, tracking
+// timeline, report, summary) and is the one that inverts.
+const LIGHT_COLORS = {
+  primary: '#DA3830',
+  pageBg: '#F8F9FA',
+  white: '#FFFFFF',
+  borderLight: '#E3E6EA',
+  textDark: '#1B1B1B',
+  textMuted: '#6B7480',
+  success: '#1E9E5A',
+  warning: '#F5A300',
+  danger: '#D32F2F',
+  surface: '#FFFFFF',
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  pageBg: '#121212',
+  white: '#FFFFFF',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  success: '#4FE092',
+  warning: '#F5B94D',
+  danger: '#FF6B6B',
+  surface: '#1E1E1E',
+};
 const POLL_INTERVAL_MS = 10000;
 // Mirrors CANCELLABLE_STATUSES in service.controller.ts. REJECTED is included
 // so a customer isn't stuck waiting indefinitely for an admin to reassign --
@@ -61,6 +95,8 @@ export default function ServiceTrackingScreen() {
   const route = useRoute<RouteProp<ParamList, 'ServiceTracking'>>();
   const { bookingId } = route.params;
   const { token } = useSelector((state: RootState) => state.auth);
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [booking, setBooking] = useState<ServiceBooking | null>(null);
   const [loading, setLoading] = useState(true);
@@ -255,7 +291,7 @@ export default function ServiceTrackingScreen() {
           <Text style={styles.headerTitle}>Tracking Service</Text>
           <Text style={styles.headerSubtitle}>#{booking.bookingNumber}</Text>
         </View>
-        <HeaderCartButton color="#1C1C1C" backgroundColor="rgba(0,0,0,0.05)" />
+        <HeaderCartButton color={colors.textDark} backgroundColor={colors.pageBg} />
       </View>
 
       <CompactBookingShell maxWidth={880} style={styles.flexFill}>
@@ -455,10 +491,10 @@ export default function ServiceTrackingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   flexFill: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.white },
+  header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.surface },
   backButton: { marginRight: 16, padding: 4 },
   backIcon: { fontSize: 24, color: colors.textDark, fontWeight: 'bold' },
   headerTitle: { fontSize: 18, fontWeight: '800', color: colors.textDark },
@@ -471,39 +507,46 @@ const styles = StyleSheet.create({
 
   technicianPhoto: { width: 44, height: 44, borderRadius: 22 },
 
-  otpCard: { backgroundColor: '#EEF2FF', margin: 14, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: colors.primary, alignItems: 'center' },
-  otpTitle: { fontSize: 13, fontWeight: '700', color: colors.textDark },
-  otpCode: { fontSize: 28, fontWeight: '900', color: colors.primary, letterSpacing: 4, marginVertical: 6 },
-  otpHint: { fontSize: 12, color: colors.textMuted, textAlign: 'center' },
+  // Fixed pale-blue accent card (never inverts -- a small "here's your code"
+  // callout, not a general surface), so its border/text are pinned to the
+  // LIGHT_COLORS values rather than the dynamic `colors` object -- letting
+  // them flip would put dark-mode's brighter ink/primary shades (tuned for
+  // dark backgrounds) on top of this still-pale-blue bg, which is illegible.
+  otpCard: { backgroundColor: '#EEF2FF', margin: 14, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: LIGHT_COLORS.primary, alignItems: 'center' },
+  otpTitle: { fontSize: 13, fontWeight: '700', color: LIGHT_COLORS.textDark },
+  otpCode: { fontSize: 28, fontWeight: '900', color: LIGHT_COLORS.primary, letterSpacing: 4, marginVertical: 6 },
+  otpHint: { fontSize: 12, color: LIGHT_COLORS.textMuted, textAlign: 'center' },
 
   cancelledBanner: { alignItems: 'center', padding: 40 },
   cancelledIcon: { fontSize: 40, color: colors.danger, marginBottom: 12, fontWeight: 'bold' },
   cancelledTitle: { fontSize: 18, fontWeight: '800', color: colors.textDark, marginBottom: 8 },
   cancelledReason: { fontSize: 13, color: colors.textMuted, textAlign: 'center' },
 
-  approvalCard: { backgroundColor: '#FFF8E1', margin: 14, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: colors.warning },
-  approvalTitle: { fontSize: 15, fontWeight: '800', color: colors.textDark, marginBottom: 6 },
-  approvalNote: { fontSize: 13, color: colors.textDark, marginBottom: 8, lineHeight: 18 },
-  approvalCost: { fontSize: 14, fontWeight: '800', color: colors.warning },
+  // Same fixed-accent-card reasoning as otpCard above -- pale amber bg never
+  // inverts, so text/border painted directly on it are pinned fixed too.
+  approvalCard: { backgroundColor: '#FFF8E1', margin: 14, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: LIGHT_COLORS.warning },
+  approvalTitle: { fontSize: 15, fontWeight: '800', color: LIGHT_COLORS.textDark, marginBottom: 6 },
+  approvalNote: { fontSize: 13, color: LIGHT_COLORS.textDark, marginBottom: 8, lineHeight: 18 },
+  approvalCost: { fontSize: 14, fontWeight: '800', color: LIGHT_COLORS.warning },
   approvalBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
   approvalRejectBtn: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.danger },
   approvalRejectText: { color: colors.danger, fontWeight: '700', fontSize: 13 },
   approvalAcceptBtn: { backgroundColor: colors.success },
   approvalAcceptText: { color: colors.white, fontWeight: '700', fontSize: 13 },
 
-  technicianCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, marginHorizontal: 14, marginTop: 14, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: colors.borderLight },
+  technicianCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, marginHorizontal: 14, marginTop: 14, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: colors.borderLight },
   technicianAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.pageBg, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   technicianName: { fontSize: 14, fontWeight: '800', color: colors.textDark, marginBottom: 3 },
   technicianMeta: { fontSize: 12, color: colors.textMuted },
   iconBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.pageBg, justifyContent: 'center', alignItems: 'center', marginLeft: 8 },
 
-  trackingCard: { backgroundColor: colors.white, borderRadius: 20, padding: 20, margin: 14 },
+  trackingCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, margin: 14 },
   trackingTitle: { fontSize: 16, fontWeight: '800', color: colors.textDark, marginBottom: 16 },
 
   timelineNode: { flexDirection: 'row', minHeight: 60 },
   nodeColumn: { alignItems: 'center', width: 26, marginRight: 14, position: 'relative' },
   pulseRing: { position: 'absolute', top: 0, width: 18, height: 18, borderRadius: 9, backgroundColor: colors.primary, zIndex: 1 },
-  nodeCircle: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#D1D5DB', backgroundColor: colors.white, justifyContent: 'center', alignItems: 'center', zIndex: 2 },
+  nodeCircle: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: '#D1D5DB', backgroundColor: colors.surface, justifyContent: 'center', alignItems: 'center', zIndex: 2 },
   nodeCircleActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   nodeIcon: { color: colors.white, fontSize: 9, fontWeight: 'bold' },
   nodeLine: { width: 2, flex: 1, backgroundColor: '#D1D5DB', marginVertical: -2 },
@@ -513,7 +556,7 @@ const styles = StyleSheet.create({
   nodeTitle: { fontSize: 13, fontWeight: '600', color: '#9CA3AF' },
   nodeTitleActive: { color: colors.textDark, fontWeight: '700' },
 
-  reportCard: { backgroundColor: colors.white, borderRadius: 14, padding: 16, marginHorizontal: 14, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight },
+  reportCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginHorizontal: 14, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight },
   reportTitle: { fontSize: 16, fontWeight: '800', color: colors.textDark, marginBottom: 12 },
   reportSectionLabel: { fontSize: 12, fontWeight: '800', color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6, marginTop: 4 },
   reportPhotoWrap: { marginRight: 10, alignItems: 'center' },
@@ -523,7 +566,7 @@ const styles = StyleSheet.create({
   reportNote: { fontSize: 13, color: colors.textDark, lineHeight: 19, marginBottom: 4 },
   reportStars: { fontSize: 18, color: colors.warning, marginBottom: 4 },
 
-  summaryCard: { backgroundColor: colors.white, borderRadius: 14, padding: 16, marginHorizontal: 14, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight },
+  summaryCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginHorizontal: 14, marginBottom: 14, borderWidth: 1, borderColor: colors.borderLight },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
   summaryLabel: { fontSize: 13, color: colors.textMuted },
   summaryValue: { fontSize: 13, color: colors.textDark, fontWeight: '700' },

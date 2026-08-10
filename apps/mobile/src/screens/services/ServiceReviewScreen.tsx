@@ -1,11 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { submitBookingReview } from '../../services/service.service';
-import { colors } from './theme';
+import { useIsDarkMode } from '../../theme/useThemeColors';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
@@ -22,6 +22,9 @@ export default function ServiceReviewScreen() {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const { isDesktopUp } = useBreakpoint();
   useFocusEffect(
@@ -92,7 +95,34 @@ export default function ServiceReviewScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// `darkInk` is a fixed brand-dark header bar, deliberately unchanged in dark
+// mode; `white` (header/button text) stays literal white in both themes;
+// `surface` is the actual card/input background and inverts.
+const LIGHT_COLORS = {
+  primary: '#DA3830',
+  darkInk: '#1B1B1B',
+  pageBg: '#F8F9FA',
+  white: '#FFFFFF',
+  surface: '#FFFFFF',
+  borderLight: '#E3E6EA',
+  textDark: '#1B1B1B',
+  textMuted: '#6B7480',
+  warning: '#F5A300',
+};
+
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  primary: '#FF5A4E',
+  darkInk: '#1B1B1B',
+  pageBg: '#121212',
+  white: '#FFFFFF',
+  surface: '#1E1E1E',
+  borderLight: '#2E2E2E',
+  textDark: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  warning: '#F5B94D',
+};
+
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.pageBg },
   flexFill: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: colors.darkInk },
@@ -105,9 +135,9 @@ const styles = StyleSheet.create({
 
   starsRow: { flexDirection: 'row', justifyContent: 'center', marginBottom: 28, gap: 8 },
   star: { fontSize: 40, color: colors.borderLight },
-  starActive: { color: '#F5A300' },
+  starActive: { color: colors.warning },
 
-  textArea: { backgroundColor: colors.white, borderRadius: 12, padding: 14, fontSize: 14, color: colors.textDark, borderWidth: 1, borderColor: colors.borderLight, minHeight: 120, marginBottom: 24 },
+  textArea: { backgroundColor: colors.surface, borderRadius: 12, padding: 14, fontSize: 14, color: colors.textDark, borderWidth: 1, borderColor: colors.borderLight, minHeight: 120, marginBottom: 24 },
 
   submitBtn: { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
   submitBtnDisabled: { backgroundColor: '#F0B2A5' },
