@@ -67,7 +67,7 @@
     "noCoupons": "No coupons available right now. Check back soon!",
     "selectAppLanguage": "Select App Language",
     "mechBazar": "Mech Bazar",
-    "appVersion": "Version 2.4.0 (Build 902)",
+    "appVersion": "Version {{version}}",
     "appTagline": "Everything Your Vehicle Needs, Delivered to Your Doorstep.",
     "developer": "Developer",
     "developerName": "Mech Bazar Team",
@@ -104,6 +104,8 @@
     "carOnly": " (Car only)",
     "bikeOnly": " (Bike only)",
     "latestVersionMsg": "You are running the latest version!",
+    "updateAvailableMsg": "A new version ({{version}}) is available. Please update from the store to get the latest features.",
+    "checkForUpdatesFailedMsg": "Couldn't check for updates. Please try again.",
     "legal": {
       "privacy": "Privacy Policy",
       "terms": "Terms of Service",

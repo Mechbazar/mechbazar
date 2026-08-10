@@ -23,6 +23,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import { useTranslation } from 'react-i18next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, { Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
+import Constants from 'expo-constants';
 import { RootState } from '../store';
 import { logout, updateUserSuccess } from '../store/authSlice';
 import { setThemePreference } from '../store/themeSlice';
@@ -126,6 +127,7 @@ export default function AccountScreen() {
   const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(true);
   const [isLanguageModalVisible, setIsLanguageModalVisible] = useState(false);
   const [isAboutModalVisible, setIsAboutModalVisible] = useState(false);
+  const [isCheckingForUpdate, setIsCheckingForUpdate] = useState(false);
   const [isChangePasswordModalVisible, setIsChangePasswordModalVisible] = useState(false);
   const [isChangePhoneModalVisible, setIsChangePhoneModalVisible] = useState(false);
 
@@ -183,6 +185,28 @@ export default function AccountScreen() {
   const handleSelectLanguage = (code: LanguageCode) => {
     dispatch(setLanguage(code));
     setIsLanguageModalVisible(false);
+  };
+
+  // Real installed version -- Constants.expoConfig.version is resolved from
+  // apps/mobile/package.json at build time, the same field EAS uses.
+  const appVersion = Constants.expoConfig?.version || '1.0.0';
+
+  const handleCheckForUpdates = async () => {
+    setIsCheckingForUpdate(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/app-config/mobile-version?current=${encodeURIComponent(appVersion)}`);
+      if (!res.ok) throw new Error('bad response');
+      const data = await res.json();
+      if (data.upToDate) {
+        Alert.alert(t('account.checkForUpdates'), t('account.latestVersionMsg'));
+      } else {
+        Alert.alert(t('account.checkForUpdates'), t('account.updateAvailableMsg', { version: data.latestVersion }));
+      }
+    } catch (e) {
+      Alert.alert(t('account.checkForUpdates'), t('account.checkForUpdatesFailedMsg'));
+    } finally {
+      setIsCheckingForUpdate(false);
+    }
   };
 
   const handleChangePassword = async () => {
@@ -1091,7 +1115,7 @@ export default function AccountScreen() {
             <View style={{ alignItems: 'center', marginVertical: 20 }}>
               <Ionicons name="settings" size={48} color={colors.primary} style={{ marginBottom: 12 }} />
               <Text style={styles.modalTitle}>{t('account.mechBazar')}</Text>
-              <Text style={styles.aboutVersion}>{t('account.appVersion')}</Text>
+              <Text style={styles.aboutVersion}>{t('account.appVersion', { version: appVersion })}</Text>
               <Text style={styles.aboutSub}>{t('account.appTagline')}</Text>
             </View>
 
@@ -1108,9 +1132,14 @@ export default function AccountScreen() {
 
             <TouchableOpacity
               style={styles.aboutUpdateBtn}
-              onPress={() => Alert.alert(t('account.checkForUpdates'), t('account.latestVersionMsg'))}
+              onPress={handleCheckForUpdates}
+              disabled={isCheckingForUpdate}
             >
-              <Text style={styles.aboutUpdateBtnText}>{t('account.checkForUpdates')}</Text>
+              {isCheckingForUpdate ? (
+                <ActivityIndicator size="small" color={colors.white} />
+              ) : (
+                <Text style={styles.aboutUpdateBtnText}>{t('account.checkForUpdates')}</Text>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsAboutModalVisible(false)}>

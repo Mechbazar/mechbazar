@@ -19,6 +19,9 @@ export const NAV_ROLES: Record<string, string[]> = {
   // Matches serviceability.routes.ts's `admins` gate on the mutating
   // /serviceability/pincodes endpoints.
   '/serviceable-areas': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
+  // Matches appConfig.routes.ts's `admins` gate on the mutating
+  // PUT /app-config/mobile-version endpoint.
+  '/app-settings': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
   '/inventory': ['ADMIN', 'SUPER_ADMIN', 'INVENTORY_MANAGER', 'OPERATIONS_MANAGER', 'VENDOR_MANAGER'],
   '/services': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
   '/vendors': ['ADMIN', 'SUPER_ADMIN', 'VENDOR_MANAGER'],

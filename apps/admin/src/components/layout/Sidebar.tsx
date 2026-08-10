@@ -65,6 +65,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Settings',
     links: [
       { to: '/commission-settings', icon: 'gear', label: 'Commission & Payout Settings' },
+      { to: '/app-settings', icon: 'gear', label: 'App Settings' },
       { to: '/admin-management', icon: 'shield', label: 'Administrators' },
       // No NAV_ROLES entry -- the backend endpoint is open to every
       // authenticated role (GET/PATCH /customers/notification-preferences
