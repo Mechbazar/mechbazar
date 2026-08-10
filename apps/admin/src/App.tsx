@@ -48,6 +48,7 @@ const Broadcast = lazy(() => import('./pages/Broadcast'));
 const NotificationAnalytics = lazy(() => import('./pages/NotificationAnalytics'));
 const Profile = lazy(() => import('./pages/Profile'));
 const AdminManagement = lazy(() => import('./pages/AdminManagement'));
+const ServiceableAreas = lazy(() => import('./pages/ServiceableAreas'));
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -75,6 +76,7 @@ function AnimatedRoutes() {
           <Route path="/categories" element={<Categories />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/admin-management" element={<AdminManagement />} />
+          <Route path="/serviceable-areas" element={<ServiceableAreas />} />
           {/* Deliberately not in the sidebar -- MechBazar doesn't sell
               products directly, only vendors do, so this isn't a top-level
               section of its own. It's still the only place to review pending

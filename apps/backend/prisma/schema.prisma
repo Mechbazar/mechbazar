@@ -544,6 +544,22 @@ model Address {
   serviceBookings  ServiceBooking[]
 }
 
+// Admin-curated allowlist of pincodes MechBazar actually delivers/services --
+// checked at order/booking creation against the delivery/service address's
+// pincode. See services/serviceability.service.ts for the bootstrap rule (an
+// empty table means unrestricted, not "nothing is serviceable") that keeps a
+// fresh deploy of this feature from blocking every order platform-wide before
+// an admin has populated it.
+model ServiceablePincode {
+  id        String   @id @default(uuid())
+  pincode   String   @unique
+  city      String?
+  state     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // =======================
 // VEHICLE MASTER DATA
 // =======================

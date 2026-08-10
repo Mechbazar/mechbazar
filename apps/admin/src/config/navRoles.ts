@@ -16,6 +16,9 @@ export const NAV_ROLES: Record<string, string[]> = {
   '/mechanics': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
   '/categories': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
   '/vehicles': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER', 'INVENTORY_MANAGER'],
+  // Matches serviceability.routes.ts's `admins` gate on the mutating
+  // /serviceability/pincodes endpoints.
+  '/serviceable-areas': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
   '/inventory': ['ADMIN', 'SUPER_ADMIN', 'INVENTORY_MANAGER', 'OPERATIONS_MANAGER', 'VENDOR_MANAGER'],
   '/services': ['ADMIN', 'SUPER_ADMIN', 'OPERATIONS_MANAGER'],
   '/vendors': ['ADMIN', 'SUPER_ADMIN', 'VENDOR_MANAGER'],

@@ -41,6 +41,7 @@ const NAV_GROUPS: NavGroup[] = [
       { to: '/categories', icon: 'categories', label: 'Categories' },
       { to: '/services', icon: 'service_catalog', label: 'Service Catalog' },
       { to: '/vehicles', icon: 'vehicles', label: 'Vehicle Master' },
+      { to: '/serviceable-areas', icon: 'warehouses', label: 'Serviceable Areas' },
     ],
   },
   {

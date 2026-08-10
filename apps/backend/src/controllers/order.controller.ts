@@ -9,6 +9,7 @@ import { broadcastOrderStatus } from '../services/orderState';
 import { sanitizeOrder, sanitizeOrders, stripDeliveryOtp, stripDeliveryOtps } from '../utils/sanitizeUser';
 import { pendingPaymentCreateInput, creditWalletForOnlineRefund } from '../services/payment.service';
 import { resolveProductCommissionPercent, resolveRiderPayout, recordCommission, round2 } from '../services/commission.service';
+import { isPincodeServiceable } from '../services/serviceability.service';
 
 // Thrown from inside the createOrder $transaction to carry an intended HTTP
 // status (400/409) back out through Prisma's error propagation, instead of
@@ -311,6 +312,10 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
             pincode: '400099',
           }
         });
+      }
+
+      if (!(await isPincodeServiceable(address.pincode))) {
+        throw new OrderError(400, `Sorry, we don't currently deliver to pincode ${address.pincode}.`);
       }
 
       let subtotal = 0;

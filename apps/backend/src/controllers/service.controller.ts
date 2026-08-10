@@ -9,6 +9,7 @@ import { haversineKm } from '../utils/geo';
 import { pendingPaymentCreateInput, creditWalletForOnlineRefund } from '../services/payment.service';
 import { broadcastBookingStatus } from '../utils/realtimeBooking';
 import { ASSIGNMENT_RESPONSE_WINDOW_MS, TECHNICIAN_ACTIVE_STATUSES } from '../services/jobState';
+import { isPincodeServiceable } from '../services/serviceability.service';
 import { creditServiceCompletion } from '../services/commission.service';
 
 // Thrown from inside createBooking's $transaction to carry an intended HTTP
@@ -382,6 +383,9 @@ export const createBooking = async (req: AuthRequest, res: Response) => {
     const booking = await prisma.$transaction(async (tx) => {
       const address = await tx.address.findFirst({ where: { id: addressId, userId } });
       if (!address) throw new BookingError(404, 'Address not found');
+      if (!(await isPincodeServiceable(address.pincode))) {
+        throw new BookingError(400, `Sorry, we don't currently service pincode ${address.pincode}.`);
+      }
 
       if (userVehicleId) {
         const ownedVehicle = await tx.userVehicle.findFirst({ where: { id: userVehicleId, userId } });

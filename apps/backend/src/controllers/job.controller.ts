@@ -16,6 +16,7 @@ import {
   issueJobOtp, getOrIssueCustomerOtp, verifyAndConsumeOtp, OtpError,
 } from '../services/jobOtp.service';
 import { ingestPings, getJobTrail, forgetJobTracking, PingInput } from '../services/tracking.service';
+import { isPincodeServiceable } from '../services/serviceability.service';
 import { placeMaskedCall, contactAvailability, CallError, recordCallStatus } from '../services/call.service';
 import { creditServiceCompletion } from '../services/commission.service';
 import { emitToJob } from '../realtime/gateway';
@@ -298,6 +299,9 @@ export const createEmergencyJob = async (req: AuthRequest, res: Response) => {
     const job = await prisma.$transaction(async (tx) => {
       const address = await tx.address.findFirst({ where: { id: addressId, userId } });
       if (!address) throw new ApiError(404, 'ADDRESS_NOT_FOUND', 'Address not found.');
+      if (!(await isPincodeServiceable(address.pincode))) {
+        throw new ApiError(400, 'NOT_SERVICEABLE', `Sorry, we don't currently service pincode ${address.pincode}.`);
+      }
 
       const category = await tx.serviceCategory.findUnique({ where: { id: categoryId } });
       if (!category || category.status !== 'Active') throw new ApiError(404, 'CATEGORY_NOT_FOUND', 'Service not found.');

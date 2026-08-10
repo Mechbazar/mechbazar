@@ -71,6 +71,21 @@ export const updateMyAddress = async (
   }
 };
 
+// Public endpoint (no auth needed) -- checked while the customer is entering
+// or picking an address, so a non-serviceable pincode surfaces as an inline
+// warning here rather than only as a rejected order/booking at checkout.
+export const checkPincodeServiceable = async (pincode: string): Promise<boolean | null> => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/serviceability/check?pincode=${encodeURIComponent(pincode)}`);
+    if (!res.ok) return null; // unknown -- don't block on a check that itself failed
+    const data = await res.json();
+    return !!data.serviceable;
+  } catch (err) {
+    console.error('checkPincodeServiceable failed', err);
+    return null;
+  }
+};
+
 export const deleteMyAddress = async (
   token: string,
   id: string
