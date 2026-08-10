@@ -25,6 +25,14 @@ export class ApiError extends Error {
 
 interface FetchOpts { rethrow?: boolean; signal?: AbortSignal }
 
+// A category's `icon` field is meant to hold a single emoji glyph -- but
+// nothing stops an admin from pasting an image URL into it by mistake
+// (instead of using the separate `image` field). Rendered as plain text,
+// that shows up to customers as a raw http(s):// string. Catch it here, at
+// the one shared place every screen gets category data from, rather than
+// duplicating the guard in each screen that renders `icon` as a fallback.
+const isUrlLike = (s: string) => /^(https?:)?\/\//i.test(s.trim());
+
 function toApiError(err: any): ApiError {
   if (err instanceof ApiError) return err;
   if (err?.name === 'AbortError') return new ApiError('Request timed out', { kind: 'timeout' });
@@ -110,7 +118,7 @@ export const fetchCategories = async (type: VehicleType, opts?: FetchOpts): Prom
         .map((c: any) => ({
           id: c.id,
           name: c.name,
-          icon: c.icon || '📦',
+          icon: c.icon && !isUrlLike(c.icon) ? c.icon : '📦',
           image: c.image?.startsWith('/') ? `${SERVER_ORIGIN}${c.image}` : c.image,
           vehicleType: c.vehicleType || type,
           productCount: c.productCount ?? 0,

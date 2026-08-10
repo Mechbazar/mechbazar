@@ -3,6 +3,7 @@ import { View, ActivityIndicator, StyleSheet, Platform, Appearance, Animated } f
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, LinkingOptions, createNavigationContainerRef, CommonActions } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -15,6 +16,9 @@ import { loginSuccess } from './src/store/authSlice';
 import { hydrateCart } from './src/store/cartSlice';
 import { hydrateGarage, setVehicleTypeHydrated, loadVehicleType } from './src/store/appSlice';
 import { setThemePreferenceHydrated, loadThemePreference, systemSchemeChanged } from './src/store/themeSlice';
+import { setLanguageHydrated, loadLanguagePreference } from './src/store/languageSlice';
+import { useIsDarkMode } from './src/theme/useThemeColors';
+import './src/i18n';
 import './src/services/sessionGuard';
 import ErrorBoundary from './src/components/shared/ErrorBoundary';
 import { registerForPushNotificationsAsync, addNotificationTapListener } from './src/services/notifications';
@@ -184,53 +188,31 @@ const MOBILE_TAB_BAR_STYLE = {
   bottom: 20,
   left: 16,
   right: 16,
-  // Translucent charcoal rather than a flat fill -- the closest a floating
-  // RN tab bar gets to glassmorphism without pulling in expo-blur (a new
-  // native module every existing build would need to be rebuilt to include).
-  backgroundColor: 'rgba(28,28,30,0.88)',
+  // White floating pill with a subtle top border/shadow -- replaces the
+  // earlier translucent-charcoal/glassmorphism treatment, which read as too
+  // dark/heavy against the flatter, lighter redesign of the screens above it.
+  backgroundColor: '#FFFFFF',
   borderRadius: 24,
   height: 64,
   paddingBottom: Platform.OS === 'ios' ? 0 : 8,
   paddingTop: 8,
   borderTopWidth: 0,
   borderWidth: 1,
-  borderColor: 'rgba(255,255,255,0.08)',
-  shadowColor: '#000000',
-  shadowOffset: { width: 0, height: 10 },
-  shadowOpacity: 0.35,
-  shadowRadius: 10,
+  borderColor: '#EDEFF5',
+  shadowColor: '#0B1220',
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.08,
+  shadowRadius: 14,
   elevation: 8,
 };
 
-// Selected tab gets a red circular backdrop, a glow, and a spring "pop" --
-// the rest just tint the glyph, same as before.
+// Simple flat glyph tint -- active = brand red, inactive = gray. Replaces
+// the earlier red "glow bubble" chip (glass highlight/shade layers, spring
+// pop) with a plain icon-color swap, matching the flatter redesign.
 function AnimatedTabIcon({ focused, name }: { focused: boolean; name: keyof typeof Ionicons.glyphMap }) {
-  const scale = useRef(new Animated.Value(focused ? 1 : 0)).current;
-  useEffect(() => {
-    Animated.spring(scale, { toValue: focused ? 1 : 0, useNativeDriver: true, bounciness: 10, speed: 16 }).start();
-  }, [focused]);
-
   return (
     <View style={tabIconStyles.wrap}>
-      <Animated.View
-        style={[
-          tabIconStyles.glowBubble,
-          {
-            opacity: scale,
-            transform: [{ scale }],
-          },
-        ]}
-      >
-        {/* Same top-left glass highlight / bottom-right shade Icon3D uses
-            everywhere else (Services/Categories/Feature Cards/header
-            buttons) -- so the selected tab reads as the same chip material
-            as the rest of the app's icon system instead of a flat dot. */}
-        <View style={tabIconStyles.glowInner}>
-          <View pointerEvents="none" style={tabIconStyles.glowHighlight} />
-          <View pointerEvents="none" style={tabIconStyles.glowShade} />
-        </View>
-      </Animated.View>
-      <Ionicons name={name} size={focused ? 21 : 22} color={focused ? '#FFFFFF' : '#8E8E93'} />
+      <Ionicons name={name} size={focused ? 23 : 22} color={focused ? '#E53935' : '#8E8E93'} />
     </View>
   );
 }
@@ -241,44 +223,6 @@ const tabIconStyles = StyleSheet.create({
     height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  glowBubble: {
-    position: 'absolute',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    shadowColor: '#E53935',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  glowInner: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    overflow: 'hidden',
-    backgroundColor: '#E53935',
-  },
-  glowHighlight: {
-    position: 'absolute',
-    top: 3,
-    left: 5,
-    width: 16,
-    height: 9,
-    borderRadius: 7,
-    backgroundColor: '#FFFFFF',
-    opacity: 0.4,
-  },
-  glowShade: {
-    position: 'absolute',
-    bottom: -4,
-    right: -4,
-    width: 25,
-    height: 25,
-    borderRadius: 13,
-    backgroundColor: '#0B1220',
-    opacity: 0.1,
   },
 });
 
@@ -315,6 +259,7 @@ function RootNavigator() {
   const cartItems = useSelector((state: RootState) => state.cart.items);
   const myGarage = useSelector((state: RootState) => state.app.myGarage);
   const activeVehicleId = useSelector((state: RootState) => state.app.activeVehicleId);
+  const isDark = useIsDarkMode();
 
   const [isReady, setIsReady] = useState(false);
   // Guards the persistence effects below so the empty pre-hydration state
@@ -383,6 +328,7 @@ function RootNavigator() {
 
         dispatch(setVehicleTypeHydrated(await loadVehicleType()));
         dispatch(setThemePreferenceHydrated(await loadThemePreference()));
+        dispatch(setLanguageHydrated(await loadLanguagePreference()));
       } catch (e) {
         console.error('Failed to hydrate app state from storage', e);
       } finally {
@@ -544,14 +490,27 @@ function RootNavigator() {
 
   if (!isReady) {
     return (
-      <View style={styles.loaderContainer}>
-        <ActivityIndicator size="large" color="#E23B22" />
-      </View>
+      <>
+        {/* loaderContainer is always light, regardless of theme -- dark icons
+            read correctly here even before the theme preference finishes
+            hydrating from storage. */}
+        <StatusBar style="dark" />
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#E23B22" />
+        </View>
+      </>
     );
   }
 
   return (
     <>
+      {/* Every sibling app (rider/mechanic/seller-mobile/admin-mobile) sets
+          this; it was missing here, which is what made the status bar read as
+          transparent -- with no explicit style, Android draws no background
+          and lets content show through underneath the icons. This app also
+          supports a user-selectable dark theme (the siblings don't), so the
+          icon color has to flip with it instead of being hardcoded. */}
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <OfflineBanner />
       <NavigationContainer ref={navigationRef} linking={linking}>
       <DesktopAppShell>

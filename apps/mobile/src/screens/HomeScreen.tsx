@@ -4,7 +4,7 @@
 // Everything below line 6 is identical in both files -- verify with
 // `diff <(tail -n +7 HomeScreen.tsx) <(tail -n +7 HomeScreenMobile.tsx)`.
 // They drifted once already (the reviewsCount branch); mirror every change.
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,15 +20,13 @@ import {
   ImageBackground,
   Alert,
   Modal,
-  Platform,
   Share
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Loader } from '@mechbazar/shared';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
-import { logout } from '../store/authSlice';
 import { addToCart, updateQuantity } from '../store/cartSlice';
 import { setVehicleType } from '../store/appSlice';
 import { fetchCategories, getTrendingProducts, fetchBanners, fetchOffers, HomeOffer, NO_IMAGE_PLACEHOLDER } from '../services/product.service';
@@ -40,6 +38,8 @@ import { locationService } from '../services/location.service';
 import { reverseGeocode } from '../services/geocode.service';
 import { API_BASE_URL } from '../services/api';
 import { Icon3D } from '../components/shared/Icon3D';
+import { useIsDarkMode } from '../theme/useThemeColors';
+import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
 
@@ -49,7 +49,7 @@ const { width } = Dimensions.get('window');
 // This shade clears it (~4.6:1) while reading as the same red at a glance.
 // `primaryBrand` is the exact spec hex, used only for decorative surfaces
 // (gradients, icon accents) where contrast isn't load-bearing.
-const colors = {
+const LIGHT_COLORS = {
   bg: '#F7F8FC',
   card: '#FFFFFF',
   ink: '#111111',
@@ -62,20 +62,42 @@ const colors = {
   white: '#FFFFFF'
 };
 
+const DARK_COLORS: typeof LIGHT_COLORS = {
+  bg: '#121212',
+  card: '#1E1E1E',
+  ink: '#F1F2F4',
+  textMuted: '#A6ACB5',
+  border: '#2E2E2E',
+  primary: '#FF5A4E',
+  primaryBrand: '#FF6B5E',
+  success: '#4FE092',
+  warning: '#F5B94D',
+  white: '#FFFFFF'
+};
+
+// Shared by the main screen and every module-scope subcomponent below it
+// (VehiclePill, PaginationDot, CategoryOrb, etc.) -- they're rendered only
+// from within HomeScreen but are real function components, so pulling theme
+// state via this hook is legal and avoids prop-drilling colors/styles
+// through every one of them individually.
+const useScreenColors = () => {
+  const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return { colors, styles };
+};
+
 const CARD_RADIUS = 24;
 
 const SERVICES = [
-  { id: 's1', type: 'wash', name: 'Premium Wash', price: 199 },
-  { id: 's2', type: 'ac', name: 'AC Servicing', price: 499 },
-  { id: 's3', type: 'oil', name: 'Oil Change', price: 399 },
-  { id: 's4', type: 'battery', name: 'Battery Service', price: 999 },
-  { id: 's5', type: 'tyre', name: 'Tyre Service', price: 149 },
-  { id: 's6', type: 'brake', name: 'Brake Service', price: 299 },
-  { id: 's7', type: 'spa', name: 'Car Spa', price: 799 },
-  { id: 's8', type: 'emergency', name: 'Emergency Help', price: 499 }
+  { id: 's1', type: 'wash', nameKey: 'home.services.wash', price: 199 },
+  { id: 's2', type: 'ac', nameKey: 'home.services.ac', price: 499 },
+  { id: 's3', type: 'oil', nameKey: 'home.services.oil', price: 399 },
+  { id: 's4', type: 'battery', nameKey: 'home.services.battery', price: 999 },
+  { id: 's5', type: 'tyre', nameKey: 'home.services.tyre', price: 149 },
+  { id: 's6', type: 'brake', nameKey: 'home.services.brake', price: 299 },
+  { id: 's7', type: 'spa', nameKey: 'home.services.spa', price: 799 },
+  { id: 's8', type: 'emergency', nameKey: 'home.services.emergency', price: 499 }
 ];
-
-import Svg, { Rect, Defs, LinearGradient, RadialGradient, Stop, Circle } from 'react-native-svg';
 
 // One icon per service type, in the same Icon3D chip language used for
 // Quick Actions / Categories / the tab bar / header buttons -- replaces the
@@ -87,12 +109,13 @@ const SERVICE_ICONS: Record<string, { set: 'ionicons' | 'mci'; name: string; tin
   oil: { set: 'mci', name: 'oil', tint: '#FFF9DB', iconColor: '#F59F00' },
   battery: { set: 'mci', name: 'car-battery', tint: '#EBFBEE', iconColor: '#2B8A3E' },
   tyre: { set: 'mci', name: 'tire', tint: '#F1F3F5', iconColor: '#495057' },
-  brake: { set: 'mci', name: 'car-brake-alert', tint: '#FFECEB', iconColor: colors.primary },
+  brake: { set: 'mci', name: 'car-brake-alert', tint: '#FFECEB', iconColor: LIGHT_COLORS.primary },
   spa: { set: 'ionicons', name: 'sparkles-outline', tint: '#F8F0FC', iconColor: '#9C36B5' },
   emergency: { set: 'mci', name: 'car-emergency', tint: '#FFF0F6', iconColor: '#D6336C' },
 };
 
 const ServiceIllustration = ({ type }: { type: string }) => {
+  const { styles } = useScreenColors();
   const cfg = SERVICE_ICONS[type];
   if (!cfg) return null;
   return (
@@ -111,32 +134,21 @@ const OFFER_PALETTE = [
   { color: '#E8F7FF', borderColor: '#74C0FC' },
 ];
 
-// Two-color pill for the Cars/Bikes selector. Scales up and gains a red
-// gradient fill when selected -- the sliding-indicator-behind-static-labels
-// design this replaced is now two independently animated pills instead.
-function VehiclePill({ label, emoji, active, onPress }: { label: string; emoji: string; active: boolean; onPress: () => void }) {
+// Two-option pill for the Cars/Bikes selector. Flat red fill (no gradient)
+// when selected, matching the rest of the flatter icon/surface language.
+function VehiclePill({ label, icon, iconSet, active, onPress }: { label: string; icon: string; iconSet: 'ionicons' | 'mci'; active: boolean; onPress: () => void }) {
+  const { colors, styles } = useScreenColors();
   const scale = useRef(new Animated.Value(active ? 1.03 : 1)).current;
   useEffect(() => {
     Animated.spring(scale, { toValue: active ? 1.03 : 1, useNativeDriver: true, bounciness: 8 }).start();
   }, [active]);
+  const IconComp = iconSet === 'mci' ? MaterialCommunityIcons : Ionicons;
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={{ flex: 1 }}>
-      <Animated.View style={[styles.pill, active && styles.pillActiveShadow, { transform: [{ scale }] }]}>
-        {active && (
-          <View style={StyleSheet.absoluteFill}>
-            <Svg height="100%" width="100%">
-              <Defs>
-                <LinearGradient id={`pillGrad-${label}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                  <Stop offset="0%" stopColor={colors.primaryBrand} />
-                  <Stop offset="100%" stopColor={colors.primary} />
-                </LinearGradient>
-              </Defs>
-              <Rect width="100%" height="100%" fill={`url(#pillGrad-${label})`} rx={18} ry={18} />
-            </Svg>
-          </View>
-        )}
-        <Text style={[styles.pillText, active && styles.pillTextActive]}>{emoji}  {label}</Text>
+      <Animated.View style={[styles.pill, active && [styles.pillActive, styles.pillActiveShadow], { transform: [{ scale }] }]}>
+        <IconComp name={icon as any} size={16} color={active ? colors.white : colors.textMuted} />
+        <Text style={[styles.pillText, active && styles.pillTextActive]}>{label}</Text>
       </Animated.View>
     </TouchableOpacity>
   );
@@ -146,6 +158,7 @@ function VehiclePill({ label, emoji, active, onPress }: { label: string; emoji: 
 // of just swapping color, so the carousel position reads as a smooth
 // transition rather than a jump cut.
 function PaginationDot({ active }: { active: boolean }) {
+  const { colors, styles } = useScreenColors();
   const anim = useRef(new Animated.Value(active ? 1 : 0)).current;
   useEffect(() => {
     Animated.timing(anim, { toValue: active ? 1 : 0, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: false }).start();
@@ -155,46 +168,35 @@ function PaginationDot({ active }: { active: boolean }) {
   return <Animated.View style={[styles.paginationDot, { width: dotWidth, backgroundColor: bg as any }]} />;
 }
 
-// Quick-action tile: a glossy Icon3D chip with a gentle idle float (one of
-// the few tap targets this app lets breathe continuously -- see Icon3D's
-// `floating` doc comment for why the rest of the icon system doesn't) that
-// also lifts slightly on press.
-function QuickActionCard({ icon, label, tint, iconColor, onPress }: { icon: any; label: string; tint: string; iconColor: string; onPress: () => void }) {
+// Quick-action card: icon + title + subtitle, white card with a soft border/
+// shadow -- no idle float, so the "what do you need today?" grid reads as
+// calm and scannable rather than six simultaneously animating tiles.
+function QuickActionCard({ icon, label, subtitle, tint, iconColor, onPress }: { icon: any; label: string; subtitle: string; tint: string; iconColor: string; onPress: () => void }) {
+  const { styles } = useScreenColors();
   const scale = useRef(new Animated.Value(1)).current;
-  const pressIn = () => Animated.spring(scale, { toValue: 0.94, useNativeDriver: true, speed: 50 }).start();
+  const pressIn = () => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 50 }).start();
   const pressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 50 }).start();
   return (
     <TouchableOpacity onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} activeOpacity={0.9} style={styles.quickCardTouchable}>
       <Animated.View style={[styles.quickCard, { transform: [{ scale }] }]}>
-        <Icon3D name={icon} size={54} tint={tint} iconColor={iconColor} floating elevated style={{ marginBottom: 8 }} />
+        <Icon3D name={icon} size={44} tint={tint} iconColor={iconColor} style={{ marginBottom: 10 }} />
         <Text style={styles.quickLabel} numberOfLines={1}>{label}</Text>
+        <Text style={styles.quickSubtitle} numberOfLines={2}>{subtitle}</Text>
       </Animated.View>
     </TouchableOpacity>
   );
 }
 
-// Circular "floating orb" category icon -- a soft gradient ring behind a
-// white disc holding the real category image (or an emoji fallback).
+// Circular category icon: a plain white disc (border + soft shadow) holding
+// the real category image, or an emoji fallback when the category has none.
 function CategoryOrb({ cat, onPress }: { cat: Category; onPress: () => void }) {
+  const { styles } = useScreenColors();
   const scale = useRef(new Animated.Value(1)).current;
   const pressIn = () => Animated.spring(scale, { toValue: 0.92, useNativeDriver: true, speed: 50 }).start();
   const pressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 50 }).start();
   return (
     <TouchableOpacity onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} activeOpacity={0.9} style={styles.categoryItem}>
       <Animated.View style={[styles.categoryRing, { transform: [{ scale }] }]}>
-        <Svg style={StyleSheet.absoluteFill} height="100%" width="100%">
-          <Defs>
-            <RadialGradient id={`catGlow-${cat.id}`} cx="50%" cy="50%" r="50%">
-              <Stop offset="0%" stopColor={colors.primaryBrand} stopOpacity={0.16} />
-              <Stop offset="100%" stopColor={colors.primaryBrand} stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          <Circle cx="50%" cy="50%" r="50%" fill={`url(#catGlow-${cat.id})`} />
-        </Svg>
-        {/* Same top-left glass highlight Icon3D uses -- kept as a hand overlay
-            here (rather than routed through Icon3D) since this ring wraps a
-            real photo or emoji, not one of our vector glyphs. */}
-        <View pointerEvents="none" style={styles.categoryRingHighlight} />
         <View style={styles.categoryOrb}>
           {cat.image ? (
             <Image source={{ uri: cat.image }} style={styles.categoryIconImg} />
@@ -210,6 +212,8 @@ function CategoryOrb({ cat, onPress }: { cat: Category; onPress: () => void }) {
 
 export default function HomeScreen({ navigation }: any) {
   const dispatch = useDispatch();
+  const { t } = useTranslation();
+  const { colors, styles } = useScreenColors();
   const { token } = useSelector((state: RootState) => state.auth);
   const cartItems = useSelector((state: RootState) => state.cart.items);
   const vehicleType = useSelector((state: RootState) => state.app.vehicleType);
@@ -426,12 +430,14 @@ export default function HomeScreen({ navigation }: any) {
     : locationName;
 
   const QUICK_ACTIONS = [
-    { key: 'parts', label: 'Spare Parts', icon: 'car' as const, tint: '#FFECEB', iconColor: colors.primary, onPress: () => scrollToSection('categories') },
-    { key: 'mechanic', label: 'Home Mechanic', icon: 'build' as const, tint: '#EBFBEE', iconColor: '#2B8A3E', onPress: () => scrollToSection('services') },
-    { key: 'orders', label: 'Track Order', icon: 'cube-outline' as const, tint: '#E8F7FF', iconColor: '#1C7ED6', onPress: () => navigation.navigate('MainTabs', { screen: 'Orders' }) },
-    { key: 'breakdown', label: 'Breakdown', icon: 'flash' as const, tint: '#FFF9DB', iconColor: '#F59F00', onPress: handleEmergencyBreakdown },
-    { key: 'tools', label: 'Garage Tools', icon: 'construct' as const, tint: '#F8F0FC', iconColor: '#9C36B5', onPress: () => scrollToSection('categories') },
-    { key: 'deals', label: "Today's Deals", icon: 'gift' as const, tint: '#FFF0F6', iconColor: '#D6336C', onPress: () => scrollToSection('offers', 'trending') },
+    { key: 'parts', label: t('home.quickActions.spareParts'), subtitle: t('home.quickActions.sparePartsSubtitle'), icon: 'car' as const, tint: '#FFECEB', iconColor: colors.primary, onPress: () => scrollToSection('categories') },
+    { key: 'mechanic', label: t('home.quickActions.homeMechanic'), subtitle: t('home.quickActions.homeMechanicSubtitle'), icon: 'build' as const, tint: '#EBFBEE', iconColor: '#2B8A3E', onPress: () => scrollToSection('services') },
+    { key: 'orders', label: t('home.quickActions.trackOrder'), subtitle: t('home.quickActions.trackOrderSubtitle'), icon: 'cube-outline' as const, tint: '#E8F7FF', iconColor: '#1C7ED6', onPress: () => navigation.navigate('MainTabs', { screen: 'Orders' }) },
+    { key: 'breakdown', label: t('home.quickActions.breakdown'), subtitle: t('home.quickActions.breakdownSubtitle'), icon: 'flash' as const, tint: '#FFF9DB', iconColor: '#F59F00', onPress: handleEmergencyBreakdown },
+    // Repointed at the existing "My Garage" route -- it used to just scroll
+    // to Shop by Category, silently duplicating the Spare Parts card above.
+    { key: 'tools', label: t('home.quickActions.garageTools'), subtitle: t('home.quickActions.garageToolsSubtitle'), icon: 'construct' as const, tint: '#F8F0FC', iconColor: '#9C36B5', onPress: () => navigation.navigate('Garage') },
+    { key: 'deals', label: t('home.quickActions.todaysDeals'), subtitle: t('home.quickActions.todaysDealsSubtitle'), icon: 'gift' as const, tint: '#FFF0F6', iconColor: '#D6336C', onPress: () => scrollToSection('offers', 'trending') },
   ];
 
   const renderHeader = () => (
@@ -449,7 +455,7 @@ export default function HomeScreen({ navigation }: any) {
           >
             <View style={styles.deliverToLabelRow}>
               <Ionicons name="location" size={12} color={colors.primary} />
-              <Text style={styles.deliverToLabel}>Deliver to</Text>
+              <Text style={styles.deliverToLabel}>{t('home.deliverTo')}</Text>
             </View>
             <View style={styles.deliverToValueRow}>
               <Text style={styles.deliverToValue} numberOfLines={1}>{deliveryLabel}</Text>
@@ -499,7 +505,7 @@ export default function HomeScreen({ navigation }: any) {
           <Ionicons name="search" size={19} color={colors.textMuted} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search genuine parts, accessories & services..."
+            placeholder={t('home.searchPlaceholder')}
             placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -508,14 +514,14 @@ export default function HomeScreen({ navigation }: any) {
             returnKeyType="search"
           />
           <TouchableOpacity onPress={handleOpenFilters} accessibilityLabel="Filter products" activeOpacity={0.85}>
-            <Icon3D name="options-outline" size={38} shape="squircle" tint={colors.primary} iconColor={colors.white} elevated />
+            <Icon3D name="options-outline" size={38} shape="squircle" tint={colors.primary} iconColor={colors.white} />
           </TouchableOpacity>
         </View>
 
-        {/* Cars/Bikes premium pill selector */}
+        {/* Cars/Bikes selector */}
         <View style={styles.pillRow}>
-          <VehiclePill label="Cars" emoji="🚗" active={vehicleType === VehicleType.CAR} onPress={() => toggleVehicleType(VehicleType.CAR)} />
-          <VehiclePill label="Bikes" emoji="🏍️" active={vehicleType === VehicleType.BIKE} onPress={() => toggleVehicleType(VehicleType.BIKE)} />
+          <VehiclePill label={t('home.cars')} icon="car-outline" iconSet="ionicons" active={vehicleType === VehicleType.CAR} onPress={() => toggleVehicleType(VehicleType.CAR)} />
+          <VehiclePill label={t('home.bikes')} icon="motorbike" iconSet="mci" active={vehicleType === VehicleType.BIKE} onPress={() => toggleVehicleType(VehicleType.BIKE)} />
         </View>
       </View>
     </View>
@@ -549,7 +555,7 @@ export default function HomeScreen({ navigation }: any) {
                   <Text style={styles.bannerOfferText}>{banner.offer}</Text>
 
                   <TouchableOpacity style={styles.shopNowBtn} onPress={handleSearch} activeOpacity={0.85}>
-                    <Text style={styles.shopNowText}>Shop Now</Text>
+                    <Text style={styles.shopNowText}>{t('home.shopNow')}</Text>
                     <Ionicons name="arrow-forward" size={14} color={colors.white} />
                   </TouchableOpacity>
                 </View>
@@ -577,14 +583,16 @@ export default function HomeScreen({ navigation }: any) {
           {renderBanners()}
         </View>
 
-        {/* QUICK ACTIONS SECTION */}
+        {/* QUICK ACTIONS SECTION -- "What do you need today?" */}
         <View style={styles.quickActionsContainer}>
+          <Text style={styles.quickActionsTitle}>{t('home.whatDoYouNeed')}</Text>
           <View style={styles.quickGrid}>
             {QUICK_ACTIONS.map((qa) => (
               <QuickActionCard
                 key={qa.key}
                 icon={qa.icon}
                 label={qa.label}
+                subtitle={qa.subtitle}
                 tint={qa.tint}
                 iconColor={qa.iconColor}
                 onPress={qa.onPress}
@@ -596,7 +604,10 @@ export default function HomeScreen({ navigation }: any) {
         {/* SHOP BY CATEGORY SECTION */}
         <View style={styles.section} onLayout={registerSection('categories')}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Shop by Category</Text>
+            <Text style={styles.sectionTitle}>{t('home.shopByCategory')}</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Categories' })}>
+              <Text style={styles.seeAllText}>{t('home.seeAll')}</Text>
+            </TouchableOpacity>
           </View>
           {isHomeContentLoading ? (
             <View style={{ paddingVertical: 24, alignItems: 'center' }}>
@@ -620,12 +631,30 @@ export default function HomeScreen({ navigation }: any) {
           )}
         </View>
 
+        {/* TRUST SECTION */}
+        <View style={styles.section}>
+          <View style={styles.trustRow}>
+            <View style={styles.trustItem}>
+              <Ionicons name="shield-checkmark-outline" size={22} color={colors.primary} />
+              <Text style={styles.trustItemText}>{t('home.trust.genuineProducts')}</Text>
+            </View>
+            <View style={styles.trustItem}>
+              <Ionicons name="pricetags-outline" size={22} color={colors.primary} />
+              <Text style={styles.trustItemText}>{t('home.trust.bestPrices')}</Text>
+            </View>
+            <View style={styles.trustItem}>
+              <Ionicons name="headset-outline" size={22} color={colors.primary} />
+              <Text style={styles.trustItemText}>{t('home.trust.expertSupport')}</Text>
+            </View>
+          </View>
+        </View>
+
         {/* SERVICES SECTION */}
         <View style={styles.section} onLayout={registerSection('services')}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Doorstep Services</Text>
+            <Text style={styles.sectionTitle}>{t('home.doorstepServices')}</Text>
             <TouchableOpacity onPress={() => navigation.navigate('Services')}>
-              <Text style={styles.seeAllText}>See all</Text>
+              <Text style={styles.seeAllText}>{t('home.seeAll')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -634,13 +663,13 @@ export default function HomeScreen({ navigation }: any) {
               <View key={serv.id} style={styles.serviceCard}>
                 <ServiceIllustration type={serv.type} />
                 <View style={styles.serviceInfo}>
-                  <Text style={styles.serviceName}>{serv.name}</Text>
-                  <Text style={styles.servicePrice}>Starts at ₹{serv.price}</Text>
+                  <Text style={styles.serviceName}>{t(serv.nameKey)}</Text>
+                  <Text style={styles.servicePrice}>{t('home.startsAt', { price: serv.price })}</Text>
                   <TouchableOpacity
                     style={styles.serviceBookBtn}
                     onPress={() => navigation.navigate('Services')}
                   >
-                    <Text style={styles.serviceBookBtnText}>Book Now</Text>
+                    <Text style={styles.serviceBookBtnText}>{t('home.bookNow')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -651,7 +680,7 @@ export default function HomeScreen({ navigation }: any) {
         {/* FEATURED / TRENDING PRODUCTS SECTION */}
         <View style={styles.section} onLayout={registerSection('trending')}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Trending {vehicleType === VehicleType.CAR ? 'Car Parts' : 'Bike Parts'}</Text>
+            <Text style={styles.sectionTitle}>{vehicleType === VehicleType.CAR ? t('home.trendingCarParts') : t('home.trendingBikeParts')}</Text>
           </View>
 
           {isHomeContentLoading ? (
@@ -692,7 +721,7 @@ export default function HomeScreen({ navigation }: any) {
                     </View>
                     {(prod.discountPercentage ?? 0) > 0 && (
                       <View style={styles.discountTag}>
-                        <Text style={styles.discountTagText}>{prod.discountPercentage}% OFF</Text>
+                        <Text style={styles.discountTagText}>{t('home.percentOff', { percent: prod.discountPercentage })}</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -706,10 +735,10 @@ export default function HomeScreen({ navigation }: any) {
                       {prod.reviewsCount ? (
                         <>
                           <Ionicons name="star" size={12} color="#F5A300" />
-                          <Text style={styles.ratingText}>{prod.rating} ({prod.reviewsCount} reviews)</Text>
+                          <Text style={styles.ratingText}>{t('home.ratingReviews', { rating: prod.rating, count: prod.reviewsCount })}</Text>
                         </>
                       ) : (
-                        <Text style={styles.ratingText}>New</Text>
+                        <Text style={styles.ratingText}>{t('home.new')}</Text>
                       )}
                     </View>
 
@@ -720,7 +749,7 @@ export default function HomeScreen({ navigation }: any) {
 
                     <View style={styles.priceRow}>
                       <View>
-                        <Text style={styles.originalPrice}>MRP ₹{prod.originalPrice}</Text>
+                        <Text style={styles.originalPrice}>{t('home.mrp', { price: prod.originalPrice })}</Text>
                         <Text style={styles.price}>₹{prod.price}</Text>
                       </View>
 
@@ -754,7 +783,7 @@ export default function HomeScreen({ navigation }: any) {
                             vehicleType: prod.vehicleType
                           }))}
                         >
-                          <Text style={styles.addButtonText}>ADD</Text>
+                          <Text style={styles.addButtonText}>{t('home.add')}</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -777,7 +806,7 @@ export default function HomeScreen({ navigation }: any) {
                         navigation.navigate('Cart');
                       }}
                     >
-                      <Text style={styles.buyNowBtnText}>Buy Now</Text>
+                      <Text style={styles.buyNowBtnText}>{t('home.buyNow')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -794,7 +823,7 @@ export default function HomeScreen({ navigation }: any) {
         {(isHomeContentLoading || offers.length > 0) && (
           <View style={styles.section} onLayout={registerSection('offers')}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Today's Special Offers</Text>
+              <Text style={styles.sectionTitle}>{t('home.todaysOffers')}</Text>
             </View>
             {isHomeContentLoading ? (
               <View style={{ paddingVertical: 24, alignItems: 'center' }}>
@@ -824,53 +853,6 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         )}
 
-        {/* TRUST ACCREDITATION SECTION */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Our Promises</Text>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
-            <View style={styles.trustCard}><Text style={styles.trustCardText}>💯 Genuine Parts</Text></View>
-            <View style={styles.trustCard}><Text style={styles.trustCardText}>🛠️ Verified Mechanics</Text></View>
-            <View style={styles.trustCard}><Text style={styles.trustCardText}>🚀 Fast Delivery</Text></View>
-            <View style={styles.trustCard}><Text style={styles.trustCardText}>🔒 Secure Payments</Text></View>
-            <View style={styles.trustCard}><Text style={styles.trustCardText}>📞 24x7 Support</Text></View>
-          </ScrollView>
-        </View>
-
-        {/* WHY CHOOSE MECH BAZAR SECTION */}
-        <View style={[styles.section, { marginBottom: 12 }]}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Why Choose Mech Bazar?</Text>
-          </View>
-          <View style={styles.whyGrid}>
-            <View style={styles.whyCard}>
-              <Ionicons name="home-outline" size={22} color={colors.primary} />
-              <Text style={styles.whyTitle}>Doorstep Service</Text>
-            </View>
-            <View style={styles.whyCard}>
-              <Ionicons name="shield-checkmark-outline" size={22} color={colors.primary} />
-              <Text style={styles.whyTitle}>Expert Mechanics</Text>
-            </View>
-            <View style={styles.whyCard}>
-              <Ionicons name="map-outline" size={22} color={colors.primary} />
-              <Text style={styles.whyTitle}>Live Tracking</Text>
-            </View>
-            <View style={styles.whyCard}>
-              <Ionicons name="chatbubbles-outline" size={22} color={colors.primary} />
-              <Text style={styles.whyTitle}>In-App Chat</Text>
-            </View>
-            <View style={styles.whyCard}>
-              <Ionicons name="ribbon-outline" size={22} color={colors.primary} />
-              <Text style={styles.whyTitle}>Warranty Support</Text>
-            </View>
-            <View style={styles.whyCard}>
-              <Ionicons name="arrow-undo-outline" size={22} color={colors.primary} />
-              <Text style={styles.whyTitle}>Easy Returns</Text>
-            </View>
-          </View>
-        </View>
-
       </ScrollView>
 
       {/* SEARCH SUGGESTIONS OVERLAY */}
@@ -887,7 +869,7 @@ export default function HomeScreen({ navigation }: any) {
               <Ionicons name="search" size={20} color={colors.textMuted} />
               <TextInput
                 style={styles.overlayInput}
-                placeholder="Search genuine parts, accessories & services..."
+                placeholder={t('home.searchPlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -904,9 +886,9 @@ export default function HomeScreen({ navigation }: any) {
             {recentSearches.length > 0 && (
               <View style={styles.overlayBlock}>
                 <View style={styles.overlayBlockHeader}>
-                  <Text style={styles.overlayBlockTitle}>Recent Searches</Text>
+                  <Text style={styles.overlayBlockTitle}>{t('home.recentSearches')}</Text>
                   <TouchableOpacity onPress={() => setRecentSearches([])}>
-                    <Text style={styles.clearText}>Clear All</Text>
+                    <Text style={styles.clearText}>{t('home.clearAll')}</Text>
                   </TouchableOpacity>
                 </View>
                 <View style={styles.recentRow}>
@@ -926,7 +908,7 @@ export default function HomeScreen({ navigation }: any) {
 
             {/* Popular tags */}
             <View style={styles.overlayBlock}>
-              <Text style={styles.overlayBlockTitle}>Popular Suggestions</Text>
+              <Text style={styles.overlayBlockTitle}>{t('home.popularSuggestions')}</Text>
               <View style={styles.suggestionsGrid}>
                 {suggestions.map((term, i) => (
                   <TouchableOpacity
@@ -954,7 +936,7 @@ export default function HomeScreen({ navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg
@@ -1032,12 +1014,14 @@ const styles = StyleSheet.create({
   searchBarRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.bg,
+    backgroundColor: colors.card,
     borderRadius: 20,
-    height: 48,
+    height: 50,
     paddingLeft: 14,
     paddingRight: 5,
     gap: 8,
+    borderWidth: 1.5,
+    borderColor: colors.border,
   },
   searchInput: {
     flex: 1,
@@ -1053,17 +1037,24 @@ const styles = StyleSheet.create({
   pill: {
     height: 40,
     borderRadius: 18,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.bg,
-    overflow: 'hidden',
+    gap: 6,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  pillActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   pillActiveShadow: {
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
   pillText: {
     fontSize: 13,
@@ -1136,23 +1127,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     marginTop: 22,
   },
+  quickActionsTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: colors.ink,
+    marginBottom: 12,
+    paddingHorizontal: 6,
+  },
   quickGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
   quickCardTouchable: {
-    width: '33.33%',
+    width: '50%',
     paddingHorizontal: 6,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   quickCard: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    shadowColor: '#0B1220',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   quickLabel: {
-    fontSize: 11.5,
+    fontSize: 14.5,
     fontWeight: '700',
     color: colors.ink,
-    textAlign: 'center',
+  },
+  quickSubtitle: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    color: colors.textMuted,
+    marginTop: 2,
   },
   section: {
     marginTop: 26,
@@ -1197,16 +1211,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
     marginBottom: 8,
-  },
-  categoryRingHighlight: {
-    position: 'absolute',
-    top: 8,
-    left: 10,
-    width: 24,
-    height: 14,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    opacity: 0.55,
   },
   categoryOrb: {
     width: 52,
@@ -1458,19 +1462,23 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     padding: 14,
   },
+  // offerCard's background is a fixed light pastel from OFFER_PALETTE
+  // (decorative, doesn't invert with the theme) -- its text must stay pinned
+  // to the light-mode ink/muted tones too, not the dynamic `colors` that
+  // turn near-white in dark mode and disappear against it.
   offerTitle: {
     fontSize: 13.5,
     fontWeight: '800',
-    color: colors.ink,
+    color: LIGHT_COLORS.ink,
   },
   offerDesc: {
     fontSize: 11,
-    color: colors.textMuted,
+    color: LIGHT_COLORS.textMuted,
     marginTop: 3,
   },
   offerBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.white,
+    backgroundColor: LIGHT_COLORS.white,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -1479,40 +1487,30 @@ const styles = StyleSheet.create({
   offerBadgeText: {
     fontSize: 10.5,
     fontWeight: '800',
-    color: colors.ink,
+    color: LIGHT_COLORS.ink,
     letterSpacing: 0.5,
   },
-  trustCard: {
+  trustRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  trustItem: {
+    flex: 1,
+    alignItems: 'center',
     backgroundColor: colors.card,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginRight: 10,
-  },
-  trustCardText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: colors.ink,
-  },
-  whyGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 12,
-  },
-  whyCard: {
-    width: '33.33%',
-    alignItems: 'center',
     paddingVertical: 14,
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
   },
-  whyTitle: {
+  trustItemText: {
     fontSize: 11,
     fontWeight: '700',
     color: colors.ink,
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
   overlaySafe: {
     flex: 1,
