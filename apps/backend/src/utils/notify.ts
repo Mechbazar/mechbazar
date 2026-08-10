@@ -90,6 +90,7 @@ const TRANSACTIONAL_TYPES = new Set<string>([
   'ADMIN_NEW_ORDER',
   'ADMIN_NEW_CUSTOMER',
   'ADMIN_VENDOR_PENDING',
+  'VENDOR_NEW_ORDER',
 ]);
 
 // The rest of the catalog, mapped to the preference column that gates it.
@@ -167,6 +168,7 @@ const DISPLAY_CATEGORY_BY_TYPE: Record<string, NotificationDisplayCategory> = {
   ADMIN_NEW_CUSTOMER: 'ACCOUNT',
   ADMIN_VENDOR_PENDING: 'VENDOR_UPDATES',
   ORDER_STATUS: 'ORDERS',
+  VENDOR_NEW_ORDER: 'ORDERS',
 };
 
 export function classifyNotificationDisplayCategory(type: string | null): NotificationDisplayCategory {

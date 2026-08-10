@@ -512,6 +512,29 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       { type: 'ADMIN_NEW_ORDER', socketOnly: true }
     );
 
+    // A vendor previously had no way to learn about a new order except by
+    // having their Orders screen open and waiting for its own poll (vendor
+    // web) or manually pulling to refresh (seller-mobile) -- neither app
+    // holds a live socket connection, unlike the admin ping above. Not
+    // socketOnly: unlike the admin feed, this is the vendor's only signal
+    // that they have something to fulfill, so it must persist + push.
+    const orderedVendorIds = [...new Set(newOrder.items.map((item) => item.product.vendorId))];
+    prisma.vendor
+      .findMany({ where: { id: { in: orderedVendorIds } }, select: { userId: true } })
+      .then((vendors) => {
+        const vendorUserIds = [...new Set(vendors.map((v) => v.userId))];
+        for (const vendorUserId of vendorUserIds) {
+          notifyUser(
+            vendorUserId,
+            'New order received',
+            `You have a new order #${newOrder.id.slice(0, 8)} to fulfill.`,
+            { orderId: newOrder.id },
+            { type: 'VENDOR_NEW_ORDER' }
+          );
+        }
+      })
+      .catch((err) => console.error('Failed to notify vendor(s) of new order:', err));
+
     res.status(201).json({
       message: 'Order placed successfully',
       order: newOrder
