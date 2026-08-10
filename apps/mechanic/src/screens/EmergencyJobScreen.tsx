@@ -65,7 +65,7 @@ export const EmergencyJobScreen = () => {
         if (!ok) Alert.alert('Location permission needed', 'Enable location access so the customer can track you.');
       });
     } else {
-      stopTracking();
+      stopTracking(bookingId);
     }
   }, [job?.status, bookingId]);
 

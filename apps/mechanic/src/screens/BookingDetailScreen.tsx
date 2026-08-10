@@ -6,6 +6,12 @@ import * as ImagePicker from 'expo-image-picker';
 import { colors, Typography, Card, Button, Input, Loader, technicianService } from '@mechbazar/shared';
 import { Phone, Navigation as NavigationIcon, Camera, MessageCircle, Clock } from 'lucide-react-native';
 import { formatINR } from '../utils/currency';
+import { startTracking, stopTracking } from '../services/jobLocation';
+
+// Statuses in which the customer's tracking screen expects a live mechanic
+// position -- mirrors LIVE_TRACKING_STATUSES in the backend's
+// services/jobState.ts and EmergencyJobScreen's identical LIVE_STATUSES.
+const LIVE_STATUSES = new Set(['MECHANIC_ACCEPTED', 'MECHANIC_ON_THE_WAY', 'ARRIVED', 'WORK_STARTED']);
 
 // Backend flow: MECHANIC_ASSIGNED -> (Accept/Reject, within a countdown --
 // see AssignmentCountdown below) -> MECHANIC_ACCEPTED -> MECHANIC_ON_THE_WAY
@@ -68,6 +74,25 @@ export const BookingDetailScreen = () => {
     queryClient.invalidateQueries({ queryKey: ['technician-booking', bookingId] });
     queryClient.invalidateQueries({ queryKey: ['technician-bookings'] });
   };
+
+  // Background GPS runs for exactly as long as this booking is in a
+  // live-tracking status -- same pipeline (jobLocation.ts -> the backend's
+  // ingestPings) EmergencyJobScreen already uses, just never wired up here.
+  // Without this, the customer's ServiceTrackingScreen had nothing to show
+  // for a regular (non-emergency) booking except whatever the coarse
+  // "while online, on the mechanic's Home tab" ping in services/location.ts
+  // last happened to write -- which stops updating the moment the mechanic
+  // navigates here to actually work the job.
+  useEffect(() => {
+    if (!booking) return;
+    if (LIVE_STATUSES.has(booking.status)) {
+      startTracking(bookingId).then((ok) => {
+        if (!ok) Alert.alert('Location permission needed', 'Enable location access so the customer can track you.');
+      });
+    } else {
+      stopTracking(bookingId);
+    }
+  }, [booking?.status, bookingId]);
 
   const statusMutation = useMutation({
     mutationFn: ({ status, otp }: { status: string; otp?: string }) => technicianService.updateBookingStatus(bookingId, status, otp ? { otp } : undefined),

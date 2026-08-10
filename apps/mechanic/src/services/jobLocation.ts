@@ -2,7 +2,9 @@ import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { jobService, getSocket, CLIENT_EVENTS } from '@mechbazar/shared';
 
-// Live GPS sharing for an active emergency job.
+// Live GPS sharing for an active job -- emergency or a regular scheduled
+// booking, the backend ingestion pipeline (tracking.service.ts's ingestPings)
+// doesn't distinguish between them, it just checks the booking's own status.
 //
 // Requirement: share GPS every 3-5s while an active job exists, stop
 // automatically on completion, survive backgrounding, and recover from an
@@ -18,10 +20,20 @@ import { jobService, getSocket, CLIENT_EVENTS } from '@mechbazar/shared';
 //    the buffer; the next successful flush sends everything that queued up,
 //    so a tunnel or a dead signal produces a gap-filled trail on reconnect
 //    instead of silently losing minutes of track.
-//  * `stopTracking()` is called from exactly one place: the job-status effect
-//    in EmergencyJobScreen, keyed off LIVE_TRACKING_STATUSES. There is no
-//    separate "stop on complete" special case to forget -- leaving that
-//    status set is what stops it, for every terminal status uniformly.
+//  * `stopTracking()` is called from the job-status effect in both
+//    EmergencyJobScreen and BookingDetailScreen, keyed off each one's own
+//    live-tracking status set. There is no separate "stop on complete"
+//    special case to forget -- leaving that status set is what stops it, for
+//    every terminal status uniformly. Since a mechanic can only ever have one
+//    job in a live-tracking status at a time (the backend refuses to assign a
+//    second one while the first is still active -- see
+//    TECHNICIAN_ACTIVE_STATUSES), only one of these screens is ever actually
+//    tracking at once -- but a mechanic can still simply be *viewing* an
+//    unrelated (e.g. completed) booking's detail screen while a different job
+//    is genuinely live elsewhere, so `stopTracking` takes the caller's own
+//    bookingId and is a no-op unless it matches what's actually being
+//    tracked -- otherwise that unrelated screen would kill real tracking out
+//    from under the live job the instant it's viewed.
 
 const TASK_NAME = 'mechbazar-job-location-task';
 const FLUSH_INTERVAL_MS = 4000; // matches TRACKING_PING_INTERVAL_SECONDS default
@@ -132,9 +144,19 @@ export async function startTracking(bookingId: string): Promise<boolean> {
   return true;
 }
 
-/** Stops sharing GPS. Flushes any buffered fixes first so the last few seconds aren't lost. */
-export async function stopTracking(): Promise<void> {
+/**
+ * Stops sharing GPS. Flushes any buffered fixes first so the last few seconds
+ * aren't lost.
+ *
+ * `forBookingId`, if given, scopes the call: it only stops tracking if that
+ * booking is the one actually being tracked, and is a no-op otherwise. Every
+ * caller should pass its own bookingId -- see the module comment above for
+ * why an unscoped stop is unsafe when more than one booking screen can be on
+ * screen (or effect-cleaned-up) at once.
+ */
+export async function stopTracking(forBookingId?: string): Promise<void> {
   if (!activeBookingId) return;
+  if (forBookingId && forBookingId !== activeBookingId) return;
   const bookingId = activeBookingId;
 
   if (flushTimer) { clearInterval(flushTimer); flushTimer = null; }
