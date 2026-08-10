@@ -1244,15 +1244,32 @@ export const deleteVendor = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    // No onDelete cascade exists in the schema. The sales guard above means
-    // none of this vendor's products have ever been ordered, but they can
-    // still carry unsold-product footprint -- wishlists, warehouse
-    // inventory (and that inventory's own stock-movement ledger), stock
-    // transfers, purchase order lines -- every one of which has to be
-    // cleared before the products (and then the vendor, then the user) can
-    // be deleted, or the final delete throws an opaque FK-violation 500.
-    // Mirrors deleteTechnician's identical reasoning for its own userId
-    // cleanup below.
+    // Every account is a single identity that can carry multiple roles --
+    // this vendor's own User row is implicitly a CUSTOMER too, and may have
+    // placed orders of their own with no connection to their vendor
+    // products (soldCount above only counts orders *of this vendor's
+    // products*, not orders *placed by* this person). Without this guard,
+    // Address.deleteMany below throws an opaque FK-violation 500 the moment
+    // one of those orders references one of their addresses (Order.userId
+    // would also block the final User delete even if it didn't) -- found
+    // live 2026-08-10 trying to delete a test vendor account that had placed
+    // one order as a customer.
+    const ownOrderCount = await prisma.order.count({ where: { userId: vendor.userId } });
+    if (ownOrderCount > 0) {
+      res.status(400).json({ error: 'Cannot delete a vendor whose account has its own order history. Disable them instead.' });
+      return;
+    }
+
+    // No onDelete cascade exists in the schema. The guards above mean
+    // none of this vendor's products have ever been ordered and this
+    // account has no order history of its own, but they can still carry
+    // unsold-product footprint -- wishlists, warehouse inventory (and that
+    // inventory's own stock-movement ledger), stock transfers, purchase
+    // order lines -- every one of which has to be cleared before the
+    // products (and then the vendor, then the user) can be deleted, or the
+    // final delete throws an opaque FK-violation 500. Mirrors
+    // deleteTechnician's identical reasoning for its own userId cleanup
+    // below.
     await prisma.$transaction([
       prisma.stockMovement.deleteMany({ where: { inventory: { product: { vendorId: id } } } }),
       prisma.inventory.deleteMany({ where: { product: { vendorId: id } } }),
