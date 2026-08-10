@@ -1026,6 +1026,22 @@ export const deleteTechnician = async (req: Request, res: Response): Promise<voi
       return;
     }
 
+    // Every account is a single identity that can carry multiple roles --
+    // this technician's own User row is implicitly a CUSTOMER too, and may
+    // have placed product orders of their own with no connection to their
+    // technician work (bookingCount above only counts service bookings they
+    // were assigned, not orders they placed as a shopper). Without this
+    // guard, Address.deleteMany below throws an opaque FK-violation 500 the
+    // moment one of those orders references one of their addresses
+    // (Order.userId would also block the final User delete even if it
+    // hadn't) -- same bug found and fixed in vendor.controller.ts's
+    // deleteVendor 2026-08-10, mirrored here.
+    const ownOrderCount = await prisma.order.count({ where: { userId: technician.userId } });
+    if (ownOrderCount > 0) {
+      res.status(400).json({ error: 'Cannot delete a technician whose account has its own order history. Suspend or block them instead.' });
+      return;
+    }
+
     // No onDelete cascade exists in the schema, so any other table referencing
     // this technician's userId (not just the technician-specific tables
     // above) must be cleaned up first, or prisma.user.delete throws an opaque
