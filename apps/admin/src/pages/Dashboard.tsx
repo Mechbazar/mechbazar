@@ -444,8 +444,8 @@ export default function Dashboard() {
             </Card>
           </motion.div>
 
-          {/* Widgets grid: Pending Orders / Inventory Alerts / Pending Approvals / Top Vendors */}
-          <motion.div variants={staggerItem} className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
+          {/* Widgets grid: Pending Orders / Inventory Alerts / Pending Approvals / Top Vendors / Customer Insights / Service Bookings Overview */}
+          <motion.div variants={staggerItem} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 items-start">
             <Card padding="md" className="flex flex-col">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-content-primary">Pending Orders</h3>
@@ -533,10 +533,7 @@ export default function Dashboard() {
                 </div>
               )}
             </Card>
-          </motion.div>
 
-          {/* Customer Insights + Service Bookings heatmap */}
-          <motion.div variants={staggerItem} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card padding="md">
               <h3 className="text-sm font-bold text-content-primary mb-4">Customer Insights</h3>
               <div className="grid grid-cols-2 gap-5">
