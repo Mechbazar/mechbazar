@@ -1,8 +1,12 @@
 import { Request, Response } from 'express';
 import prisma from '../config/prisma';
+import { AuthRequest } from '../middlewares/auth';
+import { Role } from '@prisma/client';
 import { normalizeVehicleType, parseVehicleTypeFilter } from '../utils/vehicleType';
 
-export const getCategories = async (req: Request, res: Response) => {
+const ADMIN_CATEGORY_ROLES: string[] = [Role.ADMIN, Role.SUPER_ADMIN, Role.OPERATIONS_MANAGER];
+
+export const getCategories = async (req: AuthRequest, res: Response) => {
   try {
     const { vehicleType, vehicle_type } = req.query;
     const rawVehicleType = vehicleType || vehicle_type;
@@ -12,9 +16,18 @@ export const getCategories = async (req: Request, res: Response) => {
       return;
     }
 
+    // Public/customer/vendor callers only ever see Active categories -- the
+    // admin panel's "Inactive (Hidden)" status option previously did nothing
+    // at all, since this query never filtered on status and every consumer
+    // (mobile app, vendor product-creation picker) shared this same public
+    // endpoint. Admins keep seeing every status so the Categories page can
+    // still manage (and re-activate) hidden ones.
+    const isAdminCaller = !!req.user && ADMIN_CATEGORY_ROLES.includes(req.user.role);
+
     const categories = await prisma.category.findMany({
       where: {
         ...(resolvedVehicleType && { vehicleType: resolvedVehicleType }),
+        ...(!isAdminCaller && { status: 'Active' }),
       },
       include: {
         _count: { select: { products: true } }

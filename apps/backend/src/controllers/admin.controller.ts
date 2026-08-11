@@ -553,7 +553,13 @@ export const getNotificationAnalytics = async (req: Request, res: Response) => {
       clicked,
       failed,
       deliveryRate: sent ? Math.round((delivered / sent) * 1000) / 10 : 0,
-      ctr: delivered ? Math.round((clicked / delivered) * 1000) / 10 : 0,
+      // Denominator is `sent`, not `delivered`: clickedAt is also set by an
+      // in-app tap (markNotificationRead), which needs no successful push
+      // delivery at all -- a customer can open the app and tap a notification
+      // whose push send never landed. Since every clicked row is necessarily
+      // one of the sent rows, `sent` is the only denominator this ratio can't
+      // exceed; `delivered` let it read past 100% (e.g. 191.7% observed live).
+      ctr: sent ? Math.round((clicked / sent) * 1000) / 10 : 0,
       byCategory,
     });
   } catch (error) {
