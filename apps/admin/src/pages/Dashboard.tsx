@@ -553,9 +553,9 @@ export default function Dashboard() {
 
             <Card padding="md" className="xl:col-span-3">
               <h3 className="text-sm font-bold text-content-primary mb-4">Service Bookings Overview</h3>
-              <div className="flex gap-3">
+              <div className="flex gap-3 xl:max-w-xl">
                 <div className="flex-1 overflow-x-auto">
-                  <div className="grid grid-cols-7 gap-1.5 min-w-[16rem] xl:max-w-xl">
+                  <div className="grid grid-cols-7 gap-1.5 min-w-[16rem]">
                     {WEEKDAY_LABELS.map((d) => (
                       <span key={d} className="text-center text-[10px] font-semibold text-content-muted">{d}</span>
                     ))}
