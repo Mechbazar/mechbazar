@@ -19,7 +19,6 @@ const router = Router();
 const admins = [Role.ADMIN, Role.SUPER_ADMIN, Role.CUSTOMER_SUPPORT];
 
 router.get('/', authenticate, authorize(admins), getCustomers);
-router.patch('/:id', authenticate, authorize(admins), updateCustomer);
 
 // Self-service, any authenticated role -- not admin-gated like the routes above.
 router.get('/notifications', authenticate, getMyNotifications);
@@ -57,8 +56,11 @@ router.post('/me/vehicles', authenticate, createMyVehicle);
 router.put('/me/vehicles/:id', authenticate, updateMyVehicle);
 router.delete('/me/vehicles/:id', authenticate, deleteMyVehicle);
 
-// Registered last so the literal '/notifications' and '/me/...' paths above are
-// matched before these catch-all id params.
+// Registered last so the literal '/notifications', '/notification-preferences'
+// and '/me/...' paths above are matched before these catch-all id params --
+// Express matches a single-segment ':id' against ANY single-segment path, so
+// a catch-all registered earlier silently swallows a same-depth literal route
+// registered after it.
 //
 // DELETE '/:id' in particular MUST stay below DELETE '/me': it used to sit at
 // the top of this file, where it swallowed DELETE /customers/me as id="me" and
@@ -67,6 +69,15 @@ router.delete('/me/vehicles/:id', authenticate, deleteMyVehicle);
 // the self-service account deletion required by Google Play's data deletion
 // policy and Apple Guideline 5.1.1(v) unreachable in production.
 router.get('/:id', authenticate, authorize(admins), getCustomerById);
+// PATCH '/:id' has the identical bug: it used to sit at the top of this file
+// (right after GET '/'), where it swallowed every PATCH /customers/notification-
+// preferences call as id="notification-preferences" -- an admin/support caller
+// (the only roles that pass this route's authorize() gate) got a bare 500
+// "Failed to update customer" from prisma.user.update() failing on a
+// nonexistent id, while every other role got 403 first. The real handler
+// (updateMyNotificationPreferences, registered above) was never reached by
+// anyone. Found live 2026-08-10.
+router.patch('/:id', authenticate, authorize(admins), updateCustomer);
 // Deleting another user's account is destructive, so unlike the read/approve
 // routes above it is not open to CUSTOMER_SUPPORT.
 router.delete('/:id', authenticate, authorize([Role.ADMIN, Role.SUPER_ADMIN]), deleteCustomer);
