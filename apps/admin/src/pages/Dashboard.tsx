@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import {
   Plus, Store, Wrench, Tag, PackageSearch, Megaphone, Target, ChevronDown,
-  Calendar, FileText, Radio, Package, AlertTriangle,
+  Calendar, FileText, Radio, Package, AlertTriangle, CheckCircle2,
 } from 'lucide-react';
 import type { RootState } from '../store';
 import { API_URL } from '../config/api';
@@ -445,8 +445,8 @@ export default function Dashboard() {
           </motion.div>
 
           {/* Widgets grid: Pending Orders / Inventory Alerts / Pending Approvals / Top Vendors */}
-          <motion.div variants={staggerItem} className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <Card padding="md">
+          <motion.div variants={staggerItem} className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-stretch">
+            <Card padding="md" className="flex h-full flex-col">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-content-primary">Pending Orders</h3>
                 <button onClick={() => navigate('/orders')} className="text-xs font-semibold text-brand-primary hover:text-brand-accent transition-colors">View All</button>
@@ -466,13 +466,18 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            <Card padding="md">
+            <Card padding="md" className="flex h-full flex-col">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-content-primary">Inventory Alerts</h3>
                 <button onClick={() => navigate('/inventory')} className="text-xs font-semibold text-brand-primary hover:text-brand-accent transition-colors">View All</button>
               </div>
               {lowStockItems.length === 0 ? (
-                <p className="text-xs text-content-muted">All stock levels healthy.</p>
+                <div className="flex flex-1 flex-col items-center justify-center gap-2.5 py-2 text-center">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-success-500/10 text-success-600 dark:text-success-400">
+                    <CheckCircle2 size={16} />
+                  </span>
+                  <p className="text-xs text-content-muted">All stock levels healthy.</p>
+                </div>
               ) : (
                 <div className="space-y-2.5">
                   {lowStockItems.map((inv) => (
@@ -488,7 +493,7 @@ export default function Dashboard() {
               )}
             </Card>
 
-            <Card padding="md">
+            <Card padding="md" className="flex h-full flex-col">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-content-primary">Pending Approvals</h3>
                 <button onClick={() => navigate('/vendors?status=UNDER_VERIFICATION')} className="text-xs font-semibold text-brand-primary hover:text-brand-accent transition-colors">View All</button>
@@ -507,13 +512,15 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            <Card padding="md">
+            <Card padding="md" className="flex h-full flex-col">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-content-primary">Top Vendors</h3>
                 <button onClick={() => navigate('/vendors')} className="text-xs font-semibold text-brand-primary hover:text-brand-accent transition-colors">View All</button>
               </div>
               {leaderboard.length === 0 ? (
-                <p className="text-xs text-content-muted">No vendor sales in the last 30 days.</p>
+                <div className="flex flex-1 items-center justify-center py-2 text-center">
+                  <p className="text-xs text-content-muted">No vendor sales in the last 30 days.</p>
+                </div>
               ) : (
                 <div className="space-y-2.5">
                   {leaderboard.map((v, i) => (
