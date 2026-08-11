@@ -534,9 +534,9 @@ export default function Dashboard() {
               )}
             </Card>
 
-            <Card padding="md">
+            <Card padding="md" className="xl:col-span-2">
               <h3 className="text-sm font-bold text-content-primary mb-4">Customer Insights</h3>
-              <div className="grid grid-cols-2 gap-5">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
                 {[
                   { label: 'New Customers (30d)', value: newCustomers30d.toLocaleString('en-IN') },
                   { label: 'Avg. Order Value', value: `₹${avgOrderValue30d.toLocaleString('en-IN')}` },
@@ -551,11 +551,11 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            <Card padding="md">
+            <Card padding="md" className="xl:col-span-3">
               <h3 className="text-sm font-bold text-content-primary mb-4">Service Bookings Overview</h3>
               <div className="flex gap-3">
                 <div className="flex-1 overflow-x-auto">
-                  <div className="grid grid-cols-7 gap-1.5 min-w-[16rem]">
+                  <div className="grid grid-cols-7 gap-1.5 min-w-[16rem] xl:max-w-xl">
                     {WEEKDAY_LABELS.map((d) => (
                       <span key={d} className="text-center text-[10px] font-semibold text-content-muted">{d}</span>
                     ))}
