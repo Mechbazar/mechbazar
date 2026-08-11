@@ -286,7 +286,7 @@ export default function Dashboard() {
   }, [bookingsSeries]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-6 max-w-[1600px] mx-auto">
+    <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="space-y-6 max-w-[2000px] mx-auto">
       {/* Hero */}
       <motion.div variants={staggerItem}>
         <Card variant="glass" padding="lg" className="relative overflow-hidden">
