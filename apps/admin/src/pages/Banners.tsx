@@ -9,6 +9,21 @@ import { Button, Card, Badge, Modal, Input, Select, Checkbox, Loader, EmptyState
 import { API_URL } from '../config/api';
 import { fadeInUp } from '../utils/motion';
 
+function BannerImage({ src, alt }: { src: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
+    return <div className="flex items-center justify-center h-full text-content-muted">No Image</div>;
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 export default function Banners() {
   const { token } = useSelector((state: RootState) => state.auth);
   const [banners, setBanners] = useState<any[]>([]);
@@ -129,11 +144,7 @@ export default function Banners() {
           {banners.map((banner) => (
             <Card key={banner.id} padding="none" className="overflow-hidden group">
               <div className="h-48 relative overflow-hidden bg-surface-sunken">
-                {banner.image ? (
-                  <img src={banner.image} alt={banner.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                ) : (
-                  <div className="flex items-center justify-center h-full text-content-muted">No Image</div>
-                )}
+                <BannerImage src={banner.image} alt={banner.title} />
                 <div className="absolute top-2 right-2 flex gap-2">
                   <button onClick={() => handleOpenModal(banner)} className="p-2 bg-surface-overlay/90 rounded-lg text-brand-primary hover:bg-surface-hover backdrop-blur-sm transition-colors">
                     <Edit className="w-4 h-4" />
