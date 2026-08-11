@@ -445,8 +445,8 @@ export default function Dashboard() {
           </motion.div>
 
           {/* Widgets grid: Pending Orders / Inventory Alerts / Pending Approvals / Top Vendors */}
-          <motion.div variants={staggerItem} className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-stretch">
-            <Card padding="md" className="flex h-full flex-col">
+          <motion.div variants={staggerItem} className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
+            <Card padding="md" className="flex flex-col">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-content-primary">Pending Orders</h3>
                 <button onClick={() => navigate('/orders')} className="text-xs font-semibold text-brand-primary hover:text-brand-accent transition-colors">View All</button>
@@ -466,7 +466,7 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            <Card padding="md" className="flex h-full flex-col">
+            <Card padding="md" className="flex flex-col">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-content-primary">Inventory Alerts</h3>
                 <button onClick={() => navigate('/inventory')} className="text-xs font-semibold text-brand-primary hover:text-brand-accent transition-colors">View All</button>
@@ -493,7 +493,7 @@ export default function Dashboard() {
               )}
             </Card>
 
-            <Card padding="md" className="flex h-full flex-col">
+            <Card padding="md" className="flex flex-col">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-content-primary">Pending Approvals</h3>
                 <button onClick={() => navigate('/vendors?status=UNDER_VERIFICATION')} className="text-xs font-semibold text-brand-primary hover:text-brand-accent transition-colors">View All</button>
@@ -512,7 +512,7 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            <Card padding="md" className="flex h-full flex-col">
+            <Card padding="md" className="flex flex-col">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-content-primary">Top Vendors</h3>
                 <button onClick={() => navigate('/vendors')} className="text-xs font-semibold text-brand-primary hover:text-brand-accent transition-colors">View All</button>
