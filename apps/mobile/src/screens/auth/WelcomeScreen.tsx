@@ -817,11 +817,22 @@ export default function WelcomeScreen() {
   // -- Platform.OS is never 'web' there, and consumePendingRedirect is never
   // populated anyway since only App.web.tsx's RequireAuth guard (which native
   // never bundles) calls setPendingRedirect. Returns true if it navigated.
+  //
+  // Falls back to Home when there's no pending redirect -- guest-first mode
+  // means a user can reach this screen (a bare header "Login / Register"
+  // click, a direct/refreshed URL, browser back/forward, ...) without ever
+  // going through a flow that sets one. Without this fallback a successful
+  // login just silently reset the form back to the phone-number step with no
+  // navigation at all -- indistinguishable from a failed login even though
+  // the user was actually authenticated.
   const redirectAfterLogin = () => {
     if (Platform.OS !== 'web') return false;
     const pending = consumePendingRedirect();
-    if (!pending) return false;
-    navigation.navigate(pending.screen, pending.params);
+    if (pending) {
+      navigation.navigate(pending.screen, pending.params);
+    } else {
+      navigation.navigate('MainTabs', { screen: 'Home' });
+    }
     return true;
   };
 
