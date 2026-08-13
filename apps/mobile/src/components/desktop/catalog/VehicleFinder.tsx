@@ -168,6 +168,15 @@ const styles = StyleSheet.create({
     borderColor: colors.borderLight,
     padding: spacing.lg,
     marginBottom: spacing.lg,
+    // react-native-web gives every View an implicit `z-index: 0` (not CSS's
+    // `auto`), which makes `position: relative` + that 0 create a real
+    // stacking context. Without this, this card and the later `layout` row
+    // below it (FilterSidebar + product grid) are two same-level (0)
+    // contexts that paint in DOM order -- trapping the open dropdown's own
+    // zIndex:20 inside this card's context, so it renders *behind*
+    // FilterSidebar's content instead of above it. A higher zIndex here
+    // lets this whole card's stacking context win regardless of DOM order.
+    zIndex: 2,
   },
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing.md },
   title: { fontSize: 15, fontWeight: '700', color: colors.textDark },
@@ -179,7 +188,11 @@ const styles = StyleSheet.create({
   typeBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   typeBtnText: { fontSize: 12, fontWeight: '700', color: colors.textMuted },
   typeBtnTextActive: { color: colors.white },
-  fieldsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  // Same implicit-zIndex:0 stacking-context issue as `card` above, one level
+  // down: without this, `actions` (the Find Parts/Clear buttons row right
+  // below) is a later DOM sibling at the same default z-index and paints over
+  // an open dropdown's overflow instead of under it.
+  fieldsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, zIndex: 1 },
   field: { flexGrow: 1, minWidth: 160, zIndex: 1 },
   fieldLabel: { fontSize: 11, fontWeight: '700', color: colors.textMuted, marginBottom: 4, textTransform: 'uppercase' },
   trigger: {
