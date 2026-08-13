@@ -7,7 +7,7 @@ import { verifyOtpAndResolvePhone, OtpVerificationError } from '../utils/otp';
 import { generateToken } from '../utils/jwt';
 import { notifyUser } from '../utils/notify';
 import { registerPushDevice, removePushDeviceByToken } from '../utils/pushDevice';
-import { sanitizeUser, sanitizeUsers, sanitizeOrders, stripDeliveryOtps } from '../utils/sanitizeUser';
+import { sanitizeUser, sanitizeUsers, stripDeliveryOtps } from '../utils/sanitizeUser';
 import { recordAuditLog } from '../utils/auditLog';
 import prisma from '../config/prisma';
 
@@ -111,7 +111,7 @@ export const createRider = async (req: Request, res: Response): Promise<void> =>
         include: { deliveryProfile: true },
       });
 
-      res.status(201).json(rider);
+      res.status(201).json(sanitizeUser(rider));
       return;
     }
 
@@ -144,7 +144,7 @@ export const createRider = async (req: Request, res: Response): Promise<void> =>
       }
     });
 
-    res.status(201).json(rider);
+    res.status(201).json(sanitizeUser(rider));
   } catch (error) {
     console.error('Error creating rider:', error);
     if (
@@ -748,14 +748,21 @@ export const getMyDeliveries = async (req: AuthRequest, res: Response): Promise<
         items: { include: { product: true } },
         address: true,
         payment: true,
-        user: true,
+        // Scoped to what the rider app actually displays (contact name +
+        // phone -- see DeliveryDetailScreen.tsx) rather than the full User
+        // row -- the old `include: { user: true }` + sanitizeOrders() only
+        // ever stripped password/firebaseUid, so email, wallet balance,
+        // GST/business fields, and push tokens were all reaching the rider
+        // unnecessarily (VMR-10 fix). sanitizeOrders is no longer needed here
+        // since this select never includes password/firebaseUid to strip.
+        user: { select: { id: true, name: true, phone: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
     // Never let the rider read the code directly off their own delivery list
     // -- it must come from the customer reading it aloud, or the OTP step is
     // pointless.
-    res.status(200).json(stripDeliveryOtps(sanitizeOrders(orders)));
+    res.status(200).json(stripDeliveryOtps(orders));
   } catch (error) {
     console.error('Error fetching own deliveries:', error);
     res.status(500).json({ error: 'Failed to fetch deliveries' });
