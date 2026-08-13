@@ -1,6 +1,6 @@
 import prisma from '../config/prisma';
 import { env } from '../config/env';
-import { sweepExpiredAssignments } from '../services/dispatch.service';
+import { sweepExpiredAssignments, sweepUnassignedBookings } from '../services/dispatch.service';
 import { sweepExpiredOtps } from '../services/jobOtp.service';
 import { sweepOldPings } from '../services/tracking.service';
 import { reconcileStalePendingPayments } from '../services/payment.service';
@@ -43,6 +43,10 @@ const SETTLEMENT_GENERATION_SWEEP_MS = 60 * 60_000;
 // minute of slop is unnoticeable, and it's a cheap indexed query
 // (status/sendAt) unless something is actually due.
 const SCHEDULED_NOTIFICATION_SWEEP_MS = 60_000;
+// UNASSIGNED BOOKING AUTO-CANCEL (60s) -- the threshold itself is 15
+// minutes, so a minute of slop in catching it is unnoticeable, same
+// reasoning as the scheduled-notification sweep above.
+const UNASSIGNED_BOOKING_SWEEP_MS = 60_000;
 // DELIVERY RETRY (5m) -- rides out a transient Expo/FCM outage; not
 // latency-sensitive (push delivery already isn't instant), and each retried
 // notification makes its own HTTP call to Expo/FCM, so this stays
@@ -157,8 +161,15 @@ export function startSweepers(): void {
     }
   });
 
+  schedule('unassigned-booking-cancel', UNASSIGNED_BOOKING_SWEEP_MS, async () => {
+    const { cancelled } = await sweepUnassignedBookings();
+    if (cancelled) {
+      console.log(`[sweeper] unassigned-booking-cancel: cancelled=${cancelled}`);
+    }
+  });
+
   console.log(
-    `[sweeper] started (assignment ${DISPATCH_SWEEP_MS / 1000}s, presence ${PRESENCE_SWEEP_MS / 1000}s, retention ${RETENTION_SWEEP_MS / 60000}m, payment-reconcile ${PAYMENT_RECONCILE_SWEEP_MS / 60000}m, settlement-generation ${SETTLEMENT_GENERATION_SWEEP_MS / 60000}m, scheduled-notifications ${SCHEDULED_NOTIFICATION_SWEEP_MS / 1000}s, delivery-retry ${DELIVERY_RETRY_SWEEP_MS / 60000}m)`
+    `[sweeper] started (assignment ${DISPATCH_SWEEP_MS / 1000}s, presence ${PRESENCE_SWEEP_MS / 1000}s, retention ${RETENTION_SWEEP_MS / 60000}m, payment-reconcile ${PAYMENT_RECONCILE_SWEEP_MS / 60000}m, settlement-generation ${SETTLEMENT_GENERATION_SWEEP_MS / 60000}m, scheduled-notifications ${SCHEDULED_NOTIFICATION_SWEEP_MS / 1000}s, delivery-retry ${DELIVERY_RETRY_SWEEP_MS / 60000}m, unassigned-booking-cancel ${UNASSIGNED_BOOKING_SWEEP_MS / 1000}s)`
   );
 }
 

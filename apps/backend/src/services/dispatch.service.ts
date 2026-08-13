@@ -331,3 +331,57 @@ export async function sweepExpiredAssignments(): Promise<{ expired: number }> {
 
   return { expired };
 }
+
+// A scheduled booking still sitting in PENDING_ADMIN_ASSIGNMENT this long
+// means no admin has picked a mechanic at all yet -- the UI's own copy
+// ("Usually assigned within 10-15 minutes") sets the customer's expectation,
+// so 15 minutes past that is a real SLA miss, not routine variance. Rather
+// than leave the customer staring at a spinner indefinitely, the booking is
+// cancelled and they're told to try again, same as if they'd tapped Cancel
+// themselves (identical transaction shape to service.controller.ts's
+// cancelBooking, just system-initiated). Emergency jobs are excluded --
+// they need faster human dispatch attention than a 15-minute window
+// implies, and auto-cancelling a breakdown request with no fallback offered
+// is a worse outcome than leaving it queued.
+const AUTO_CANCEL_UNASSIGNED_MS = 15 * 60_000;
+
+export async function sweepUnassignedBookings(): Promise<{ cancelled: number }> {
+  const cutoff = new Date(Date.now() - AUTO_CANCEL_UNASSIGNED_MS);
+  const stale = await prisma.serviceBooking.findMany({
+    where: { status: 'PENDING_ADMIN_ASSIGNMENT', isEmergency: false, createdAt: { lt: cutoff } },
+    select: { id: true, bookingNumber: true, userId: true },
+    take: 200,
+  });
+
+  let cancelled = 0;
+  for (const job of stale) {
+    try {
+      const reason = 'No mechanic was assigned within 15 minutes';
+      await prisma.$transaction(async (tx) => {
+        await tx.serviceBooking.update({
+          where: { id: job.id },
+          data: { status: 'CANCELLED', cancelReason: reason },
+        });
+        await tx.bookingStatusHistory.create({
+          data: { bookingId: job.id, status: 'CANCELLED', note: `Auto-cancelled: ${reason.toLowerCase()}` },
+        });
+      });
+      cancelled += 1;
+      await notifyUser(
+        job.userId,
+        'Booking cancelled',
+        `We couldn't assign a mechanic to booking #${job.bookingNumber} in time, so it was cancelled. Please book again and we'll get right on it.`,
+        { bookingId: job.id }
+      );
+      await notifyAdmins(
+        'Booking auto-cancelled',
+        `Booking #${job.bookingNumber} was auto-cancelled -- no mechanic was assigned within 15 minutes.`,
+        { bookingId: job.id }
+      );
+    } catch (err) {
+      console.error(`[dispatch] sweepUnassignedBookings failed for ${job.id}:`, err);
+    }
+  }
+
+  return { cancelled };
+}
