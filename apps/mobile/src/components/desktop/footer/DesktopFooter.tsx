@@ -82,13 +82,11 @@ function FooterLink({ label, onPress, token, dense }: { label: string; onPress: 
       accessibilityRole="link"
       accessibilityLabel={label}
       onPress={() => (isVendorLinkForLoggedIn ? Linking.openURL('https://vendor.mechbazar.com') : onPress(navigation))}
-      style={({ hovered, focused }: any) => [
-        styles.linkRow,
-        dense && styles.linkRowDense,
-        (hovered || focused) && styles.linkRowActive,
-      ]}
+      style={[styles.linkRow, dense && styles.linkRowDense]}
     >
-      <Text style={styles.linkText}>{label}</Text>
+      {({ hovered, focused }: any) => (
+        <Text style={[styles.linkText, (hovered || focused) && styles.linkTextActive]}>{label}</Text>
+      )}
     </Pressable>
   );
 }
@@ -171,15 +169,16 @@ function BackToTopBar() {
   };
 
   return (
-    <Pressable
-      ref={nodeRef}
-      onPress={handlePress}
-      accessibilityRole="button"
-      accessibilityLabel="Back to top"
-      style={({ hovered, focused }: any) => [styles.backToTop, (hovered || focused) && styles.backToTopActive]}
-    >
-      <Ionicons name="chevron-up-outline" size={14} color={colors.mutedOnDark} />
-      <Text style={styles.backToTopText}>Back to top</Text>
+    <Pressable ref={nodeRef} onPress={handlePress} accessibilityRole="button" accessibilityLabel="Back to top" style={styles.backToTop}>
+      {({ hovered, focused }: any) => {
+        const active = hovered || focused;
+        return (
+          <>
+            <Ionicons name="chevron-up-outline" size={13} color={active ? colors.white : colors.mutedOnDark} />
+            <Text style={[styles.backToTopText, active && styles.backToTopTextActive]}>Back to top</Text>
+          </>
+        );
+      }}
     </Pressable>
   );
 }
@@ -193,33 +192,36 @@ export default function DesktopFooter() {
     <View style={styles.footer} role="contentinfo">
       <BackToTopBar />
 
-      <Container style={styles.brandRow}>
-        {/* Dark tone: the footer is the dark brand surface, same as the header. */}
-        <Logo tone="dark" width={168} />
-        <Text style={styles.brandTagline}>
-          Genuine auto parts and trusted mechanic services, delivered to your doorstep.
-        </Text>
+      {/* Brand + nav columns share one visual section (no rule between them) --
+          only the trust row and the bottom bar get a divider above them, per
+          the "brand/nav | trust | legal" three-part structure. */}
+      <Container style={styles.footerInner}>
+        <View style={styles.brandBlock}>
+          {/* Dark tone: the footer is the dark brand surface, same as the header. */}
+          <Logo tone="dark" width={168} />
+          <Text style={styles.brandTagline}>
+            Genuine auto parts and trusted mechanic services, delivered to your doorstep.
+          </Text>
+        </View>
+
+        <View style={[styles.grid, isMobileLayout && styles.gridMobile]}>
+          <FooterColumn title="Get to Know Us" links={GET_TO_KNOW_US} token={token} collapsible={isMobileLayout} />
+          <FooterColumn title="Shop & Services" links={SHOP_AND_SERVICES} token={token} collapsible={isMobileLayout} />
+          <FooterColumn title="Partner With Us" links={PARTNER_WITH_US} token={token} collapsible={isMobileLayout} />
+          <FooterColumn title="Let Us Help You" links={LET_US_HELP_YOU} token={token} collapsible={isMobileLayout} />
+          <FooterColumn title="Policies" links={POLICIES} token={token} collapsible={isMobileLayout} />
+        </View>
       </Container>
 
       <View style={styles.divider} />
 
-      <Container style={[styles.grid, isMobileLayout && styles.gridMobile]}>
-        <FooterColumn title="Get to Know Us" links={GET_TO_KNOW_US} token={token} collapsible={isMobileLayout} />
-        <FooterColumn title="Shop & Services" links={SHOP_AND_SERVICES} token={token} collapsible={isMobileLayout} />
-        <FooterColumn title="Partner With Us" links={PARTNER_WITH_US} token={token} collapsible={isMobileLayout} />
-        <FooterColumn title="Let Us Help You" links={LET_US_HELP_YOU} token={token} collapsible={isMobileLayout} />
-        <FooterColumn title="Policies" links={POLICIES} token={token} collapsible={isMobileLayout} />
-      </Container>
-
-      <View style={styles.divider} />
-
-      <Container style={styles.trustRow}>
-        <Ionicons name="cash-outline" size={16} color={colors.mutedOnDark} />
+      <Container style={[styles.footerInner, styles.trustRow]}>
+        <Ionicons name="cash-outline" size={14} color={colors.mutedOnDark} />
         <Text style={styles.trustText}>Cash on Delivery available on every order and every service booking</Text>
       </Container>
 
       <View style={styles.bottomBar}>
-        <Container style={[styles.bottomRow, isMobileLayout && styles.bottomRowMobile]}>
+        <Container style={[styles.footerInner, styles.bottomRow, isMobileLayout && styles.bottomRowMobile]}>
           <Text style={styles.copyright}>© {new Date().getFullYear()} MechBazar. All rights reserved.</Text>
           <View style={[styles.bottomLinks, isMobileLayout && styles.bottomLinksMobile]}>
             {BOTTOM_BAR_LINKS.map(link => (
@@ -232,8 +234,20 @@ export default function DesktopFooter() {
   );
 }
 
+// A brighter secondary tone than colors.mutedOnDark (#9AA2AD) for nav links
+// specifically -- mutedOnDark already clears AA contrast on dark surfaces,
+// but reads dim at a glance; this keeps links a clear step below the white
+// headings while being easier to scan. Supporting/auxiliary text (the COD
+// line, copyright) stays on colors.mutedOnDark, one tier down from links.
+const LINK_TEXT_COLOR = '#C7CDD5';
+// Narrower than the shared Container's 1280 maxContentWidth -- the footer's
+// own columns don't need that much width, and stretching them across it is
+// what was reading as "spread across an empty black area".
+const FOOTER_MAX_WIDTH = 1120;
+
 const styles = StyleSheet.create({
   footer: { backgroundColor: colors.darkInk, marginTop: spacing.xxl },
+  footerInner: { maxWidth: FOOTER_MAX_WIDTH },
 
   backToTop: {
     width: '100%',
@@ -241,41 +255,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
-    backgroundColor: colors.steel,
+    paddingVertical: 9,
   },
-  backToTopActive: { backgroundColor: '#2E3742' },
   backToTopText: { color: colors.mutedOnDark, fontSize: 12, fontWeight: '700', letterSpacing: 0.3 },
+  backToTopTextActive: { color: colors.white },
 
-  brandRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: spacing.lg,
-    paddingVertical: spacing.xl,
+  brandBlock: {
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.lg,
   },
-  brandTagline: { color: colors.mutedOnDark, fontSize: 13, lineHeight: 20, flexShrink: 1, maxWidth: 440 },
+  brandTagline: { color: colors.mutedOnDark, fontSize: 13, lineHeight: 20, maxWidth: 440 },
 
-  divider: { height: 1, backgroundColor: colors.steel },
+  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)' },
 
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingVertical: spacing.xl,
-    gap: spacing.xl,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
+    gap: spacing.lg,
   },
-  gridMobile: { flexDirection: 'column', gap: 0, paddingVertical: 0 },
+  gridMobile: { flexDirection: 'column', gap: 0, paddingTop: 0, paddingBottom: 0 },
 
-  column: { flexGrow: 1, minWidth: 170, gap: 4 },
-  columnTitle: { color: colors.white, fontSize: 14, fontWeight: '700', letterSpacing: 0.2 },
-  columnLinks: { marginTop: 6, gap: 2 },
+  // Fixed width (not flexGrow) so columns hug their own content and sit
+  // close together with a consistent gap, instead of stretching to fill
+  // whatever room the row has.
+  column: { width: 190, gap: 4 },
+  columnTitle: { color: colors.white, fontSize: 15, fontWeight: '800', letterSpacing: 0.2 },
+  columnLinks: { marginTop: 8, gap: 3 },
 
-  linkRow: { paddingVertical: 4, paddingHorizontal: 4, marginHorizontal: -4, borderRadius: radius.sm },
-  linkRowDense: { paddingVertical: 10 },
-  linkRowActive: { backgroundColor: 'rgba(255,255,255,0.08)' },
-  linkText: { color: colors.mutedOnDark, fontSize: 13.5, lineHeight: 20 },
+  linkRow: { paddingVertical: 3, paddingHorizontal: 4, marginHorizontal: -4, borderRadius: radius.sm },
+  linkRowDense: { paddingVertical: 12 },
+  linkText: { color: LINK_TEXT_COLOR, fontSize: 13.5, lineHeight: 21 },
+  linkTextActive: { color: colors.white, textDecorationLine: 'underline', textDecorationColor: colors.primary },
 
-  mobileColumn: { borderBottomWidth: 1, borderBottomColor: colors.steel },
+  mobileColumn: { borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.08)' },
   mobileColumnHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -289,18 +305,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm + 4,
   },
   trustText: { color: colors.mutedOnDark, fontSize: 12.5, flexShrink: 1 },
 
-  bottomBar: { borderTopWidth: 1, borderTopColor: colors.steel },
+  bottomBar: { borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
   bottomRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.sm,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
   },
   bottomRowMobile: { flexDirection: 'column', alignItems: 'center', justifyContent: 'center' },
   bottomLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
