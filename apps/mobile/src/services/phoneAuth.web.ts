@@ -124,6 +124,17 @@ const resetRecaptcha = () => {
     }
     recaptchaVerifier = null;
   }
+  // RecaptchaVerifier.clear() tears down Firebase's own listeners but does
+  // not reliably un-register the underlying grecaptcha widget from the DOM
+  // node it was rendered into -- that registry is keyed by the node itself,
+  // not by the (now-discarded) Firebase wrapper object. A later render()
+  // against the SAME node (e.g. after a failed or abandoned first attempt)
+  // can still throw "reCAPTCHA has already been rendered in this element"
+  // even though recaptchaVerifier above is already null. Removing the node
+  // guarantees the next ensureRecaptchaContainer() call starts clean.
+  if (typeof document !== 'undefined') {
+    document.getElementById(RECAPTCHA_CONTAINER_ID)?.remove();
+  }
 };
 
 // Kept in lockstep with phoneAuth.ts's exported shape (SendOtpResult,
