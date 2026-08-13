@@ -123,7 +123,7 @@ export const createTechnician = async (req: Request, res: Response): Promise<voi
         include: { technicianProfile: true },
       });
 
-      res.status(201).json(technician);
+      res.status(201).json(sanitizeUser(technician));
       return;
     }
 
@@ -154,7 +154,7 @@ export const createTechnician = async (req: Request, res: Response): Promise<voi
       include: { technicianProfile: true },
     });
 
-    res.status(201).json(technician);
+    res.status(201).json(sanitizeUser(technician));
   } catch (error) {
     console.error('Error creating technician:', error);
     if (error && typeof error === 'object' && 'code' in error && (error as any).code === 'P2002') {
@@ -793,21 +793,26 @@ export const getMyEarnings = async (req: AuthRequest, res: Response): Promise<vo
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
+    // Sums CommissionRecord.netPayoutAmount -- the mechanic's actual
+    // commission-split share that creditServiceCompletion (commission.
+    // service.ts) credits to walletBalance -- rather than the full
+    // customer-paid ServiceBooking.finalAmount (VMR-07 fix; the old query
+    // overstated earnings by including the platform's share too).
     const [totalEarnedResult, todayEarnedResult] = await Promise.all([
-      prisma.serviceBooking.aggregate({
-        where: { technicianId: technician.id, status: 'COMPLETED' },
-        _sum: { finalAmount: true },
+      prisma.commissionRecord.aggregate({
+        where: { technicianId: technician.id, sourceType: 'SERVICE_BOOKING' },
+        _sum: { netPayoutAmount: true },
       }),
-      prisma.serviceBooking.aggregate({
-        where: { technicianId: technician.id, status: 'COMPLETED', updatedAt: { gte: startOfToday } },
-        _sum: { finalAmount: true },
+      prisma.commissionRecord.aggregate({
+        where: { technicianId: technician.id, sourceType: 'SERVICE_BOOKING', createdAt: { gte: startOfToday } },
+        _sum: { netPayoutAmount: true },
       }),
     ]);
 
     res.status(200).json({
       walletBalance: technician.walletBalance,
-      totalEarned: totalEarnedResult._sum.finalAmount || 0,
-      todayEarned: todayEarnedResult._sum.finalAmount || 0,
+      totalEarned: totalEarnedResult._sum.netPayoutAmount || 0,
+      todayEarned: todayEarnedResult._sum.netPayoutAmount || 0,
       bankAccounts: technician.bankAccounts,
       settlements: technician.settlements,
     });
@@ -991,15 +996,18 @@ export const getTechnicianEarnings = async (req: Request, res: Response): Promis
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
+    // Sums CommissionRecord.netPayoutAmount, matching getMyEarnings above
+    // (VMR-07 fix) -- the mechanic's actual commission-split share, not the
+    // full customer-paid ServiceBooking.finalAmount.
     const [totalEarnedResult, todayEarnedResult] = await Promise.all([
-      prisma.serviceBooking.aggregate({ where: { technicianId: id, status: 'COMPLETED' }, _sum: { finalAmount: true } }),
-      prisma.serviceBooking.aggregate({ where: { technicianId: id, status: 'COMPLETED', updatedAt: { gte: startOfToday } }, _sum: { finalAmount: true } }),
+      prisma.commissionRecord.aggregate({ where: { technicianId: id, sourceType: 'SERVICE_BOOKING' }, _sum: { netPayoutAmount: true } }),
+      prisma.commissionRecord.aggregate({ where: { technicianId: id, sourceType: 'SERVICE_BOOKING', createdAt: { gte: startOfToday } }, _sum: { netPayoutAmount: true } }),
     ]);
 
     res.status(200).json({
       walletBalance: technician.walletBalance,
-      totalEarned: totalEarnedResult._sum.finalAmount || 0,
-      todayEarned: todayEarnedResult._sum.finalAmount || 0,
+      totalEarned: totalEarnedResult._sum.netPayoutAmount || 0,
+      todayEarned: todayEarnedResult._sum.netPayoutAmount || 0,
       bankAccounts: technician.bankAccounts,
       settlements: technician.settlements,
     });
@@ -1414,8 +1422,22 @@ export const payTechnicianSalary = async (req: AuthRequest, res: Response): Prom
       return;
     }
 
-    const settlement = await prisma.technicianSettlement.create({
-      data: { technicianId, amount, status: 'PENDING', type: 'SALARY' },
+    const settlement = await prisma.$transaction(async (tx) => {
+      // Re-check for a pending settlement inside the transaction -- mirrors
+      // vendor.controller.ts's requestPayout, which narrows the window where
+      // two concurrent requests both pass the outer check above and both
+      // create a PENDING settlement (VMR-06 fix; the outer check alone ran
+      // outside any transaction with no re-check at write time, so two
+      // concurrent payout requests for the same mechanic could both succeed).
+      const stillNoPending = await tx.technicianSettlement.findFirst({
+        where: { technicianId, status: 'PENDING', type: 'SALARY' },
+      });
+      if (stillNoPending) {
+        throw new Error('DUPLICATE_PENDING_PAYOUT');
+      }
+      return tx.technicianSettlement.create({
+        data: { technicianId, amount, status: 'PENDING', type: 'SALARY' },
+      });
     });
 
     recordAuditLog({
@@ -1435,7 +1457,11 @@ export const payTechnicianSalary = async (req: AuthRequest, res: Response): Prom
     );
 
     res.status(201).json(settlement);
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === 'DUPLICATE_PENDING_PAYOUT') {
+      res.status(400).json({ error: 'A salary payout is already pending for this mechanic.' });
+      return;
+    }
     console.error('Error paying technician salary:', error);
     res.status(500).json({ error: 'Failed to initiate salary payout' });
   }
