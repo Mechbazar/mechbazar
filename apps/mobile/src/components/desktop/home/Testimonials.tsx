@@ -12,17 +12,32 @@ interface FeaturedReview {
   productName: string;
 }
 
+interface Props {
+  // The heading above this section lives in the parent (HomeScreenDesktop),
+  // which has no way to know this component's fetch came back empty --
+  // without this, "What Our Customers Say" rendered with nothing under it
+  // (UX-03 fix). Fires once the fetch settles, true only when there's at
+  // least one review to show.
+  onHasData?: (hasData: boolean) => void;
+}
+
 // Real 5-star reviews (GET /products/reviews/featured), not the illustrative
 // quotes with fabricated names/cities this section used to hardcode -- those
 // were added before a reviews API existed; one exists now (review.controller.ts).
-export default function Testimonials() {
+export default function Testimonials({ onHasData }: Props) {
   const [reviews, setReviews] = useState<FeaturedReview[]>([]);
 
   useEffect(() => {
     fetch(`${API_BASE_URL}/products/reviews/featured`)
       .then(res => (res.ok ? res.json() : []))
-      .then(setReviews)
-      .catch(() => setReviews([]));
+      .then((data: FeaturedReview[]) => {
+        setReviews(data);
+        onHasData?.(Array.isArray(data) && data.length > 0);
+      })
+      .catch(() => {
+        setReviews([]);
+        onHasData?.(false);
+      });
   }, []);
 
   if (reviews.length === 0) return null;

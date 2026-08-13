@@ -71,6 +71,10 @@ export default function HomeScreenDesktop() {
   const [bikeParts, setBikeParts] = useState<Product[]>([]);
   const [carParts, setCarParts] = useState<Product[]>([]);
   const [topVendors, setTopVendors] = useState<TopVendor[]>([]);
+  // Defaults true so the heading doesn't flash in then disappear on the
+  // common case where reviews DO exist -- Testimonials reports back once its
+  // own fetch settles (UX-03 fix, see Testimonials.tsx).
+  const [hasTestimonials, setHasTestimonials] = useState(true);
   const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ErrorKind | null>(null);
@@ -315,10 +319,12 @@ export default function HomeScreenDesktop() {
         </Container>
       )}
 
-      <Container style={styles.section}>
-        <SectionHeading>What Our Customers Say</SectionHeading>
-        <Testimonials />
-      </Container>
+      {hasTestimonials && (
+        <Container style={styles.section}>
+          <SectionHeading>What Our Customers Say</SectionHeading>
+          <Testimonials onHasData={setHasTestimonials} />
+        </Container>
+      )}
 
       <Container style={styles.section}>
         <DownloadAppSection />
