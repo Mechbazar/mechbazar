@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Image, Alert, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Image, Alert, RefreshControl, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { HeaderCartButton } from '../components/HeaderCartButton';
@@ -16,6 +16,7 @@ import CompactBookingShell from '../components/desktop/shared/CompactBookingShel
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 import { useIsDarkMode } from '../theme/useThemeColors';
 import { useTranslation } from 'react-i18next';
+import { notify, confirm } from '../utils/notify';
 
 type OrdersTab = 'products' | 'services';
 
@@ -208,42 +209,55 @@ export default function OrderHistoryScreen() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   const handleCancelOrder = (orderId: string) => {
+    // Alert.alert(...) is a no-op stub on react-native-web (see utils/notify.ts),
+    // so this whole confirm→cancel→error flow was silently dead on web. The
+    // Platform.OS branches below keep native's Alert.alert calls byte-identical
+    // and only add a working web path via notify()/confirm() (real
+    // window.confirm/window.alert).
+    const performCancel = async () => {
+      setCancellingId(orderId);
+      try {
+        const response = await fetch(`${API_BASE_URL}/orders/${orderId}/cancel`, {
+          method: 'PATCH',
+          headers: { 'Authorization': `Bearer ${token || ''}` },
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          const message = data.error || 'This order can no longer be cancelled. Please contact support.';
+          if (Platform.OS === 'web') {
+            confirm('Cannot Cancel', message, () => (navigation as any).navigate('HelpCenter'), 'Get Help');
+          } else {
+            Alert.alert('Cannot Cancel', message, [
+              { text: 'Close', style: 'cancel' },
+              { text: 'Get Help', onPress: () => (navigation as any).navigate('HelpCenter') },
+            ]);
+          }
+          return;
+        }
+        setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: data.status } : o)));
+      } catch (error) {
+        console.error('Failed to cancel order', error);
+        notify('Error', 'Could not reach the server. Please try again.');
+      } finally {
+        setCancellingId(null);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      confirm(
+        'Cancel order',
+        'Are you sure you want to cancel this order? This cannot be undone.',
+        performCancel,
+        'Cancel Order'
+      );
+      return;
+    }
     Alert.alert(
       'Cancel order',
       'Are you sure you want to cancel this order? This cannot be undone.',
       [
         { text: 'Keep Order', style: 'cancel' },
-        {
-          text: 'Cancel Order',
-          style: 'destructive',
-          onPress: async () => {
-            setCancellingId(orderId);
-            try {
-              const response = await fetch(`${API_BASE_URL}/orders/${orderId}/cancel`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token || ''}` },
-              });
-              const data = await response.json();
-              if (!response.ok) {
-                Alert.alert(
-                  'Cannot Cancel',
-                  data.error || 'This order can no longer be cancelled. Please contact support.',
-                  [
-                    { text: 'Close', style: 'cancel' },
-                    { text: 'Get Help', onPress: () => (navigation as any).navigate('HelpCenter') },
-                  ]
-                );
-                return;
-              }
-              setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status: data.status } : o)));
-            } catch (error) {
-              console.error('Failed to cancel order', error);
-              Alert.alert('Error', 'Could not reach the server. Please try again.');
-            } finally {
-              setCancellingId(null);
-            }
-          },
-        },
+        { text: 'Cancel Order', style: 'destructive', onPress: performCancel },
       ]
     );
   };
