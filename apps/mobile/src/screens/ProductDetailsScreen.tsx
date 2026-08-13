@@ -81,6 +81,13 @@ export default function ProductDetailsScreen() {
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [wishlistBusy, setWishlistBusy] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  // Set only if NO_IMAGE_PLACEHOLDER itself also fails to render -- the real
+  // product image and the placeholder both point at broken sources at that
+  // point, so there is nothing left worth another <Image> attempt at (CJ-03
+  // fix: previously the onError fallback pointed at the same placeholder that
+  // had just failed, so a broken placeholder rendered as blank space instead
+  // of a visible fallback icon).
+  const [placeholderFailed, setPlaceholderFailed] = useState(false);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [relatedWishlist, setRelatedWishlist] = useState<Record<string, boolean>>({});
   const [reviews, setReviews] = useState<ProductReview[]>([]);
@@ -275,11 +282,17 @@ export default function ProductDetailsScreen() {
         </View>
 
         <View style={styles.imageContainer}>
-          <Image
-            source={{ uri: imageFailed ? NO_IMAGE_PLACEHOLDER : product.image }}
-            style={styles.image}
-            onError={() => setImageFailed(true)}
-          />
+          {imageFailed && placeholderFailed ? (
+            <View style={[styles.image, styles.imageFallback]}>
+              <Ionicons name="image-outline" size={64} color={colors.textMuted} />
+            </View>
+          ) : (
+            <Image
+              source={{ uri: imageFailed ? NO_IMAGE_PLACEHOLDER : product.image }}
+              style={styles.image}
+              onError={() => (imageFailed ? setPlaceholderFailed(true) : setImageFailed(true))}
+            />
+          )}
           {product.discountPercentage && (
             <View style={styles.discountBadge}>
               <Text style={styles.discountText}>{t('home.percentOff', { percent: product.discountPercentage })}</Text>
@@ -499,6 +512,7 @@ const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
     borderBottomColor: colors.border,
   },
   image: { width: '100%', height: '100%', resizeMode: 'contain' },
+  imageFallback: { alignItems: 'center', justifyContent: 'center' },
   discountBadge: {
     position: 'absolute',
     bottom: 20,
