@@ -11,7 +11,7 @@ import { fetchMyAddresses } from '../services/address.service';
 import { createOrder, validateCoupon as validateCouponApi } from '../services/order.service';
 import { getPaymentConfig, openRazorpayCheckout, verifyRazorpayPayment } from '../services/payment.service';
 import { AddressPickerSheet } from '../components/services/AddressPickerSheet';
-import { useBreakpoint } from '../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import { setPendingRedirect } from '../navigation/postLoginRedirect';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
@@ -39,7 +39,7 @@ export default function CartScreen() {
   const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
     useCallback(() => {
       if (!isDesktopUp) return;

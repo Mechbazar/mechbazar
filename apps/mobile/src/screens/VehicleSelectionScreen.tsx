@@ -9,7 +9,7 @@ import { HeaderCartButton } from '../components/HeaderCartButton';
 import { VehicleType } from '../types/product';
 import { fetchManufacturers, fetchModels, fetchVariants } from '../services/product.service';
 import { createMyVehicle } from '../services/garage.service';
-import { useBreakpoint } from '../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
@@ -64,7 +64,7 @@ export default function VehicleSelectionScreen() {
   // Animation for Toggle
   const indicatorPosition = useRef(new Animated.Value(0)).current;
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
     useCallback(() => {
       if (!isDesktopUp) return;

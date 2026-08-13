@@ -6,7 +6,7 @@ import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navig
 import { HeaderCartButton } from '../../components/HeaderCartButton';
 import { ServicePackage } from '../../types/service';
 import { fetchServicePackages } from '../../services/service.service';
-import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
@@ -56,7 +56,7 @@ export default function ServiceCategoryScreen() {
   const [packages, setPackages] = useState<ServicePackage[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
     useCallback(() => {
       if (!isDesktopUp) return;

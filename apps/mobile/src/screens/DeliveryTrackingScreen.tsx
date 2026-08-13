@@ -8,7 +8,7 @@ import { RootState } from '../store';
 import { getSocket, subscribeToOrder, SERVER_EVENTS } from '@mechbazar/shared';
 
 import { API_BASE_URL } from '../services/api';
-import { useBreakpoint } from '../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
@@ -42,7 +42,7 @@ export default function DeliveryTrackingScreen() {
   // Pulse animation for active node
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
     useCallback(() => {
       if (!isDesktopUp) return;

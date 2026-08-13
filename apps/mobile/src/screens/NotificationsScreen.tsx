@@ -16,7 +16,7 @@ import { useSelector } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
 import { RootState } from '../store';
 import { API_BASE_URL } from '../services/api';
-import { useBreakpoint } from '../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
@@ -160,7 +160,7 @@ export default function NotificationsScreen() {
     }
   };
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
     useCallback(() => {
       if (!isDesktopUp) return;

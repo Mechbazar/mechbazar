@@ -9,7 +9,7 @@ import { VehicleType } from '../../types/product';
 import { ServicePackage, ServiceCategory, TimeSlot, ServiceAddress } from '../../types/service';
 import { fetchServicePackageById, fetchTimeSlots, createServiceBooking, uploadBookingImage } from '../../services/service.service';
 import { AddressPickerSheet } from '../../components/services/AddressPickerSheet';
-import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
 import { useIsDarkMode } from '../../theme/useThemeColors';
@@ -115,7 +115,7 @@ export default function ServiceBookingScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   // Opts this screen into DesktopAppShell's "full page" mode on desktop --
   // skips the shell's default box+footer so this wizard gets the shorter
   // header and no marketing footer while it's the focused screen. Native/

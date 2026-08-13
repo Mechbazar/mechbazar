@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useBreakpoint } from '../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
@@ -36,7 +36,7 @@ export default function StaticPageScreen() {
   // back to a real page instead of trusting the param.
   const content = STATIC_PAGES[route.params?.page] ?? STATIC_PAGES.about;
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
     useCallback(() => {
       if (!isDesktopUp) return;

@@ -8,7 +8,7 @@ import { RootState } from '../store';
 import { Category } from '../types/product';
 import { fetchCategories, NO_IMAGE_PLACEHOLDER } from '../services/product.service';
 import { HeaderCartButton } from '../components/HeaderCartButton';
-import { useBreakpoint } from '../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
@@ -99,7 +99,7 @@ export default function CategoriesScreen() {
     }, [loadCategories])
   );
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
     useCallback(() => {
       if (!isDesktopUp) return;

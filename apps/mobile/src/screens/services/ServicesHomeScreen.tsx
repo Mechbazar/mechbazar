@@ -14,7 +14,7 @@ import { jobService, Job } from '@mechbazar/shared';
 import { HeaderCartButton } from '../../components/HeaderCartButton';
 import { Icon3D } from '../../components/shared/Icon3D';
 import { useIsDarkMode } from '../../theme/useThemeColors';
-import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
@@ -138,7 +138,7 @@ export default function ServicesHomeScreen({ navigation }: any) {
   useEffect(() => { loadCategories(); }, [loadCategories]);
   useFocusEffect(useCallback(() => { loadCategories(); loadBookings(); loadActiveJob(); }, [loadCategories, loadBookings, loadActiveJob]));
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
     useCallback(() => {
       if (!isDesktopUp) return;

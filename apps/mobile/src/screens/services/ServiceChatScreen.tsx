@@ -7,7 +7,7 @@ import { RootState } from '../../store';
 import { ServiceChatMessage } from '../../types/service';
 import { fetchBookingMessages, sendBookingMessage } from '../../services/service.service';
 import { useIsDarkMode } from '../../theme/useThemeColors';
-import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
 
@@ -31,7 +31,7 @@ export default function ServiceChatScreen() {
   // Full-page (no marketing footer) -- a chat screen's input bar should be
   // the last visible element, not have a multi-column footer pushed in
   // below it the way DesktopAppShell's default wrap would.
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
     useCallback(() => {
       if (!isDesktopUp) return;

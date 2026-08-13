@@ -9,7 +9,7 @@ import { ServiceBooking, BookingStatus } from '../../types/service';
 import { fetchBookingById, cancelServiceBooking, respondToBookingApproval, fetchTechnicianPhotoDataUri, fetchBookingImageDataUri } from '../../services/service.service';
 import { confirm, notify } from '../../utils/notify';
 import { HeaderCartButton } from '../../components/HeaderCartButton';
-import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
@@ -105,7 +105,7 @@ export default function ServiceTrackingScreen() {
   const [cancelling, setCancelling] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
     useCallback(() => {
       if (!isDesktopUp) return;

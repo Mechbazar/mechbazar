@@ -21,7 +21,7 @@ import ProductRail from '../components/desktop/home/ProductRail';
 import { useDispatch, useSelector } from 'react-redux';
 import { addToCart, RootState } from '../store';
 import { HeaderCartButton } from '../components/HeaderCartButton';
-import { useBreakpoint } from '../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import { setPendingRedirect } from '../navigation/postLoginRedirect';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
@@ -97,7 +97,7 @@ export default function ProductDetailsScreen() {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewMessage, setReviewMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
     useCallback(() => {
       if (!isDesktopUp) return;

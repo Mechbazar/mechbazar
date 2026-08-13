@@ -10,7 +10,7 @@ import { addToCart } from '../store/cartSlice';
 import { ServiceBooking } from '../types/service';
 import { fetchMyBookings } from '../services/service.service';
 import ServiceBookingCard from '../components/services/ServiceBookingCard';
-import { useBreakpoint } from '../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
@@ -116,7 +116,7 @@ export default function OrderHistoryScreen() {
     fetchBookings();
   }, [token]));
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
     useCallback(() => {
       if (!isDesktopUp) return;

@@ -17,7 +17,7 @@ import { addToCart } from '../store/cartSlice';
 import { RootState } from '../store';
 import { Product } from '../types/product';
 import { fetchMyWishlist, removeFromWishlist } from '../services/wishlist.service';
-import { useBreakpoint } from '../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
@@ -57,7 +57,7 @@ export default function WishlistScreen() {
   // (product details, home) is reflected here without a manual pull-to-refresh.
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
     useCallback(() => {
       if (!isDesktopUp) return;

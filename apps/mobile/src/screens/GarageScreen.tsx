@@ -18,7 +18,7 @@ import { RootState } from '../store';
 import { setActiveVehicle, removeVehicleFromGarage, updateVehicleInGarage, hydrateGarage } from '../store/appSlice';
 import { HeaderCartButton } from '../components/HeaderCartButton';
 import { fetchMyVehicles, updateMyVehicle, deleteMyVehicle } from '../services/garage.service';
-import { useBreakpoint } from '../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
@@ -53,7 +53,7 @@ export default function GarageScreen() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   // Independent of the data-refetch useFocusEffect below -- kept separate so
   // this shell-registration concern doesn't get tangled with the vehicle
   // refetch logic.

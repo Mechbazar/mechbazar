@@ -28,7 +28,7 @@ import {
 } from '../services/address.service';
 import { locationService } from '../services/location.service';
 import { reverseGeocode, GeocodeSuccess } from '../services/geocode.service';
-import { useBreakpoint } from '../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
@@ -102,7 +102,7 @@ export default function AddressManagementScreen() {
   // actually disable the button instead of just relabelling it.
   const [saving, setSaving] = useState(false);
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
     React.useCallback(() => {
       if (!isDesktopUp) return;

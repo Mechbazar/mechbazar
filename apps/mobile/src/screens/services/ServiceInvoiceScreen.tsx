@@ -11,7 +11,7 @@ import { RootState } from '../../store';
 import { ServiceInvoice, ServiceBooking } from '../../types/service';
 import { fetchBookingInvoice, fetchBookingById } from '../../services/service.service';
 import { useIsDarkMode } from '../../theme/useThemeColors';
-import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../../components/desktop/shared/MinimalFooter';
@@ -58,7 +58,7 @@ export default function ServiceInvoiceScreen() {
   const colors = useIsDarkMode() ? DARK_COLORS : LIGHT_COLORS;
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
     useCallback(() => {
       if (!isDesktopUp) return;
