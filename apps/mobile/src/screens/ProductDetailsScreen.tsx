@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   TextInput,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +23,7 @@ import { addToCart, RootState } from '../store';
 import { HeaderCartButton } from '../components/HeaderCartButton';
 import { useBreakpoint } from '../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
+import { setPendingRedirect } from '../navigation/postLoginRedirect';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 import { useIsDarkMode } from '../theme/useThemeColors';
@@ -129,9 +131,21 @@ export default function ProductDetailsScreen() {
 
   useEffect(() => { loadReviews(); }, [loadReviews]);
 
+  // Web: redirect-with-return instead of a bare alert, matching the pattern
+  // used elsewhere (Cart checkout, DesktopHeader's wishlist icon) -- see
+  // postLoginRedirect.ts. Native keeps the plain alert unchanged.
+  const promptWishlistLogin = () => {
+    if (Platform.OS === 'web') {
+      setPendingRedirect({ screen: 'ProductDetails', params: { productId } });
+      navigation.navigate('Welcome');
+      return;
+    }
+    alert('Please log in to save items to your wishlist.');
+  };
+
   const handleRelatedWishlistToggle = async (id: string) => {
     if (!token) {
-      alert('Please log in to save items to your wishlist.');
+      promptWishlistLogin();
       return;
     }
     const was = !!relatedWishlist[id];
@@ -167,7 +181,7 @@ export default function ProductDetailsScreen() {
 
   const handleToggleWishlist = async () => {
     if (!token) {
-      alert('Please log in to save items to your wishlist.');
+      promptWishlistLogin();
       return;
     }
     setWishlistBusy(true);

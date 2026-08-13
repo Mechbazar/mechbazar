@@ -6,6 +6,8 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import { fetchMyWishlist } from '../../../services/wishlist.service';
 import { useBreakpoint } from '../../../hooks/useBreakpoint';
+import { setPendingRedirect } from '../../../navigation/postLoginRedirect';
+import { navigationRef } from '../../../navigation/webNavigationRef';
 import { Logo } from '@mechbazar/shared';
 import { colors, spacing, radius } from '../../../theme/tokens';
 import Container from '../shared/Container';
@@ -46,6 +48,23 @@ export default function DesktopHeader() {
   const { isWide } = useBreakpoint();
 
   const [wishlistCount, setWishlistCount] = useState(0);
+
+  // Sends a guest to Welcome, remembering where to send them back to after
+  // login (see postLoginRedirect.ts). `target` is used when the click itself
+  // is a protected action (e.g. the Wishlist icon); with no target, this is
+  // a bare "Login / Register" click, so fall back to the page the guest was
+  // already browsing (via navigationRef -- DesktopHeader renders outside the
+  // Stack.Navigator, same reason desktopFullPageScreenStore.ts avoids
+  // useNavigationState here, so the container ref is used instead of a hook).
+  const goToLogin = (target?: { screen: string; params?: object }) => {
+    if (target) {
+      setPendingRedirect(target);
+    } else if (navigationRef.isReady()) {
+      const current = navigationRef.getCurrentRoute();
+      if (current) setPendingRedirect({ screen: current.name, params: current.params });
+    }
+    navigation.navigate('Welcome');
+  };
 
   useEffect(() => {
     if (!token) {
@@ -89,7 +108,7 @@ export default function DesktopHeader() {
             icon="heart-outline"
             count={wishlistCount}
             label="Wishlist"
-            onPress={() => navigation.navigate(token ? 'Wishlist' : 'Welcome')}
+            onPress={() => (token ? navigation.navigate('Wishlist') : goToLogin({ screen: 'Wishlist' }))}
           />
           <IconAction
             icon="cart-outline"
@@ -122,7 +141,7 @@ export default function DesktopHeader() {
           ) : (
             <Pressable
               style={styles.loginButton}
-              onPress={() => navigation.navigate('Welcome')}
+              onPress={() => goToLogin()}
               accessibilityRole="button"
             >
               <Text style={styles.loginButtonText}>Login / Register</Text>

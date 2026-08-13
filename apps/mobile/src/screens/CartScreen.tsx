@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image, TextInput, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Loader } from '@mechbazar/shared';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -12,6 +12,7 @@ import { createOrder, validateCoupon as validateCouponApi } from '../services/or
 import { getPaymentConfig, openRazorpayCheckout, verifyRazorpayPayment } from '../services/payment.service';
 import { AddressPickerSheet } from '../components/services/AddressPickerSheet';
 import { useBreakpoint } from '../hooks/useBreakpoint';
+import { setPendingRedirect } from '../navigation/postLoginRedirect';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import { useIsDarkMode } from '../theme/useThemeColors';
@@ -70,6 +71,15 @@ export default function CartScreen() {
   }, []);
 
   const handleChangeAddress = () => {
+    // Guest on web: AddressPickerSheet below only renders when a token
+    // exists, so opening it here would be a dead click -- send them to log
+    // in and back to Cart instead. Native never reaches this with !token
+    // (Cart is only reachable there once logged in), so this is a no-op off web.
+    if (Platform.OS === 'web' && !token) {
+      setPendingRedirect({ screen: 'Cart' });
+      (navigation as any).navigate('Welcome');
+      return;
+    }
     setShowAddressSheet(true);
   };
 
@@ -103,6 +113,14 @@ export default function CartScreen() {
   };
 
   const handleCheckout = async () => {
+    // Guest on web placing an order: send to login and back to Cart instead
+    // of the generic "select an address" alert below (which would just loop
+    // forever since AddressPickerSheet can't open for a guest either).
+    if (Platform.OS === 'web' && !token) {
+      setPendingRedirect({ screen: 'Cart' });
+      (navigation as any).navigate('Welcome');
+      return;
+    }
     if (!selectedAddress || !token) {
       alert('Please select a delivery address before checking out.');
       return;

@@ -29,6 +29,7 @@ import { API_BASE_URL } from '../../services/api';
 import { sendPhoneOtp, confirmPhoneOtp, watchForAutoVerification } from '../../services/phoneAuth';
 import { notify } from '../../utils/notify';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
+import { consumePendingRedirect } from '../../navigation/postLoginRedirect';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import Container from '../../components/desktop/shared/Container';
 import { spacing, typography, radius, shadows, darkColors, colors as brandColors } from '../../theme/tokens';
@@ -810,6 +811,20 @@ export default function WelcomeScreen() {
     }
   };
 
+  // Web-only: send the guest back to whatever protected action they were
+  // trying to do (Cart checkout, My Orders, a wishlist toggle, ...) instead
+  // of always landing on Home after login. On native this is always a no-op
+  // -- Platform.OS is never 'web' there, and consumePendingRedirect is never
+  // populated anyway since only App.web.tsx's RequireAuth guard (which native
+  // never bundles) calls setPendingRedirect. Returns true if it navigated.
+  const redirectAfterLogin = () => {
+    if (Platform.OS !== 'web') return false;
+    const pending = consumePendingRedirect();
+    if (!pending) return false;
+    navigation.navigate(pending.screen, pending.params);
+    return true;
+  };
+
   // Everything after Firebase is happy: swap the ID token for a MechBazar
   // session. Shared by all three ways an ID token can arrive (manual code,
   // instant auto-verification, or late auto-verification while the OTP box
@@ -841,6 +856,7 @@ export default function WelcomeScreen() {
           user: data.user,
           token: data.token
         }));
+        redirectAfterLogin();
       } else {
         notify('Authentication Failed', data.error || 'Authentication failed');
       }
@@ -887,6 +903,7 @@ export default function WelcomeScreen() {
       if (res.ok) {
         pendingIdTokenRef.current = null;
         dispatch(loginSuccess({ user: data.user, token: data.token }));
+        redirectAfterLogin();
       } else {
         notify('Registration Failed', data.error || 'Failed to create your account.');
       }
