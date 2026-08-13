@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   getTechnicians,
   getTechnicianById,
@@ -49,6 +50,23 @@ const admins = [Role.ADMIN, Role.SUPER_ADMIN, Role.OPERATIONS_MANAGER];
 const technicianOnly = [Role.SERVICE_TECHNICIAN];
 const superAdminOnly = [Role.SUPER_ADMIN];
 
+// Completion-code attempts for scheduled bookings now go through the same
+// encrypted, attempt-limited JobOtp path emergency jobs use (jobOtp.service.ts
+// / job.controller.ts's completeJob) -- this mirrors job.routes.ts's own
+// otpLimiter as its transport-level complement. updateMyBookingStatus handles
+// every status transition, not just the OTP-guarded COMPLETED one, so skip
+// counts every other transition so ordinary status updates are never
+// throttled by this.
+const otpLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.headers.authorization || req.ip || 'unknown',
+  skip: (req) => req.body?.status !== 'COMPLETED',
+  message: { error: 'Too many verification attempts. Please wait before trying again.', code: 'RATE_LIMITED' },
+});
+
 // Public self-registration — no auth yet, this *creates* the account.
 router.post('/register', registerTechnician);
 router.post('/login', loginTechnician);
@@ -64,7 +82,7 @@ router.patch('/me/availability', authenticate, authorize(technicianOnly), requir
 router.patch('/me/location', authenticate, authorize(technicianOnly), requireApprovedTechnician, updateMyLocation);
 router.post('/me/push-token', authenticate, authorize(technicianOnly), registerMyPushToken);
 router.delete('/me/push-token', authenticate, authorize(technicianOnly), clearMyPushToken);
-router.patch('/me/bookings/:id/status', authenticate, authorize(technicianOnly), requireApprovedTechnician, updateMyBookingStatus);
+router.patch('/me/bookings/:id/status', authenticate, authorize(technicianOnly), requireApprovedTechnician, otpLimiter, updateMyBookingStatus);
 router.post('/me/bookings/:id/accept', authenticate, authorize(technicianOnly), requireApprovedTechnician, acceptBookingJob);
 router.post('/me/bookings/:id/reject', authenticate, authorize(technicianOnly), requireApprovedTechnician, rejectBookingJob);
 router.post('/me/bookings/:id/generate-otp', authenticate, authorize(technicianOnly), requireApprovedTechnician, generateBookingCompletionOtp);

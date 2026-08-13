@@ -11,6 +11,7 @@ import { broadcastBookingStatus } from '../utils/realtimeBooking';
 import { ASSIGNMENT_RESPONSE_WINDOW_MS, TECHNICIAN_ACTIVE_STATUSES } from '../services/jobState';
 import { isPincodeServiceable } from '../services/serviceability.service';
 import { creditServiceCompletion } from '../services/commission.service';
+import { issueJobOtp, verifyAndConsumeOtp, OtpError } from '../services/jobOtp.service';
 
 // Thrown from inside createBooking's $transaction to carry an intended HTTP
 // status (400/404/409) back out, mirroring order.controller.ts's OrderError.
@@ -632,16 +633,18 @@ export const updateMyBookingStatus = async (req: AuthRequest, res: Response) => 
       return res.status(400).json({ error: `Cannot move from ${booking.status} to ${status}` });
     }
 
-    if (status === 'COMPLETED') {
-      if (!booking.completionOtp) {
-        return res.status(400).json({ error: 'Generate an OTP and have the customer read it to you before marking this job completed.' });
-      }
-      if (!otp || String(otp) !== booking.completionOtp) {
-        return res.status(400).json({ error: 'Incorrect OTP' });
-      }
-    }
-
     const updated = await prisma.$transaction(async (tx) => {
+      // Completion codes now go through the same encrypted, attempt-limited,
+      // expiring JobOtp path emergency jobs already use (jobOtp.service.ts) --
+      // verified INSIDE this transaction, same as job.controller.ts's
+      // completeJob, so the attempt-increment and the status transition it
+      // authorises commit or roll back together (VMR-08 fix; previously this
+      // compared against the legacy plaintext `completionOtp` column with no
+      // attempt cap or expiry check).
+      if (status === 'COMPLETED') {
+        await verifyAndConsumeOtp(tx, id, 'COMPLETION', otp);
+      }
+
       // Atomically claim the transition: only matches if the booking's status
       // is still what we just read, re-checked under Postgres's row lock at
       // UPDATE time -- not against the stale `booking.status` read above.
@@ -689,6 +692,9 @@ export const updateMyBookingStatus = async (req: AuthRequest, res: Response) => 
 
     res.status(200).json(updated);
   } catch (error: any) {
+    if (error instanceof OtpError) {
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
     if (error.message?.startsWith('Booking status changed concurrently')) {
       return res.status(409).json({ error: error.message });
     }
@@ -797,23 +803,19 @@ export const generateBookingCompletionOtp = async (req: AuthRequest, res: Respon
       return res.status(400).json({ error: 'OTP can only be generated once work has started' });
     }
 
-    const otp = String(Math.floor(1000 + Math.random() * 9000));
-    await prisma.serviceBooking.update({
-      where: { id },
-      data: { completionOtp: otp, completionOtpGeneratedAt: new Date() },
-    });
+    // Now issues through the same encrypted, attempt-limited, expiring JobOtp
+    // path emergency jobs already use (jobOtp.service.ts), which also sends
+    // the customer notification itself -- see requestCompletion in
+    // job.controller.ts for the identical pattern (VMR-08 fix; this
+    // previously generated a bare 4-digit plaintext code with no attempt cap
+    // or expiry check).
+    const issued = await issueJobOtp(id, 'COMPLETION', req.user!.userId);
 
-    // Deliberately never echoed back to the technician's own response -- the
-    // customer must read it aloud for the technician to enter. The OTP itself
-    // must not go in the push title/body either: those render on the lock
-    // screen by default, which would defeat the point of requiring the
-    // customer to read it aloud. Keep it in the data payload only, where it's
-    // reachable by the app in the foreground but not shown in a notification
-    // preview.
-    notifyUser(booking.userId, 'Completion code ready', 'Open the app to view your mechanic completion code.', { bookingId: id, completionOtp: otp });
-
-    res.status(200).json({ message: 'OTP sent to the customer' });
+    res.status(200).json({ message: 'OTP sent to the customer', expiresAt: issued.expiresAt });
   } catch (error: any) {
+    if (error instanceof OtpError) {
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
     console.error('Error generating completion OTP:', error.message);
     res.status(500).json({ error: 'Failed to generate OTP' });
   }
