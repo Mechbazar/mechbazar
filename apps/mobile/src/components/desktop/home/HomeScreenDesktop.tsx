@@ -13,13 +13,16 @@ import { setDesktopFullPageScreenActive } from '../../../navigation/desktopFullP
 import Container from '../shared/Container';
 import CategoryNavStrip from './CategoryNavStrip';
 import HeroCarousel from './HeroCarousel';
+import QuickActions from './QuickActions';
 import CategoryGridDesktop from './CategoryGridDesktop';
+import VehicleFinderSection from './VehicleFinderSection';
 import ProductRail from './ProductRail';
 import PromoCategoryCards from './PromoCategoryCards';
 import BrandsRow from './BrandsRow';
 import { MechanicServicesSection, GarageServicesSection } from './ServiceHighlights';
 import TopVendorsRow from './TopVendorsRow';
 import NewsletterSection from './NewsletterSection';
+import FinalVehicleCta from './FinalVehicleCta';
 import TrustBadges from './TrustBadges';
 import Testimonials from './Testimonials';
 import DownloadAppSection from './DownloadAppSection';
@@ -203,8 +206,16 @@ export default function HomeScreenDesktop() {
       </Container>
 
       <Container style={styles.section}>
+        <QuickActions />
+      </Container>
+
+      <Container style={styles.section}>
         <SectionHeading actionLabel="View All →" onAction={() => navigation.navigate('MainTabs', { screen: 'Categories' })}>Shop by Category</SectionHeading>
         <CategoryGridDesktop categories={categories} />
+      </Container>
+
+      <Container style={styles.section}>
+        <VehicleFinderSection />
       </Container>
 
       {homeExtras.deals.length > 0 && (
@@ -255,6 +266,11 @@ export default function HomeScreenDesktop() {
         <GarageServicesSection />
       </Container>
 
+      <Container style={styles.section}>
+        <SectionHeading>Why MechBazar</SectionHeading>
+        <TrustBadges />
+      </Container>
+
       {promoCategories.length > 0 && (
         <Container style={styles.section}>
           <PromoCategoryCards categories={promoCategories} />
@@ -300,16 +316,16 @@ export default function HomeScreenDesktop() {
       )}
 
       <Container style={styles.section}>
-        <TrustBadges />
-      </Container>
-
-      <Container style={styles.section}>
         <SectionHeading>What Our Customers Say</SectionHeading>
         <Testimonials />
       </Container>
 
       <Container style={styles.section}>
         <DownloadAppSection />
+      </Container>
+
+      <Container style={styles.section}>
+        <FinalVehicleCta />
       </Container>
 
       <Container style={styles.section}>
