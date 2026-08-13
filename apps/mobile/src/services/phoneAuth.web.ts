@@ -14,12 +14,19 @@ import { friendlyAuthErrorMessage } from '../utils/authErrors';
 // invisible reCAPTCHA widget, which only exists on this platform.
 const RECAPTCHA_CONTAINER_ID = 'firebase-recaptcha-container';
 
+// console.warn, not console.log: babel.config.js strips every console.log
+// call from release builds (rider/apps-wide policy against leaking
+// operationally-sensitive values via device logs) but explicitly keeps
+// warn/error as "the only production-diagnostics channel this app has".
+// This logging was written to make OTP failures diagnosable in the field --
+// on console.log it silently never reached production at all since that
+// babel config was added.
 const log = (msg: string, extra?: unknown) => {
   const line = `[otp:web] ${new Date().toISOString()} ${msg}`;
   if (extra !== undefined) {
-    console.log(line, extra);
+    console.warn(line, extra);
   } else {
-    console.log(line);
+    console.warn(line);
   }
 };
 
