@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   getRiders,
   getRiderById,
@@ -34,6 +35,23 @@ const router = Router();
 const admins = [Role.ADMIN, Role.SUPER_ADMIN, Role.OPERATIONS_MANAGER];
 const riderOnly = [Role.DELIVERY_PARTNER];
 
+// Delivery-code attempts are additionally capped per-code in the database
+// (Order.deliveryOtpAttempts). This is the transport-level complement --
+// mirrors job.routes.ts's otpLimiter -- so an attacker can't cycle through
+// fresh codes to get five fresh guesses each time.
+// updateMyDeliveryStatus handles every rider status transition, not just the
+// OTP-guarded one -- skip counts every non-DELIVERED transition so a busy
+// rider's ordinary picked-up/on-the-way updates are never throttled by this.
+const otpLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => req.headers.authorization || req.ip || 'unknown',
+  skip: (req) => req.body?.status !== 'DELIVERED',
+  message: { error: 'Too many verification attempts. Please wait before trying again.', code: 'RATE_LIMITED' },
+});
+
 // Public self-registration — no auth yet, this *creates* the account.
 router.post('/register', registerRider);
 router.post('/login', loginRider);
@@ -49,7 +67,7 @@ router.patch('/me/availability', authenticate, authorize(riderOnly), requireAppr
 router.patch('/me/location', authenticate, authorize(riderOnly), requireApprovedRider, updateMyLocation);
 router.post('/me/push-token', authenticate, authorize(riderOnly), registerMyPushToken);
 router.delete('/me/push-token', authenticate, authorize(riderOnly), clearMyPushToken);
-router.patch('/me/deliveries/:id/status', authenticate, authorize(riderOnly), requireApprovedRider, updateMyDeliveryStatus);
+router.patch('/me/deliveries/:id/status', authenticate, authorize(riderOnly), requireApprovedRider, otpLimiter, updateMyDeliveryStatus);
 router.post('/me/deliveries/:id/generate-otp', authenticate, authorize(riderOnly), requireApprovedRider, generateDeliveryOtp);
 router.get('/me/earnings', authenticate, authorize(riderOnly), getMyEarnings);
 router.post('/me/bank', authenticate, authorize(riderOnly), addMyBankAccount);

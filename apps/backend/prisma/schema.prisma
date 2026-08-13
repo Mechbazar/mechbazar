@@ -776,6 +776,11 @@ model Order {
   // rider's own client, only to the order's owner.
   deliveryOtp            String?
   deliveryOtpGeneratedAt DateTime?
+  // Wrong-guess counter, reset to 0 every time a fresh code is generated.
+  // Checked against env.JOB_OTP_MAX_ATTEMPTS (same limit JobOtp uses) before
+  // a guess is even compared, and incremented atomically so two concurrent
+  // guesses can't both slip under the cap.
+  deliveryOtpAttempts    Int        @default(0)
 
   // Exact amount credited to the assigned rider's wallet when this order was
   // marked DELIVERED, computed from PlatformCommissionSettings' rider payout

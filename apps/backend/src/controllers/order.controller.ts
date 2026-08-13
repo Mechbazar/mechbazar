@@ -10,6 +10,7 @@ import { sanitizeOrder, sanitizeOrders, stripDeliveryOtp, stripDeliveryOtps } fr
 import { pendingPaymentCreateInput, creditWalletForOnlineRefund } from '../services/payment.service';
 import { resolveProductCommissionPercent, resolveRiderPayout, recordCommission, round2 } from '../services/commission.service';
 import { isPincodeServiceable } from '../services/serviceability.service';
+import { env } from '../config/env';
 
 // Thrown from inside the createOrder $transaction to carry an intended HTTP
 // status (400/409) back out through Prisma's error propagation, instead of
@@ -931,24 +932,52 @@ export const updateMyDeliveryStatus = async (req: AuthRequest, res: Response) =>
       if (order.payment?.method === 'COD' && !codCollected) {
         return res.status(400).json({ error: 'COD collection must be confirmed to mark as delivered' });
       }
-      // Only enforced once an OTP has actually been generated for this order
-      // -- keeps this backward-compatible with any order that reached
-      // ON_THE_WAY before this feature existed / where generate-otp was
-      // never called.
-      if (order.deliveryOtp) {
-        if (!otp) {
-          return res.status(400).json({ error: 'Ask the customer for their delivery code and enter it to confirm delivery.' });
-        }
-        if (String(otp) !== order.deliveryOtp) {
-          return res.status(400).json({ error: 'Incorrect delivery code.' });
-        }
-      }
     }
     if (status === 'RETURNED' && !issueReason) {
       return res.status(400).json({ error: 'issueReason is required when reporting a delivery issue' });
     }
 
     const { updated, credits } = await prisma.$transaction(async (tx) => {
+      // Delivery-code check runs INSIDE the transaction, attempt-capped and
+      // TTL-checked the same way jobOtp.service.ts's verifyAndConsumeOtp works
+      // for emergency jobs (VMR-09 fix; previously this compared the plaintext
+      // code outside any transaction with no attempt limit or expiry check --
+      // live-verified 8 consecutive wrong guesses returned plain 400s with no
+      // lockout). Only enforced once an OTP has actually been generated for
+      // this order -- keeps this backward-compatible with any order that
+      // reached ON_THE_WAY before this feature existed / where generate-otp
+      // was never called.
+      if (status === 'DELIVERED' && order.deliveryOtp) {
+        if (order.deliveryOtpGeneratedAt && Date.now() - order.deliveryOtpGeneratedAt.getTime() > env.JOB_OTP_TTL_SECONDS * 1000) {
+          throw new OrderError(410, 'This delivery code has expired. Ask the customer for a fresh one.');
+        }
+        if (order.deliveryOtpAttempts >= env.JOB_OTP_MAX_ATTEMPTS) {
+          throw new OrderError(429, 'Too many incorrect attempts. Ask the customer to generate a new code.');
+        }
+        if (!otp) {
+          throw new OrderError(400, 'Ask the customer for their delivery code and enter it to confirm delivery.');
+        }
+        // Increment BEFORE comparing, conditioned on the attempt count just
+        // read, so two concurrent guesses can't both pass the cap check and
+        // both get a free attempt -- one of them loses this compare-and-swap.
+        const bumped = await tx.order.updateMany({
+          where: { id, deliveryOtpAttempts: order.deliveryOtpAttempts },
+          data: { deliveryOtpAttempts: { increment: 1 } },
+        });
+        if (bumped.count === 0) {
+          throw new OrderError(409, 'Another verification is in progress. Try again.');
+        }
+        if (String(otp) !== order.deliveryOtp) {
+          const remaining = Math.max(0, env.JOB_OTP_MAX_ATTEMPTS - (order.deliveryOtpAttempts + 1));
+          throw new OrderError(
+            400,
+            remaining > 0
+              ? `Incorrect delivery code. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`
+              : 'Incorrect delivery code. Ask the customer to generate a new one.'
+          );
+        }
+      }
+
       // Atomically claim the transition: only matches if the order's status
       // is still what we just read, re-checked under Postgres's row lock at
       // UPDATE time -- not against the stale `order.status` read above.
@@ -964,7 +993,7 @@ export const updateMyDeliveryStatus = async (req: AuthRequest, res: Response) =>
           ...(proofImageUrl && { proofImageUrl }),
           ...(typeof codCollected === 'boolean' && { codCollected }),
           ...(issueReason && { issueReason }),
-          ...(status === 'DELIVERED' && { deliveryOtp: null, deliveryOtpGeneratedAt: null }),
+          ...(status === 'DELIVERED' && { deliveryOtp: null, deliveryOtpGeneratedAt: null, deliveryOtpAttempts: 0 }),
         },
       });
       if (claim.count === 0) {
@@ -1020,9 +1049,11 @@ export const generateDeliveryOtp = async (req: AuthRequest, res: Response) => {
     }
 
     const otp = String(Math.floor(1000 + Math.random() * 9000));
+    // Reset the wrong-guess counter with every fresh code, same as JobOtp
+    // reissuing invalidates the previous code's attempt count along with it.
     await prisma.order.update({
       where: { id },
-      data: { deliveryOtp: otp, deliveryOtpGeneratedAt: new Date() },
+      data: { deliveryOtp: otp, deliveryOtpGeneratedAt: new Date(), deliveryOtpAttempts: 0 },
     });
 
     notifyUser(order.userId, 'Delivery code ready', 'Open the app to view your delivery confirmation code.', { orderId: id, deliveryOtp: otp });
