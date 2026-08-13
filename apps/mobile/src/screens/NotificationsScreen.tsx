@@ -84,6 +84,13 @@ interface NotificationItem {
   actions?: { label: string; deepLink: string }[] | null;
 }
 
+// Guards against a stale/bad row whose title or body is the literal string
+// "undefined"/"null" rather than a real value -- a plain `item.title || ...`
+// fallback only catches an empty/missing field, not this, since the string
+// itself is truthy.
+const sanitizeNotificationText = (value?: string | null): string | undefined =>
+  value && value !== 'undefined' && value !== 'null' ? value : undefined;
+
 export default function NotificationsScreen() {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
@@ -233,7 +240,7 @@ export default function NotificationsScreen() {
         <View style={styles.headerLabelRow}>
           {!item.isRead && <View style={styles.unreadDot} />}
           <Text style={[styles.cardTitle, !item.isRead && styles.textBold]}>
-            {item.title || t('notifications.notificationFallback')}
+            {sanitizeNotificationText(item.title) || t('notifications.notificationFallback')}
           </Text>
         </View>
         <TouchableOpacity onPress={() => handleDelete(item.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -241,7 +248,7 @@ export default function NotificationsScreen() {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.cardBody}>{item.body}</Text>
+      <Text style={styles.cardBody}>{sanitizeNotificationText(item.body)}</Text>
 
       {!!item.imageUrl && <Image source={{ uri: item.imageUrl }} style={styles.cardImage} resizeMode="cover" />}
 
