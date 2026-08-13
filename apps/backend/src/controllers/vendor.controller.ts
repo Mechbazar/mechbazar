@@ -35,6 +35,20 @@ const respondToFirebaseAuthError = (res: Response, err: FirebaseAuthError): void
   res.status(statusByCode[err.code]).json(bodyByCode[err.code]);
 };
 
+// addMyProduct/updateMyProduct auto-approve with no admin review step (see
+// `status: 'APPROVED'` below), so this bounds check is the only gate a vendor
+// product's price/mrp/stock ever passes through before it's live on the
+// public storefront. Callers pass the *effective* value for each field (the
+// new value if the request is changing it, otherwise the product's existing
+// value) so a partial update can't dodge the check by omitting a field.
+const validateProductPricing = (price: number, mrp: number, stock: number): string | null => {
+  if (!Number.isFinite(price) || price < 0) return 'Price cannot be negative.';
+  if (!Number.isFinite(mrp) || mrp < 0) return 'MRP cannot be negative.';
+  if (!Number.isFinite(stock) || stock < 0) return 'Stock cannot be negative.';
+  if (price > mrp) return 'Price cannot be greater than MRP.';
+  return null;
+};
+
 // Document files are private KYC content (see VendorDocument.fileData in
 // schema.prisma) -- fileData is excluded from every list/profile response
 // below and can only be fetched back out through getVendorDocumentFile.
@@ -565,6 +579,12 @@ export const addMyProduct = async (req: Request, res: Response): Promise<void> =
 
     if (!categoryId || !brandId) {
       res.status(400).json({ error: 'Category and Brand are required fields' });
+      return;
+    }
+
+    const pricingError = validateProductPricing(Number(price), Number(mrp), parseInt(stock, 10));
+    if (pricingError) {
+      res.status(400).json({ error: pricingError });
       return;
     }
 
@@ -1440,6 +1460,19 @@ export const updateMyProduct = async (req: Request, res: Response): Promise<void
     // Ensure product belongs to this vendor
     const product = await prisma.product.findFirst({ where: { id, vendorId: vendor.id } });
     if (!product) { res.status(404).json({ error: 'Product not found' }); return; }
+
+    // Effective value = the new one if this request is changing it, else
+    // whatever the product already has -- a partial edit (e.g. only sending
+    // `price`) must still be checked against the real current mrp/stock, not
+    // an undefined one.
+    const effectivePrice = price !== undefined ? Number(price) : product.price;
+    const effectiveMrp = mrp !== undefined ? Number(mrp) : product.mrp;
+    const effectiveStock = stock !== undefined ? Number(stock) : product.stock;
+    const pricingError = validateProductPricing(effectivePrice, effectiveMrp, effectiveStock);
+    if (pricingError) {
+      res.status(400).json({ error: pricingError });
+      return;
+    }
 
     // categoryId, brandId and images used to be destructured away and never
     // written, so the vendor edit form silently discarded all three: a vendor
