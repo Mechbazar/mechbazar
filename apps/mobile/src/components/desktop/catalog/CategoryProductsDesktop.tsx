@@ -5,7 +5,7 @@ import { useFocusEffect, useNavigation, useRoute, NavigationProp, RouteProp } fr
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import { addToCart, updateQuantity } from '../../../store/cartSlice';
-import { Category, FilterOptions, Product } from '../../../types/product';
+import { Category, FilterOptions, Product, VehicleType } from '../../../types/product';
 import { fetchCategories, fetchBrands, getCategoryProducts } from '../../../services/product.service';
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../../../services/wishlist.service';
 import { setDesktopFullPageScreenActive } from '../../../navigation/desktopFullPageScreenStore';
@@ -32,6 +32,15 @@ type ParamList = {
     modelId?: string;
     year?: string;
     initialSearchQuery?: string;
+    // Homepage product rails (Today's Deals/Best Sellers/Trending/...) aren't
+    // one real category, so their "View All" lands here unfiltered
+    // (categoryName: 'Search Results') but pre-sorted to match the rail.
+    initialSortBy?: FilterOptions['sortBy'];
+    // Only set by rails whose products come from a fixed vehicle type
+    // (Popular Bike Parts / Car Parts & Accessories) that may not match the
+    // app's single global vehicle filter -- overrides it for this page only,
+    // never writes back to the global vehicleType.
+    vehicleType?: VehicleType;
   };
 };
 
@@ -48,11 +57,14 @@ export default function CategoryProductsDesktop() {
   const route = useRoute<RouteProp<ParamList, 'CategoryProducts'>>();
   const navigation = useNavigation<NavigationProp<any>>();
   const dispatch = useDispatch();
-  const vehicleType = useSelector((state: RootState) => state.app.vehicleType);
+  const globalVehicleType = useSelector((state: RootState) => state.app.vehicleType);
   const token = useSelector((state: RootState) => state.auth.token);
   const cartItems = useSelector((state: RootState) => state.cart.items);
 
   const routeParams = route.params || ({} as ParamList['CategoryProducts']);
+  // A route-level override (only set by rails fixed to one vehicle type, e.g.
+  // Popular Bike Parts) beats the global filter for this page only.
+  const vehicleType = routeParams.vehicleType || globalVehicleType;
   const [categoryName, setCategoryName] = useState(routeParams.categoryName || 'Products');
   const [searchQuery, setSearchQuery] = useState(routeParams.initialSearchQuery || '');
   const [vehicleBrandName, setVehicleBrandName] = useState(routeParams.brandId);
@@ -70,7 +82,7 @@ export default function CategoryProductsDesktop() {
   const [availableBrands, setAvailableBrands] = useState<string[]>([]);
   const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
   const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
-  const [filters, setFilters] = useState<FilterOptions>({ sortBy: 'popular', brands: [], inStockOnly: false });
+  const [filters, setFilters] = useState<FilterOptions>({ sortBy: routeParams.initialSortBy || 'popular', brands: [], inStockOnly: false });
   const [searchFocused, setSearchFocused] = useState(false);
 
   useFocusEffect(
@@ -176,6 +188,7 @@ export default function CategoryProductsDesktop() {
         </View>
 
         <VehicleFinder
+          vehicleTypeOverride={routeParams.vehicleType}
           hasActiveSelection={!!vehicleBrandName}
           onFind={({ brandName, modelName, year }) => {
             setVehicleBrandName(brandName);

@@ -336,6 +336,47 @@ export const fetchBrands = async (vehicleType: VehicleType): Promise<string[]> =
   }
 };
 
+export interface HomeBrand {
+  id: string;
+  name: string;
+  logo: string | null;
+}
+
+export interface HomeExtras {
+  deals: Product[];
+  featured: Product[];
+  bestSellers: Product[];
+  brands: HomeBrand[];
+}
+
+// GET /api/home aggregates deals (isDeal)/featured (isFeatured)/bestSellers
+// (real salesCount order, not a client-side guess)/brands (real Brand rows,
+// with logo) in one round trip -- built on the backend (home.controller.ts)
+// but never called from the frontend until now. Product arrays go through
+// the same mapBackendProduct() every other product fetch above uses (the
+// raw rows here carry the same mrp/images[]/brand.name shape as /products).
+export const fetchHomeExtras = async (type: VehicleType, opts?: FetchOpts): Promise<HomeExtras> => {
+  const empty: HomeExtras = { deals: [], featured: [], bestSellers: [], brands: [] };
+  try {
+    const res = await fetch(`${API_BASE_URL}/home?vehicle=${type}`, { signal: opts?.signal });
+    if (!res.ok) {
+      if (opts?.rethrow) throw new ApiError('Failed to fetch home extras', { status: res.status, kind: 'http' });
+      return empty;
+    }
+    const data = await res.json();
+    return {
+      deals: (data.deals || []).map((p: any) => mapBackendProduct(p, { vehicleType: type })),
+      featured: (data.featured || []).map((p: any) => mapBackendProduct(p, { vehicleType: type })),
+      bestSellers: (data.bestSellers || []).map((p: any) => mapBackendProduct(p, { vehicleType: type })),
+      brands: (data.brands || []).map((b: any) => ({ id: b.id, name: b.name, logo: b.logo || null })),
+    };
+  } catch (err) {
+    if (opts?.rethrow) throw toApiError(err);
+    console.error(err);
+    return empty;
+  }
+};
+
 export const getCategoryProducts = async (
   vehicleType: VehicleType,
   categoryName: string,

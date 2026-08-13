@@ -56,6 +56,12 @@ interface VehicleFinderProps {
   onFind: (selection: { brandName?: string; modelName?: string; year?: string; variantName?: string }) => void;
   onClear: () => void;
   hasActiveSelection: boolean;
+  // CategoryProductsDesktop can be opened with a vehicleType route override
+  // (e.g. a homepage "View All" from a Popular Bike Parts rail) that differs
+  // from the global filter -- without this, the Car/Bike pill here read the
+  // global value directly and showed the wrong one selected even though the
+  // page's own results were correctly scoped.
+  vehicleTypeOverride?: VehicleType;
 }
 
 const currentYear = new Date().getFullYear();
@@ -67,9 +73,10 @@ const YEARS: Option[] = Array.from({ length: currentYear - 2007 }, (_, i) => {
 // Same cascade (manufacturer -> model -> variant, plus a client-generated
 // year list) and the same services VehicleSelectionScreen already uses for
 // the garage "add a vehicle" flow -- no new endpoints.
-export default function VehicleFinder({ onFind, onClear, hasActiveSelection }: VehicleFinderProps) {
+export default function VehicleFinder({ onFind, onClear, hasActiveSelection, vehicleTypeOverride }: VehicleFinderProps) {
   const dispatch = useDispatch();
-  const vehicleType = useSelector((state: RootState) => state.app.vehicleType);
+  const globalVehicleType = useSelector((state: RootState) => state.app.vehicleType);
+  const vehicleType = vehicleTypeOverride ?? globalVehicleType;
 
   const [brands, setBrands] = useState<Option[]>([]);
   const [models, setModels] = useState<Option[]>([]);

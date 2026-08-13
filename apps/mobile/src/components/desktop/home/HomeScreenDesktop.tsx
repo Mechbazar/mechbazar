@@ -1,19 +1,21 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, Alert, StyleSheet } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { View, Text, Pressable, ScrollView, Alert, StyleSheet } from 'react-native';
+import { useFocusEffect, useNavigation, NavigationProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
-import { fetchCategories, getTrendingProducts, fetchBanners } from '../../../services/product.service';
+import { fetchCategories, fetchBanners, fetchHomeExtras, getTrendingProducts, HomeExtras } from '../../../services/product.service';
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../../../services/wishlist.service';
 import { fetchTopVendors, TopVendor } from '../../../services/vendor.service';
-import { Category, Product } from '../../../types/product';
+import { Category, Product, VehicleType } from '../../../types/product';
 import { spacing } from '../../../theme/tokens';
 import { useThemeColors } from '../../../theme/useThemeColors';
 import { setDesktopFullPageScreenActive } from '../../../navigation/desktopFullPageScreenStore';
 import Container from '../shared/Container';
+import CategoryNavStrip from './CategoryNavStrip';
 import HeroCarousel from './HeroCarousel';
 import CategoryGridDesktop from './CategoryGridDesktop';
 import ProductRail from './ProductRail';
+import PromoCategoryCards from './PromoCategoryCards';
 import BrandsRow from './BrandsRow';
 import { MechanicServicesSection, GarageServicesSection } from './ServiceHighlights';
 import TopVendorsRow from './TopVendorsRow';
@@ -27,26 +29,44 @@ import ErrorState, { ErrorKind, classifyError } from '../states/ErrorState';
 import EmptyState from '../states/EmptyState';
 
 const FETCH_TIMEOUT_MS = 15000;
+const EMPTY_EXTRAS: HomeExtras = { deals: [], featured: [], bestSellers: [], brands: [] };
 
-function SectionHeading({ children }: { children: React.ReactNode }) {
+function SectionHeading({
+  children, actionLabel, onAction,
+}: { children: React.ReactNode; actionLabel?: string; onAction?: () => void }) {
   const colors = useThemeColors();
-  return <Text style={[styles.sectionTitle, { color: colors.textDark }]}>{children}</Text>;
+  return (
+    <View style={styles.sectionHeadingRow}>
+      <Text style={[styles.sectionTitle, { color: colors.textDark }]}>{children}</Text>
+      {!!actionLabel && !!onAction && (
+        <Pressable onPress={onAction}>
+          <Text style={[styles.sectionAction, { color: colors.primary }]}>{actionLabel}</Text>
+        </Pressable>
+      )}
+    </View>
+  );
 }
 
 // The desktop-only Home screen (rendered by HomeScreen.web.tsx at desktop
 // widths). Fetches the same data via the same services the mobile Home
-// screen uses (fetchCategories/getTrendingProducts/fetchBanners/
-// fetchMyWishlist) independently, rather than being prop-driven, so it stays
-// fully decoupled from HomeScreenMobile.tsx -- editing one can't break the
-// other. No new backend endpoints anywhere in this tree.
+// screen uses, plus fetchHomeExtras (GET /api/home -- deals/featured/
+// bestSellers/brands, previously unused by any frontend) and two explicit
+// getTrendingProducts('BIKE'|'CAR', 8) calls so the Popular Bike Parts /
+// Car Parts & Accessories rails can both show up regardless of the app's
+// single global vehicle filter (there's no car/bike toggle in the desktop
+// header to conflict with). Stays fully decoupled from HomeScreenMobile.tsx
+// -- editing one can't break the other. No new backend endpoints.
 export default function HomeScreenDesktop() {
   const colors = useThemeColors();
+  const navigation = useNavigation<NavigationProp<any>>();
   const token = useSelector((state: RootState) => state.auth.token);
   const vehicleType = useSelector((state: RootState) => state.app.vehicleType);
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [banners, setBanners] = useState<any[]>([]);
-  const [trending, setTrending] = useState<Product[]>([]);
+  const [homeExtras, setHomeExtras] = useState<HomeExtras>(EMPTY_EXTRAS);
+  const [bikeParts, setBikeParts] = useState<Product[]>([]);
+  const [carParts, setCarParts] = useState<Product[]>([]);
   const [topVendors, setTopVendors] = useState<TopVendor[]>([]);
   const [wishlist, setWishlist] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
@@ -70,17 +90,17 @@ export default function HomeScreenDesktop() {
 
     Promise.all([
       fetchCategories(vehicleType, { rethrow: true, signal: controller.signal }),
-      // Fetched at 20 (not just the 8 actually shown in the "Trending" rail)
-      // so Best Sellers / Flash Deals / Special Offers / Popular Brands below
-      // have a wider real pool to derive from instead of all reslicing the
-      // same 8 items.
-      getTrendingProducts(vehicleType, 20, { rethrow: true, signal: controller.signal }),
       fetchBanners(vehicleType, { rethrow: true, signal: controller.signal }),
+      fetchHomeExtras(vehicleType, { rethrow: true, signal: controller.signal }),
+      getTrendingProducts(VehicleType.BIKE, 8, { rethrow: true, signal: controller.signal }),
+      getTrendingProducts(VehicleType.CAR, 8, { rethrow: true, signal: controller.signal }),
     ])
-      .then(([cats, trend, banns]) => {
+      .then(([cats, banns, extras, bikes, cars]) => {
         setCategories(cats);
-        setTrending(trend);
         setBanners(banns);
+        setHomeExtras(extras);
+        setBikeParts(bikes);
+        setCarParts(cars);
       })
       .catch((err) => setError(classifyError(err)))
       .finally(() => {
@@ -111,27 +131,20 @@ export default function HomeScreenDesktop() {
     if (!result.ok) setWishlist(prev => ({ ...prev, [id]: was }));
   };
 
-  const bestSellers = useMemo(
-    () => [...trending].sort((a, b) => (b.reviewsCount ?? 0) - (a.reviewsCount ?? 0)).slice(0, 8),
-    [trending],
-  );
-  const flashDeals = useMemo(
-    () => trending.filter(p => (p.discountPercentage ?? 0) > 0).sort((a, b) => (b.discountPercentage ?? 0) - (a.discountPercentage ?? 0)).slice(0, 8),
-    [trending],
-  );
-  // Distinct from Flash Deals (any discounted product, ranked by discount%):
-  // this is the Product.isDeal flag, which a vendor/admin sets explicitly to
-  // curate a promotion -- not every discounted product is a "special offer".
-  const specialOffers = useMemo(
-    () => trending.filter(p => p.isDeal).slice(0, 8),
-    [trending],
-  );
-  const brands = useMemo(
-    () => Array.from(new Set(trending.map(p => p.brand).filter(Boolean))).slice(0, 10),
-    [trending],
+  // Promo cards (brief section 6) reuse whatever real categories already
+  // have an uploaded image, favoring the ones with the most products --
+  // no invented categories or copy.
+  const promoCategories = useMemo(
+    () => [...categories]
+      .filter(c => !!c.image)
+      .sort((a, b) => (b.productCount ?? 0) - (a.productCount ?? 0))
+      .slice(0, 3),
+    [categories],
   );
 
-  const isEmpty = !loading && !error && categories.length === 0 && trending.length === 0 && banners.length === 0;
+  const hasAnyProducts = bikeParts.length > 0 || carParts.length > 0
+    || homeExtras.deals.length > 0 || homeExtras.featured.length > 0 || homeExtras.bestSellers.length > 0;
+  const isEmpty = !loading && !error && categories.length === 0 && banners.length === 0 && !hasAnyProducts;
 
   if (loading) {
     return (
@@ -183,14 +196,54 @@ export default function HomeScreenDesktop() {
 
   return (
     <ScrollView style={[styles.page, { backgroundColor: colors.pageBg }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
+      <CategoryNavStrip categories={categories} />
+
       <Container style={styles.section}>
         <HeroCarousel banners={banners} />
       </Container>
 
       <Container style={styles.section}>
-        <SectionHeading>Shop by Category</SectionHeading>
+        <SectionHeading actionLabel="View All →" onAction={() => navigation.navigate('MainTabs', { screen: 'Categories' })}>Shop by Category</SectionHeading>
         <CategoryGridDesktop categories={categories} />
       </Container>
+
+      {homeExtras.deals.length > 0 && (
+        <Container style={styles.section}>
+          <ProductRail
+            title="Today's Deals"
+            products={homeExtras.deals}
+            wishlist={wishlist}
+            onWishlistToggle={handleWishlistToggle}
+            viewAllSortBy="discount"
+          />
+        </Container>
+      )}
+
+      {bikeParts.length > 0 && (
+        <Container style={styles.section}>
+          <ProductRail
+            title="Popular Bike Parts"
+            products={bikeParts}
+            wishlist={wishlist}
+            onWishlistToggle={handleWishlistToggle}
+            viewAllSortBy="popular"
+            viewAllVehicleType={VehicleType.BIKE}
+          />
+        </Container>
+      )}
+
+      {carParts.length > 0 && (
+        <Container style={styles.section}>
+          <ProductRail
+            title="Car Parts & Accessories"
+            products={carParts}
+            wishlist={wishlist}
+            onWishlistToggle={handleWishlistToggle}
+            viewAllSortBy="popular"
+            viewAllVehicleType={VehicleType.CAR}
+          />
+        </Container>
+      )}
 
       <Container style={styles.section}>
         <SectionHeading>Mechanic Services</SectionHeading>
@@ -202,37 +255,40 @@ export default function HomeScreenDesktop() {
         <GarageServicesSection />
       </Container>
 
-      <Container style={styles.section}>
-        <ProductRail
-          title={`Trending ${vehicleType === 'BIKE' ? 'Bike' : 'Car'} Parts`}
-          products={trending.slice(0, 8)}
-          wishlist={wishlist}
-          onWishlistToggle={handleWishlistToggle}
-        />
-      </Container>
-
-      {bestSellers.length > 0 && (
+      {promoCategories.length > 0 && (
         <Container style={styles.section}>
-          <ProductRail title="Best Sellers" products={bestSellers} wishlist={wishlist} onWishlistToggle={handleWishlistToggle} />
+          <PromoCategoryCards categories={promoCategories} />
         </Container>
       )}
 
-      {specialOffers.length > 0 && (
+      {homeExtras.brands.length > 0 && (
         <Container style={styles.section}>
-          <ProductRail title="Special Offers" products={specialOffers} wishlist={wishlist} onWishlistToggle={handleWishlistToggle} />
+          <SectionHeading>Shop by Brand</SectionHeading>
+          <BrandsRow brands={homeExtras.brands} />
         </Container>
       )}
 
-      {flashDeals.length > 0 && (
+      {homeExtras.featured.length > 0 && (
         <Container style={styles.section}>
-          <ProductRail title="Flash Deals" products={flashDeals} wishlist={wishlist} onWishlistToggle={handleWishlistToggle} />
+          <ProductRail
+            title={`Trending ${vehicleType === 'BIKE' ? 'Bike' : 'Car'} Parts`}
+            products={homeExtras.featured}
+            wishlist={wishlist}
+            onWishlistToggle={handleWishlistToggle}
+            viewAllSortBy="newest"
+          />
         </Container>
       )}
 
-      {brands.length > 0 && (
+      {homeExtras.bestSellers.length > 0 && (
         <Container style={styles.section}>
-          <SectionHeading>Popular Brands</SectionHeading>
-          <BrandsRow brands={brands} />
+          <ProductRail
+            title="Best Sellers"
+            products={homeExtras.bestSellers}
+            wishlist={wishlist}
+            onWishlistToggle={handleWishlistToggle}
+            viewAllSortBy="best_selling"
+          />
         </Container>
       )}
 
@@ -269,5 +325,7 @@ const styles = StyleSheet.create({
   page: { flex: 1 },
   content: { paddingTop: spacing.xl },
   section: { marginBottom: spacing.xxl },
-  sectionTitle: { fontSize: 22, fontWeight: '700', marginBottom: spacing.md },
+  sectionHeadingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
+  sectionTitle: { fontSize: 22, fontWeight: '700' },
+  sectionAction: { fontSize: 14, fontWeight: '700' },
 });
