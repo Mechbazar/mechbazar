@@ -21,3 +21,33 @@ export const notify = (title: string, message?: string): void => {
   }
   Alert.alert(title, message);
 };
+
+// Same reasoning as notify() above, extended to the Yes/No confirm shape
+// Alert.alert's button-array form is used for (delete this address, cancel
+// this booking, ...): on web that form is exactly as dead as the plain
+// single-button call -- no dialog renders, so onPress never fires and the
+// action silently does nothing. window.confirm() is the real browser
+// equivalent (synchronous, but that's fine here -- every call site is
+// already inside an event handler). destructiveLabel/onConfirm mirror the
+// two things every call site actually varied in its Alert.alert button
+// array; cancelLabel matches Alert.alert's implicit default.
+export const confirm = (
+  title: string,
+  message: string,
+  onConfirm: () => void,
+  destructiveLabel = 'OK',
+): void => {
+  if (Platform.OS === 'web') {
+    const text = `${title}\n\n${message}`;
+    if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+      if (window.confirm(text)) onConfirm();
+    } else {
+      console.log(`[confirm] ${text}`);
+    }
+    return;
+  }
+  Alert.alert(title, message, [
+    { text: 'Cancel', style: 'cancel' },
+    { text: destructiveLabel, style: 'destructive', onPress: onConfirm },
+  ]);
+};

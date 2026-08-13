@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Animated, Linking, Alert, ScrollView, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Linking, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -7,6 +7,7 @@ import { RootState } from '../../store';
 import { getSocket, subscribeToJob, SERVER_EVENTS, JobStatusEvent } from '@mechbazar/shared';
 import { ServiceBooking, BookingStatus } from '../../types/service';
 import { fetchBookingById, cancelServiceBooking, respondToBookingApproval, fetchTechnicianPhotoDataUri, fetchBookingImageDataUri } from '../../services/service.service';
+import { confirm, notify } from '../../utils/notify';
 import { HeaderCartButton } from '../../components/HeaderCartButton';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
@@ -214,22 +215,17 @@ export default function ServiceTrackingScreen() {
   }, [token, imageIdsKey]);
 
   const handleCancel = () => {
-    Alert.alert('Cancel booking', 'Are you sure you want to cancel this service booking?', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Yes, cancel', style: 'destructive', onPress: async () => {
-          if (!token) return;
-          setCancelling(true);
-          const res = await cancelServiceBooking(token, bookingId);
-          setCancelling(false);
-          if (!res.ok) Alert.alert('Error', res.error || 'Failed to cancel booking');
-          else {
-            const data = await fetchBookingById(token, bookingId);
-            if (data) setBooking(data);
-          }
-        },
-      },
-    ]);
+    confirm('Cancel booking', 'Are you sure you want to cancel this service booking?', async () => {
+      if (!token) return;
+      setCancelling(true);
+      const res = await cancelServiceBooking(token, bookingId);
+      setCancelling(false);
+      if (!res.ok) notify('Error', res.error || 'Failed to cancel booking');
+      else {
+        const data = await fetchBookingById(token, bookingId);
+        if (data) setBooking(data);
+      }
+    }, 'Yes, cancel');
   };
 
   const handleApproval = async (approve: boolean) => {
@@ -237,7 +233,7 @@ export default function ServiceTrackingScreen() {
     setRespondingApproval(true);
     const res = await respondToBookingApproval(token, bookingId, approve);
     setRespondingApproval(false);
-    if (!res.ok) Alert.alert('Error', res.error || 'Failed to respond');
+    if (!res.ok) notify('Error', res.error || 'Failed to respond');
     else {
       const data = await fetchBookingById(token, bookingId);
       if (data) setBooking(data);
