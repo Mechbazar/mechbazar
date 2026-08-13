@@ -2,8 +2,6 @@ import React, { useRef, useState } from 'react';
 import { View, Text, Pressable, Linking, Platform, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
-import { useSelector } from 'react-redux';
-import { RootState } from '../../../store';
 import { Logo } from '@mechbazar/shared';
 import { colors, spacing, radius } from '../../../theme/tokens';
 import { useBreakpoint } from '../../../hooks/useBreakpoint';
@@ -21,9 +19,10 @@ import Container from '../shared/Container';
 //     tab").
 //   - "Your Account" -> AccountDashboard, the same screen DesktopHeader's
 //     avatar/name click already opens (kept consistent with the header).
-//   - "Become a Vendor" reuses DesktopFooter's pre-existing logged-in
-//     exception: an already-registered vendor opens the live
-//     vendor.mechbazar.com portal instead of the signup form.
+//   - "Become a Vendor" always opens the live vendor.mechbazar.com portal
+//     (external), not WholesaleRegistration -- that screen creates a
+//     customer bulk-buyer account (accountType: 'WHOLESALE'), unrelated to
+//     becoming a marketplace seller.
 // "Become a Rider" was requested by the design brief but has no existing
 // page or signup flow anywhere in this app, so it's intentionally omitted
 // rather than linked to a placeholder.
@@ -47,7 +46,11 @@ const SHOP_AND_SERVICES: FooterLinkItem[] = [
 ];
 
 const PARTNER_WITH_US: FooterLinkItem[] = [
-  { label: 'Become a Vendor', onPress: nav => nav.navigate('WholesaleRegistration') },
+  // Not WholesaleRegistration -- that screen posts accountType: 'WHOLESALE'
+  // to /auth/register, i.e. a customer bulk-buyer account, unrelated to
+  // becoming a marketplace seller. Vendor signup/management actually lives
+  // on the separate vendor portal.
+  { label: 'Become a Vendor', onPress: () => Linking.openURL('https://vendor.mechbazar.com') },
   { label: 'Become a Mechanic', onPress: nav => nav.navigate('StaticPage', { page: 'become-mechanic' }) },
 ];
 
@@ -73,15 +76,14 @@ const BOTTOM_BAR_LINKS: FooterLinkItem[] = [
   { label: 'Account Deletion', onPress: nav => nav.navigate('StaticPage', { page: 'account-deletion' }) },
 ];
 
-function FooterLink({ label, onPress, token, dense }: { label: string; onPress: (nav: NavigationProp<any>) => void; token: string | null; dense?: boolean }) {
+function FooterLink({ label, onPress, dense }: { label: string; onPress: (nav: NavigationProp<any>) => void; dense?: boolean }) {
   const navigation = useNavigation<NavigationProp<any>>();
-  const isVendorLinkForLoggedIn = label === 'Become a Vendor' && !!token;
 
   return (
     <Pressable
       accessibilityRole="link"
       accessibilityLabel={label}
-      onPress={() => (isVendorLinkForLoggedIn ? Linking.openURL('https://vendor.mechbazar.com') : onPress(navigation))}
+      onPress={() => onPress(navigation)}
       style={[styles.linkRow, dense && styles.linkRowDense]}
     >
       {({ hovered, focused }: any) => (
@@ -95,8 +97,8 @@ function FooterLink({ label, onPress, token, dense }: { label: string; onPress: 
 // accessible expand/collapse section (aria-expanded via accessibilityState)
 // on mobile, per column -- each section opens independently.
 function FooterColumn({
-  title, links, token, collapsible,
-}: { title: string; links: FooterLinkItem[]; token: string | null; collapsible: boolean }) {
+  title, links, collapsible,
+}: { title: string; links: FooterLinkItem[]; collapsible: boolean }) {
   const [open, setOpen] = useState(false);
 
   if (!collapsible) {
@@ -105,7 +107,7 @@ function FooterColumn({
         <Text style={styles.columnTitle}>{title}</Text>
         <View style={styles.columnLinks}>
           {links.map(link => (
-            <FooterLink key={link.label} label={link.label} onPress={link.onPress} token={token} />
+            <FooterLink key={link.label} label={link.label} onPress={link.onPress} />
           ))}
         </View>
       </View>
@@ -127,7 +129,7 @@ function FooterColumn({
       {open && (
         <View style={styles.mobileColumnLinks}>
           {links.map(link => (
-            <FooterLink key={link.label} label={link.label} onPress={link.onPress} token={token} dense />
+            <FooterLink key={link.label} label={link.label} onPress={link.onPress} dense />
           ))}
         </View>
       )}
@@ -184,7 +186,6 @@ function BackToTopBar() {
 }
 
 export default function DesktopFooter() {
-  const token = useSelector((state: RootState) => state.auth.token);
   const { breakpoint } = useBreakpoint();
   const isMobileLayout = breakpoint === 'mobile';
 
@@ -205,11 +206,11 @@ export default function DesktopFooter() {
         </View>
 
         <View style={[styles.grid, isMobileLayout && styles.gridMobile]}>
-          <FooterColumn title="Get to Know Us" links={GET_TO_KNOW_US} token={token} collapsible={isMobileLayout} />
-          <FooterColumn title="Shop & Services" links={SHOP_AND_SERVICES} token={token} collapsible={isMobileLayout} />
-          <FooterColumn title="Partner With Us" links={PARTNER_WITH_US} token={token} collapsible={isMobileLayout} />
-          <FooterColumn title="Let Us Help You" links={LET_US_HELP_YOU} token={token} collapsible={isMobileLayout} />
-          <FooterColumn title="Policies" links={POLICIES} token={token} collapsible={isMobileLayout} />
+          <FooterColumn title="Get to Know Us" links={GET_TO_KNOW_US} collapsible={isMobileLayout} />
+          <FooterColumn title="Shop & Services" links={SHOP_AND_SERVICES} collapsible={isMobileLayout} />
+          <FooterColumn title="Partner With Us" links={PARTNER_WITH_US} collapsible={isMobileLayout} />
+          <FooterColumn title="Let Us Help You" links={LET_US_HELP_YOU} collapsible={isMobileLayout} />
+          <FooterColumn title="Policies" links={POLICIES} collapsible={isMobileLayout} />
         </View>
       </Container>
 
@@ -225,7 +226,7 @@ export default function DesktopFooter() {
           <Text style={styles.copyright}>© {new Date().getFullYear()} MechBazar. All rights reserved.</Text>
           <View style={[styles.bottomLinks, isMobileLayout && styles.bottomLinksMobile]}>
             {BOTTOM_BAR_LINKS.map(link => (
-              <FooterLink key={link.label} label={link.label} onPress={link.onPress} token={token} />
+              <FooterLink key={link.label} label={link.label} onPress={link.onPress} />
             ))}
           </View>
         </Container>
