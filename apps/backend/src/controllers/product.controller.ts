@@ -118,9 +118,9 @@ export const getProducts = async (req: AuthRequest, res: Response) => {
       ...(categoryName && { category: { name: String(categoryName) } }),
       ...(resolvedSearch && {
         OR: [
-          { name: { contains: String(resolvedSearch) } }, // No mode insensitive since Prisma MySQL doesn't strictly need it if collation is CI, but can add it if needed.
-          { oemNumber: { contains: String(resolvedSearch) } },
-          { description: { contains: String(resolvedSearch) } }
+          { name: { contains: String(resolvedSearch), mode: 'insensitive' as const } },
+          { oemNumber: { contains: String(resolvedSearch), mode: 'insensitive' as const } },
+          { description: { contains: String(resolvedSearch), mode: 'insensitive' as const } }
         ]
       }),
       ...((vehicleId || vehicleMake || vehicleModel) && {
@@ -217,8 +217,8 @@ export const getSearchSuggestions = async (req: Request, res: Response) => {
         status: 'APPROVED',
         ...(resolvedVehicleType && { vehicleType: resolvedVehicleType }),
         OR: [
-          { name: { contains: q } },
-          { oemNumber: { contains: q } },
+          { name: { contains: q, mode: 'insensitive' as const } },
+          { oemNumber: { contains: q, mode: 'insensitive' as const } },
         ],
       },
       select: { id: true, name: true, images: true, price: true, category: { select: { name: true } } },
