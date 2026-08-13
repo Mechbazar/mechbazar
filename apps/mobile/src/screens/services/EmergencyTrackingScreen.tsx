@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import {
@@ -10,6 +10,7 @@ import LiveTrackingMap from '../../components/shared/maps/LiveTrackingMap';
 import AssignmentWaitingCard from '../../components/services/AssignmentWaitingCard';
 import { useIsDarkMode } from '../../theme/useThemeColors';
 import { useTranslation } from 'react-i18next';
+import { notify, confirm } from '../../utils/notify';
 
 // Live emergency job tracking. Distinct from ServiceTrackingScreen (the
 // scheduled-booking tracker, which polls every 10s) because "instant" only
@@ -168,24 +169,19 @@ export default function EmergencyTrackingScreen() {
   }, [bookingId, refresh]);
 
   const handleCancel = () => {
-    Alert.alert('Cancel request', 'Are you sure you want to cancel this emergency request?', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Yes, cancel', style: 'destructive', onPress: async () => {
-          setCancelling(true);
-          const res = await jobService.cancelJob(bookingId, 'Cancelled by customer');
-          setCancelling(false);
-          if (!res.ok) Alert.alert('Error', res.error || 'Failed to cancel');
-          else refresh();
-        },
-      },
-    ]);
+    confirm('Cancel request', 'Are you sure you want to cancel this emergency request?', async () => {
+      setCancelling(true);
+      const res = await jobService.cancelJob(bookingId, 'Cancelled by customer');
+      setCancelling(false);
+      if (!res.ok) notify('Error', res.error || 'Failed to cancel');
+      else refresh();
+    }, 'Yes, cancel');
   };
 
   const handleCall = async () => {
     const res = await jobService.callCounterparty(bookingId);
     if ('error' in res) {
-      Alert.alert('Cannot call right now', res.error);
+      notify('Cannot call right now', res.error);
     } else {
       setCallMessage(res.message);
       setTimeout(() => setCallMessage(null), 6000);
@@ -197,7 +193,7 @@ export default function EmergencyTrackingScreen() {
     setSubmittingRating(true);
     const res = await jobService.rateJob(bookingId, rating, comment || undefined);
     setSubmittingRating(false);
-    if (!res.ok) Alert.alert('Error', res.error || 'Failed to submit rating');
+    if (!res.ok) notify('Error', res.error || 'Failed to submit rating');
     else refresh();
   };
 

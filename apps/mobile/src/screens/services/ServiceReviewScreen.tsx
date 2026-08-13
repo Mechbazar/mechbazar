@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, TextInput, Alert, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, TextInput, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { submitBookingReview } from '../../services/service.service';
+import { notify } from '../../utils/notify';
 import { useIsDarkMode } from '../../theme/useThemeColors';
 import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
@@ -41,12 +42,10 @@ export default function ServiceReviewScreen() {
     const res = await submitBookingReview(token, bookingId, rating, comment || undefined);
     setSubmitting(false);
     if (!res.ok) {
-      Alert.alert('Error', res.error || 'Failed to submit review');
+      notify('Error', res.error || 'Failed to submit review');
       return;
     }
-    Alert.alert('Thank you!', 'Your review has been submitted.', [
-      { text: 'OK', onPress: () => navigation.goBack() },
-    ]);
+    notify('Thank you!', 'Your review has been submitted.', () => navigation.goBack());
   };
 
   return (

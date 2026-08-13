@@ -7,8 +7,7 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  ScrollView,
-  Alert
+  ScrollView
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDispatch } from 'react-redux';
@@ -20,6 +19,7 @@ import { useBreakpoint } from '../../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
 import Container from '../../components/desktop/shared/Container';
 import { spacing as deskSpacing, radius as deskRadius } from '../../theme/tokens';
+import { notify } from '../../utils/notify';
 
 const colors = {
   primary: '#DA3830',
@@ -252,11 +252,11 @@ export default function WholesaleRegistrationScreen() {
   const handleRegister = async () => {
     // Validations
     if (!companyName || !contactPerson || !phone || !email || !password || !city || !state) {
-      Alert.alert('Validation Error', 'Please fill in all required fields.');
+      notify('Validation Error', 'Please fill in all required fields.');
       return;
     }
     if (phone.length < 10) {
-      Alert.alert('Validation Error', 'Please enter a valid 10-digit mobile number.');
+      notify('Validation Error', 'Please enter a valid 10-digit mobile number.');
       return;
     }
 
@@ -286,23 +286,18 @@ export default function WholesaleRegistrationScreen() {
       const data = await res.json();
 
       if (res.ok) {
-        Alert.alert('Success', 'Wholesale registration successful!', [
-          {
-            text: 'OK',
-            onPress: () => {
-              dispatch(loginSuccess({
-                user: data.user,
-                token: data.token
-              }));
-            }
-          }
-        ]);
+        notify('Success', 'Wholesale registration successful!', () => {
+          dispatch(loginSuccess({
+            user: data.user,
+            token: data.token
+          }));
+        });
       } else {
-        Alert.alert('Registration Failed', data.error || 'Something went wrong.');
+        notify('Registration Failed', data.error || 'Something went wrong.');
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      Alert.alert('Network Error', `Could not complete registration: ${message}`);
+      notify('Network Error', `Could not complete registration: ${message}`);
     } finally {
       setIsLoading(false);
     }

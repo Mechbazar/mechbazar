@@ -4,9 +4,8 @@ import {
   Text, 
   TouchableOpacity, 
   StyleSheet, 
-  FlatList, 
-  Alert, 
-  TextInput, 
+  FlatList,
+  TextInput,
   ActivityIndicator, 
   Modal, 
   Platform,
@@ -35,6 +34,7 @@ import CompactBookingShell from '../components/desktop/shared/CompactBookingShel
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 import { useIsDarkMode } from '../theme/useThemeColors';
 import { useTranslation } from 'react-i18next';
+import { notify, confirm } from '../utils/notify';
 
 // `secondary` is a fixed dark header/button bar (already dark in light mode),
 // deliberately unchanged in dark mode. `white` is text-on-that-bar blended
@@ -200,24 +200,24 @@ export default function AddressManagementScreen() {
     try {
       const coords = await locationService.getCurrentLocation();
       if (!coords) {
-        Alert.alert('GPS Error', 'Failed to retrieve coordinates. Please check your permissions.');
+        notify('GPS Error', 'Failed to retrieve coordinates. Please check your permissions.');
         return;
       }
       if (!token) return;
       const result = await reverseGeocode(token, coords.latitude, coords.longitude);
       if (result.ok) {
         applyGeocodeResult(result);
-        Alert.alert('GPS Success', 'Location loaded successfully!');
+        notify('GPS Success', 'Location loaded successfully!');
       } else {
         // Still keep the raw coordinates even if reverse geocoding is
         // unavailable -- the pin/lat/lng are still useful without an address.
         setLat(coords.latitude);
         setLng(coords.longitude);
-        Alert.alert('GPS Error', 'Got your location, but could not resolve it to an address. You can drop the pin manually.');
+        notify('GPS Error', 'Got your location, but could not resolve it to an address. You can drop the pin manually.');
       }
     } catch (e) {
       console.error(e);
-      Alert.alert('GPS Error', 'An error occurred while loading GPS.');
+      notify('GPS Error', 'An error occurred while loading GPS.');
     } finally {
       setFetchingGPS(false);
     }
@@ -256,7 +256,7 @@ export default function AddressManagementScreen() {
     ].filter(([value]) => !String(value ?? '').trim()).map(([, label]) => label);
 
     if (missing.length > 0) {
-      Alert.alert('Missing details', `Please fill in: ${missing.join(', ')}.`);
+      notify('Missing details', `Please fill in: ${missing.join(', ')}.`);
       return;
     }
 
@@ -285,9 +285,9 @@ export default function AddressManagementScreen() {
         if (res.address) {
           setModalVisible(false);
           await loadAddresses();
-          Alert.alert('Success', 'Address updated successfully!');
+          notify('Success', 'Address updated successfully!');
         } else {
-          Alert.alert('Error', res.error || 'Failed to update address.');
+          notify('Error', res.error || 'Failed to update address.');
         }
       } else {
         // Create mode
@@ -295,9 +295,9 @@ export default function AddressManagementScreen() {
         if (res.address) {
           setModalVisible(false);
           await loadAddresses();
-          Alert.alert('Success', 'Address created successfully!');
+          notify('Success', 'Address created successfully!');
         } else {
-          Alert.alert('Error', res.error || 'Failed to create address.');
+          notify('Error', res.error || 'Failed to create address.');
         }
       }
     } finally {
@@ -308,25 +308,18 @@ export default function AddressManagementScreen() {
   };
 
   const handleDelete = async (id: string) => {
-    Alert.alert('Delete Address', 'Are you sure you want to delete this address?', [
-      { text: 'Cancel', style: 'cancel' },
-      { 
-        text: 'Delete', 
-        style: 'destructive',
-        onPress: async () => {
-          if (!token) return;
-          setLoading(true);
-          const res = await deleteMyAddress(token, id);
-          if (res.ok) {
-            loadAddresses();
-            Alert.alert('Success', 'Address deleted successfully.');
-          } else {
-            Alert.alert('Error', res.error || 'Failed to delete address.');
-          }
-          setLoading(false);
-        }
+    confirm('Delete Address', 'Are you sure you want to delete this address?', async () => {
+      if (!token) return;
+      setLoading(true);
+      const res = await deleteMyAddress(token, id);
+      if (res.ok) {
+        loadAddresses();
+        notify('Success', 'Address deleted successfully.');
+      } else {
+        notify('Error', res.error || 'Failed to delete address.');
       }
-    ]);
+      setLoading(false);
+    }, 'Delete');
   };
 
   const handleSetDefault = async (addr: any) => {
@@ -336,7 +329,7 @@ export default function AddressManagementScreen() {
     if (res.address) {
       loadAddresses();
     } else {
-      Alert.alert('Error', res.error || 'Failed to update address default status.');
+      notify('Error', res.error || 'Failed to update address default status.');
     }
     setLoading(false);
   };

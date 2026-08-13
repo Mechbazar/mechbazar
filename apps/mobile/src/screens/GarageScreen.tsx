@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   FlatList,
-  Alert,
   Modal,
   TextInput,
   Platform,
@@ -23,6 +22,7 @@ import { useBreakpoint } from '../hooks/useBreakpoint';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
+import { notify, confirm } from '../utils/notify';
 
 const colors = {
   primary: '#DA3830',
@@ -89,30 +89,23 @@ export default function GarageScreen() {
     setBusyId(null);
     if (!result.vehicle) {
       dispatch(hydrateGarage({ myGarage: prevGarage, activeVehicleId: prevGarage.find(v => v.isDefault)?.id ?? null }));
-      Alert.alert('Error', result.error || 'Failed to set default vehicle');
+      notify('Error', result.error || 'Failed to set default vehicle');
     }
   };
 
   const handleDeleteVehicle = (id: string) => {
-    Alert.alert('Delete Vehicle', 'Are you sure you want to remove this vehicle from your garage?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          if (!token) return;
-          setBusyId(id);
-          const result = await deleteMyVehicle(token, id);
-          setBusyId(null);
-          if (!result.ok) {
-            Alert.alert('Error', result.error || 'Failed to remove vehicle');
-            return;
-          }
-          dispatch(removeVehicleFromGarage(id));
-          Alert.alert('Deleted', 'Vehicle removed.');
-        }
+    confirm('Delete Vehicle', 'Are you sure you want to remove this vehicle from your garage?', async () => {
+      if (!token) return;
+      setBusyId(id);
+      const result = await deleteMyVehicle(token, id);
+      setBusyId(null);
+      if (!result.ok) {
+        notify('Error', result.error || 'Failed to remove vehicle');
+        return;
       }
-    ]);
+      dispatch(removeVehicleFromGarage(id));
+      notify('Deleted', 'Vehicle removed.');
+    }, 'Delete');
   };
 
   const handleOpenEditModal = (veh: any) => {
@@ -129,12 +122,12 @@ export default function GarageScreen() {
     const result = await updateMyVehicle(token, selectedVehicle.id, { nickname, trim, registrationNumber });
     setSavingEdit(false);
     if (!result.vehicle) {
-      Alert.alert('Error', result.error || 'Failed to update vehicle');
+      notify('Error', result.error || 'Failed to update vehicle');
       return;
     }
     dispatch(updateVehicleInGarage({ ...selectedVehicle, nickname, trim, registrationNumber }));
     setEditModalVisible(false);
-    Alert.alert('Success', 'Vehicle details updated successfully!');
+    notify('Success', 'Vehicle details updated successfully!');
   };
 
   const renderHeader = () => (

@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StyleSheet, 
-  ScrollView, 
-  Alert, 
-  Image, 
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Image,
   Modal, 
   Dimensions, 
   Switch,
@@ -32,6 +31,7 @@ import { API_BASE_URL, SERVER_ORIGIN } from '../services/api';
 import { fetchMyBookings, cancelServiceBooking } from '../services/service.service';
 import { sendPhoneOtp, confirmPhoneOtp, watchForAutoVerification } from '../services/phoneAuth';
 import { SUPPORT_PHONE_E164, buildSupportWhatsAppUrl } from '../config/support';
+import { notify, confirm } from '../utils/notify';
 
 const { width } = Dimensions.get('window');
 
@@ -176,7 +176,7 @@ export default function AccountScreen() {
     setIsNotificationsEnabled(value);
     try {
       await AsyncStorage.setItem('@mechbazar_notifications', String(value));
-      Alert.alert('Notifications', value ? 'Push notifications enabled. You will receive updates about your bookings.' : 'Push notifications disabled.');
+      notify('Notifications', value ? 'Push notifications enabled. You will receive updates about your bookings.' : 'Push notifications disabled.');
     } catch (e) {
       console.error(e);
     }
@@ -198,12 +198,12 @@ export default function AccountScreen() {
       if (!res.ok) throw new Error('bad response');
       const data = await res.json();
       if (data.upToDate) {
-        Alert.alert(t('account.checkForUpdates'), t('account.latestVersionMsg'));
+        notify(t('account.checkForUpdates'), t('account.latestVersionMsg'));
       } else {
-        Alert.alert(t('account.checkForUpdates'), t('account.updateAvailableMsg', { version: data.latestVersion }));
+        notify(t('account.checkForUpdates'), t('account.updateAvailableMsg', { version: data.latestVersion }));
       }
     } catch (e) {
-      Alert.alert(t('account.checkForUpdates'), t('account.checkForUpdatesFailedMsg'));
+      notify(t('account.checkForUpdates'), t('account.checkForUpdatesFailedMsg'));
     } finally {
       setIsCheckingForUpdate(false);
     }
@@ -211,15 +211,15 @@ export default function AccountScreen() {
 
   const handleChangePassword = async () => {
     if (!newPassword.trim() || !confirmPassword.trim()) {
-      Alert.alert('Validation Error', 'Please fill in all fields.');
+      notify('Validation Error', 'Please fill in all fields.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      Alert.alert('Validation Error', 'New passwords do not match.');
+      notify('Validation Error', 'New passwords do not match.');
       return;
     }
     if (newPassword.length < 6) {
-      Alert.alert('Validation Error', 'New password must be at least 6 characters.');
+      notify('Validation Error', 'New password must be at least 6 characters.');
       return;
     }
     try {
@@ -230,17 +230,17 @@ export default function AccountScreen() {
       });
       const data = await res.json();
       if (!res.ok) {
-        Alert.alert('Error', data.error || 'Failed to change password.');
+        notify('Error', data.error || 'Failed to change password.');
         return;
       }
       setIsChangePasswordModalVisible(false);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      Alert.alert('Success', 'Your password has been updated.');
+      notify('Success', 'Your password has been updated.');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      Alert.alert('Network Error', `Could not update password: ${message}`);
+      notify('Network Error', `Could not update password: ${message}`);
     }
   };
 
@@ -261,17 +261,17 @@ export default function AccountScreen() {
       });
       const data = await res.json();
       if (!res.ok) {
-        Alert.alert('Error', data.error || 'Failed to update phone number.');
+        notify('Error', data.error || 'Failed to update phone number.');
         return;
       }
       setIsChangePhoneModalVisible(false);
       setOtpCode('');
       setNewPhone('');
       if (user) dispatch(updateUserSuccess({ ...user, phone: data.phone }));
-      Alert.alert('Success', 'Phone number updated successfully!');
+      notify('Success', 'Phone number updated successfully!');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      Alert.alert('Network Error', `Could not update phone number: ${message}`);
+      notify('Network Error', `Could not update phone number: ${message}`);
     } finally {
       completingPhoneUpdateRef.current = false;
       setIsVerifyingPhone(false);
@@ -291,7 +291,7 @@ export default function AccountScreen() {
 
   const handleSendPhoneOtp = async () => {
     if (!newPhone.trim() || newPhone.length < 10) {
-      Alert.alert('Validation Error', 'Please enter a valid 10-digit mobile number.');
+      notify('Validation Error', 'Please enter a valid 10-digit mobile number.');
       return;
     }
     setIsVerifyingPhone(true);
@@ -307,10 +307,10 @@ export default function AccountScreen() {
         return;
       }
       setIsOtpSent(true);
-      Alert.alert('Verification Code Sent', 'A 6-digit OTP code has been sent to your new mobile number.');
+      notify('Verification Code Sent', 'A 6-digit OTP code has been sent to your new mobile number.');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      Alert.alert('Error', message || 'Could not send OTP.');
+      notify('Error', message || 'Could not send OTP.');
     } finally {
       setIsVerifyingPhone(false);
     }
@@ -318,7 +318,7 @@ export default function AccountScreen() {
 
   const handleVerifyAndUpdatePhone = async () => {
     if (!otpCode.trim() || otpCode.length < 4) {
-      Alert.alert('Validation Error', 'Please enter a valid OTP code.');
+      notify('Validation Error', 'Please enter a valid OTP code.');
       return;
     }
     setIsVerifyingPhone(true);
@@ -330,7 +330,7 @@ export default function AccountScreen() {
     } catch (err) {
       setIsVerifyingPhone(false);
       const message = err instanceof Error ? err.message : String(err);
-      Alert.alert('Error', message || 'The OTP you entered is incorrect or has expired.');
+      notify('Error', message || 'The OTP you entered is incorrect or has expired.');
       return;
     }
     await completeUpdatePhone(idToken);
@@ -342,27 +342,17 @@ export default function AccountScreen() {
   // Backed by DELETE /customers/me, which anonymises the account in place and
   // keeps only the invoice/tax records Indian law obliges us to retain.
   const handleDeleteAccount = () => {
-    Alert.alert(
+    confirm(
       'Delete Account',
       'This permanently deletes your MechBazar account.\n\n' +
         '• Your profile, saved addresses, garage vehicles, wishlist and notifications are erased\n' +
         '• Your order and booking history will no longer be available to you\n' +
         '• Invoices and tax records are retained for 8 years, as required by Indian law\n\n' +
         'This cannot be undone.',
-      [
-        { text: 'Keep My Account', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          // Second confirmation: a single destructive tap on a list row is too
-          // easy to hit by accident for an irreversible action.
-          onPress: () =>
-            Alert.alert('Are you sure?', 'Deleting your account is permanent and cannot be reversed.', [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Delete Permanently', style: 'destructive', onPress: confirmDeleteAccount },
-            ]),
-        },
-      ]
+      // Second confirmation: a single destructive tap on a list row is too
+      // easy to hit by accident for an irreversible action.
+      () => confirm('Are you sure?', 'Deleting your account is permanent and cannot be reversed.', confirmDeleteAccount, 'Delete Permanently'),
+      'Delete'
     );
   };
 
@@ -379,7 +369,7 @@ export default function AccountScreen() {
       if (!res.ok) {
         // 409 is the expected "you still have work in flight" case, which the
         // user can actually act on -- surface the backend's wording verbatim.
-        Alert.alert(
+        notify(
           res.status === 409 ? 'Finish your active orders first' : 'Could not delete account',
           data?.error || 'Something went wrong. Please try again or contact support.'
         );
@@ -390,14 +380,14 @@ export default function AccountScreen() {
       // rehydrates the now-invalid token on next launch. Keys must match
       // App.tsx's USER_STORAGE_KEY / CART_STORAGE_KEY.
       await AsyncStorage.multiRemove(['mb-user', 'mb-cart-v2']).catch(() => {});
-      Alert.alert(
+      notify(
         'Account Deleted',
         data?.message ||
           'Your account has been deleted. Personal data has been removed. Invoices and tax records are retained as required by Indian law.',
-        [{ text: 'OK', onPress: () => dispatch(logout()) }]
+        () => dispatch(logout())
       );
     } catch (e) {
-      Alert.alert('Could not delete account', 'Please check your connection and try again.');
+      notify('Could not delete account', 'Please check your connection and try again.');
     } finally {
       setIsDeletingAccount(false);
     }
@@ -454,71 +444,53 @@ export default function AccountScreen() {
   }, []);
 
   const handleLogout = () => {
-    Alert.alert('Log out', 'Are you sure you want to log out of Mech Bazar?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log out',
-        style: 'destructive',
-        onPress: async () => {
-          // An Expo push token identifies the device, not the account -- on a
-          // shared/reset device, leaving it registered would keep sending
-          // this account's order/refund notifications to whoever logs in
-          // next. Best-effort: logout proceeds even if this fails.
-          if (token) {
-            try {
-              await Promise.all([
-                fetch(`${API_BASE_URL}/auth/push-token`, {
-                  method: 'DELETE',
-                  headers: { Authorization: `Bearer ${token}` },
-                }),
-                // Web push token is a separate column (User.fcmToken) -- clear
-                // it too so a shared/reset browser doesn't keep this
-                // account's notifications after the next person logs in.
-                fetch(`${API_BASE_URL}/auth/push-token?type=fcm`, {
-                  method: 'DELETE',
-                  headers: { Authorization: `Bearer ${token}` },
-                }),
-              ]);
-            } catch (e) {
-              console.error('Failed to clear push token on logout:', e);
-            }
-          }
-          dispatch(logout());
-        },
-      },
-    ]);
+    confirm('Log out', 'Are you sure you want to log out of Mech Bazar?', async () => {
+      // An Expo push token identifies the device, not the account -- on a
+      // shared/reset device, leaving it registered would keep sending
+      // this account's order/refund notifications to whoever logs in
+      // next. Best-effort: logout proceeds even if this fails.
+      if (token) {
+        try {
+          await Promise.all([
+            fetch(`${API_BASE_URL}/auth/push-token`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            // Web push token is a separate column (User.fcmToken) -- clear
+            // it too so a shared/reset browser doesn't keep this
+            // account's notifications after the next person logs in.
+            fetch(`${API_BASE_URL}/auth/push-token?type=fcm`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+          ]);
+        } catch (e) {
+          console.error('Failed to clear push token on logout:', e);
+        }
+      }
+      dispatch(logout());
+    }, 'Log out');
   };
 
   const handleCancelBooking = (bookingId: string) => {
-    Alert.alert(
-      'Cancel Booking',
-      'Are you sure you want to cancel this service booking?',
-      [
-        { text: 'No', style: 'cancel' },
-        { 
-          text: 'Yes, Cancel', 
-          style: 'destructive',
-          onPress: async () => {
-            if (!token) return;
-            const res = await cancelServiceBooking(token, bookingId, 'Requested from Customer Profile');
-            if (res.ok) {
-              Alert.alert('Cancelled', 'Your service booking has been cancelled successfully.');
-              loadDatabaseData(); // Reload details
-            } else {
-              Alert.alert('Error', res.error || 'Failed to cancel service booking.');
-            }
-          }
-        }
-      ]
-    );
+    confirm('Cancel Booking', 'Are you sure you want to cancel this service booking?', async () => {
+      if (!token) return;
+      const res = await cancelServiceBooking(token, bookingId, 'Requested from Customer Profile');
+      if (res.ok) {
+        notify('Cancelled', 'Your service booking has been cancelled successfully.');
+        loadDatabaseData(); // Reload details
+      } else {
+        notify('Error', res.error || 'Failed to cancel service booking.');
+      }
+    }, 'Yes, Cancel');
   };
 
   const handleEditProfileImage = () => {
-    Alert.alert('Profile Photo', 'Choose from gallery or take a new photo to update.');
+    notify('Profile Photo', 'Choose from gallery or take a new photo to update.');
   };
 
   const handleEditProfile = () => {
-    Alert.alert('Edit Profile', 'Profile details edit form is loading...');
+    notify('Edit Profile', 'Profile details edit form is loading...');
   };
 
   const handleShowCoupons = async () => {
@@ -650,7 +622,7 @@ export default function AccountScreen() {
               <Text style={styles.quickActionLabel}>{t('account.alerts', { count: notificationCount })}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickActionBtn} onPress={() => Alert.alert(t('account.wallet'), `Your ledger balance: ₹${user?.wallet || '0.00'}`)}>
+            <TouchableOpacity style={styles.quickActionBtn} onPress={() => notify(t('account.wallet'), `Your ledger balance: ₹${user?.wallet || '0.00'}`)}>
               <View style={[styles.quickActionIconCircle, { backgroundColor: '#FFF0F6' }]}>
                 <Ionicons name="wallet-outline" size={20} color="#D6336C" />
               </View>
@@ -684,7 +656,7 @@ export default function AccountScreen() {
                   </View>
                 </View>
                 <View style={styles.vehicleBtnRow}>
-                  <TouchableOpacity style={styles.vehicleSecondaryBtn} onPress={() => Alert.alert(t('account.vehicleSpecs'), t('account.vehicleSpecsMsg', { brand: veh.brand, model: veh.model, fuel: veh.fuelType || t('account.petrol') }))}>
+                  <TouchableOpacity style={styles.vehicleSecondaryBtn} onPress={() => notify(t('account.vehicleSpecs'), t('account.vehicleSpecsMsg', { brand: veh.brand, model: veh.model, fuel: veh.fuelType || t('account.petrol') }))}>
                     <Text style={styles.vehicleSecondaryBtnText}>{t('account.viewDetails')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.vehiclePrimaryBtn} onPress={() => navigation.navigate('Services')}>
@@ -746,10 +718,10 @@ export default function AccountScreen() {
                     onPress={() => {
                       if (booking.technician?.user?.phone) {
                         Linking.openURL(`tel:${booking.technician.user.phone}`).catch(() =>
-                          Alert.alert(t('common.error'), t('account.couldNotOpenDialer'))
+                          notify(t('common.error'), t('account.couldNotOpenDialer'))
                         );
                       } else {
-                        Alert.alert(t('account.notAssignedTitle'), t('account.notAssignedMsg'));
+                        notify(t('account.notAssignedTitle'), t('account.notAssignedMsg'));
                       }
                     }}
                   >
@@ -856,20 +828,20 @@ export default function AccountScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={styles.collapsibleItem} onPress={() => {
                 const url = buildSupportWhatsAppUrl('Hello Mech Bazar Support, I need help with my account.');
-                Linking.openURL(url).catch(() => Alert.alert(t('common.error'), t('account.couldNotOpenWhatsApp')));
+                Linking.openURL(url).catch(() => notify(t('common.error'), t('account.couldNotOpenWhatsApp')));
               }}>
                 <Ionicons name="chatbox-ellipses-outline" size={16} color={colors.secondary} />
                 <Text style={styles.collapsibleItemText}>{t('account.startLiveChat')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.collapsibleItem} onPress={() => {
                 const url = buildSupportWhatsAppUrl('Hello Mech Bazar Support, I need help with my bookings.');
-                Linking.openURL(url).catch(() => Alert.alert(t('common.error'), t('account.couldNotLaunchWhatsApp')));
+                Linking.openURL(url).catch(() => notify(t('common.error'), t('account.couldNotLaunchWhatsApp')));
               }}>
                 <Ionicons name="logo-whatsapp" size={16} color="#25D366" />
                 <Text style={styles.collapsibleItemText}>{t('account.whatsappSupport')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.collapsibleItem} onPress={() => {
-                Linking.openURL(`tel:${SUPPORT_PHONE_E164}`).catch(() => Alert.alert(t('common.error'), t('account.callSupportUnavailable')));
+                Linking.openURL(`tel:${SUPPORT_PHONE_E164}`).catch(() => notify(t('common.error'), t('account.callSupportUnavailable')));
               }}>
                 <Ionicons name="call-outline" size={16} color={colors.secondary} />
                 <Text style={styles.collapsibleItemText}>{t('account.callSupport')}</Text>

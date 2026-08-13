@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TextInput,
   ScrollView,
-  Alert,
   Platform,
   Image
 } from 'react-native';
@@ -25,6 +24,7 @@ import CompactBookingShell from '../components/desktop/shared/CompactBookingShel
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 import { useIsDarkMode } from '../theme/useThemeColors';
 import { useTranslation } from 'react-i18next';
+import { notify } from '../utils/notify';
 
 const GENDER_OPTIONS = [
   { value: 'Male', labelKey: 'editProfile.male' },
@@ -91,7 +91,7 @@ export default function EditProfileScreen() {
   const handleChangePhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Allow photo library access to change your profile photo.');
+      notify('Permission needed', 'Allow photo library access to change your profile photo.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -118,19 +118,19 @@ export default function EditProfileScreen() {
       });
       const uploadData = await uploadRes.json();
       if (!uploadRes.ok) {
-        Alert.alert('Upload Failed', uploadData.error || 'Could not upload photo.');
+        notify('Upload Failed', uploadData.error || 'Could not upload photo.');
         return;
       }
       const result2 = await updateMyProfile(token || '', { avatar: uploadData.url });
       if (result2.error) {
-        Alert.alert('Update Failed', result2.error);
+        notify('Update Failed', result2.error);
         return;
       }
       setAvatar(uploadData.url);
       dispatch(updateUserSuccess({ avatar: uploadData.url }));
-      Alert.alert('Success', 'Profile photo updated.');
+      notify('Success', 'Profile photo updated.');
     } catch (e) {
-      Alert.alert('Error', 'Network error while uploading photo.');
+      notify('Error', 'Network error while uploading photo.');
     } finally {
       setUploadingPhoto(false);
     }
@@ -138,11 +138,11 @@ export default function EditProfileScreen() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Validation Error', 'Name cannot be empty.');
+      notify('Validation Error', 'Name cannot be empty.');
       return;
     }
     if (!phone.trim()) {
-      Alert.alert('Validation Error', 'Mobile number cannot be empty.');
+      notify('Validation Error', 'Mobile number cannot be empty.');
       return;
     }
 
@@ -154,14 +154,12 @@ export default function EditProfileScreen() {
     setSaving(false);
 
     if (result.error) {
-      Alert.alert('Update Failed', result.error);
+      notify('Update Failed', result.error);
       return;
     }
 
     dispatch(updateUserSuccess({ name, email, gender, dob }));
-    Alert.alert('Success', 'Profile updated successfully!', [
-      { text: 'OK', onPress: () => navigation.goBack() }
-    ]);
+    notify('Success', 'Profile updated successfully!', () => navigation.goBack());
   };
 
   return (

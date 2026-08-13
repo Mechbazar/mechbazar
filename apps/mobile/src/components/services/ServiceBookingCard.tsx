@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Alert, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Linking } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { ServiceBooking, BookingStatus } from '../../types/service';
 import { cancelServiceBooking, fetchTechnicianPhotoDataUri } from '../../services/service.service';
 import { useIsDarkMode } from '../../theme/useThemeColors';
+import { notify, confirm } from '../../utils/notify';
 
 // File-local copy of screens/services/theme.ts's palette (that file stays a
 // static light-only export for its other, not-yet-converted consumers) --
@@ -147,42 +148,33 @@ export default function ServiceBookingCard({ booking, token, onChanged }: Props)
   };
 
   const handleCancel = () => {
-    Alert.alert('Cancel booking', 'Are you sure you want to cancel this service booking?', [
-      { text: 'No', style: 'cancel' },
-      {
-        text: 'Yes, cancel', style: 'destructive', onPress: async () => {
-          setCancelling(true);
-          const res = await cancelServiceBooking(token, booking.id);
-          setCancelling(false);
-          if (!res.ok) Alert.alert('Error', res.error || 'Failed to cancel booking');
-          else onChanged();
-        },
-      },
-    ]);
+    confirm('Cancel booking', 'Are you sure you want to cancel this service booking?', async () => {
+      setCancelling(true);
+      const res = await cancelServiceBooking(token, booking.id);
+      setCancelling(false);
+      if (!res.ok) notify('Error', res.error || 'Failed to cancel booking');
+      else onChanged();
+    }, 'Yes, cancel');
   };
 
   // No reschedule API exists yet, so offer the honest equivalent built from
   // real endpoints: cancel this booking, then rebook the same package at a
   // fresh date/time.
   const handleReschedule = () => {
-    Alert.alert(
+    confirm(
       'Reschedule booking',
       'To pick a new date or time, cancel this booking and book the same service again at a slot that suits you.',
-      [
-        { text: 'Keep Booking', style: 'cancel' },
-        {
-          text: 'Cancel & Rebook', style: 'destructive', onPress: async () => {
-            setCancelling(true);
-            const res = await cancelServiceBooking(token, booking.id, 'Rescheduled by customer');
-            setCancelling(false);
-            if (!res.ok) Alert.alert('Error', res.error || 'Failed to cancel booking');
-            else {
-              onChanged();
-              goRebook();
-            }
-          },
-        },
-      ]
+      async () => {
+        setCancelling(true);
+        const res = await cancelServiceBooking(token, booking.id, 'Rescheduled by customer');
+        setCancelling(false);
+        if (!res.ok) notify('Error', res.error || 'Failed to cancel booking');
+        else {
+          onChanged();
+          goRebook();
+        }
+      },
+      'Cancel & Rebook'
     );
   };
 

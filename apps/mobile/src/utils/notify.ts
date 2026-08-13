@@ -9,7 +9,7 @@ import { Alert, Platform } from 'react-native';
 // Use this helper instead of Alert.alert for anything that must be visible on
 // web. On native it delegates to the real Alert; on web it falls back to the
 // browser's window.alert so the message actually reaches the user.
-export const notify = (title: string, message?: string): void => {
+export const notify = (title: string, message?: string, onDismiss?: () => void): void => {
   if (Platform.OS === 'web') {
     const text = message ? `${title}\n\n${message}` : title;
     if (typeof window !== 'undefined' && typeof window.alert === 'function') {
@@ -17,9 +17,14 @@ export const notify = (title: string, message?: string): void => {
     } else {
       console.log(`[notify] ${text}`);
     }
+    onDismiss?.();
     return;
   }
-  Alert.alert(title, message);
+  if (onDismiss) {
+    Alert.alert(title, message, [{ text: 'OK', onPress: onDismiss }]);
+  } else {
+    Alert.alert(title, message);
+  }
 };
 
 // Same reasoning as notify() above, extended to the Yes/No confirm shape
