@@ -1,5 +1,5 @@
 import React from 'react';
-import { useBreakpoint } from '../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import HomeScreenMobile from './HomeScreenMobile';
 import HomeScreenDesktop from '../components/desktop/home/HomeScreenDesktop';
 
@@ -7,6 +7,6 @@ import HomeScreenDesktop from '../components/desktop/home/HomeScreenDesktop';
 // platform-extension resolution, same mechanism as DesktopAppShell.web.tsx).
 // Native never sees this file or anything it imports.
 export default function HomeScreen(props: any) {
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   return isDesktopUp ? <HomeScreenDesktop /> : <HomeScreenMobile {...props} />;
 }
