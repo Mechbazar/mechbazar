@@ -496,7 +496,21 @@ function RootNavigator() {
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <OfflineBanner />
-      <NavigationContainer ref={navigationRef} linking={linking}>
+      <NavigationContainer
+        ref={navigationRef}
+        linking={linking}
+        // React Navigation's default web title formatter is `options?.title ??
+        // route?.name` (useDocumentTitle.tsx) -- for some route shapes here
+        // (nested tab screens, CategoryProducts) that resolves to a real
+        // undefined at the time it runs, and `document.title = undefined`
+        // silently coerces to the literal string "undefined" in every browser
+        // tab. No screen in this app sets an explicit `options.title` today,
+        // so this only ever needs the safe fallback -- never leave the tab
+        // title as literal "undefined".
+        documentTitle={{
+          formatter: (options, route) => options?.title ?? route?.name ?? 'MechBazar',
+        }}
+      >
       <DesktopAppShell>
       {/* Guest-first: every screen is registered unconditionally (no
           token ? loggedIn : loggedOut split like App.tsx). Protected screens
