@@ -1015,6 +1015,12 @@ model Banner {
   vehicleType  VehicleType? // null = shown on both CAR and BIKE, same convention as Coupon.vehicleType
   buttonText   String?
   redirectLink String?
+  // When the uploaded image is a pre-designed graphic that already has its own
+  // title/CTA baked in (e.g. a Canva export), the app's own title/subtitle/CTA
+  // overlay duplicates it and the two collide visually. Off = show the raw
+  // image only (still tappable via link/redirectLink); on (default) = today's
+  // behavior, for plain photo banners that rely on the app to render the copy.
+  showOverlay  Boolean     @default(true)
   isActive     Boolean     @default(true)
   startDate    DateTime?
   endDate      DateTime?

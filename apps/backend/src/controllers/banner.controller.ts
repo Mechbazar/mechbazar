@@ -42,7 +42,7 @@ export const getPublicBanners = async (req: Request, res: Response): Promise<voi
 
 export const createBanner = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { title, image, type, link, buttonText, redirectLink, vehicleType, isActive, startDate, endDate } = req.body;
+    const { title, image, type, link, buttonText, redirectLink, vehicleType, showOverlay, isActive, startDate, endDate } = req.body;
 
     if (type && !Object.values(BannerType).includes(type)) {
       res.status(400).json({ error: `Invalid type "${type}". Must be one of ${Object.values(BannerType).join(', ')}.` });
@@ -61,6 +61,7 @@ export const createBanner = async (req: AuthRequest, res: Response): Promise<voi
         // Coupon.vehicleType's convention -- only normalize when a specific
         // CAR/BIKE value was actually chosen.
         vehicleType: vehicleType ? normalizeVehicleType(vehicleType) : null,
+        showOverlay: showOverlay !== undefined ? Boolean(showOverlay) : true,
         isActive: isActive !== undefined ? Boolean(isActive) : true,
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
@@ -81,7 +82,7 @@ export const createBanner = async (req: AuthRequest, res: Response): Promise<voi
 export const updateBanner = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
-    const { title, image, type, link, buttonText, redirectLink, vehicleType, isActive, startDate, endDate } = req.body;
+    const { title, image, type, link, buttonText, redirectLink, vehicleType, showOverlay, isActive, startDate, endDate } = req.body;
 
     if (type && !Object.values(BannerType).includes(type)) {
       res.status(400).json({ error: `Invalid type "${type}". Must be one of ${Object.values(BannerType).join(', ')}.` });
@@ -98,6 +99,7 @@ export const updateBanner = async (req: AuthRequest, res: Response): Promise<voi
         buttonText,
         redirectLink,
         vehicleType: vehicleType !== undefined ? (vehicleType ? normalizeVehicleType(vehicleType) : null) : undefined,
+        showOverlay: showOverlay !== undefined ? Boolean(showOverlay) : undefined,
         isActive: isActive !== undefined ? Boolean(isActive) : undefined,
         startDate: startDate ? new Date(startDate) : startDate === null ? null : undefined,
         endDate: endDate ? new Date(endDate) : endDate === null ? null : undefined,

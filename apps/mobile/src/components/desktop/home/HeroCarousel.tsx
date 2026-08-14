@@ -12,6 +12,7 @@ interface Banner {
   offer: string;
   redirectLink?: string;
   image: { uri: string } | number;
+  showOverlay?: boolean;
 }
 
 // Consumes the exact banners array HomeScreen already fetches via
@@ -58,19 +59,34 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
     }
   };
 
+  // Some banner images are pre-designed graphics with their own baked-in
+  // title/subtitle/CTA (e.g. a Canva export) -- rendering our own title/CTA
+  // text on top of those collides visually with the image's own copy. When
+  // the admin has flagged that, skip the dark tint + text entirely and just
+  // make the raw image itself tappable so the link still works.
+  const showOverlay = banner.showOverlay !== false;
+
   return (
     <View style={styles.wrapper}>
       <Animated.View style={[styles.slide, { opacity: fade }]}>
-        <Image source={banner.image} style={styles.image} resizeMode="cover" />
-        <View style={styles.overlay} />
-        <View style={styles.textBlock}>
-          <Text style={styles.title}>{banner.title}</Text>
-          {!!banner.subtitle && <Text style={styles.subtitle}>{banner.subtitle}</Text>}
-          <Pressable style={({ hovered }: any) => [styles.cta, hovered && styles.ctaHovered]} onPress={handleCta}>
-            <Text style={styles.ctaText}>{banner.offer || 'Shop Now'}</Text>
-            <Ionicons name="arrow-forward" size={16} color={colors.white} />
+        {showOverlay ? (
+          <>
+            <Image source={banner.image} style={styles.image} resizeMode="cover" />
+            <View style={styles.overlay} />
+            <View style={styles.textBlock}>
+              <Text style={styles.title}>{banner.title}</Text>
+              {!!banner.subtitle && <Text style={styles.subtitle}>{banner.subtitle}</Text>}
+              <Pressable style={({ hovered }: any) => [styles.cta, hovered && styles.ctaHovered]} onPress={handleCta}>
+                <Text style={styles.ctaText}>{banner.offer || 'Shop Now'}</Text>
+                <Ionicons name="arrow-forward" size={16} color={colors.white} />
+              </Pressable>
+            </View>
+          </>
+        ) : (
+          <Pressable onPress={handleCta} style={styles.slide}>
+            <Image source={banner.image} style={styles.image} resizeMode="cover" />
           </Pressable>
-        </View>
+        )}
       </Animated.View>
 
       {banners.length > 1 && (

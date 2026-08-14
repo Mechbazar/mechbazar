@@ -41,6 +41,7 @@ export default function Banners() {
     image: '',
     type: 'HOMEPAGE',
     vehicleType: '', // '' = All (Car & Bike), otherwise 'CAR' | 'BIKE'
+    showOverlay: true,
     link: '',
     isActive: true,
     startDate: '',
@@ -73,6 +74,7 @@ export default function Banners() {
         image: banner.image || '',
         type: banner.type || 'HOMEPAGE',
         vehicleType: banner.vehicleType || '',
+        showOverlay: banner.showOverlay ?? true,
         link: banner.link || '',
         isActive: banner.isActive ?? true,
         startDate: banner.startDate ? new Date(banner.startDate).toISOString().split('T')[0] : '',
@@ -81,7 +83,7 @@ export default function Banners() {
     } else {
       setIsEditing(false);
       setFormData({
-        id: '', title: '', image: '', type: 'HOMEPAGE', vehicleType: '', link: '', isActive: true, startDate: '', endDate: ''
+        id: '', title: '', image: '', type: 'HOMEPAGE', vehicleType: '', showOverlay: true, link: '', isActive: true, startDate: '', endDate: ''
       });
     }
     setImageError('');
@@ -195,6 +197,11 @@ export default function Banners() {
                       {banner.vehicleType === 'BIKE' ? 'Bike' : 'Car'} only
                     </Badge>
                   )}
+                  {banner.showOverlay === false && (
+                    <Badge variant="neutral" className="backdrop-blur-sm uppercase">
+                      Image-only
+                    </Badge>
+                  )}
                 </div>
               </div>
               <div className="p-4">
@@ -299,6 +306,17 @@ export default function Banners() {
                 value={formData.image}
                 onChange={(e) => setFormData({...formData, image: e.target.value})}
               />
+            </div>
+
+            <div className="mt-3">
+              <Checkbox
+                label="Overlay a title, subtitle and button on top of this image"
+                checked={formData.showOverlay}
+                onChange={(e) => setFormData({...formData, showOverlay: e.target.checked})}
+              />
+              <p className="text-content-muted text-xs mt-1.5 ml-6">
+                Turn this off if the image is already a finished design with its own text and call-to-action baked in (e.g. exported from Canva) -- otherwise the app's title/button will be drawn on top and collide with it.
+              </p>
             </div>
           </div>
 

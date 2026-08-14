@@ -563,22 +563,34 @@ export default function HomeScreen({ navigation }: any) {
         >
           {banners.map((banner, index) => (
             <View key={banner.id} style={{ width, paddingHorizontal: 16 }}>
-              <ImageBackground
-                source={banner.image}
-                style={styles.fullBanner}
-                imageStyle={{ borderRadius: CARD_RADIUS }}
-              >
-                <View style={styles.bannerGlass}>
-                  <Text style={styles.bannerTitleText}>{banner.title}</Text>
-                  <Text style={styles.bannerSubtitleText}>{banner.subtitle}</Text>
-                  <Text style={styles.bannerOfferText}>{banner.offer}</Text>
+              {banner.showOverlay !== false ? (
+                <ImageBackground
+                  source={banner.image}
+                  style={styles.fullBanner}
+                  imageStyle={{ borderRadius: CARD_RADIUS }}
+                >
+                  <View style={styles.bannerGlass}>
+                    <Text style={styles.bannerTitleText}>{banner.title}</Text>
+                    <Text style={styles.bannerSubtitleText}>{banner.subtitle}</Text>
+                    <Text style={styles.bannerOfferText}>{banner.offer}</Text>
 
-                  <TouchableOpacity style={styles.shopNowBtn} onPress={() => handleBannerPress(banner)} activeOpacity={0.85}>
-                    <Text style={styles.shopNowText}>{t('home.shopNow')}</Text>
-                    <Ionicons name="arrow-forward" size={14} color={colors.white} />
-                  </TouchableOpacity>
-                </View>
-              </ImageBackground>
+                    <TouchableOpacity style={styles.shopNowBtn} onPress={() => handleBannerPress(banner)} activeOpacity={0.85}>
+                      <Text style={styles.shopNowText}>{t('home.shopNow')}</Text>
+                      <Ionicons name="arrow-forward" size={14} color={colors.white} />
+                    </TouchableOpacity>
+                  </View>
+                </ImageBackground>
+              ) : (
+                // Pre-designed graphic with its own baked-in title/CTA (see
+                // Banner.showOverlay) -- show the image as-is, whole thing tappable.
+                <TouchableOpacity activeOpacity={0.9} onPress={() => handleBannerPress(banner)}>
+                  <ImageBackground
+                    source={banner.image}
+                    style={styles.fullBanner}
+                    imageStyle={{ borderRadius: CARD_RADIUS }}
+                  />
+                </TouchableOpacity>
+              )}
             </View>
           ))}
         </ScrollView>

@@ -160,6 +160,10 @@ export const fetchBanners = async (type: VehicleType, opts?: FetchOpts): Promise
         offer: b.buttonText || 'Shop Now',
         redirectLink: b.redirectLink || b.link,
         image: imageUrl ? { uri: imageUrl } : require('../../assets/car_banner.jpg'),
+        // false only when the admin has explicitly marked the image as a
+        // pre-designed graphic that already has its own title/CTA baked in
+        // (see Banner.showOverlay) -- everything else keeps today's overlay.
+        showOverlay: b.showOverlay !== false,
         vehicleType: type
       };
     });
