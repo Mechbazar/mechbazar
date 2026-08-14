@@ -24,6 +24,7 @@ import TopVendorsRow from './TopVendorsRow';
 import NewsletterSection from './NewsletterSection';
 import FinalVehicleCta from './FinalVehicleCta';
 import TrustBadges from './TrustBadges';
+import BenefitsStrip from './BenefitsStrip';
 import Testimonials from './Testimonials';
 import DownloadAppSection from './DownloadAppSection';
 import DesktopFooter from '../footer/DesktopFooter';
@@ -203,19 +204,32 @@ export default function HomeScreenDesktop() {
 
   return (
     <ScrollView style={[styles.page, { backgroundColor: colors.pageBg }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
-      <CategoryNavStrip categories={categories} />
-
-      <Container style={styles.section}>
-        <HeroCarousel banners={banners} />
-      </Container>
-
+      {/* Reference-matched top block: Header (DesktopAppShell) -> Quick
+          Actions -> Shop by Category -> Trust Banner -> Benefits strip,
+          in that exact order. Everything below this block is the app's
+          existing homepage content, restyled to the same design language
+          rather than removed (2026-08-14 redesign). */}
       <Container style={styles.section}>
         <QuickActions />
       </Container>
 
       <Container style={styles.section}>
-        <SectionHeading actionLabel="View All →" onAction={() => navigation.navigate('MainTabs', { screen: 'Categories' })}>Shop by Category</SectionHeading>
+        <SectionHeading actionLabel="View All Categories →" onAction={() => navigation.navigate('MainTabs', { screen: 'Categories' })}>Shop by Category</SectionHeading>
         <CategoryGridDesktop categories={categories} />
+      </Container>
+
+      <Container style={styles.section}>
+        <TrustBadges />
+      </Container>
+
+      <Container style={styles.section}>
+        <BenefitsStrip />
+      </Container>
+
+      <CategoryNavStrip categories={categories} />
+
+      <Container style={styles.section}>
+        <HeroCarousel banners={banners} />
       </Container>
 
       <Container style={styles.section}>
@@ -268,11 +282,6 @@ export default function HomeScreenDesktop() {
       <Container style={styles.section}>
         <SectionHeading>Garage Services</SectionHeading>
         <GarageServicesSection />
-      </Container>
-
-      <Container style={styles.section}>
-        <SectionHeading>Why MechBazar</SectionHeading>
-        <TrustBadges />
       </Container>
 
       {promoCategories.length > 0 && (

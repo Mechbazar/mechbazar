@@ -449,6 +449,22 @@ export const getCategoryProducts = async (
   }
 };
 
+// Grand total across the whole catalog (no vehicleType filter) -- reuses
+// the existing GET /products endpoint's X-Total-Count header (same header
+// getCategoryProducts already reads). Purely for the homepage benefits
+// strip's "Wide Range" stat so it shows a real, live count instead of a
+// hardcoded number that goes stale as the catalog grows.
+export const fetchTotalProductCount = async (opts?: FetchOpts): Promise<number | null> => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/products?limit=1`, { signal: opts?.signal });
+    if (!response.ok) return null;
+    const header = response.headers.get('X-Total-Count');
+    return header ? Number(header) : null;
+  } catch {
+    return null;
+  }
+};
+
 export const getTrendingProducts = async (vehicleType: VehicleType, limit: number = 5, opts?: FetchOpts): Promise<Product[]> => {
   try {
     const response = await fetch(`${API_BASE_URL}/products?vehicleType=${encodeURIComponent(vehicleType)}`, { signal: opts?.signal });

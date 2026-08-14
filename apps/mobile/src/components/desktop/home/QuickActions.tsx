@@ -59,6 +59,7 @@ export default function QuickActions() {
             <Text style={styles.title}>{action.title}</Text>
             <Text style={styles.desc} numberOfLines={1}>{action.desc}</Text>
           </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
         </Pressable>
       ))}
     </View>
@@ -77,12 +78,13 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.borderLight,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     paddingHorizontal: spacing.md,
+    ...shadows.sm,
   },
   cardHovered: { ...shadows.md, borderColor: colors.primary },
   iconCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  textCol: { flexShrink: 1 },
+  textCol: { flex: 1, minWidth: 0 },
   title: { fontSize: 14, fontWeight: '700', color: colors.textDark, marginBottom: 2 },
   desc: { fontSize: 12, color: colors.textMuted },
 });

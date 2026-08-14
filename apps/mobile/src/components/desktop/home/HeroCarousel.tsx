@@ -103,7 +103,12 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
 const styles = StyleSheet.create({
   wrapper: {
     width: '100%',
-    height: 420,
+    // Was 420 -- read as the "huge hero banner" the redesign brief asks to
+    // avoid, especially once it's demoted below the reference's matched
+    // top section instead of leading the page. Kept as a compact promo
+    // strip rather than removed outright (2026-08-14 redesign chose to
+    // restyle existing lower sections in place, not delete them).
+    height: 220,
     borderRadius: radius.lg,
     overflow: 'hidden',
     position: 'relative',
@@ -113,23 +118,23 @@ const styles = StyleSheet.create({
   image: { width: '100%', height: '100%', position: 'absolute' },
   overlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: 'rgba(17,17,18,0.45)',
+    backgroundColor: 'rgba(17,17,18,0.4)',
   },
   textBlock: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: spacing.xxl,
-    maxWidth: 640,
+    paddingHorizontal: spacing.xl,
+    maxWidth: 560,
   },
-  title: { color: colors.white, fontSize: 40, fontWeight: '800', marginBottom: 12, lineHeight: 46 },
-  subtitle: { color: 'rgba(255,255,255,0.9)', fontSize: 18, marginBottom: 24, lineHeight: 26 },
+  title: { color: colors.white, fontSize: 26, fontWeight: '800', marginBottom: 8, lineHeight: 32 },
+  subtitle: { color: 'rgba(255,255,255,0.9)', fontSize: 14, marginBottom: 16, lineHeight: 20 },
   cta: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     backgroundColor: colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
     borderRadius: radius.md,
     alignSelf: 'flex-start',
   },

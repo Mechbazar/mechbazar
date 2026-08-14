@@ -125,22 +125,26 @@ export default function SearchBar() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, minWidth: 160, maxWidth: 480, position: 'relative', zIndex: 20 },
+  // Widened from 480 -- the reference's search bar is the visually
+  // dominant element in the header (product discovery is the primary
+  // homepage action per the redesign brief), not a narrow afterthought.
+  container: { flex: 1, minWidth: 160, maxWidth: 640, position: 'relative', zIndex: 20 },
   wrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.white,
     borderRadius: radius.md,
-    height: 40,
+    height: 42,
     paddingLeft: 12,
     borderWidth: 1,
     borderColor: colors.borderLight,
+    ...shadows.sm,
   },
   // Replaces the native input outline (suppressed below so it doesn't clash
   // with the pill container) with an equivalent visible focus indicator --
   // without this, keyboard users tabbing into the search box would see no
   // focus indication at all.
-  wrapperFocused: { borderColor: colors.primary, ...shadows.sm },
+  wrapperFocused: { borderColor: colors.primary, ...shadows.md },
   icon: { marginRight: 8 },
   input: {
     flex: 1,
@@ -150,8 +154,8 @@ const styles = StyleSheet.create({
     outlineStyle: 'none' as any,
   },
   button: {
-    height: 40,
-    width: 42,
+    height: 42,
+    width: 44,
     borderRadius: radius.md,
     backgroundColor: colors.primary,
     alignItems: 'center',
