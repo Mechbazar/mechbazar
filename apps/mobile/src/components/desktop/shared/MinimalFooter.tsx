@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
-import { useBreakpoint } from '../../../hooks/useBreakpoint';
+import { useStableIsDesktopUp } from '../../../hooks/useStableIsDesktopUp';
 import { colors, spacing } from '../../../theme/tokens';
 
 // A minimal stand-in for DesktopFooter.tsx on booking-flow screens, where the
@@ -12,7 +12,7 @@ import { colors, spacing } from '../../../theme/tokens';
 // does get parsed into the native bundle; keeping it to View/Text/Pressable
 // only keeps that cost negligible. isDesktopUp-gated no-op on native/mobile-web.
 export default function MinimalFooter() {
-  const { isDesktopUp } = useBreakpoint();
+  const isDesktopUp = useStableIsDesktopUp();
   const navigation = useNavigation<NavigationProp<any>>();
   if (!isDesktopUp) return null;
   return (

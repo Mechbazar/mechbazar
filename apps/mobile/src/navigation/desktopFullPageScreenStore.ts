@@ -12,22 +12,34 @@ import { useSyncExternalStore } from 'react';
 // useNavigationState -- which need to be called from inside the navigator
 // tree -- throw "Couldn't get the navigation state" when called there.
 // Self-managing screens report their own focus via useFocusEffect instead,
-// which is the supported way to do this. Only one screen is ever focused at
-// a time, so a single shared flag is enough regardless of how many screens
-// opt into this pattern.
-let active = false;
+// which is the supported way to do this.
+//
+// A reference count, not a plain boolean: during an in-app navigation
+// between two full-page screens (e.g. Home -> Categories), the incoming
+// screen's useFocusEffect can commit and call setDesktopFullPageScreenActive
+// (true) *before* the outgoing screen's own cleanup fires and calls it
+// (false) -- live-traced as Categories setting true, then Home's blur
+// cleanup immediately setting false again, clobbering it back off for the
+// screen that's actually still on screen. A plain boolean has no way to
+// tell "the screen that turned this off is the one that's currently
+// active" apart from "some other screen still wants it on"; a count does,
+// since matching increment/decrement pairs net out correctly regardless of
+// which order the two screens' effects fire in.
+let count = 0;
 const listeners = new Set<() => void>();
 
 export function setDesktopFullPageScreenActive(value: boolean) {
-  if (active === value) return;
-  active = value;
-  listeners.forEach(l => l());
+  const wasActive = count > 0;
+  count = Math.max(0, count + (value ? 1 : -1));
+  if (wasActive !== (count > 0)) {
+    listeners.forEach(l => l());
+  }
 }
 
 export function useDesktopFullPageScreenActive(): boolean {
   return useSyncExternalStore(
     (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
-    () => active,
+    () => count > 0,
     () => false,
   );
 }
