@@ -59,17 +59,17 @@ function SectionHeading({
 // header to conflict with). Stays fully decoupled from HomeScreenMobile.tsx
 // -- editing one can't break the other. No new backend endpoints.
 //
-// Section order below is Trust Banner -> Benefits -> Category Nav -> Hero
-// -> Vehicle Finder -> everything else, per the 2026-08-14 redesign
-// follow-up. The original redesign pass restyled every existing section but
-// left them all mounted, which put a full 6-column "Shop by Category" grid
-// (CategoryGridDesktop, since deleted) within ~600px of CategoryNavStrip's
-// compact pill row showing the exact same categories twice -- a real,
-// literal duplicate, not just a stylistic mismatch. There is now exactly
-// one category-browsing surface in the page body (CategoryNavStrip); the
-// header's MegaMenu dropdown is a separate, expected UI pattern, not a
-// homepage-body duplicate. PromoCategoryCards (a third category-tile
-// pattern, image-based) was removed for the same reason.
+// Section order below is intentional and pinned by explicit client
+// direction (2026-08-14 redesign follow-ups): Hero -> Vehicle Finder ->
+// Category Nav -> Trust Banner -> Benefits -> everything else. The hero
+// must be the first thing under the header with nothing between them --
+// don't reorder Trust/Benefits back above it. There is exactly one
+// category-browsing surface in the page body (CategoryNavStrip) -- a full
+// 6-column "Shop by Category" grid (CategoryGridDesktop) and an
+// image-based promo-tile variant (PromoCategoryCards) were both deleted
+// entirely (not hidden) after they were found duplicating this same strip
+// on the live page. The header's MegaMenu dropdown is a separate, expected
+// UI pattern, not a homepage-body duplicate.
 export default function HomeScreenDesktop() {
   const colors = useThemeColors();
   const token = useSelector((state: RootState) => state.auth.token);
@@ -199,21 +199,21 @@ export default function HomeScreenDesktop() {
   return (
     <ScrollView style={[styles.page, { backgroundColor: colors.pageBg }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
       <Container style={styles.section}>
-        <TrustBadges />
-      </Container>
-
-      <Container style={styles.section}>
-        <BenefitsStrip />
-      </Container>
-
-      <CategoryNavStrip categories={categories} />
-
-      <Container style={styles.section}>
         <HeroCarousel banners={banners} />
       </Container>
 
       <Container style={styles.section}>
         <VehicleFinderSection />
+      </Container>
+
+      <CategoryNavStrip categories={categories} />
+
+      <Container style={styles.section}>
+        <TrustBadges />
+      </Container>
+
+      <Container style={styles.section}>
+        <BenefitsStrip />
       </Container>
 
       <Container style={styles.section}>
