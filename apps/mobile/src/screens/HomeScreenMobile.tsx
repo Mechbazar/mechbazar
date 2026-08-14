@@ -234,6 +234,7 @@ export default function HomeScreen({ navigation }: any) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [categories, setCategories] = useState<Category[]>([]);
   const [banners, setBanners] = useState<any[]>([]);
+  const [bannerAspectRatios, setBannerAspectRatios] = useState<Record<string, number>>({});
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [trendingProducts, setTrendingProducts] = useState<Product[]>([]);
   const [failedImageIds, setFailedImageIds] = useState<Record<string, boolean>>({});
@@ -267,6 +268,22 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   const suggestions = ['Engine Oils', 'Brake Pads', 'Helmets', 'Car Wash Kit', 'Mechanics'];
+
+  // Pre-designed graphic banners (showOverlay === false) must display at
+  // their own aspect ratio -- fullBanner's fixed height crops content near
+  // the top/bottom edges (e.g. a trust-badges row) that a plain background
+  // photo wouldn't miss, but a designed graphic does.
+  useEffect(() => {
+    banners.forEach((b) => {
+      if (b.showOverlay === false && b.image?.uri && !bannerAspectRatios[b.id]) {
+        Image.getSize(
+          b.image.uri,
+          (w, h) => setBannerAspectRatios((prev) => ({ ...prev, [b.id]: w / h })),
+          () => {}
+        );
+      }
+    });
+  }, [banners]);
 
   // Banner slide loop
   useEffect(() => {
@@ -582,12 +599,19 @@ export default function HomeScreen({ navigation }: any) {
                 </ImageBackground>
               ) : (
                 // Pre-designed graphic with its own baked-in title/CTA (see
-                // Banner.showOverlay) -- show the image as-is, whole thing tappable.
+                // Banner.showOverlay) -- show the image as-is, whole thing
+                // tappable. Sized to its real aspect ratio (once known) and
+                // "contain"-fit instead of fullBanner's fixed-height cover
+                // crop, so nothing near the image's edges gets cut off.
                 <TouchableOpacity activeOpacity={0.9} onPress={() => handleBannerPress(banner)}>
                   <ImageBackground
                     source={banner.image}
-                    style={styles.fullBanner}
+                    style={[
+                      styles.fullBanner,
+                      bannerAspectRatios[banner.id] ? { height: undefined, aspectRatio: bannerAspectRatios[banner.id] } : null,
+                    ]}
                     imageStyle={{ borderRadius: CARD_RADIUS }}
+                    resizeMode="contain"
                   />
                 </TouchableOpacity>
               )}

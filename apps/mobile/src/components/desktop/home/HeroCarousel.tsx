@@ -24,6 +24,23 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
   const navigation = useNavigation<NavigationProp<any>>();
   const [index, setIndex] = useState(0);
   const fade = useRef(new Animated.Value(1)).current;
+  const [aspectRatios, setAspectRatios] = useState<Record<string, number>>({});
+
+  // Pre-designed graphic banners (showOverlay === false) must display at
+  // their own aspect ratio -- the fixed wrapper height + cover crop below
+  // chops off content near the top/bottom edges (e.g. a trust-badges row)
+  // that a plain background photo wouldn't miss, but a designed graphic does.
+  useEffect(() => {
+    banners.forEach((b) => {
+      if (b.showOverlay === false && typeof b.image === 'object' && 'uri' in b.image && !aspectRatios[b.id]) {
+        Image.getSize(
+          b.image.uri,
+          (w, h) => setAspectRatios((prev) => ({ ...prev, [b.id]: w / h })),
+          () => {}
+        );
+      }
+    });
+  }, [banners]);
 
   useEffect(() => {
     if (banners.length < 2) return;
@@ -65,9 +82,10 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
   // the admin has flagged that, skip the dark tint + text entirely and just
   // make the raw image itself tappable so the link still works.
   const showOverlay = banner.showOverlay !== false;
+  const noOverlayAspect = !showOverlay ? aspectRatios[banner.id] : undefined;
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, noOverlayAspect ? { height: undefined, aspectRatio: noOverlayAspect } : null]}>
       <Animated.View style={[styles.slide, { opacity: fade }]}>
         {showOverlay ? (
           <>
@@ -83,8 +101,12 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
             </View>
           </>
         ) : (
+          // "contain" (not "cover") -- once aspectRatios[banner.id] is known
+          // the wrapper already matches the image exactly so this is a no-op,
+          // but it guarantees no cropping during the single frame before that
+          // measurement resolves, when the wrapper is still the default height.
           <Pressable onPress={handleCta} style={styles.slide}>
-            <Image source={banner.image} style={styles.image} resizeMode="cover" />
+            <Image source={banner.image} style={styles.image} resizeMode="contain" />
           </Pressable>
         )}
       </Animated.View>
