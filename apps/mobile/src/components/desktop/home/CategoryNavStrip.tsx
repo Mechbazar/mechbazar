@@ -6,11 +6,12 @@ import { colors, spacing, radius } from '../../../theme/tokens';
 import Container from '../shared/Container';
 
 // A slim, always-visible quick-nav strip (Amazon's under-header department
-// row) -- deliberately lighter-weight than CategoryGridDesktop's card grid
-// further down the page, which stays as the fuller "Shop by Category"
-// section. Same `categories` array HomeScreenDesktop already fetches (no
-// new request) and the same navigate-to-CategoryProducts interaction
-// CategoryGridDesktop/MegaMenu already use.
+// row) -- the ONLY category-browsing surface in the homepage body as of the
+// 2026-08-14 redesign follow-up (a separate 6-column "Shop by Category"
+// grid used to sit ~600px below this, showing the exact same categories a
+// second time -- deleted, not just hidden). Same `categories` array
+// HomeScreenDesktop already fetches (no new request) and the same
+// navigate-to-CategoryProducts interaction MegaMenu's header dropdown uses.
 export default function CategoryNavStrip({ categories }: { categories: Category[] }) {
   const navigation = useNavigation<NavigationProp<any>>();
   if (categories.length === 0) return null;

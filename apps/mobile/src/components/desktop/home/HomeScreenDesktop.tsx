@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, ScrollView, Alert, StyleSheet } from 'react-native';
-import { useFocusEffect, useNavigation, NavigationProp } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import { fetchCategories, fetchBanners, fetchHomeExtras, getTrendingProducts, HomeExtras } from '../../../services/product.service';
@@ -14,10 +14,8 @@ import Container from '../shared/Container';
 import CategoryNavStrip from './CategoryNavStrip';
 import HeroCarousel from './HeroCarousel';
 import QuickActions from './QuickActions';
-import CategoryGridDesktop from './CategoryGridDesktop';
 import VehicleFinderSection from './VehicleFinderSection';
 import ProductRail from './ProductRail';
-import PromoCategoryCards from './PromoCategoryCards';
 import BrandsRow from './BrandsRow';
 import { MechanicServicesSection, GarageServicesSection } from './ServiceHighlights';
 import TopVendorsRow from './TopVendorsRow';
@@ -28,7 +26,7 @@ import BenefitsStrip from './BenefitsStrip';
 import Testimonials from './Testimonials';
 import DownloadAppSection from './DownloadAppSection';
 import DesktopFooter from '../footer/DesktopFooter';
-import { HeroSkeleton, CategoryGridSkeleton, ProductGridSkeleton, SectionTitleSkeleton, SkeletonSection } from '../states/Skeletons';
+import { HeroSkeleton, ProductGridSkeleton, SectionTitleSkeleton, SkeletonSection } from '../states/Skeletons';
 import ErrorState, { ErrorKind, classifyError } from '../states/ErrorState';
 import EmptyState from '../states/EmptyState';
 
@@ -60,9 +58,20 @@ function SectionHeading({
 // single global vehicle filter (there's no car/bike toggle in the desktop
 // header to conflict with). Stays fully decoupled from HomeScreenMobile.tsx
 // -- editing one can't break the other. No new backend endpoints.
+//
+// Section order below is Trust Banner -> Benefits -> Category Nav -> Hero
+// -> Vehicle Finder -> everything else, per the 2026-08-14 redesign
+// follow-up. The original redesign pass restyled every existing section but
+// left them all mounted, which put a full 6-column "Shop by Category" grid
+// (CategoryGridDesktop, since deleted) within ~600px of CategoryNavStrip's
+// compact pill row showing the exact same categories twice -- a real,
+// literal duplicate, not just a stylistic mismatch. There is now exactly
+// one category-browsing surface in the page body (CategoryNavStrip); the
+// header's MegaMenu dropdown is a separate, expected UI pattern, not a
+// homepage-body duplicate. PromoCategoryCards (a third category-tile
+// pattern, image-based) was removed for the same reason.
 export default function HomeScreenDesktop() {
   const colors = useThemeColors();
-  const navigation = useNavigation<NavigationProp<any>>();
   const token = useSelector((state: RootState) => state.auth.token);
   const vehicleType = useSelector((state: RootState) => state.app.vehicleType);
 
@@ -139,17 +148,6 @@ export default function HomeScreenDesktop() {
     if (!result.ok) setWishlist(prev => ({ ...prev, [id]: was }));
   };
 
-  // Promo cards (brief section 6) reuse whatever real categories already
-  // have an uploaded image, favoring the ones with the most products --
-  // no invented categories or copy.
-  const promoCategories = useMemo(
-    () => [...categories]
-      .filter(c => !!c.image)
-      .sort((a, b) => (b.productCount ?? 0) - (a.productCount ?? 0))
-      .slice(0, 3),
-    [categories],
-  );
-
   const hasAnyProducts = bikeParts.length > 0 || carParts.length > 0
     || homeExtras.deals.length > 0 || homeExtras.featured.length > 0 || homeExtras.bestSellers.length > 0;
   const isEmpty = !loading && !error && categories.length === 0 && banners.length === 0 && !hasAnyProducts;
@@ -161,10 +159,6 @@ export default function HomeScreenDesktop() {
           <SkeletonSection label="Loading homepage content">
             <HeroSkeleton />
           </SkeletonSection>
-        </Container>
-        <Container style={styles.section}>
-          <SectionTitleSkeleton />
-          <CategoryGridSkeleton />
         </Container>
         <Container style={styles.section}>
           <SectionTitleSkeleton />
@@ -204,20 +198,6 @@ export default function HomeScreenDesktop() {
 
   return (
     <ScrollView style={[styles.page, { backgroundColor: colors.pageBg }]} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} role="main">
-      {/* Reference-matched top block: Header (DesktopAppShell) -> Quick
-          Actions -> Shop by Category -> Trust Banner -> Benefits strip,
-          in that exact order. Everything below this block is the app's
-          existing homepage content, restyled to the same design language
-          rather than removed (2026-08-14 redesign). */}
-      <Container style={styles.section}>
-        <QuickActions />
-      </Container>
-
-      <Container style={styles.section}>
-        <SectionHeading actionLabel="View All Categories →" onAction={() => navigation.navigate('MainTabs', { screen: 'Categories' })}>Shop by Category</SectionHeading>
-        <CategoryGridDesktop categories={categories} />
-      </Container>
-
       <Container style={styles.section}>
         <TrustBadges />
       </Container>
@@ -234,6 +214,10 @@ export default function HomeScreenDesktop() {
 
       <Container style={styles.section}>
         <VehicleFinderSection />
+      </Container>
+
+      <Container style={styles.section}>
+        <QuickActions />
       </Container>
 
       {homeExtras.deals.length > 0 && (
@@ -283,12 +267,6 @@ export default function HomeScreenDesktop() {
         <SectionHeading>Garage Services</SectionHeading>
         <GarageServicesSection />
       </Container>
-
-      {promoCategories.length > 0 && (
-        <Container style={styles.section}>
-          <PromoCategoryCards categories={promoCategories} />
-        </Container>
-      )}
 
       {homeExtras.brands.length > 0 && (
         <Container style={styles.section}>

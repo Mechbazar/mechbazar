@@ -48,20 +48,6 @@ export function HeroSkeleton() {
   );
 }
 
-export function CategoryGridSkeleton({ count = 12 }: { count?: number }) {
-  return (
-    <View style={styles.categoryGrid} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      {Array.from({ length: count }).map((_, i) => (
-        <View key={i} style={styles.categoryItem}>
-          <Bone width={64} height={64} radiusSize={32} style={{ marginBottom: spacing.sm }} />
-          <Bone width={80} height={12} style={{ marginBottom: 6 }} />
-          <Bone width={50} height={10} />
-        </View>
-      ))}
-    </View>
-  );
-}
-
 export function ProductCardSkeleton() {
   return (
     <View style={styles.card}>
@@ -109,11 +95,6 @@ const styles = StyleSheet.create({
     width: 1,
     height: 1,
     overflow: 'hidden',
-  },
-  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-  categoryItem: {
-    width: 168, backgroundColor: colors.white, borderRadius: radius.lg,
-    borderWidth: 1, borderColor: colors.borderLight, paddingVertical: spacing.lg, alignItems: 'center',
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
   card: {
