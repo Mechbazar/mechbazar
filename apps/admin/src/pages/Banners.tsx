@@ -4,9 +4,9 @@ import { useSelector } from 'react-redux';
 import toast from 'react-hot-toast';
 import { motion } from 'framer-motion';
 import type { RootState } from '../store';
-import { Plus, Edit, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, CheckCircle, XCircle, ImagePlus } from 'lucide-react';
 import { Button, Card, Badge, Modal, Input, Select, Checkbox, Loader, EmptyState, Icon3D } from '../components/ui';
-import { API_URL } from '../config/api';
+import { API_URL, resolveUploadUrl } from '../config/api';
 import { fadeInUp } from '../utils/motion';
 import { useConfirm } from '../hooks/useConfirm';
 
@@ -17,7 +17,7 @@ function BannerImage({ src, alt }: { src: string; alt: string }) {
   }
   return (
     <img
-      src={src}
+      src={resolveUploadUrl(src)}
       alt={alt}
       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
       onError={() => setFailed(true)}
@@ -32,6 +32,8 @@ export default function Banners() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState('');
 
   const [formData, setFormData] = useState({
     id: '',
@@ -80,7 +82,34 @@ export default function Banners() {
         id: '', title: '', image: '', type: 'HOMEPAGE', link: '', isActive: true, startDate: '', endDate: ''
       });
     }
+    setImageError('');
     setShowModal(true);
+  };
+
+  // POST /upload stores the file (Firebase Storage when a bucket is
+  // configured, otherwise the backend's own uploads/ dir) and returns the
+  // URL to persist on the banner -- same endpoint Products.tsx already
+  // uses. Added because admins were pasting page URLs (e.g. a Canva share
+  // link, which points at Canva's viewer page, not a raw image file) into
+  // the old plain-text "Image URL" field; an <img> can't render a webpage,
+  // so the banner silently showed "No Image". A real upload sidesteps
+  // needing a pre-hosted direct image URL at all.
+  const handleImageUpload = async (file: File) => {
+    setImageError('');
+    setUploadingImage(true);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      const res = await axios.post(`${API_URL}/upload`, body, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.data?.url) throw new Error('Upload returned no URL');
+      setFormData((prev) => ({ ...prev, image: res.data.url }));
+    } catch (err: any) {
+      setImageError(err?.response?.data?.error || 'Image upload failed. Please try again.');
+    } finally {
+      setUploadingImage(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -208,13 +237,63 @@ export default function Banners() {
             onChange={(e) => setFormData({...formData, title: e.target.value})}
           />
 
-          <Input
-            label="Image URL"
-            type="url"
-            required
-            value={formData.image}
-            onChange={(e) => setFormData({...formData, image: e.target.value})}
-          />
+          <div>
+            <label className="block text-sm font-semibold text-content-secondary mb-2">Banner Image</label>
+
+            {formData.image && (
+              <div className="relative w-fit mb-3">
+                <img
+                  src={resolveUploadUrl(formData.image)}
+                  alt="Banner preview"
+                  className="h-24 w-40 rounded-xl object-cover border border-border-default"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              </div>
+            )}
+
+            <input
+              id="banner-image-input"
+              type="file"
+              accept="image/*"
+              disabled={uploadingImage}
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleImageUpload(file);
+                // Reset so picking the same file twice still fires onChange.
+                e.target.value = '';
+              }}
+            />
+            <label
+              htmlFor="banner-image-input"
+              className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border-default px-4 py-2 text-sm font-medium text-content-secondary hover:border-brand-primary hover:text-brand-primary transition-colors ${
+                uploadingImage ? 'pointer-events-none opacity-60' : ''
+              }`}
+            >
+              <ImagePlus className="h-4 w-4" />
+              {uploadingImage ? 'Uploading…' : formData.image ? 'Replace image' : 'Upload image'}
+            </label>
+
+            {imageError && <p className="mt-2 text-sm text-danger-500">{imageError}</p>}
+
+            {/* Fallback for an image already hosted elsewhere -- but NOT a
+                page URL (e.g. a Canva share link, a Google Drive share
+                link): those point at a viewer page, not raw image bytes,
+                so an <img> can't render them. Uploading above avoids this
+                trap entirely for anyone unsure what "direct image URL"
+                means. */}
+            <div className="mt-3">
+              <Input
+                label="Or paste a direct image URL"
+                type="text"
+                required
+                placeholder="https://example.com/banner.jpg"
+                helperText="Must be a link to the image file itself, not a page that displays it (a Canva/Drive share link won't work here)."
+                value={formData.image}
+                onChange={(e) => setFormData({...formData, image: e.target.value})}
+              />
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <Select
