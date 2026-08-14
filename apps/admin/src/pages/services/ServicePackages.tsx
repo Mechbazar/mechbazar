@@ -6,6 +6,7 @@ import type { RootState } from '../../store';
 import { Search, Edit2, Trash2, Star } from 'lucide-react';
 import { Button, Card, Badge, Modal, Input, Checkbox, EmptyState, Icon3D } from '../../components/ui';
 import { API_URL, resolveUploadUrl } from '../../config/api';
+import { useConfirm } from '../../hooks/useConfirm';
 
 const emptyForm = {
   categoryId: '', name: '', description: '', image: '', price: '', discountPrice: '',
@@ -16,6 +17,7 @@ const emptyForm = {
 
 export default function ServicePackages() {
   const { token } = useSelector((state: RootState) => state.auth);
+  const confirm = useConfirm();
   const [packages, setPackages] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -137,7 +139,7 @@ export default function ServicePackages() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this package?')) return;
+    if (!(await confirm({ title: 'Delete package', message: 'Are you sure you want to delete this package? This cannot be undone.' }))) return;
     try {
       const res = await fetch(`${API_URL}/services/packages/${id}`, {
         method: 'DELETE',

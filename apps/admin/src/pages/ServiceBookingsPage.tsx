@@ -14,6 +14,7 @@ import { getAdminSocket } from '../services/adminRealtime';
 import { Badge, Button, Card, DataTable, EmptyState, Loader, Modal, Tabs, Icon3D } from '../components/ui';
 import type { Column, TabItem } from '../components/ui';
 import { fadeInUp } from '../utils/motion';
+import { useConfirm } from '../hooks/useConfirm';
 
 const BOOKINGS_POLL_INTERVAL_MS = 15000;
 const PAGE_SIZE = 20;
@@ -69,6 +70,7 @@ const getStatusBadge = (status: string) => {
 
 export default function ServiceBookingsPage() {
   const { token } = useSelector((state: RootState) => state.auth);
+  const confirm = useConfirm();
   const [searchParams] = useSearchParams();
   const [bookings, setBookings] = useState<any[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
@@ -193,7 +195,7 @@ export default function ServiceBookingsPage() {
   };
 
   const handleCancelBooking = async (bookingId: string) => {
-    if (!confirm('Cancel this booking?')) return;
+    if (!(await confirm({ title: 'Cancel booking', message: 'Cancel this booking?' }))) return;
     try {
       await axios.patch(`${API_URL}/services/bookings/${bookingId}/admin-status`, { status: 'CANCELLED' }, { headers: { Authorization: `Bearer ${token}` } });
       if (selectedBooking?.id === bookingId) setSelectedBooking(null);
@@ -204,7 +206,7 @@ export default function ServiceBookingsPage() {
   };
 
   const handleRefund = async (bookingId: string) => {
-    if (!confirm("Mark this booking's payment as refunded?")) return;
+    if (!(await confirm({ title: 'Confirm refund', message: "Mark this booking's payment as refunded?" }))) return;
     try {
       await axios.patch(`${API_URL}/services/bookings/${bookingId}/refund`, {}, { headers: { Authorization: `Bearer ${token}` } });
       fetchBookings();
@@ -229,7 +231,7 @@ export default function ServiceBookingsPage() {
       next === 'COMPLETED'
         ? `${label}? This skips the technician's OTP confirmation from the customer -- only use this for support overrides.`
         : `${label} for this booking?`;
-    if (!confirm(confirmMsg)) return;
+    if (!(await confirm({ title: 'Force status change', message: confirmMsg, variant: next === 'COMPLETED' ? 'warning' : 'default' }))) return;
     try {
       await axios.patch(`${API_URL}/services/bookings/${bookingId}/admin-status`, { status: next }, { headers: { Authorization: `Bearer ${token}` } });
       fetchBookings();

@@ -8,9 +8,11 @@ import EmojiPicker from 'emoji-picker-react';
 import { Button, Card, Badge, Modal, Input, Select, Checkbox, EmptyState, Icon3D } from '../../components/ui';
 import { API_URL } from '../../config/api';
 import { fadeInUp } from '../../utils/motion';
+import { useConfirm } from '../../hooks/useConfirm';
 
 export default function ServiceCategories() {
   const { token } = useSelector((state: RootState) => state.auth);
+  const confirm = useConfirm();
   const [categories, setCategories] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -86,7 +88,7 @@ export default function ServiceCategories() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this service category?')) return;
+    if (!(await confirm({ title: 'Delete service category', message: 'Are you sure you want to delete this service category? This cannot be undone.' }))) return;
     try {
       const res = await fetch(`${API_URL}/services/categories/${id}`, {
         method: 'DELETE',

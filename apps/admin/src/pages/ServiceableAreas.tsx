@@ -10,6 +10,7 @@ import type { Column } from '../components/ui';
 import type { RootState } from '../store';
 import { API_URL } from '../config/api';
 import { fadeInUp } from '../utils/motion';
+import { useConfirm } from '../hooks/useConfirm';
 
 type ServiceablePincode = {
   id: string;
@@ -23,6 +24,7 @@ type ServiceablePincode = {
 export default function ServiceableAreas() {
   const { token } = useSelector((state: RootState) => state.auth);
   const headers = { Authorization: `Bearer ${token}` };
+  const confirm = useConfirm();
 
   const [rows, setRows] = useState<ServiceablePincode[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +72,7 @@ export default function ServiceableAreas() {
   };
 
   const handleDelete = async (row: ServiceablePincode) => {
-    if (!confirm(`Remove pincode ${row.pincode} from the serviceable list?`)) return;
+    if (!(await confirm({ title: 'Remove pincode', message: `Remove pincode ${row.pincode} from the serviceable list?` }))) return;
     try {
       await axios.delete(`${API_URL}/serviceability/pincodes/${row.id}`, { headers });
       setRows((prev) => prev.filter((r) => r.id !== row.id));

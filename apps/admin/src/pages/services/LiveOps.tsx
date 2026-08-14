@@ -12,6 +12,7 @@ import type { LiveOpsJobRow, LiveOpsResponse } from '../../services/liveOpsServi
 import { getAdminSocket } from '../../services/adminRealtime';
 import LocationMapView from '../../components/maps/LocationMapView';
 import type { LocationMapMarker } from '../../components/maps/LocationMapView';
+import { useConfirm } from '../../hooks/useConfirm';
 
 const POLL_MS = 6000;
 
@@ -227,6 +228,7 @@ function JobDetailPanel({
   const [reason, setReason] = useState('');
   const [forceStatus, setForceStatus] = useState('');
   const [busy, setBusy] = useState(false);
+  const confirm = useConfirm();
 
   useEffect(() => {
     liveOpsService.getJobDetail(token, job.id).then((res) => setDetail(res.job));
@@ -266,7 +268,7 @@ function JobDetailPanel({
       toast.error('Pick a status and enter a reason (at least 5 characters).');
       return;
     }
-    if (!confirm(`Force this job to ${forceStatus}? This bypasses the customer's OTP verification and is logged.`)) return;
+    if (!(await confirm({ title: 'Force status change', message: `Force this job to ${forceStatus}? This bypasses the customer's OTP verification and is logged.`, variant: 'warning' }))) return;
     setBusy(true);
     try {
       await liveOpsService.forceStatus(token, job.id, forceStatus, reason.trim());

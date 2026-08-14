@@ -8,9 +8,11 @@ import EmojiPicker from 'emoji-picker-react';
 import { Button, Card, Badge, Modal, Input, Select, EmptyState, Icon3D } from '../components/ui';
 import { API_URL } from '../config/api';
 import { fadeInUp } from '../utils/motion';
+import { useConfirm } from '../hooks/useConfirm';
 
 export default function Categories() {
   const { token } = useSelector((state: RootState) => state.auth);
+  const confirm = useConfirm();
   const [categories, setCategories] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -85,7 +87,7 @@ export default function Categories() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this category?')) {
+    if (await confirm({ title: 'Delete category', message: 'Are you sure you want to delete this category? This cannot be undone.' })) {
       try {
         const res = await fetch(`${API_URL}/categories/${id}`, {
           method: 'DELETE',

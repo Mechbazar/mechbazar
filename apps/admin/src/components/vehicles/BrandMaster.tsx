@@ -6,6 +6,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Badge, Button, Card, DataTable, EmptyState, Input, Modal, Select, Tabs } from '../ui';
 import type { Column, TabItem } from '../ui';
 import { API_URL } from '../../config/api';
+import { useConfirm } from '../../hooks/useConfirm';
 
 const BRAND_TABS: TabItem[] = [
   { id: 'ALL', label: 'All' },
@@ -27,6 +28,7 @@ type Brand = {
 // existing make/model/variant/fuel/year combination table.
 export default function BrandMaster({ token }: { token: string | null }) {
   const headers = { Authorization: `Bearer ${token}` };
+  const confirm = useConfirm();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'ALL' | 'CAR' | 'BIKE'>('ALL');
@@ -105,7 +107,7 @@ export default function BrandMaster({ token }: { token: string | null }) {
   };
 
   const handleDelete = async (brand: Brand) => {
-    if (!confirm(`Delete brand "${brand.name}"? This cannot be undone.`)) return;
+    if (!(await confirm({ title: 'Delete brand', message: `Delete brand "${brand.name}"? This cannot be undone.` }))) return;
     try {
       await axios.delete(`${API_URL}/vehicles/manufacturers/${brand.id}`, { headers });
       toast.success('Brand deleted.');

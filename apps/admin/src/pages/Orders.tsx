@@ -11,6 +11,7 @@ import LocationMapView from '../components/maps/LocationMapView';
 import { Badge, Button, Card, DataTable, EmptyState, Modal, StatCard, Tabs, Icon3D } from '../components/ui';
 import type { Column, TabItem } from '../components/ui';
 import { fadeInUp } from '../utils/motion';
+import { useConfirm } from '../hooks/useConfirm';
 
 const ORDERS_POLL_INTERVAL_MS = 20000;
 
@@ -35,6 +36,7 @@ const TABS: TabItem[] = [
 
 export default function Orders() {
   const { token } = useSelector((state: RootState) => state.auth);
+  const confirm = useConfirm();
   const [searchParams] = useSearchParams();
   const [orders, setOrders] = useState<any[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
@@ -303,7 +305,7 @@ export default function Orders() {
                   )}
                   {order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && (
                     <button
-                      onClick={() => { if (confirm('Are you sure you want to cancel this order?')) handleUpdateStatus(order.id, 'CANCELLED'); }}
+                      onClick={async () => { if (await confirm({ title: 'Cancel order', message: 'Are you sure you want to cancel this order?' })) handleUpdateStatus(order.id, 'CANCELLED'); }}
                       className="w-full text-left px-4 py-2 text-sm text-danger-500 hover:bg-danger-500/10"
                     >
                       Cancel Order

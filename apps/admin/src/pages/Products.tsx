@@ -21,9 +21,11 @@ import { Button, Card, Badge, Modal, Input, Select, DataTable, EmptyState, StatC
 import type { Column } from '../components/ui';
 import { API_URL, resolveUploadUrl } from '../config/api';
 import { fadeInUp } from '../utils/motion';
+import { useConfirm } from '../hooks/useConfirm';
 
 export default function Products() {
   const { token } = useSelector((state: RootState) => state.auth);
+  const confirm = useConfirm();
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -177,7 +179,7 @@ export default function Products() {
   };
 
   const handleDelete = async (productId: string) => {
-    if (!confirm('Are you sure you want to delete this product?')) return;
+    if (!(await confirm({ title: 'Delete product', message: 'Are you sure you want to delete this product? This cannot be undone.' }))) return;
     try {
       await axios.delete(`${API_URL}/products/${productId}`, {
         headers: { Authorization: `Bearer ${token}` }

@@ -8,6 +8,7 @@ import { Plus, Edit, Trash2, CheckCircle, XCircle } from 'lucide-react';
 import { Button, Card, Badge, Modal, Input, Select, Checkbox, Loader, EmptyState, Icon3D } from '../components/ui';
 import { API_URL } from '../config/api';
 import { fadeInUp } from '../utils/motion';
+import { useConfirm } from '../hooks/useConfirm';
 
 function BannerImage({ src, alt }: { src: string; alt: string }) {
   const [failed, setFailed] = useState(false);
@@ -26,6 +27,7 @@ function BannerImage({ src, alt }: { src: string; alt: string }) {
 
 export default function Banners() {
   const { token } = useSelector((state: RootState) => state.auth);
+  const confirm = useConfirm();
   const [banners, setBanners] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -108,7 +110,7 @@ export default function Banners() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this banner?')) return;
+    if (!(await confirm({ title: 'Delete banner', message: 'Are you sure you want to delete this banner? This cannot be undone.' }))) return;
     try {
       await axios.delete(`${API_URL}/banners/${id}`, {
         headers: { Authorization: `Bearer ${token}` }

@@ -3,6 +3,8 @@ export { Button } from './Button';
 export { Badge } from './Badge';
 export { Loader } from './Loader';
 export { Modal } from './Modal';
+export { ConfirmDialog } from './ConfirmDialog';
+export type { ConfirmOptions, ConfirmVariant } from './ConfirmDialog';
 export { Input } from './Input';
 export { Select } from './Select';
 export { Checkbox } from './Checkbox';

@@ -14,6 +14,7 @@ import PlaceAutocompleteField from '../components/maps/PlaceAutocompleteField';
 import LocationMapView from '../components/maps/LocationMapView';
 import type { GeocodeSuccess } from '../services/geocode.service';
 import { fadeInUp } from '../utils/motion';
+import { useConfirm } from '../hooks/useConfirm';
 
 const emptyAddress = {
   addressLine1: '', addressLine2: '', city: '', state: '', pincode: '', country: '',
@@ -32,6 +33,7 @@ const getStatusBadge = (status: string) => {
 
 export default function Vendors() {
   const { token } = useSelector((state: RootState) => state.auth);
+  const confirm = useConfirm();
   const [vendors, setVendors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -175,7 +177,7 @@ export default function Vendors() {
   };
 
   const handleDelete = async (vendor: any) => {
-    if (!confirm(`Delete ${vendor.vendorProfile?.storeName || vendor.name}? This cannot be undone.`)) return;
+    if (!(await confirm({ title: 'Delete vendor', message: `Delete ${vendor.vendorProfile?.storeName || vendor.name}? This cannot be undone.` }))) return;
     try {
       // vendor.id is the User id -- DELETE /vendors/:id expects the Vendor
       // (profile) id, same convention as the status route above.

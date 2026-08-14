@@ -16,6 +16,7 @@ import PlaceAutocompleteField from '../components/maps/PlaceAutocompleteField';
 import LocationMapView from '../components/maps/LocationMapView';
 import type { GeocodeSuccess } from '../services/geocode.service';
 import { fadeInUp } from '../utils/motion';
+import { useConfirm } from '../hooks/useConfirm';
 
 const KYC_REVIEWABLE = new Set(['PENDING', 'UNDER_VERIFICATION', 'RESUBMISSION_REQUIRED']);
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -36,6 +37,7 @@ const getKycStatusBadge = (status: string) => {
 
 export default function MechanicsPage() {
   const { token } = useSelector((state: RootState) => state.auth);
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const [technicians, setTechnicians] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -279,7 +281,7 @@ export default function MechanicsPage() {
   // -- distinct from Enable/Disable above, which only flips isActive without
   // touching the underlying verification status.
   const handleSuspend = async (technician: any) => {
-    if (!confirm(`Suspend ${technician.name}? They will stop receiving new jobs.`)) return;
+    if (!(await confirm({ title: 'Suspend mechanic', message: `Suspend ${technician.name}? They will stop receiving new jobs.`, variant: 'warning' }))) return;
     try {
       await axios.patch(`${API_URL}/technicians/${technician.technicianProfile.id}/status`, { status: 'SUSPENDED' }, { headers: { Authorization: `Bearer ${token}` } });
       fetchTechnicians();
@@ -298,7 +300,7 @@ export default function MechanicsPage() {
   };
 
   const handleDelete = async (technician: any) => {
-    if (!confirm(`Delete ${technician.name}? This cannot be undone.`)) return;
+    if (!(await confirm({ title: 'Delete mechanic', message: `Delete ${technician.name}? This cannot be undone.` }))) return;
     try {
       // technician.id is the User id -- DELETE /technicians/:id expects the
       // ServiceTechnician (profile) id, same as every other technicianProfile-
@@ -421,7 +423,7 @@ export default function MechanicsPage() {
 
   const handlePaySalary = async () => {
     if (!payProfileModalTechnician) return;
-    if (!confirm(`Initiate a salary payout of ₹${payProfile.monthlySalary || '(profile default)'} for ${payProfileModalTechnician.name}?`)) return;
+    if (!(await confirm({ title: 'Confirm payout', message: `Initiate a salary payout of ₹${payProfile.monthlySalary || '(profile default)'} for ${payProfileModalTechnician.name}?`, variant: 'default' }))) return;
     setPaySalaryBusy(true);
     try {
       await axios.post(

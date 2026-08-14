@@ -17,6 +17,7 @@ import OfflineBanner from './components/OfflineBanner';
 import ChangePasswordDialog from './components/ChangePasswordDialog';
 import PageLoader from './components/PageLoader';
 import { pageTransition } from './utils/motion';
+import { ConfirmProvider } from './hooks/useConfirm';
 
 // Route-level code-splitting: each page is its own chunk, fetched only when
 // its route is actually visited, instead of every page's code (and every
@@ -167,7 +168,7 @@ function MainLayout() {
 
 function App() {
   return (
-    <>
+    <ConfirmProvider>
       <Toaster />
       <Router>
         <Suspense fallback={<PageLoader />}>
@@ -186,7 +187,7 @@ function App() {
           </Routes>
         </Suspense>
       </Router>
-    </>
+    </ConfirmProvider>
   );
 }
 

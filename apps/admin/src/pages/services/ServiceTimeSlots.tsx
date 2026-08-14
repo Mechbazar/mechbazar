@@ -7,11 +7,13 @@ import { Edit2, Trash2 } from 'lucide-react';
 import { Button, Card, Badge, Modal, Input, DataTable, EmptyState, Icon3D } from '../../components/ui';
 import type { Column } from '../../components/ui';
 import { API_URL } from '../../config/api';
+import { useConfirm } from '../../hooks/useConfirm';
 
 const emptyForm = { label: '', startTime: '', endTime: '', maxBookingsPerSlot: '20', isActive: true, sortOrder: 0 };
 
 export default function ServiceTimeSlots() {
   const { token } = useSelector((state: RootState) => state.auth);
+  const confirm = useConfirm();
   const [slots, setSlots] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSlot, setEditingSlot] = useState<any>(null);
@@ -73,7 +75,7 @@ export default function ServiceTimeSlots() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this time slot?')) return;
+    if (!(await confirm({ title: 'Delete time slot', message: 'Delete this time slot?' }))) return;
     try {
       const res = await fetch(`${API_URL}/services/time-slots/${id}`, {
         method: 'DELETE',

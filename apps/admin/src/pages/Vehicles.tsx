@@ -10,6 +10,7 @@ import type { RootState } from '../store';
 import { API_URL } from '../config/api';
 import { fadeInUp } from '../utils/motion';
 import BrandMaster from '../components/vehicles/BrandMaster';
+import { useConfirm } from '../hooks/useConfirm';
 
 const NEW = '__new__';
 
@@ -35,6 +36,7 @@ const emptyForm = {
 export default function Vehicles() {
   const { token } = useSelector((state: RootState) => state.auth);
   const authHeaders = { headers: { Authorization: `Bearer ${token}` } };
+  const confirm = useConfirm();
 
   const [section, setSection] = useState<'VEHICLES' | 'BRANDS'>('VEHICLES');
   const [vehicles, setVehicles] = useState<any[]>([]);
@@ -150,7 +152,7 @@ export default function Vehicles() {
 
   const handleDelete = async (vehicle: any) => {
     const label = `${vehicle.manufacturer.name} ${vehicle.model.name}${vehicle.variant ? ' ' + vehicle.variant.name : ''} (${vehicle.year})`;
-    if (!confirm(`Delete ${label}? This cannot be undone.`)) return;
+    if (!(await confirm({ title: 'Delete vehicle', message: `Delete ${label}? This cannot be undone.` }))) return;
     try {
       await axios.delete(`${API_URL}/vehicles/${vehicle.id}`, authHeaders);
       fetchVehicles();

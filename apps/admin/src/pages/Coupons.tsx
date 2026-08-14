@@ -10,9 +10,11 @@ import { Button, Card, Badge, Modal, Input, Select, Checkbox, DataTable, EmptySt
 import type { Column } from '../components/ui';
 import { API_URL } from '../config/api';
 import { fadeInUp } from '../utils/motion';
+import { useConfirm } from '../hooks/useConfirm';
 
 export default function Coupons() {
   const { token } = useSelector((state: RootState) => state.auth);
+  const confirm = useConfirm();
   const [coupons, setCoupons] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -101,7 +103,7 @@ export default function Coupons() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this coupon?')) return;
+    if (!(await confirm({ title: 'Delete coupon', message: 'Are you sure you want to delete this coupon? This cannot be undone.' }))) return;
     try {
       await axios.delete(`${API_URL}/coupons/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
