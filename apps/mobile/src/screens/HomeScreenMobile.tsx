@@ -615,10 +615,17 @@ export default function HomeScreen({ navigation }: any) {
                   <View style={styles.bannerGlass}>
                     <Text style={styles.bannerTitleText}>{banner.title}</Text>
                     <Text style={styles.bannerSubtitleText}>{banner.subtitle}</Text>
-                    <Text style={styles.bannerOfferText}>{banner.offer}</Text>
 
+                    {/* banner.offer is the admin-configured button label (mapped
+                        from the backend's buttonText field, see product.service.ts
+                        fetchBanners) -- it belongs on the button itself, same as
+                        the desktop HeroCarousel already does. This used to also
+                        render as its own floating text line above a hardcoded
+                        "Shop Now" button, which just duplicated whatever the
+                        admin typed (visibly, for any banner whose buttonText
+                        was itself along the lines of "Shop Now"). */}
                     <TouchableOpacity style={styles.shopNowBtn} onPress={() => handleBannerPress(banner)} activeOpacity={0.85}>
-                      <Text style={styles.shopNowText}>{t('home.shopNow')}</Text>
+                      <Text style={styles.shopNowText}>{banner.offer || t('home.shopNow')}</Text>
                       <Ionicons name="arrow-forward" size={14} color={colors.white} />
                     </TouchableOpacity>
                   </View>
@@ -1174,12 +1181,6 @@ const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: 2,
-  },
-  bannerOfferText: {
-    color: colors.primaryBrand,
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 4,
   },
   shopNowBtn: {
     flexDirection: 'row',

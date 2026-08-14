@@ -19,17 +19,28 @@ export default function MegaMenu() {
   const navigation = useNavigation<NavigationProp<any>>();
   const vehicleType = useSelector((state: RootState) => state.app.vehicleType);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [open, setOpen] = useState(false);
+  // Separate hover/click signals, not one `open` boolean: a real mouse click
+  // always hovers the target first (onHoverIn fires on the way in), so a
+  // naive onPress={() => setOpen(o => !o)} was toggling the just-opened-by-
+  // hover panel immediately closed again on every click -- reproduced live,
+  // the flyout opened on hover then snapped shut the instant it was clicked.
+  // `clicked` only ever gets cleared on hover-out, so a click while hovering
+  // can open/keep-open but never fight the hover state closed.
+  const [hovered, setHovered] = useState(false);
+  const [clicked, setClicked] = useState(false);
+  const open = hovered || clicked;
 
   useEffect(() => {
     fetchCategories(vehicleType).then(setCategories);
   }, [vehicleType]);
 
+  const close = () => { setHovered(false); setClicked(false); };
+
   return (
     <Pressable
-      onHoverIn={() => setOpen(true)}
-      onHoverOut={() => setOpen(false)}
-      onPress={() => setOpen(o => !o)}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={close}
+      onPress={() => setClicked(c => !c)}
       style={styles.categoriesTrigger}
       accessibilityRole="button"
       accessibilityLabel="Browse all categories"
@@ -48,7 +59,7 @@ export default function MegaMenu() {
                 style={styles.panelItem}
                 onPress={(e) => {
                   e.stopPropagation();
-                  setOpen(false);
+                  close();
                   navigation.navigate('CategoryProducts', { categoryName: cat.name });
                 }}
               >
