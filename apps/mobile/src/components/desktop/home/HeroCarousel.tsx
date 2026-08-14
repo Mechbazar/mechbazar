@@ -113,11 +113,14 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
                   width: '100%',
                   height: '100%',
                   objectFit: 'cover',
-                  // Real banner photos (motorcycles/cars) are typically shot
-                  // with the vehicle sitting in the lower half of the frame
-                  // and sky/background above -- biasing below dead-center
-                  // keeps the product in view instead of cropping through it.
-                  objectPosition: 'center 62%',
+                  // Slightly below dead-center: measured against the 3 real
+                  // vehicle banners live in prod, this is the anchor that
+                  // keeps each one's most recognizable feature (headlight/
+                  // grille) in frame, whether the vehicle sits low with sky
+                  // above (both car banners) or fills the frame's vertical
+                  // middle (the motorcycle banner) -- see the aspectRatio
+                  // comment on `wrapper` above for the full measurement.
+                  objectPosition: 'center 55%',
                 } as any}
               />
             ) : (
@@ -193,11 +196,24 @@ const styles = StyleSheet.create({
     // A fixed pixel height doesn't respond to width -- the crop ratio (and
     // how letterboxed the photo looks) silently changed across the desktop
     // range depending on viewport size. aspectRatio keeps that ratio
-    // constant instead. 4.8 lands close to the old 220px at the container's
-    // typical clamped width (~1232px, see Container's maxContentWidth) --
-    // kept as a compact promo strip per the 2026-08-14 redesign (was 420
-    // before that), just made to scale consistently instead of pinned.
-    aspectRatio: 4.8,
+    // constant instead.
+    //
+    // Was 4.8 (a "compact promo strip" chosen 2026-08-14, matching the old
+    // pinned 220px height at this container's typical clamped ~1232px
+    // width) -- measured against the live prod banner photos, that ratio
+    // only leaves ~31% of a normal (~1.4-1.5:1) source photo's height
+    // visible after a cover crop. That happened to work for two car banners
+    // shot with the car low in frame and sky above, but a third (a
+    // motorcycle shot close-up, filling the frame's vertical middle instead
+    // of sitting low) got its headlight/handlebars/mirrors cropped off
+    // entirely by the same fixed vertical anchor below. 2.8 leaves ~51%
+    // of a typical photo's height visible, which keeps the vehicle's most
+    // recognizable features in frame across every live banner measured
+    // (all 3 real vehicle photos, not just the two that happened to match
+    // the "vehicle sits low" assumption) without needing a per-banner focal
+    // point (no such field exists in the admin/API, and adding one is a
+    // backend change out of scope here).
+    aspectRatio: 2.8,
     borderRadius: radius.lg,
     overflow: 'hidden',
     position: 'relative',
