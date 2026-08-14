@@ -21,7 +21,8 @@ import {
   Alert,
   Modal,
   Share,
-  Linking
+  Linking,
+  Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -581,11 +582,36 @@ export default function HomeScreen({ navigation }: any) {
           {banners.map((banner, index) => (
             <View key={banner.id} style={{ width, paddingHorizontal: 16 }}>
               {banner.showOverlay !== false ? (
-                <ImageBackground
-                  source={banner.image}
-                  style={styles.fullBanner}
-                  imageStyle={{ borderRadius: CARD_RADIUS }}
-                >
+                // Plain View + <img> on web instead of ImageBackground: RN's
+                // cross-platform Image (what ImageBackground wraps) becomes a
+                // CSS background-image on web with background-position
+                // hard-coded to 'center' -- no prop can move it, so a photo
+                // where the vehicle sits low in frame gets cropped through
+                // it under fullBanner's short aspect ratio. A real <img>
+                // supports object-position; native is untouched (falls back
+                // to the original ImageBackground below).
+                <View style={styles.fullBanner}>
+                  {Platform.OS === 'web' && banner.image?.uri ? (
+                    <img
+                      src={banner.image.uri}
+                      alt=""
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        objectPosition: 'center 62%',
+                        borderRadius: CARD_RADIUS,
+                      } as any}
+                    />
+                  ) : (
+                    <ImageBackground
+                      source={banner.image}
+                      style={StyleSheet.absoluteFill}
+                      imageStyle={{ borderRadius: CARD_RADIUS }}
+                    />
+                  )}
                   <View style={styles.bannerGlass}>
                     <Text style={styles.bannerTitleText}>{banner.title}</Text>
                     <Text style={styles.bannerSubtitleText}>{banner.subtitle}</Text>
@@ -596,7 +622,7 @@ export default function HomeScreen({ navigation }: any) {
                       <Ionicons name="arrow-forward" size={14} color={colors.white} />
                     </TouchableOpacity>
                   </View>
-                </ImageBackground>
+                </View>
               ) : (
                 // Pre-designed graphic with its own baked-in title/CTA (see
                 // Banner.showOverlay) -- show the image as-is, whole thing
@@ -1123,7 +1149,11 @@ const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
     marginTop: 16,
   },
   fullBanner: {
-    height: 190,
+    // aspectRatio (not a fixed height) so this stays a natural photo crop
+    // on phone-width slides; maxHeight stops it growing too tall on wider
+    // tablet-width slides, where fixed 190 used to letterbox badly (~5:1).
+    aspectRatio: 1.9,
+    maxHeight: 220,
     borderRadius: CARD_RADIUS,
     overflow: 'hidden',
     justifyContent: 'flex-end',

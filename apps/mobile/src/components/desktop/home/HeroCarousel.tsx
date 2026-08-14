@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Image, Pressable, Animated, Linking, Alert, StyleSheet } from 'react-native';
+import { View, Text, Image, Pressable, Animated, Linking, Alert, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { colors, spacing, radius } from '../../../theme/tokens';
@@ -83,14 +83,62 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
   // make the raw image itself tappable so the link still works.
   const showOverlay = banner.showOverlay !== false;
   const noOverlayAspect = !showOverlay ? aspectRatios[banner.id] : undefined;
+  // RN's cross-platform <Image> maps to a CSS background-image on web (see
+  // react-native-web's Image implementation) with background-position
+  // hard-coded to 'center' -- there's no prop that can move it. A plain
+  // <img> is the only way to get real object-position control for these
+  // photo banners, so we use one on web only; native (which never actually
+  // mounts this "desktop" component today) keeps the RN <Image> fallback.
+  // (react-native-web doesn't expose a resolveAssetSource static, so this
+  // only takes the fast path for remote {uri} banners -- the only shape
+  // fetchBanners actually returns; a numeric require()'d asset falls back
+  // to the RN <Image> branch below, which resolves it itself.)
+  const bannerImageUri =
+    showOverlay && banner.image && typeof banner.image === 'object' && 'uri' in banner.image
+      ? banner.image.uri
+      : undefined;
 
   return (
     <View style={[styles.wrapper, noOverlayAspect ? { height: 'auto' as any, aspectRatio: noOverlayAspect } : null]}>
       <Animated.View style={[styles.slide, { opacity: fade }]}>
         {showOverlay ? (
           <>
-            <Image source={banner.image} style={styles.image} resizeMode="cover" />
-            <View style={styles.overlay} />
+            {Platform.OS === 'web' && bannerImageUri ? (
+              <img
+                src={bannerImageUri}
+                alt=""
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  // Real banner photos (motorcycles/cars) are typically shot
+                  // with the vehicle sitting in the lower half of the frame
+                  // and sky/background above -- biasing below dead-center
+                  // keeps the product in view instead of cropping through it.
+                  objectPosition: 'center 62%',
+                } as any}
+              />
+            ) : (
+              <Image source={banner.image} style={styles.image} resizeMode="cover" />
+            )}
+            {/* Gradient, not a flat tint: full darkening was crushing the
+                whole photo (worst on already-dark shots) to make text
+                readable on the left, when only the left needs it. */}
+            {Platform.OS === 'web' ? (
+              <View
+                style={
+                  {
+                    ...StyleSheet.absoluteFill,
+                    backgroundImage:
+                      'linear-gradient(to right, rgba(17,17,18,0.82) 0%, rgba(17,17,18,0.55) 32%, rgba(17,17,18,0.18) 55%, rgba(17,17,18,0) 72%)',
+                  } as any
+                }
+              />
+            ) : (
+              <View style={styles.overlay} />
+            )}
             <View style={styles.textBlock}>
               <Text style={styles.title}>{banner.title}</Text>
               {!!banner.subtitle && <Text style={styles.subtitle}>{banner.subtitle}</Text>}
@@ -142,12 +190,14 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
 const styles = StyleSheet.create({
   wrapper: {
     width: '100%',
-    // Was 420 -- read as the "huge hero banner" the redesign brief asks to
-    // avoid, especially once it's demoted below the reference's matched
-    // top section instead of leading the page. Kept as a compact promo
-    // strip rather than removed outright (2026-08-14 redesign chose to
-    // restyle existing lower sections in place, not delete them).
-    height: 220,
+    // A fixed pixel height doesn't respond to width -- the crop ratio (and
+    // how letterboxed the photo looks) silently changed across the desktop
+    // range depending on viewport size. aspectRatio keeps that ratio
+    // constant instead. 4.8 lands close to the old 220px at the container's
+    // typical clamped width (~1232px, see Container's maxContentWidth) --
+    // kept as a compact promo strip per the 2026-08-14 redesign (was 420
+    // before that), just made to scale consistently instead of pinned.
+    aspectRatio: 4.8,
     borderRadius: radius.lg,
     overflow: 'hidden',
     position: 'relative',
