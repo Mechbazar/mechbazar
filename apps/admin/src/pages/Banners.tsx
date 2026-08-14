@@ -40,7 +40,7 @@ export default function Banners() {
     title: '',
     image: '',
     type: 'HOMEPAGE',
-    vehicleType: 'CAR',
+    vehicleType: '', // '' = All (Car & Bike), otherwise 'CAR' | 'BIKE'
     link: '',
     isActive: true,
     startDate: '',
@@ -72,7 +72,7 @@ export default function Banners() {
         title: banner.title || '',
         image: banner.image || '',
         type: banner.type || 'HOMEPAGE',
-        vehicleType: banner.vehicleType || 'CAR',
+        vehicleType: banner.vehicleType || '',
         link: banner.link || '',
         isActive: banner.isActive ?? true,
         startDate: banner.startDate ? new Date(banner.startDate).toISOString().split('T')[0] : '',
@@ -81,7 +81,7 @@ export default function Banners() {
     } else {
       setIsEditing(false);
       setFormData({
-        id: '', title: '', image: '', type: 'HOMEPAGE', vehicleType: 'CAR', link: '', isActive: true, startDate: '', endDate: ''
+        id: '', title: '', image: '', type: 'HOMEPAGE', vehicleType: '', link: '', isActive: true, startDate: '', endDate: ''
       });
     }
     setImageError('');
@@ -190,9 +190,11 @@ export default function Banners() {
                   <Badge variant="neutral" className="backdrop-blur-sm uppercase">
                     {banner.type}
                   </Badge>
-                  <Badge variant="neutral" className="backdrop-blur-sm uppercase">
-                    {banner.vehicleType === 'BIKE' ? 'Bike' : 'Car'} only
-                  </Badge>
+                  {banner.vehicleType && (
+                    <Badge variant="neutral" className="backdrop-blur-sm uppercase">
+                      {banner.vehicleType === 'BIKE' ? 'Bike' : 'Car'} only
+                    </Badge>
+                  )}
                 </div>
               </div>
               <div className="p-4">
@@ -316,10 +318,11 @@ export default function Banners() {
                 value={formData.vehicleType}
                 onChange={(e) => setFormData({...formData, vehicleType: e.target.value})}
               >
-                <option value="CAR">Car</option>
-                <option value="BIKE">Bike</option>
+                <option value="">All (Car & Bike)</option>
+                <option value="CAR">Car only</option>
+                <option value="BIKE">Bike only</option>
               </Select>
-              <p className="text-content-muted text-xs mt-1.5">Only shown to shoppers browsing this vehicle type -- there's no "both" option.</p>
+              <p className="text-content-muted text-xs mt-1.5">Restrict to Car or Bike only if this promo doesn't apply to both.</p>
             </div>
           </div>
 

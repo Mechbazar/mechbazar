@@ -1012,7 +1012,7 @@ model Banner {
   image        String
   type         BannerType  @default(HOMEPAGE)
   link         String?
-  vehicleType  VehicleType @default(CAR)
+  vehicleType  VehicleType? // null = shown on both CAR and BIKE, same convention as Coupon.vehicleType
   buttonText   String?
   redirectLink String?
   isActive     Boolean     @default(true)

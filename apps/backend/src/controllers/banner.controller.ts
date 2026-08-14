@@ -27,7 +27,9 @@ export const getPublicBanners = async (req: Request, res: Response): Promise<voi
     const banners = await prisma.banner.findMany({
       where: {
         isActive: true,
-        vehicleType: vehicleFilter
+        // null vehicleType = shown for every vehicle type, so it must match
+        // regardless of which one the customer is currently browsing.
+        OR: [{ vehicleType: vehicleFilter }, { vehicleType: null }]
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -55,7 +57,10 @@ export const createBanner = async (req: AuthRequest, res: Response): Promise<voi
         link,
         buttonText,
         redirectLink,
-        vehicleType: normalizeVehicleType(vehicleType),
+        // Empty/missing vehicleType means "show for both" (null), matching
+        // Coupon.vehicleType's convention -- only normalize when a specific
+        // CAR/BIKE value was actually chosen.
+        vehicleType: vehicleType ? normalizeVehicleType(vehicleType) : null,
         isActive: isActive !== undefined ? Boolean(isActive) : true,
         startDate: startDate ? new Date(startDate) : null,
         endDate: endDate ? new Date(endDate) : null,
@@ -92,7 +97,7 @@ export const updateBanner = async (req: AuthRequest, res: Response): Promise<voi
         link,
         buttonText,
         redirectLink,
-        vehicleType: vehicleType !== undefined ? normalizeVehicleType(vehicleType) : undefined,
+        vehicleType: vehicleType !== undefined ? (vehicleType ? normalizeVehicleType(vehicleType) : null) : undefined,
         isActive: isActive !== undefined ? Boolean(isActive) : undefined,
         startDate: startDate ? new Date(startDate) : startDate === null ? null : undefined,
         endDate: endDate ? new Date(endDate) : endDate === null ? null : undefined,
