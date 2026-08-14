@@ -608,7 +608,7 @@ export default function HomeScreen({ navigation }: any) {
                     source={banner.image}
                     style={[
                       styles.fullBanner,
-                      bannerAspectRatios[banner.id] ? { height: undefined, aspectRatio: bannerAspectRatios[banner.id] } : null,
+                      bannerAspectRatios[banner.id] ? { height: 'auto' as any, aspectRatio: bannerAspectRatios[banner.id] } : null,
                     ]}
                     imageStyle={{ borderRadius: CARD_RADIUS }}
                     resizeMode="contain"

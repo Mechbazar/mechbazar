@@ -85,7 +85,7 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
   const noOverlayAspect = !showOverlay ? aspectRatios[banner.id] : undefined;
 
   return (
-    <View style={[styles.wrapper, noOverlayAspect ? { height: undefined, aspectRatio: noOverlayAspect } : null]}>
+    <View style={[styles.wrapper, noOverlayAspect ? { height: 'auto' as any, aspectRatio: noOverlayAspect } : null]}>
       <Animated.View style={[styles.slide, { opacity: fade }]}>
         {showOverlay ? (
           <>
