@@ -12,23 +12,48 @@ import { useBreakpoint } from '../../../hooks/useBreakpoint';
 // Purely a display fallback for when a category has no admin-uploaded
 // `image` -- real images always win (see the render below). Keyed by
 // lowercased category name so it survives minor casing differences from
-// the backend. Matched against the automotive-parts vocabulary the brief
-// names explicitly; anything else falls through to a generic parts icon
-// rather than the old bare-emoji '📦' placeholder, so every category still
-// gets the same glossy tinted-circle treatment.
+// the backend. Covers both vehicle types' real category names as seeded in
+// prod (verified live via GET /categories?vehicleType=CAR|BIKE 2026-08-14 --
+// BIKE roughly matches the redesign reference's broad names, CAR uses a
+// much more granular real set the reference never showed), grouped into
+// "families" that share a tint/icon so a category outside this list still
+// falls through to a reasonable relative, not a bare gray default. Anything
+// still unmatched falls through to DEFAULT_ICON rather than the old bare-
+// emoji '📦' placeholder, so every category gets the same glossy chip.
 const ICON_FALLBACKS: Record<string, { set: 'ionicons' | 'mci'; name: string; tint: string; iconColor: string }> = {
   'accessories': { set: 'mci', name: 'steering', tint: '#FDEEF0', iconColor: '#33313A' },
+  'car accessories': { set: 'mci', name: 'steering', tint: '#FDEEF0', iconColor: '#33313A' },
+  'steering parts': { set: 'mci', name: 'steering', tint: '#FDEEF0', iconColor: '#33313A' },
   'batteries': { set: 'mci', name: 'car-battery', tint: '#EBFBEE', iconColor: '#2B8A3E' },
+  'battery': { set: 'mci', name: 'car-battery', tint: '#EBFBEE', iconColor: '#2B8A3E' },
   'body parts': { set: 'mci', name: 'car-door', tint: '#FDEEF0', iconColor: '#C0392B' },
-  'brake system': { set: 'mci', name: 'car-brake-alert', tint: '#FDEEF0', iconColor: '#495057' },
+  'brake system': { set: 'mci', name: 'car-brake-alert', tint: '#F0F1F3', iconColor: '#495057' },
+  'brake disc': { set: 'mci', name: 'car-brake-alert', tint: '#F0F1F3', iconColor: '#495057' },
+  'brake pads': { set: 'mci', name: 'car-brake-alert', tint: '#F0F1F3', iconColor: '#495057' },
   'clutch': { set: 'mci', name: 'disc', tint: '#F1EEF9', iconColor: '#7048A8' },
+  'clutch kit': { set: 'mci', name: 'disc', tint: '#F1EEF9', iconColor: '#7048A8' },
   'electrical': { set: 'ionicons', name: 'flash', tint: '#FFF6E5', iconColor: '#E8890C' },
+  'alternator': { set: 'ionicons', name: 'flash', tint: '#FFF6E5', iconColor: '#E8890C' },
+  'spark plug': { set: 'ionicons', name: 'flash-outline', tint: '#FFF6E5', iconColor: '#E8890C' },
   'engine parts': { set: 'mci', name: 'engine', tint: '#F0F1F3', iconColor: '#33313A' },
+  'timing belt': { set: 'mci', name: 'timer-cog-outline', tint: '#F0F1F3', iconColor: '#33313A' },
   'filters': { set: 'mci', name: 'air-filter', tint: '#E8F3FC', iconColor: '#1C7ED6' },
+  'air filter': { set: 'mci', name: 'air-filter', tint: '#E8F3FC', iconColor: '#1C7ED6' },
+  'cabin filter': { set: 'mci', name: 'air-filter', tint: '#E8F3FC', iconColor: '#1C7ED6' },
+  'ac compressor': { set: 'mci', name: 'air-conditioner', tint: '#E8F3FC', iconColor: '#1C7ED6' },
+  'coolant': { set: 'mci', name: 'car-coolant-level', tint: '#E8F3FC', iconColor: '#1C7ED6' },
+  'radiator': { set: 'mci', name: 'radiator', tint: '#E8F3FC', iconColor: '#1C7ED6' },
+  'wiper': { set: 'mci', name: 'wiper', tint: '#E8F3FC', iconColor: '#1C7ED6' },
+  'care kit': { set: 'mci', name: 'car-wash', tint: '#E8F3FC', iconColor: '#1C7ED6' },
   'lighting': { set: 'mci', name: 'car-light-high', tint: '#FFF9DB', iconColor: '#E8A317' },
+  'headlight': { set: 'mci', name: 'car-light-high', tint: '#FFF9DB', iconColor: '#E8A317' },
+  'tail light': { set: 'mci', name: 'car-light-dimmed', tint: '#FFF9DB', iconColor: '#E8A317' },
   'oils & lubricants': { set: 'mci', name: 'oil', tint: '#FDF3E3', iconColor: '#5C4A2E' },
+  'engine oil': { set: 'mci', name: 'oil', tint: '#FDF3E3', iconColor: '#5C4A2E' },
   'suspension': { set: 'mci', name: 'car-shift-pattern', tint: '#FDEEF0', iconColor: '#C0392B' },
+  'shock absorber': { set: 'mci', name: 'car-shift-pattern', tint: '#FDEEF0', iconColor: '#C0392B' },
   'transmission': { set: 'mci', name: 'cog', tint: '#F0F1F3', iconColor: '#5F6670' },
+  'tyres': { set: 'mci', name: 'tire', tint: '#F0F1F3', iconColor: '#5F6670' },
 };
 const DEFAULT_ICON = { set: 'mci' as const, name: 'car-wrench', tint: colors.pageBg, iconColor: colors.textMuted };
 
