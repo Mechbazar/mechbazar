@@ -40,6 +40,7 @@ import { reverseGeocode } from '../services/geocode.service';
 import { API_BASE_URL } from '../services/api';
 import { Icon3D } from '../components/shared/Icon3D';
 import { useIsDarkMode } from '../theme/useThemeColors';
+import { resolveBannerLink } from '../utils/bannerLink';
 import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
@@ -360,18 +361,19 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   // Mirrors HeroCarousel's handleCta (apps/mobile/src/components/desktop/home/HeroCarousel.tsx)
-  // -- an http(s) redirectLink opens externally, anything else is treated as
-  // a category name, and no link at all falls back to browsing categories.
+  // via the shared resolveBannerLink -- an http(s)/domain-like redirectLink
+  // opens externally, anything else is treated as a category name, and no
+  // link at all falls back to browsing categories.
   const handleBannerPress = (banner: any) => {
-    const link = banner.redirectLink;
-    if (!link) {
-      navigation.navigate('MainTabs', { screen: 'Categories' });
-      return;
-    }
-    if (/^https?:\/\//i.test(link)) {
-      Linking.openURL(link);
+    const action = resolveBannerLink(banner.redirectLink);
+    if (action.type === 'external') {
+      Linking.openURL(action.url).catch(() => {
+        Alert.alert('Could not open link', 'This promotional link appears to be invalid.');
+      });
+    } else if (action.type === 'category') {
+      navigation.navigate('CategoryProducts', { categoryName: action.categoryName });
     } else {
-      navigation.navigate('CategoryProducts', { categoryName: link });
+      navigation.navigate('MainTabs', { screen: 'Categories' });
     }
   };
 

@@ -122,6 +122,9 @@ export const BannersScreen = () => {
               <View style={{ flex: 1 }}>
                 <Typography variant="h3" numberOfLines={1}>{item.title}</Typography>
                 <Typography variant="caption">{item.type} • {item.startDate || item.endDate ? `${item.startDate ? new Date(item.startDate).toLocaleDateString() : '—'} to ${item.endDate ? new Date(item.endDate).toLocaleDateString() : '—'}` : 'Always Active'}</Typography>
+                <Typography variant="caption" numberOfLines={1} style={{ fontStyle: item.link ? 'normal' : 'italic' }}>
+                  {item.link ? `Links to: ${item.link}` : 'No click link set'}
+                </Typography>
               </View>
               <Badge label={item.isActive ? 'Active' : 'Inactive'} variant={item.isActive ? 'success' : 'secondary'} size="sm" />
             </View>
@@ -151,7 +154,15 @@ export const BannersScreen = () => {
             ))}
           </View>
 
-          <Input label="Link (optional)" value={form.link} onChangeText={(t) => setForm({ ...form, link: t })} autoCapitalize="none" containerStyle={{ marginVertical: 12 }} />
+          <Input
+            label="Link (optional)"
+            value={form.link}
+            onChangeText={(t) => setForm({ ...form, link: t })}
+            autoCapitalize="none"
+            placeholder="https://example.com or a category name"
+            helperText="A full https:// link opens externally. Anything else (e.g. Filters) opens that category in the app."
+            containerStyle={{ marginVertical: 12 }}
+          />
           <Input label="Start Date (YYYY-MM-DD, optional)" value={form.startDate} onChangeText={(t) => setForm({ ...form, startDate: t })} containerStyle={{ marginBottom: 12 }} />
           <Input label="End Date (YYYY-MM-DD, optional)" value={form.endDate} onChangeText={(t) => setForm({ ...form, endDate: t })} containerStyle={{ marginBottom: 12 }} />
 

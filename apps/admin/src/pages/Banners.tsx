@@ -181,6 +181,13 @@ export default function Banners() {
                     <span>Runs: Always Active</span>
                   )}
                 </div>
+                <div className="text-sm text-content-muted mt-1 truncate">
+                  {banner.link ? (
+                    <span>Links to: <span className="text-content-primary">{banner.link}</span></span>
+                  ) : (
+                    <span className="italic">No click link set</span>
+                  )}
+                </div>
               </div>
             </Card>
           ))}
@@ -222,6 +229,8 @@ export default function Banners() {
             <Input
               label="Click Link (Optional)"
               type="text"
+              placeholder="https://example.com or a category name"
+              helperText="A full https:// link opens externally. Anything else (e.g. Filters) opens that category in the app."
               value={formData.link}
               onChange={(e) => setFormData({...formData, link: e.target.value})}
             />

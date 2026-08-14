@@ -20,7 +20,8 @@ import {
   ImageBackground,
   Alert,
   Modal,
-  Share
+  Share,
+  Linking
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -39,6 +40,7 @@ import { reverseGeocode } from '../services/geocode.service';
 import { API_BASE_URL } from '../services/api';
 import { Icon3D } from '../components/shared/Icon3D';
 import { useIsDarkMode } from '../theme/useThemeColors';
+import { resolveBannerLink } from '../utils/bannerLink';
 import { useTranslation } from 'react-i18next';
 
 const { width } = Dimensions.get('window');
@@ -358,6 +360,23 @@ export default function HomeScreen({ navigation }: any) {
     }
   };
 
+  // Mirrors HeroCarousel's handleCta (apps/mobile/src/components/desktop/home/HeroCarousel.tsx)
+  // via the shared resolveBannerLink -- an http(s)/domain-like redirectLink
+  // opens externally, anything else is treated as a category name, and no
+  // link at all falls back to browsing categories.
+  const handleBannerPress = (banner: any) => {
+    const action = resolveBannerLink(banner.redirectLink);
+    if (action.type === 'external') {
+      Linking.openURL(action.url).catch(() => {
+        Alert.alert('Could not open link', 'This promotional link appears to be invalid.');
+      });
+    } else if (action.type === 'category') {
+      navigation.navigate('CategoryProducts', { categoryName: action.categoryName });
+    } else {
+      navigation.navigate('MainTabs', { screen: 'Categories' });
+    }
+  };
+
   const handleSuggestionPress = (term: string) => {
     setSearchQuery(term);
     setIsSearchFocused(false);
@@ -554,7 +573,7 @@ export default function HomeScreen({ navigation }: any) {
                   <Text style={styles.bannerSubtitleText}>{banner.subtitle}</Text>
                   <Text style={styles.bannerOfferText}>{banner.offer}</Text>
 
-                  <TouchableOpacity style={styles.shopNowBtn} onPress={handleSearch} activeOpacity={0.85}>
+                  <TouchableOpacity style={styles.shopNowBtn} onPress={() => handleBannerPress(banner)} activeOpacity={0.85}>
                     <Text style={styles.shopNowText}>{t('home.shopNow')}</Text>
                     <Ionicons name="arrow-forward" size={14} color={colors.white} />
                   </TouchableOpacity>
