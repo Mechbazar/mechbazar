@@ -40,6 +40,7 @@ export default function Banners() {
     title: '',
     image: '',
     type: 'HOMEPAGE',
+    vehicleType: 'CAR',
     link: '',
     isActive: true,
     startDate: '',
@@ -71,6 +72,7 @@ export default function Banners() {
         title: banner.title || '',
         image: banner.image || '',
         type: banner.type || 'HOMEPAGE',
+        vehicleType: banner.vehicleType || 'CAR',
         link: banner.link || '',
         isActive: banner.isActive ?? true,
         startDate: banner.startDate ? new Date(banner.startDate).toISOString().split('T')[0] : '',
@@ -79,7 +81,7 @@ export default function Banners() {
     } else {
       setIsEditing(false);
       setFormData({
-        id: '', title: '', image: '', type: 'HOMEPAGE', link: '', isActive: true, startDate: '', endDate: ''
+        id: '', title: '', image: '', type: 'HOMEPAGE', vehicleType: 'CAR', link: '', isActive: true, startDate: '', endDate: ''
       });
     }
     setImageError('');
@@ -184,9 +186,12 @@ export default function Banners() {
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
-                <div className="absolute top-2 left-2">
+                <div className="absolute top-2 left-2 flex gap-2">
                   <Badge variant="neutral" className="backdrop-blur-sm uppercase">
                     {banner.type}
+                  </Badge>
+                  <Badge variant="neutral" className="backdrop-blur-sm uppercase">
+                    {banner.vehicleType === 'BIKE' ? 'Bike' : 'Car'} only
                   </Badge>
                 </div>
               </div>
@@ -305,15 +310,27 @@ export default function Banners() {
               <option value="CATEGORY">Category</option>
               <option value="PROMO">Promo</option>
             </Select>
-            <Input
-              label="Click Link (Optional)"
-              type="text"
-              placeholder="https://example.com or a category name"
-              helperText="A full https:// link opens externally. Anything else (e.g. Filters) opens that category in the app."
-              value={formData.link}
-              onChange={(e) => setFormData({...formData, link: e.target.value})}
-            />
+            <div>
+              <Select
+                label="Vehicle Type"
+                value={formData.vehicleType}
+                onChange={(e) => setFormData({...formData, vehicleType: e.target.value})}
+              >
+                <option value="CAR">Car</option>
+                <option value="BIKE">Bike</option>
+              </Select>
+              <p className="text-content-muted text-xs mt-1.5">Only shown to shoppers browsing this vehicle type -- there's no "both" option.</p>
+            </div>
           </div>
+
+          <Input
+            label="Click Link (Optional)"
+            type="text"
+            placeholder="https://example.com or a category name"
+            helperText="A full https:// link opens externally. Anything else (e.g. Filters) opens that category in the app."
+            value={formData.link}
+            onChange={(e) => setFormData({...formData, link: e.target.value})}
+          />
 
           <div className="grid grid-cols-2 gap-4">
             <Input
