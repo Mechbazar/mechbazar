@@ -1,11 +1,12 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Logo, logoSvgMarkup } from '@mechbazar/shared';
+import { notify } from '../utils/notify';
 import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
@@ -128,11 +129,11 @@ export default function OrderInvoiceScreen() {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(dest, { mimeType: 'application/pdf', dialogTitle: `Invoice ${shortId}` });
       } else {
-        Alert.alert('Sharing not available', 'Sharing is not supported on this device.');
+        notify('Sharing not available', 'Sharing is not supported on this device.');
       }
     } catch (err) {
       console.error('Failed to share invoice PDF:', err);
-      Alert.alert('Error', 'Failed to generate invoice PDF.');
+      notify('Error', 'Failed to generate invoice PDF.');
     } finally {
       setSharing(false);
     }
@@ -155,19 +156,19 @@ export default function OrderInvoiceScreen() {
           'application/pdf'
         );
         await FileSystem.writeAsStringAsync(targetUri, base64, { encoding: FileSystem.EncodingType.Base64 });
-        Alert.alert('Downloaded', 'Invoice saved successfully.');
+        notify('Downloaded', 'Invoice saved successfully.');
       } else {
         // iOS has no direct "save to Downloads" API for arbitrary files -- the
         // share sheet's "Save to Files" option is the closest equivalent.
         if (await Sharing.isAvailableAsync()) {
           await Sharing.shareAsync(dest, { mimeType: 'application/pdf', dialogTitle: `Invoice ${shortId}` });
         } else {
-          Alert.alert('Downloading not available', 'Downloading is not supported on this device.');
+          notify('Downloading not available', 'Downloading is not supported on this device.');
         }
       }
     } catch (err) {
       console.error('Failed to download invoice PDF:', err);
-      Alert.alert('Error', 'Failed to generate invoice PDF.');
+      notify('Error', 'Failed to generate invoice PDF.');
     } finally {
       setDownloading(false);
     }

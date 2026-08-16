@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Alert, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -10,6 +10,7 @@ import { Logo, logoSvgMarkup } from '@mechbazar/shared';
 import { RootState } from '../../store';
 import { ServiceInvoice, ServiceBooking } from '../../types/service';
 import { fetchBookingInvoice, fetchBookingById } from '../../services/service.service';
+import { notify } from '../../utils/notify';
 import { useIsDarkMode } from '../../theme/useThemeColors';
 import { useStableIsDesktopUp } from '../../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
@@ -96,11 +97,11 @@ export default function ServiceInvoiceScreen() {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(dest, { mimeType: 'application/pdf', dialogTitle: `Invoice ${invoice.invoiceNumber}` });
       } else {
-        Alert.alert('Sharing not available', 'Sharing is not supported on this device.');
+        notify('Sharing not available', 'Sharing is not supported on this device.');
       }
     } catch (err) {
       console.error('Failed to share invoice PDF:', err);
-      Alert.alert('Error', 'Failed to generate invoice PDF.');
+      notify('Error', 'Failed to generate invoice PDF.');
     } finally {
       setSharing(false);
     }
@@ -124,19 +125,19 @@ export default function ServiceInvoiceScreen() {
           'application/pdf'
         );
         await FileSystem.writeAsStringAsync(targetUri, base64, { encoding: FileSystem.EncodingType.Base64 });
-        Alert.alert('Downloaded', 'Invoice saved successfully.');
+        notify('Downloaded', 'Invoice saved successfully.');
       } else {
         // iOS has no direct "save to Downloads" API for arbitrary files -- the
         // share sheet's "Save to Files" option is the closest equivalent.
         if (await Sharing.isAvailableAsync()) {
           await Sharing.shareAsync(dest, { mimeType: 'application/pdf', dialogTitle: `Invoice ${invoice.invoiceNumber}` });
         } else {
-          Alert.alert('Downloading not available', 'Downloading is not supported on this device.');
+          notify('Downloading not available', 'Downloading is not supported on this device.');
         }
       }
     } catch (err) {
       console.error('Failed to download invoice PDF:', err);
-      Alert.alert('Error', 'Failed to generate invoice PDF.');
+      notify('Error', 'Failed to generate invoice PDF.');
     } finally {
       setDownloading(false);
     }

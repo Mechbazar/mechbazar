@@ -18,7 +18,6 @@ import {
   Animated,
   Easing,
   ImageBackground,
-  Alert,
   Modal,
   Share,
   Linking,
@@ -33,6 +32,7 @@ import { addToCart, updateQuantity } from '../store/cartSlice';
 import { setVehicleType } from '../store/appSlice';
 import { fetchCategories, getTrendingProducts, fetchBanners, fetchOffers, HomeOffer, NO_IMAGE_PLACEHOLDER } from '../services/product.service';
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../services/wishlist.service';
+import { notify } from '../utils/notify';
 import { VehicleType, Category, Product } from '../types/product';
 import { ServiceAddress } from '../types/service';
 import { fetchMyAddresses } from '../services/address.service';
@@ -386,7 +386,7 @@ export default function HomeScreen({ navigation }: any) {
     const action = resolveBannerLink(banner.redirectLink);
     if (action.type === 'external') {
       Linking.openURL(action.url).catch(() => {
-        Alert.alert('Could not open link', 'This promotional link appears to be invalid.');
+        notify('Could not open link', 'This promotional link appears to be invalid.');
       });
     } else if (action.type === 'category') {
       navigation.navigate('CategoryProducts', { categoryName: action.categoryName });
@@ -420,7 +420,7 @@ export default function HomeScreen({ navigation }: any) {
 
   const handleWishlistToggle = async (id: string) => {
     if (!token) {
-      Alert.alert('Sign in required', 'Please log in to save items to your wishlist.');
+      notify('Sign in required', 'Please log in to save items to your wishlist.');
       return;
     }
     const wasWishlisted = !!wishlist[id];
@@ -428,10 +428,10 @@ export default function HomeScreen({ navigation }: any) {
     const result = wasWishlisted ? await removeFromWishlist(token, id) : await addToWishlist(token, id);
     if (!result.ok) {
       setWishlist(prev => ({ ...prev, [id]: wasWishlisted }));
-      Alert.alert('Error', result.error || 'Failed to update wishlist');
+      notify('Error', result.error || 'Failed to update wishlist');
       return;
     }
-    Alert.alert('Wishlist', !wasWishlisted ? 'Product added to wishlist.' : 'Product removed from wishlist.');
+    notify('Wishlist', !wasWishlisted ? 'Product added to wishlist.' : 'Product removed from wishlist.');
   };
 
   const handleShareProduct = (name: string) => {

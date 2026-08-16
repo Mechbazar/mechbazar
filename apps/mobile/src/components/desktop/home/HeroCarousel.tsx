@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Image, Pressable, Animated, Linking, Alert, StyleSheet, Platform } from 'react-native';
+import { View, Text, Image, Pressable, Animated, Linking, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 import { colors, spacing, radius } from '../../../theme/tokens';
 import { resolveBannerLink } from '../../../utils/bannerLink';
+import { notify } from '../../../utils/notify';
 
 interface Banner {
   id: string;
@@ -67,7 +68,7 @@ export default function HeroCarousel({ banners }: { banners: Banner[] }) {
     const action = resolveBannerLink(banner.redirectLink);
     if (action.type === 'external') {
       Linking.openURL(action.url).catch(() => {
-        Alert.alert('Could not open link', 'This promotional link appears to be invalid.');
+        notify('Could not open link', 'This promotional link appears to be invalid.');
       });
     } else if (action.type === 'category') {
       navigation.navigate('CategoryProducts', { categoryName: action.categoryName });

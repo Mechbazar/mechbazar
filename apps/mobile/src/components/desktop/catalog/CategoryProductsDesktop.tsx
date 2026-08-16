@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, TextInput, ScrollView, Alert, StyleSheet } from 'react-native';
+import { View, Text, TextInput, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation, useRoute, NavigationProp, RouteProp } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
@@ -8,6 +8,7 @@ import { addToCart, updateQuantity } from '../../../store/cartSlice';
 import { Category, FilterOptions, Product, VehicleType } from '../../../types/product';
 import { fetchCategories, fetchBrands, getCategoryProducts } from '../../../services/product.service';
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../../../services/wishlist.service';
+import { notify } from '../../../utils/notify';
 import { setDesktopFullPageScreenActive } from '../../../navigation/desktopFullPageScreenStore';
 import { colors, spacing, radius } from '../../../theme/tokens';
 import Container from '../shared/Container';
@@ -156,7 +157,7 @@ export default function CategoryProductsDesktop() {
 
   const handleToggleWishlist = useCallback(async (product: Product) => {
     if (!token) {
-      Alert.alert('Sign in required', 'Please log in to save items to your wishlist.');
+      notify('Sign in required', 'Please log in to save items to your wishlist.');
       return;
     }
     const was = !!wishlist[product.id];

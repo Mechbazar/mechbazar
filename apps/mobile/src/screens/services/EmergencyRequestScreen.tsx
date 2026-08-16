@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Image, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -8,6 +8,7 @@ import { jobService } from '@mechbazar/shared';
 import { RootState } from '../../store';
 import { VehicleType } from '../../types/product';
 import { ServicePackage, ServiceCategory, ServiceAddress } from '../../types/service';
+import { notify } from '../../utils/notify';
 import { fetchServicePackageById } from '../../services/service.service';
 import { AddressPickerSheet } from '../../components/services/AddressPickerSheet';
 import { useIsDarkMode } from '../../theme/useThemeColors';
@@ -91,7 +92,7 @@ export default function EmergencyRequestScreen() {
   const pickImages = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Allow photo library access to attach photos.');
+      notify('Permission needed', 'Allow photo library access to attach photos.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({

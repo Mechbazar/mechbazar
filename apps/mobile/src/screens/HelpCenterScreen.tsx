@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   Linking,
-  Alert,
   Platform
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,6 +16,7 @@ import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScr
 import CompactBookingShell from '../components/desktop/shared/CompactBookingShell';
 import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 import { SUPPORT_PHONE_E164, buildSupportWhatsAppUrl } from '../config/support';
+import { notify } from '../utils/notify';
 
 const colors = {
   primary: '#E53935',
@@ -102,7 +102,7 @@ export default function HelpCenterScreen() {
         if (supported) {
           Linking.openURL(phoneNumber);
         } else {
-          Alert.alert('Error', 'Call functionality is not supported on this device.');
+          notify('Error', 'Call functionality is not supported on this device.');
         }
       })
       .catch(err => console.error(err));
@@ -111,7 +111,7 @@ export default function HelpCenterScreen() {
   const handleWhatsAppSupport = () => {
     const url = buildSupportWhatsAppUrl('Hello Mech Bazar Support, I need help with my account.');
     Linking.openURL(url).catch(() => {
-      Alert.alert('Error', `Failed to open WhatsApp. Please save ${SUPPORT_PHONE_E164} to chat.`);
+      notify('Error', `Failed to open WhatsApp. Please save ${SUPPORT_PHONE_E164} to chat.`);
     });
   };
 

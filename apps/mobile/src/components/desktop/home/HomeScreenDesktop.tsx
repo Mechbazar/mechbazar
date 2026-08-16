@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, Pressable, ScrollView, Alert, StyleSheet } from 'react-native';
+import { View, Text, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
 import { fetchCategories, fetchBanners, fetchHomeExtras, getTrendingProducts, HomeExtras } from '../../../services/product.service';
 import { fetchMyWishlist, addToWishlist, removeFromWishlist } from '../../../services/wishlist.service';
+import { notify } from '../../../utils/notify';
 import { fetchTopVendors, TopVendor } from '../../../services/vendor.service';
 import { Category, Product, VehicleType } from '../../../types/product';
 import { spacing } from '../../../theme/tokens';
@@ -139,7 +140,7 @@ export default function HomeScreenDesktop() {
 
   const handleWishlistToggle = async (id: string) => {
     if (!token) {
-      Alert.alert('Sign in required', 'Please log in to save items to your wishlist.');
+      notify('Sign in required', 'Please log in to save items to your wishlist.');
       return;
     }
     const was = !!wishlist[id];

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, TextInput, Animated, Dimensions, Modal, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, TextInput, Animated, Dimensions, Modal, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
@@ -8,6 +8,7 @@ import { RootState } from '../store';
 import { HeaderCartButton } from '../components/HeaderCartButton';
 import { VehicleType } from '../types/product';
 import { fetchManufacturers, fetchModels, fetchVariants } from '../services/product.service';
+import { notify } from '../utils/notify';
 import { createMyVehicle } from '../services/garage.service';
 import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
@@ -141,7 +142,7 @@ export default function VehicleSelectionScreen() {
     setIsSaving(false);
 
     if (!result.vehicle) {
-      Alert.alert('Error', result.error || 'Failed to save vehicle');
+      notify('Error', result.error || 'Failed to save vehicle');
       return;
     }
 

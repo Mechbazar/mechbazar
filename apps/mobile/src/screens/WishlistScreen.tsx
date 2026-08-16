@@ -6,7 +6,6 @@ import {
   StyleSheet,
   FlatList,
   Image,
-  Alert,
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { addToCart } from '../store/cartSlice';
 import { RootState } from '../store';
 import { Product } from '../types/product';
+import { notify } from '../utils/notify';
 import { fetchMyWishlist, removeFromWishlist } from '../services/wishlist.service';
 import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
@@ -75,7 +75,7 @@ export default function WishlistScreen() {
     setRemovingId(null);
     if (!result.ok) {
       setWishlist(prev);
-      Alert.alert('Error', result.error || 'Failed to remove from wishlist');
+      notify('Error', result.error || 'Failed to remove from wishlist');
     }
   };
 
@@ -91,7 +91,7 @@ export default function WishlistScreen() {
       moq: item.moq,
     }));
     handleRemove(item.id);
-    Alert.alert('Success', `${item.name} moved to cart successfully!`);
+    notify('Success', `${item.name} moved to cart successfully!`);
   };
 
   const renderItem = ({ item }: { item: Product }) => (

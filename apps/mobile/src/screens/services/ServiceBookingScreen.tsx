@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Image, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -8,6 +8,7 @@ import { RootState } from '../../store';
 import { VehicleType } from '../../types/product';
 import { ServicePackage, ServiceCategory, TimeSlot, ServiceAddress } from '../../types/service';
 import { fetchServicePackageById, fetchTimeSlots, createServiceBooking, uploadBookingImage } from '../../services/service.service';
+import { notify } from '../../utils/notify';
 import { AddressPickerSheet } from '../../components/services/AddressPickerSheet';
 import { useStableIsDesktopUp } from '../../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../../navigation/desktopFullPageScreenStore';
@@ -172,7 +173,7 @@ export default function ServiceBookingScreen() {
   const pickImages = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Allow photo library access to attach images.');
+      notify('Permission needed', 'Allow photo library access to attach images.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
