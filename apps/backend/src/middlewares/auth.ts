@@ -139,3 +139,30 @@ export const requireApprovedTechnician = async (req: AuthRequest, res: Response,
     return res.status(500).json({ error: 'Failed to verify technician status' });
   }
 };
+
+// Gates only the "operate as a vendor" endpoints (list/manage products, view
+// orders, request payout) -- mirrors requireApprovedRider/requireApprovedTechnician.
+// Registration, profile, business/bank details, document upload and
+// resubmission stay reachable at any status, otherwise a
+// PENDING/UNDER_VERIFICATION/RESUBMISSION_REQUIRED vendor could never finish
+// onboarding. Previously this middleware did not exist at all, so any
+// authenticated VENDOR-role token -- including one for an account an admin
+// has never approved -- could create live, immediately-APPROVED products via
+// POST /vendors/products; this closes that gap the same way riders/
+// technicians are already gated.
+// Must run after `authenticate` and `authorize([Role.VENDOR])`.
+export const requireApprovedVendor = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const vendor = await prisma.vendor.findUnique({ where: { userId: req.user!.userId } });
+    if (!vendor) {
+      return res.status(404).json({ error: 'Vendor profile not found' });
+    }
+    if (vendor.status !== 'APPROVED') {
+      return res.status(403).json({ error: 'Your vendor account is not yet approved.', status: vendor.status });
+    }
+    next();
+  } catch (error) {
+    console.error('requireApprovedVendor error:', error);
+    return res.status(500).json({ error: 'Failed to verify vendor status' });
+  }
+};
