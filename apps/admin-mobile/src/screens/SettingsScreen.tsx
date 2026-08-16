@@ -3,7 +3,7 @@ import { View, ScrollView, StyleSheet, Alert } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import * as SecureStore from 'expo-secure-store';
-import { colors, Typography, Card, Button, getApiBaseUrl } from '@mechbazar/shared';
+import { colors, Typography, Card, Button, getApiBaseUrl, clearPushToken } from '@mechbazar/shared';
 import { RootState, logout } from '../store';
 
 // apps/admin has no dedicated Settings page — this is the minimal, non-
@@ -21,6 +21,11 @@ export const SettingsScreen = () => {
         text: 'Sign Out',
         style: 'destructive',
         onPress: async () => {
+          try {
+            await clearPushToken();
+          } catch (e) {
+            console.error('Failed to clear push token on logout:', e);
+          }
           await SecureStore.deleteItemAsync('token');
           dispatch(logout());
         },

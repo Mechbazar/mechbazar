@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { colors, Typography, Card, Button, Input, vendorService, geocodeService, Loader } from '@mechbazar/shared';
+import { colors, Typography, Card, Button, Input, vendorService, geocodeService, Loader, clearPushToken } from '@mechbazar/shared';
 import type { GeocodeSuccess } from '@mechbazar/shared';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDispatch } from 'react-redux';
@@ -113,6 +113,11 @@ export const ProfileScreen = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign Out', style: 'destructive', onPress: async () => {
+        try {
+          await clearPushToken();
+        } catch (e) {
+          console.error('Failed to clear push token on logout:', e);
+        }
         await SecureStore.deleteItemAsync('token');
         dispatch(logout());
       }}
