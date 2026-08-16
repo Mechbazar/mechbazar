@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Image, Alert, RefreshControl, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Image, Alert, RefreshControl, Platform, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { HeaderCartButton } from '../components/HeaderCartButton';
@@ -17,6 +17,7 @@ import MinimalFooter from '../components/desktop/shared/MinimalFooter';
 import { useIsDarkMode } from '../theme/useThemeColors';
 import { useTranslation } from 'react-i18next';
 import { notify, confirm } from '../utils/notify';
+import { buildSupportWhatsAppUrl } from '../config/support';
 
 type OrdersTab = 'products' | 'services';
 
@@ -262,6 +263,29 @@ export default function OrderHistoryScreen() {
     );
   };
 
+  // MB-RETURN-006: there is no self-service "return request" endpoint on the
+  // backend -- RETURNED is a status only a vendor/admin can set directly
+  // (PATCH /vendors/orders/:id/status), reachable only from DELIVERED, with
+  // no customer-facing request/approval model in between. Rather than fake a
+  // request flow the backend can't actually honor, this connects the
+  // customer straight to support with the order pre-filled, mirroring the
+  // existing "Cannot Cancel -> Get Help" pattern in handleCancelOrder above.
+  const handleRequestReturn = (order: any) => {
+    const shortId = order.id.split('-')[0].toUpperCase();
+    const openSupport = () => {
+      const message = `Hi, I'd like to return my order #${shortId} (placed ${new Date(order.createdAt).toLocaleDateString()}). Total: ₹${order.finalAmount}.`;
+      Linking.openURL(buildSupportWhatsAppUrl(message)).catch(() => {
+        notify(t('orderHistory.returnRequestFailedTitle'), t('orderHistory.returnRequestFailedMsg'));
+      });
+    };
+    confirm(
+      t('orderHistory.requestReturnTitle'),
+      t('orderHistory.requestReturnMessage', { shortId }),
+      openSupport,
+      t('orderHistory.requestReturn')
+    );
+  };
+
   const renderOrderItem = ({ item }: { item: any }) => {
     const itemCount = item.items?.reduce((acc: number, curr: any) => acc + curr.quantity, 0) || 0;
     const firstProduct = item.items?.[0]?.product;
@@ -269,6 +293,7 @@ export default function OrderHistoryScreen() {
     const moreCount = (item.items?.length || 0) - 1;
     const expanded = expandedOrderId === item.id;
     const cancellable = item.status === 'PLACED' || item.status === 'ACCEPTED' || item.status === 'PACKING';
+    const returnable = item.status === 'DELIVERED';
 
     return (
       <View style={styles.orderCard}>
@@ -341,6 +366,11 @@ export default function OrderHistoryScreen() {
               onPress={() => handleCancelOrder(item.id)}
             >
               <Text style={styles.dangerBtnText}>{cancellingId === item.id ? t('orderHistory.cancelling') : t('orderHistory.cancel')}</Text>
+            </TouchableOpacity>
+          )}
+          {returnable && (
+            <TouchableOpacity style={styles.outlineBtn} onPress={() => handleRequestReturn(item)}>
+              <Text style={styles.outlineBtnText}>{t('orderHistory.requestReturn')}</Text>
             </TouchableOpacity>
           )}
         </View>
