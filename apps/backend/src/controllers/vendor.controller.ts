@@ -575,7 +575,7 @@ export const addMyProduct = async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const { name, description, mrp, price, b2bPrice, lowStockThreshold, stock, categoryId, brandId, oemNumber, partNumber, images, specifications } = req.body;
+    const { name, description, mrp, price, b2bPrice, moq, lowStockThreshold, stock, categoryId, brandId, oemNumber, partNumber, images, specifications } = req.body;
 
     if (!categoryId || !brandId) {
       res.status(400).json({ error: 'Category and Brand are required fields' });
@@ -615,6 +615,7 @@ export const addMyProduct = async (req: Request, res: Response): Promise<void> =
         vehicleType: category.vehicleType,
         status: 'APPROVED', // No admin approval required
         b2bPrice: b2bPrice !== undefined && b2bPrice !== '' ? Number(b2bPrice) : null,
+        moq: moq !== undefined && moq !== '' ? Math.max(1, parseInt(moq, 10)) : null,
         ...(lowStockThreshold !== undefined && lowStockThreshold !== '' && { lowStockThreshold: Number(lowStockThreshold) }),
         // Optional free-form spec sheet (schema comment: shown on
         // ProductDetailsScreen's Specifications tab) -- was accepted by the
@@ -1452,7 +1453,7 @@ export const updateMyProduct = async (req: Request, res: Response): Promise<void
   try {
     const userId = (req as any).user.userId;
     const id = String(req.params.id);
-    const { name, description, mrp, price, b2bPrice, lowStockThreshold, stock, categoryId, brandId, oemNumber, partNumber, images, specifications } = req.body;
+    const { name, description, mrp, price, b2bPrice, moq, lowStockThreshold, stock, categoryId, brandId, oemNumber, partNumber, images, specifications } = req.body;
 
     const vendor = await prisma.vendor.findUnique({ where: { userId } });
     if (!vendor) { res.status(404).json({ error: 'Vendor not found' }); return; }
@@ -1504,6 +1505,7 @@ export const updateMyProduct = async (req: Request, res: Response): Promise<void
         ...(brandId && { brandId }),
         status: 'APPROVED', // no approval needed from admin side
         b2bPrice: b2bPrice !== undefined ? (b2bPrice === '' ? null : Number(b2bPrice)) : undefined,
+        moq: moq !== undefined ? (moq === '' ? null : Math.max(1, parseInt(moq, 10))) : undefined,
         lowStockThreshold: lowStockThreshold !== undefined && lowStockThreshold !== '' ? Number(lowStockThreshold) : undefined,
         ...(specifications !== undefined && { specifications: specifications === null ? null : specifications }),
       }

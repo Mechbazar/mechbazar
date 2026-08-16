@@ -697,6 +697,11 @@ model Product {
   vehicleType       VehicleType           @default(CAR)
   discountPrice     Float?
   b2bPrice          Float?
+  // Minimum order quantity a wholesale (AccountType.WHOLESALE) buyer must
+  // purchase of this product. Null/unset means no minimum beyond the normal
+  // 1. Only meaningful together with b2bPrice -- a product with no wholesale
+  // price has nothing for this to gate.
+  moq               Int?
   lowStockThreshold Int                   @default(10)
   isFeatured        Boolean               @default(false)
   isDeal            Boolean               @default(false)

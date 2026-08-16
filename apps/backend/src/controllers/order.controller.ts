@@ -262,14 +262,14 @@ export const notifyWalletDebits = (debits: { userId: string; amount: number }[])
 
 export const createOrder = async (req: AuthRequest, res: Response) => {
   try {
-    const { items, addressId, deliveryAddress, couponCode, isB2B, payment_method } = req.body;
+    const { items, addressId, couponCode, payment_method } = req.body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Cart is empty or invalid.' });
     }
 
-    if (!addressId && !deliveryAddress) {
-      return res.status(400).json({ error: 'Delivery address is required.' });
+    if (!addressId || typeof addressId !== 'string') {
+      return res.status(400).json({ error: 'A valid delivery address is required.' });
     }
 
     // The user is identified from the verified JWT, not from the delivery
@@ -281,38 +281,33 @@ export const createOrder = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ error: 'User not found for the provided token.' });
     }
 
+    // Recomputed server-side, never trusted from the request body -- an
+    // `isB2B` flag straight from the client meant any authenticated retail
+    // customer could send `isB2B: true` and buy at wholesale (b2bPrice) on
+    // any product that has one set. Wholesale pricing is only real for an
+    // account the caller actually owns (accountType) that an admin has
+    // actually approved (isBusinessVerified) -- both already exist and are
+    // enforced nowhere before this.
+    const isB2B = user.accountType === 'WHOLESALE' && user.isBusinessVerified === true;
+
     // Order + item creation, stock decrement, and inventory/coupon adjustment
     // all happen atomically: if any product is out of stock or the coupon is
     // invalid, nothing commits -- previously these were separate un-transacted
     // calls, so a mid-loop failure could leave an Order/OrderItem row created
     // with only some products' stock decremented.
     const newOrder = await prisma.$transaction(async (tx) => {
-      // Prefer an explicit, customer-selected addressId (what the current app
-      // build sends) over the legacy free-text deliveryAddress fallback below,
-      // which used to silently ignore the customer's actual selection/default
-      // and pick an arbitrary existing address instead. The fallback path is
-      // kept only so an already-installed older app build (which never sends
-      // addressId) doesn't break at checkout before it can be updated.
-      let address = addressId
-        ? await tx.address.findFirst({ where: { id: String(addressId), userId: user.id } })
-        : null;
-      if (addressId && !address) {
+      // Scoped to the caller's own userId, so a missing, deleted, or someone
+      // else's addressId all collapse to the same "not found" case rather
+      // than silently attaching to the wrong customer's address. There is no
+      // fallback here on purpose -- a former fallback used to auto-create an
+      // address with a hard-coded, frequently non-serviceable Mumbai pincode
+      // whenever no addressId was sent, which produced orders no rider could
+      // ever be assigned to. Every current client already sends a real
+      // addressId (CreateOrderPayload.addressId is a required field), so this
+      // is not a behavior change for any real checkout.
+      const address = await tx.address.findFirst({ where: { id: String(addressId), userId: user.id } });
+      if (!address) {
         throw new OrderError(404, 'Delivery address not found.');
-      }
-      if (!address) {
-        address = await tx.address.findFirst({ where: { userId: user.id }, orderBy: { isDefault: 'desc' } });
-      }
-      if (!address) {
-        address = await tx.address.create({
-          data: {
-            userId: user.id,
-            title: 'Home',
-            line1: deliveryAddress,
-            city: 'Mumbai',
-            state: 'MH',
-            pincode: '400099',
-          }
-        });
       }
 
       if (!(await isPincodeServiceable(address.pincode))) {

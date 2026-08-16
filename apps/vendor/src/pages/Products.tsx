@@ -13,7 +13,7 @@ import { API_URL, resolveUploadUrl } from '../config/api';
 // form was saved with an empty images[] and rendered as a placeholder in the
 // customer app -- the backend has accepted `images` on create all along, and
 // the only way a vendor could attach one was the CSV bulk import.
-const emptyForm = { name: '', description: '', mrp: '', price: '', b2bPrice: '', stock: '', lowStockThreshold: '10', categoryId: '', brandId: '', oemNumber: '', partNumber: '', images: [] as string[] };
+const emptyForm = { name: '', description: '', mrp: '', price: '', b2bPrice: '', moq: '', stock: '', lowStockThreshold: '10', categoryId: '', brandId: '', oemNumber: '', partNumber: '', images: [] as string[] };
 
 export default function Products() {
   const { token } = useSelector((state: RootState) => state.auth);
@@ -58,7 +58,7 @@ export default function Products() {
   const openAdd = () => { setEditingProduct(null); setFormData({ ...emptyForm }); setImageError(''); setShowAddModal(true); };
   const openEdit = (p: any) => {
     setEditingProduct(p);
-    setFormData({ name: p.name, description: p.description || '', mrp: p.mrp, price: p.price, b2bPrice: p.b2bPrice?.toString() || '', stock: p.stock, lowStockThreshold: p.lowStockThreshold?.toString() || '10', categoryId: p.categoryId || '', brandId: p.brandId || '', oemNumber: p.oemNumber || '', partNumber: p.partNumber || '', images: p.images || [] });
+    setFormData({ name: p.name, description: p.description || '', mrp: p.mrp, price: p.price, b2bPrice: p.b2bPrice?.toString() || '', moq: p.moq?.toString() || '', stock: p.stock, lowStockThreshold: p.lowStockThreshold?.toString() || '10', categoryId: p.categoryId || '', brandId: p.brandId || '', oemNumber: p.oemNumber || '', partNumber: p.partNumber || '', images: p.images || [] });
     setImageError('');
     setShowAddModal(true);
   };
@@ -239,7 +239,9 @@ export default function Products() {
                     <div className="text-sm font-bold text-content-primary">₹{Number(product.price).toLocaleString('en-IN')}</div>
                     <div className="text-xs text-content-secondary line-through">MRP: ₹{Number(product.mrp).toLocaleString('en-IN')}</div>
                     {product.b2bPrice != null && (
-                      <div className="text-xs text-brand-secondary font-semibold mt-0.5">B2B: ₹{Number(product.b2bPrice).toLocaleString('en-IN')}</div>
+                      <div className="text-xs text-brand-secondary font-semibold mt-0.5">
+                        B2B: ₹{Number(product.b2bPrice).toLocaleString('en-IN')}{product.moq > 1 ? ` (MOQ ${product.moq})` : ''}
+                      </div>
                     )}
                   </td>
                   <td className="p-4">
@@ -278,6 +280,9 @@ export default function Products() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <Input label="B2B Wholesale Price (₹)" type="number" min="0" value={formData.b2bPrice} onChange={(e) => setFormData({...formData, b2bPrice: e.target.value})} placeholder="Optional" />
+                <Input label="B2B Minimum Order Qty" type="number" min="1" value={formData.moq} onChange={(e) => setFormData({...formData, moq: e.target.value})} placeholder="Optional, e.g. 10" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <Input label="Low Stock Threshold" type="number" min="0" value={formData.lowStockThreshold} onChange={(e) => setFormData({...formData, lowStockThreshold: e.target.value})} />
               </div>
               <div className="grid grid-cols-3 gap-4">

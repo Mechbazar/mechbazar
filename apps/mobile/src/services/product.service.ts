@@ -305,7 +305,16 @@ export const mapBackendProduct = (p: any, opts?: { vehicleType?: VehicleType; ca
     discountPercentage: p.mrp > p.price ? Math.round(((p.mrp - p.price) / p.mrp) * 100) : 0,
     time: 'SAME DAY',
     image: imageUrl,
-    isB2B: p.type === 'B2B',
+    // `type` has never been a real Product field -- this always evaluated to
+    // false. Left as-is deliberately: this value feeds several listing-card
+    // "quick add" call sites that have no access to the viewing customer's
+    // account type, so it cannot correctly decide per-viewer whether
+    // wholesale MOQ should apply here without risking a retail customer
+    // being MOQ-locked by a product a vendor merely priced for wholesale.
+    // The real, already-correct per-user computation lives in
+    // ProductDetailsScreen/CartScreen (`user.accountType === 'WHOLESALE'`);
+    // moq below now carries real backend data for that path.
+    isB2B: false,
     moq: p.moq || 1,
     category: p.category?.name || opts?.categoryFallback || 'Unknown',
     stockStatus: p.stock > 0 ? (p.stock > (p.lowStockThreshold ?? 10) ? 'In Stock' : 'Limited Stock') : 'Out of Stock',
