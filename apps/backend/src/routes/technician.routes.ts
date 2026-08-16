@@ -41,6 +41,7 @@ import {
   acceptBookingJob, rejectBookingJob, generateBookingCompletionOtp,
 } from '../controllers/service.controller';
 import { authenticate, authorize, requireApprovedTechnician } from '../middlewares/auth';
+import { accountLoginLimiter } from '../middlewares/accountLoginLimiter';
 import { technicianUpload } from '../middlewares/technicianUpload';
 import { Role } from '@prisma/client';
 
@@ -49,6 +50,9 @@ const router = Router();
 const admins = [Role.ADMIN, Role.SUPER_ADMIN, Role.OPERATIONS_MANAGER];
 const technicianOnly = [Role.SERVICE_TECHNICIAN];
 const superAdminOnly = [Role.SUPER_ADMIN];
+
+// MB-AUTH-004: matches the per-account lockout admin login already had.
+const technicianLoginLimiter = accountLoginLimiter(['phone']);
 
 // Completion-code attempts for scheduled bookings now go through the same
 // encrypted, attempt-limited JobOtp path emergency jobs use (jobOtp.service.ts
@@ -69,7 +73,7 @@ const otpLimiter = rateLimit({
 
 // Public self-registration — no auth yet, this *creates* the account.
 router.post('/register', registerTechnician);
-router.post('/login', loginTechnician);
+router.post('/login', technicianLoginLimiter, loginTechnician);
 
 // Technician self-service — must be declared before "/:id" so "me" doesn't
 // get captured as an :id param.

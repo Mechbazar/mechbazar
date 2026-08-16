@@ -27,6 +27,7 @@ import {
 } from '../controllers/rider.controller';
 import { updateMyDeliveryStatus, generateDeliveryOtp } from '../controllers/order.controller';
 import { authenticate, authorize, requireApprovedRider } from '../middlewares/auth';
+import { accountLoginLimiter } from '../middlewares/accountLoginLimiter';
 import { riderUpload } from '../middlewares/riderUpload';
 import { Role } from '@prisma/client';
 
@@ -34,6 +35,9 @@ const router = Router();
 
 const admins = [Role.ADMIN, Role.SUPER_ADMIN, Role.OPERATIONS_MANAGER];
 const riderOnly = [Role.DELIVERY_PARTNER];
+
+// MB-AUTH-004: matches the per-account lockout admin login already had.
+const riderLoginLimiter = accountLoginLimiter(['phone']);
 
 // Delivery-code attempts are additionally capped per-code in the database
 // (Order.deliveryOtpAttempts). This is the transport-level complement --
@@ -54,7 +58,7 @@ const otpLimiter = rateLimit({
 
 // Public self-registration — no auth yet, this *creates* the account.
 router.post('/register', registerRider);
-router.post('/login', loginRider);
+router.post('/login', riderLoginLimiter, loginRider);
 
 // Rider self-service — must be declared before "/:id" so "me" doesn't get
 // captured as an :id param.
