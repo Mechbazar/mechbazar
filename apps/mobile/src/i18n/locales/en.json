@@ -215,6 +215,10 @@
     "payment": "Payment",
     "cashOnDelivery": "Cash on Delivery",
     "payOnline": "Pay Online (Cards, UPI, Netbanking)",
+    "removeItem": "Remove item",
+    "removeItemTitle": "Remove item?",
+    "removeItemMessage": "This will remove this item from your cart.",
+    "remove": "Remove",
     "emptyCart": "Your cart is empty",
     "emptyCartSubtitle": "Looks like you haven't added any parts or accessories to your cart yet.",
     "continueShopping": "Continue Shopping",
@@ -345,7 +349,12 @@
     "bookAService": "Book a Service",
     "exploreServices": "Explore Services",
     "noOrdersYet": "You have no orders yet.",
-    "item": "Item"
+    "item": "Item",
+    "requestReturn": "Request Return",
+    "requestReturnTitle": "Request a return?",
+    "requestReturnMessage": "This will open WhatsApp with our support team, with order #{{shortId}} pre-filled so they can start your return.",
+    "returnRequestFailedTitle": "Could not open WhatsApp",
+    "returnRequestFailedMsg": "Please contact support from the Help Center to request a return."
   },
   "orderInvoice": {
     "invoice": "Invoice",

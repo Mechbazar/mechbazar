@@ -215,6 +215,10 @@
     "payment": "पेमेंट",
     "cashOnDelivery": "कैश ऑन डिलीवरी",
     "payOnline": "ऑनलाइन पेमेंट (कार्ड, UPI, नेटबैंकिंग)",
+    "removeItem": "आइटम हटाएं",
+    "removeItemTitle": "आइटम हटाएं?",
+    "removeItemMessage": "यह आइटम आपकी कार्ट से हटा दिया जाएगा।",
+    "remove": "हटाएं",
     "emptyCart": "आपकी कार्ट खाली है",
     "emptyCartSubtitle": "ऐसा लगता है कि आपने अभी तक अपनी कार्ट में कोई पार्ट्स या एक्सेसरीज़ नहीं जोड़े हैं।",
     "continueShopping": "खरीदारी जारी रखें",
@@ -345,7 +349,12 @@
     "bookAService": "सर्विस बुक करें",
     "exploreServices": "सर्विसेज़ देखें",
     "noOrdersYet": "आपका अभी तक कोई ऑर्डर नहीं है।",
-    "item": "आइटम"
+    "item": "आइटम",
+    "requestReturn": "वापसी का अनुरोध करें",
+    "requestReturnTitle": "वापसी का अनुरोध करें?",
+    "requestReturnMessage": "इससे हमारी सपोर्ट टीम के साथ व्हाट्सएप खुलेगा, जिसमें ऑर्डर #{{shortId}} पहले से भरा होगा ताकि वे आपकी वापसी शुरू कर सकें।",
+    "returnRequestFailedTitle": "व्हाट्सएप नहीं खोला जा सका",
+    "returnRequestFailedMsg": "कृपया वापसी का अनुरोध करने के लिए हेल्प सेंटर से सपोर्ट से संपर्क करें।"
   },
   "orderInvoice": {
     "invoice": "इनवॉइस",

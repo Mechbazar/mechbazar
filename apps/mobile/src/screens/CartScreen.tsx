@@ -5,7 +5,8 @@ import { Loader } from '@mechbazar/shared';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
-import { updateQuantity, clearCart } from '../store/cartSlice';
+import { updateQuantity, removeFromCart, clearCart } from '../store/cartSlice';
+import { confirm } from '../utils/notify';
 import { ServiceAddress } from '../types/service';
 import { fetchMyAddresses } from '../services/address.service';
 import { createOrder, validateCoupon as validateCouponApi } from '../services/order.service';
@@ -224,8 +225,22 @@ export default function CartScreen() {
             <Image source={{ uri: item.image }} style={styles.itemImage} />
             
             <View style={styles.itemDetails}>
-              <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-              
+              <View style={styles.itemNameRow}>
+                <Text style={[styles.itemName, { flex: 1 }]} numberOfLines={2}>{item.name}</Text>
+                <TouchableOpacity
+                  style={styles.removeItemBtn}
+                  onPress={() => confirm(
+                    t('cart.removeItemTitle'),
+                    t('cart.removeItemMessage'),
+                    () => dispatch(removeFromCart(item.id)),
+                    t('cart.remove')
+                  )}
+                  accessibilityLabel={t('cart.removeItem')}
+                >
+                  <Text style={styles.removeItemIcon}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                 {item.vehicleType && (
                   <View style={[styles.b2bBadge, { backgroundColor: item.vehicleType === 'CAR' ? '#DA3830' : '#BF3617' }]}>
@@ -493,7 +508,10 @@ const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   cartItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
   itemImage: { width: 70, height: 70, borderRadius: 8, marginRight: 12, borderWidth: 1, borderColor: colors.borderLight, resizeMode: 'contain' },
   itemDetails: { flex: 1 },
+  itemNameRow: { flexDirection: 'row', alignItems: 'flex-start' },
   itemName: { fontSize: 14, fontWeight: '600', color: colors.textDark, marginBottom: 4 },
+  removeItemBtn: { padding: 4, marginLeft: 8, marginTop: -2 },
+  removeItemIcon: { fontSize: 16, color: colors.textMuted },
   b2bBadge: { alignSelf: 'flex-start', backgroundColor: colors.primary, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginBottom: 8 },
   b2bText: { color: colors.white, fontSize: 9, fontWeight: 'bold' },
   priceAndQty: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
