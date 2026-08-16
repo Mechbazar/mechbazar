@@ -123,36 +123,38 @@ export default function Dashboard() {
             <p className="text-content-muted text-sm">Orders from your products will appear here</p>
           </div>
         ) : (
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-surface-sunken text-xs text-content-secondary font-semibold uppercase">
-                <th className="p-4">Order ID</th>
-                <th className="p-4">Customer</th>
-                <th className="p-4">Items</th>
-                <th className="p-4">Amount</th>
-                <th className="p-4">Status</th>
-                <th className="p-4">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-default">
-              {stats.recentOrders.map((order: any) => {
-                const orderTotal = order.items.reduce((sum: number, item: any) => sum + Number(item.price) * item.quantity, 0);
-                return (
-                  <tr key={order.id} className="hover:bg-surface-hover transition-colors">
-                    <td className="p-4 text-primary text-sm font-mono">#{order.id.slice(-8).toUpperCase()}</td>
-                    <td className="p-4">
-                      <p className="text-content-primary text-sm font-medium">{order.user?.name || 'Customer'}</p>
-                      <p className="text-content-muted text-xs">{order.user?.phone}</p>
-                    </td>
-                    <td className="p-4 text-sm text-content-secondary">{order.items.length} item(s)</td>
-                    <td className="p-4 text-sm font-bold text-content-primary">₹{orderTotal.toLocaleString('en-IN')}</td>
-                    <td className="p-4">{statusBadge(order.status)}</td>
-                    <td className="p-4 text-xs text-content-muted">{new Date(order.createdAt).toLocaleDateString('en-IN')}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-surface-sunken text-xs text-content-secondary font-semibold uppercase">
+                  <th className="p-4">Order ID</th>
+                  <th className="p-4">Customer</th>
+                  <th className="p-4">Items</th>
+                  <th className="p-4">Amount</th>
+                  <th className="p-4">Status</th>
+                  <th className="p-4">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-default">
+                {stats.recentOrders.map((order: any) => {
+                  const orderTotal = order.items.reduce((sum: number, item: any) => sum + Number(item.price) * item.quantity, 0);
+                  return (
+                    <tr key={order.id} className="hover:bg-surface-hover transition-colors">
+                      <td className="p-4 text-primary text-sm font-mono">#{order.id.slice(-8).toUpperCase()}</td>
+                      <td className="p-4">
+                        <p className="text-content-primary text-sm font-medium">{order.user?.name || 'Customer'}</p>
+                        <p className="text-content-muted text-xs">{order.user?.phone}</p>
+                      </td>
+                      <td className="p-4 text-sm text-content-secondary">{order.items.length} item(s)</td>
+                      <td className="p-4 text-sm font-bold text-content-primary">₹{orderTotal.toLocaleString('en-IN')}</td>
+                      <td className="p-4">{statusBadge(order.status)}</td>
+                      <td className="p-4 text-xs text-content-muted">{new Date(order.createdAt).toLocaleDateString('en-IN')}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
 

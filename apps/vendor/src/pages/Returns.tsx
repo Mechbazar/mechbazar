@@ -36,40 +36,42 @@ export default function Returns() {
             <p className="text-content-muted text-sm">Returned orders will appear here.</p>
           </div>
         ) : (
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-surface-sunken text-xs text-content-secondary font-semibold uppercase">
-                <th className="p-4">Order ID</th>
-                <th className="p-4">Customer</th>
-                <th className="p-4">My Items</th>
-                <th className="p-4">Amount</th>
-                <th className="p-4">Reason</th>
-                <th className="p-4">Date</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-default">
-              {orders.map((order) => {
-                const vendorItemsTotal = order.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
-                return (
-                  <tr key={order.id} className="hover:bg-surface-hover transition-colors">
-                    <td className="p-4 text-primary text-sm font-mono">#{order.id.slice(-8).toUpperCase()}</td>
-                    <td className="p-4">
-                      <p className="text-content-primary text-sm font-medium">{order.user?.name || 'Customer'}</p>
-                      <p className="text-content-muted text-xs">{order.user?.phone}</p>
-                    </td>
-                    <td className="p-4 text-sm text-content-secondary">
-                      {order.items.map((item: any) => (
-                        <div key={item.id} className="text-xs text-content-secondary truncate max-w-[200px]">{item.quantity}x {item.product.name}</div>
-                      ))}
-                    </td>
-                    <td className="p-4 text-sm font-bold text-content-primary">₹{vendorItemsTotal.toLocaleString('en-IN')}</td>
-                    <td className="p-4 text-sm text-content-secondary">{order.issueReason || '—'}</td>
-                    <td className="p-4 text-xs text-content-muted">{new Date(order.updatedAt).toLocaleDateString('en-IN')}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-surface-sunken text-xs text-content-secondary font-semibold uppercase">
+                  <th className="p-4">Order ID</th>
+                  <th className="p-4">Customer</th>
+                  <th className="p-4">My Items</th>
+                  <th className="p-4">Amount</th>
+                  <th className="p-4">Reason</th>
+                  <th className="p-4">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-default">
+                {orders.map((order) => {
+                  const vendorItemsTotal = order.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
+                  return (
+                    <tr key={order.id} className="hover:bg-surface-hover transition-colors">
+                      <td className="p-4 text-primary text-sm font-mono">#{order.id.slice(-8).toUpperCase()}</td>
+                      <td className="p-4">
+                        <p className="text-content-primary text-sm font-medium">{order.user?.name || 'Customer'}</p>
+                        <p className="text-content-muted text-xs">{order.user?.phone}</p>
+                      </td>
+                      <td className="p-4 text-sm text-content-secondary">
+                        {order.items.map((item: any) => (
+                          <div key={item.id} className="text-xs text-content-secondary truncate max-w-[200px]">{item.quantity}x {item.product.name}</div>
+                        ))}
+                      </td>
+                      <td className="p-4 text-sm font-bold text-content-primary">₹{vendorItemsTotal.toLocaleString('en-IN')}</td>
+                      <td className="p-4 text-sm text-content-secondary">{order.issueReason || '—'}</td>
+                      <td className="p-4 text-xs text-content-muted">{new Date(order.updatedAt).toLocaleDateString('en-IN')}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card>
       {orders.length > 0 && (
