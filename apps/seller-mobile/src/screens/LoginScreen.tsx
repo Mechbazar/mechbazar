@@ -45,52 +45,7 @@ export const LoginScreen = ({ navigation }: { navigation: any }) => {
         Alert.alert('Login Failed', 'No token received from server');
       }
     } catch (error: any) {
-      // TEMPORARY diagnostic verbosity -- revert once the network-error root
-      // cause is found. The normal error.response?.data?.message ||
-      // error.message collapses exactly the details (axios error code,
-      // whether a response was ever received, the resolved baseURL) needed to
-      // tell "DNS/TLS failure", "timeout", and "server reachable but rejected
-      // the request" apart from a device that can't attach a debugger.
-      const diag = [
-        `message: ${error?.message}`,
-        `code: ${error?.code}`,
-        `baseURL: ${error?.config?.baseURL}`,
-        `url: ${error?.config?.url}`,
-        `hasResponse: ${!!error?.response}`,
-        `status: ${error?.response?.status}`,
-      ].join('\n');
-
-      // Probes three hostnames that should all reach the SAME backend, to
-      // tell apart "this phone's DNS resolver still has the apex domain's old
-      // (dead-IPv6-including) answer cached" from "nothing this phone does
-      // reaches mechbazar.com at all right now" -- api./vendor. were plain
-      // A-only records even before today's DNS fix, so if either of those
-      // succeeds while the apex fails, that's conclusive: it's DNS caching,
-      // not a code/network-stack problem.
-      const probe = async (url: string): Promise<string> => {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 8000);
-        const start = Date.now();
-        try {
-          const res = await fetch(url, { signal: controller.signal });
-          return `${res.status} in ${Date.now() - start}ms`;
-        } catch (e: any) {
-          return `FAILED (${e?.name}: ${e?.message}) after ${Date.now() - start}ms`;
-        } finally {
-          clearTimeout(timer);
-        }
-      };
-
-      const [apex, apiSub, vendorSub] = await Promise.all([
-        probe('https://mechbazar.com/api/health'),
-        probe('https://api.mechbazar.com/api/health'),
-        probe('https://vendor.mechbazar.com/api/health'),
-      ]);
-
-      Alert.alert(
-        'Login Failed (diagnostic)',
-        `${diag}\n\n-- probes --\napex: ${apex}\napi.: ${apiSub}\nvendor.: ${vendorSub}`
-      );
+      Alert.alert('Login Failed', error?.response?.data?.message || error?.response?.data?.error || 'Incorrect email or password.');
     } finally {
       setLoading(false);
     }
