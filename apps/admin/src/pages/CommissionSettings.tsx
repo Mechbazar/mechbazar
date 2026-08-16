@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useSelector } from 'react-redux';
 import { motion } from 'framer-motion';
 import type { RootState } from '../store';
-import { Save, Trash2, Play, Search } from 'lucide-react';
+import { Save, Trash2, Play, Search, ShieldAlert } from 'lucide-react';
 import { Badge, Button, Card, DataTable, EmptyState, Icon3D, Input, Select, Tabs } from '../components/ui';
 import type { Column, TabItem } from '../components/ui';
 import { API_URL } from '../config/api';
@@ -49,8 +49,16 @@ type OverrideRow = {
 };
 
 export default function CommissionSettings() {
-  const { token } = useSelector((state: RootState) => state.auth);
+  const { token, user } = useSelector((state: RootState) => state.auth);
   const [section, setSection] = useState<SectionId>('SETTINGS');
+
+  // Reads are open to the broader admin set server-side, but every mutation
+  // here (settings save, override set/delete/toggle, incentive runs) is
+  // SUPER_ADMIN-only (commission.routes.ts). Without this check, a non-super
+  // admin saw every control rendered as if it worked, and only found out via
+  // a silent inline 403 after clicking Save -- mirrors AdminManagement.tsx's
+  // existing isSuperAdmin gate for the same class of problem.
+  const isSuperAdmin = user?.role === 'SUPER_ADMIN';
 
   return (
     <motion.div variants={fadeInUp} initial="hidden" animate="visible" className="space-y-6">
@@ -63,15 +71,22 @@ export default function CommissionSettings() {
         </p>
       </div>
 
+      {!isSuperAdmin && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-warning-500/30 bg-warning-500/10 px-4 py-3 text-sm text-warning-700 dark:text-warning-400">
+          <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>Only Super Admins can change commission and payout settings. You can view everything below, but saving is disabled.</span>
+        </div>
+      )}
+
       <Card padding="none" className="overflow-visible">
         <div className="p-4 border-b border-border-default">
           <Tabs tabs={SECTIONS} value={section} onChange={(id) => setSection(id as SectionId)} layoutId="commission-settings-tab" />
         </div>
         <div className="p-5 sm:p-6">
-          {section === 'SETTINGS' && <SettingsPanel token={token} />}
-          {section === 'VENDOR' && <VendorOverridesPanel token={token} />}
-          {section === 'CATEGORY' && <CategoryOverridesPanel token={token} />}
-          {section === 'ITEM' && <ItemOverridesPanel token={token} />}
+          {section === 'SETTINGS' && <SettingsPanel token={token} readOnly={!isSuperAdmin} />}
+          {section === 'VENDOR' && <VendorOverridesPanel token={token} readOnly={!isSuperAdmin} />}
+          {section === 'CATEGORY' && <CategoryOverridesPanel token={token} readOnly={!isSuperAdmin} />}
+          {section === 'ITEM' && <ItemOverridesPanel token={token} readOnly={!isSuperAdmin} />}
         </div>
       </Card>
     </motion.div>
@@ -80,7 +95,7 @@ export default function CommissionSettings() {
 
 // ============ Global & Rider Settings ============
 
-function SettingsPanel({ token }: { token: string | null }) {
+function SettingsPanel({ token, readOnly }: { token: string | null; readOnly: boolean }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -101,7 +116,7 @@ function SettingsPanel({ token }: { token: string | null }) {
   const update = (field: keyof Settings, value: any) => setSettings((s) => (s ? { ...s, [field]: value } : s));
 
   const handleSave = async () => {
-    if (!settings) return;
+    if (!settings || readOnly) return;
     setSaving(true);
     setError('');
     setSaved(false);
@@ -118,6 +133,7 @@ function SettingsPanel({ token }: { token: string | null }) {
   };
 
   const runIncentives = async (period: 'WEEKLY' | 'MONTHLY') => {
+    if (readOnly) return;
     setIncentiveBusy(period);
     setError('');
     try {
@@ -200,7 +216,7 @@ function SettingsPanel({ token }: { token: string | null }) {
                 value={settings.riderWeeklyIncentiveJobs}
                 onChange={(e) => update('riderWeeklyIncentiveJobs', Number(e.target.value))} />
             </div>
-            <Button variant="secondary" size="sm" icon={<Play size={14} />} isLoading={incentiveBusy === 'WEEKLY'} onClick={() => runIncentives('WEEKLY')}>
+            <Button variant="secondary" size="sm" icon={<Play size={14} />} isLoading={incentiveBusy === 'WEEKLY'} disabled={readOnly} onClick={() => runIncentives('WEEKLY')}>
               Run weekly incentive payout
             </Button>
           </div>
@@ -213,7 +229,7 @@ function SettingsPanel({ token }: { token: string | null }) {
                 value={settings.riderMonthlyIncentiveJobs}
                 onChange={(e) => update('riderMonthlyIncentiveJobs', Number(e.target.value))} />
             </div>
-            <Button variant="secondary" size="sm" icon={<Play size={14} />} isLoading={incentiveBusy === 'MONTHLY'} onClick={() => runIncentives('MONTHLY')}>
+            <Button variant="secondary" size="sm" icon={<Play size={14} />} isLoading={incentiveBusy === 'MONTHLY'} disabled={readOnly} onClick={() => runIncentives('MONTHLY')}>
               Run monthly incentive payout
             </Button>
           </div>
@@ -221,7 +237,7 @@ function SettingsPanel({ token }: { token: string | null }) {
       </section>
 
       <div className="flex items-center gap-3 pt-2 border-t border-border-default">
-        <Button icon={<Save size={16} />} isLoading={saving} onClick={handleSave}>Save Settings</Button>
+        <Button icon={<Save size={16} />} isLoading={saving} disabled={readOnly} onClick={handleSave}>Save Settings</Button>
         {saved && <span className="text-sm text-success-600 dark:text-success-400 font-medium">Saved</span>}
       </div>
     </div>
@@ -231,11 +247,12 @@ function SettingsPanel({ token }: { token: string | null }) {
 // ============ Shared override list + inline edit row ============
 
 function OverrideTable({
-  rows, onDelete, onToggleActive,
+  rows, onDelete, onToggleActive, readOnly,
 }: {
   rows: OverrideRow[];
   onDelete: (row: OverrideRow) => void;
   onToggleActive: (row: OverrideRow) => void;
+  readOnly: boolean;
 }) {
   const columns: Column<OverrideRow>[] = [
     { key: 'name', header: 'Name', render: (r) => <span className="font-medium text-content-primary">{r.entityName}</span> },
@@ -244,7 +261,7 @@ function OverrideTable({
       key: 'active',
       header: 'Status',
       render: (r) => (
-        <button onClick={() => onToggleActive(r)}>
+        <button onClick={() => !readOnly && onToggleActive(r)} disabled={readOnly} className={readOnly ? 'cursor-default' : 'cursor-pointer'}>
           <Badge variant={r.isActive ? 'success' : 'neutral'}>{r.isActive ? 'Active' : 'Inactive'}</Badge>
         </button>
       ),
@@ -264,7 +281,12 @@ function OverrideTable({
       headerClassName: 'text-right',
       className: 'text-right',
       render: (r) => (
-        <button onClick={() => onDelete(r)} className="text-danger-500 hover:bg-danger-500/10 p-1.5 rounded-lg" aria-label="Remove override">
+        <button
+          onClick={() => !readOnly && onDelete(r)}
+          disabled={readOnly}
+          className="text-danger-500 hover:bg-danger-500/10 p-1.5 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+          aria-label="Remove override"
+        >
           <Trash2 size={15} />
         </button>
       ),
@@ -285,7 +307,7 @@ function OverrideTable({
 
 // ============ Vendor Overrides ============
 
-function VendorOverridesPanel({ token }: { token: string | null }) {
+function VendorOverridesPanel({ token, readOnly }: { token: string | null; readOnly: boolean }) {
   const headers = { Authorization: `Bearer ${token}` };
   const [overrides, setOverrides] = useState<OverrideRow[]>([]);
   const [vendors, setVendors] = useState<{ id: string; name: string }[]>([]);
@@ -315,6 +337,7 @@ function VendorOverridesPanel({ token }: { token: string | null }) {
   }, [search, vendors]);
 
   const handleSet = async () => {
+    if (readOnly) return;
     const value = Number(pct);
     if (!selectedVendorId || !Number.isFinite(value) || value < 0 || value > 100) {
       setError('Pick a vendor and enter a commission % between 0 and 100.');
@@ -336,10 +359,12 @@ function VendorOverridesPanel({ token }: { token: string | null }) {
   };
 
   const handleDelete = async (row: OverrideRow) => {
+    if (readOnly) return;
     await axios.delete(`${API_URL}/admin/commission/overrides/vendor/${row.vendorId}`, { headers });
     load();
   };
   const handleToggle = async (row: OverrideRow) => {
+    if (readOnly) return;
     await axios.put(`${API_URL}/admin/commission/overrides/vendor/${row.vendorId}`, { commissionPercent: row.commissionPercent, isActive: !row.isActive }, { headers });
     load();
   };
@@ -367,17 +392,17 @@ function VendorOverridesPanel({ token }: { token: string | null }) {
           )}
         </div>
         <Input label="Commission %" type="number" min={0} max={100} step={0.1} value={pct} onChange={(e) => setPct(e.target.value)} className="w-32" />
-        <Button icon={<Save size={16} />} isLoading={busy} onClick={handleSet}>Set Override</Button>
+        <Button icon={<Save size={16} />} isLoading={busy} disabled={readOnly} onClick={handleSet}>Set Override</Button>
       </div>
       {error && <div className="text-sm text-danger-500">{error}</div>}
-      <OverrideTable rows={overrides} onDelete={handleDelete} onToggleActive={handleToggle} />
+      <OverrideTable rows={overrides} onDelete={handleDelete} onToggleActive={handleToggle} readOnly={readOnly} />
     </div>
   );
 }
 
 // ============ Category Overrides (product + service) ============
 
-function CategoryOverridesPanel({ token }: { token: string | null }) {
+function CategoryOverridesPanel({ token, readOnly }: { token: string | null; readOnly: boolean }) {
   const headers = { Authorization: `Bearer ${token}` };
   const [kind, setKind] = useState<'category' | 'service-category'>('category');
   const [overrides, setOverrides] = useState<OverrideRow[]>([]);
@@ -397,6 +422,7 @@ function CategoryOverridesPanel({ token }: { token: string | null }) {
   useEffect(() => { setSelectedId(''); setPct(''); load(); }, [load]);
 
   const handleSet = async () => {
+    if (readOnly) return;
     const value = Number(pct);
     if (!selectedId || !Number.isFinite(value) || value < 0 || value > 100) {
       setError('Pick a category and enter a commission % between 0 and 100.');
@@ -417,10 +443,12 @@ function CategoryOverridesPanel({ token }: { token: string | null }) {
   };
 
   const handleDelete = async (row: OverrideRow) => {
+    if (readOnly) return;
     await axios.delete(`${API_URL}/admin/commission/overrides/${kind}/${row.categoryId}`, { headers });
     load();
   };
   const handleToggle = async (row: OverrideRow) => {
+    if (readOnly) return;
     await axios.put(`${API_URL}/admin/commission/overrides/${kind}/${row.categoryId}`, { commissionPercent: row.commissionPercent, isActive: !row.isActive }, { headers });
     load();
   };
@@ -439,17 +467,17 @@ function CategoryOverridesPanel({ token }: { token: string | null }) {
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </Select>
         <Input label="Commission %" type="number" min={0} max={100} step={0.1} value={pct} onChange={(e) => setPct(e.target.value)} className="w-32" />
-        <Button icon={<Save size={16} />} isLoading={busy} onClick={handleSet}>Set Override</Button>
+        <Button icon={<Save size={16} />} isLoading={busy} disabled={readOnly} onClick={handleSet}>Set Override</Button>
       </div>
       {error && <div className="text-sm text-danger-500">{error}</div>}
-      <OverrideTable rows={overrides} onDelete={handleDelete} onToggleActive={handleToggle} />
+      <OverrideTable rows={overrides} onDelete={handleDelete} onToggleActive={handleToggle} readOnly={readOnly} />
     </div>
   );
 }
 
 // ============ Product / Service Package Overrides ============
 
-function ItemOverridesPanel({ token }: { token: string | null }) {
+function ItemOverridesPanel({ token, readOnly }: { token: string | null; readOnly: boolean }) {
   const headers = { Authorization: `Bearer ${token}` };
   const [kind, setKind] = useState<'product' | 'service-package'>('product');
   const [overrides, setOverrides] = useState<OverrideRow[]>([]);
@@ -495,6 +523,7 @@ function ItemOverridesPanel({ token }: { token: string | null }) {
   const idField = kind === 'product' ? 'productId' : 'packageId';
 
   const handleSet = async () => {
+    if (readOnly) return;
     const value = Number(pct);
     if (!selected || !Number.isFinite(value) || value < 0 || value > 100) {
       setError(`Pick a ${kind === 'product' ? 'product' : 'service'} and enter a commission % between 0 and 100.`);
@@ -516,10 +545,12 @@ function ItemOverridesPanel({ token }: { token: string | null }) {
   };
 
   const handleDelete = async (row: OverrideRow) => {
+    if (readOnly) return;
     await axios.delete(`${API_URL}/admin/commission/overrides/${kind}/${(row as any)[idField]}`, { headers });
     load();
   };
   const handleToggle = async (row: OverrideRow) => {
+    if (readOnly) return;
     await axios.put(`${API_URL}/admin/commission/overrides/${kind}/${(row as any)[idField]}`, { commissionPercent: row.commissionPercent, isActive: !row.isActive }, { headers });
     load();
   };
@@ -553,10 +584,10 @@ function ItemOverridesPanel({ token }: { token: string | null }) {
           )}
         </div>
         <Input label="Commission %" type="number" min={0} max={100} step={0.1} value={pct} onChange={(e) => setPct(e.target.value)} className="w-32" />
-        <Button icon={<Save size={16} />} isLoading={busy} onClick={handleSet}>Set Override</Button>
+        <Button icon={<Save size={16} />} isLoading={busy} disabled={readOnly} onClick={handleSet}>Set Override</Button>
       </div>
       {error && <div className="text-sm text-danger-500">{error}</div>}
-      <OverrideTable rows={overrides} onDelete={handleDelete} onToggleActive={handleToggle} />
+      <OverrideTable rows={overrides} onDelete={handleDelete} onToggleActive={handleToggle} readOnly={readOnly} />
     </div>
   );
 }
