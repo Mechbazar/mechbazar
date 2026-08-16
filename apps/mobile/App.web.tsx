@@ -294,7 +294,10 @@ function MainTabs() {
         tabBarIcon: ({ focused }) => <AnimatedTabIcon focused={focused} name={TAB_ICONS[route.name]} />,
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
+      {/* MB-TITLE-014: without an explicit title, documentTitle's formatter
+          (above) falls back to the bare route name "Home" as the browser tab
+          title -- real branding instead of the internal route name. */}
+      <Tab.Screen name="Home" component={HomeScreen} options={{ title: 'MechBazar' }} />
       <Tab.Screen name="Categories" component={CategoriesScreen} />
       <Tab.Screen name="Services" component={ServicesHomeScreen} />
       {/* Guest tapping Orders/Account gets bounced to Welcome and back
