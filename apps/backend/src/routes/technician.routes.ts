@@ -43,6 +43,7 @@ import {
 import { authenticate, authorize, requireApprovedTechnician } from '../middlewares/auth';
 import { accountLoginLimiter } from '../middlewares/accountLoginLimiter';
 import { technicianUpload } from '../middlewares/technicianUpload';
+import { redisBackedStore } from '../config/redis';
 import { Role } from '@prisma/client';
 
 const router = Router();
@@ -52,7 +53,7 @@ const technicianOnly = [Role.SERVICE_TECHNICIAN];
 const superAdminOnly = [Role.SUPER_ADMIN];
 
 // MB-AUTH-004: matches the per-account lockout admin login already had.
-const technicianLoginLimiter = accountLoginLimiter(['phone']);
+const technicianLoginLimiter = accountLoginLimiter(['phone'], 'technician');
 
 // Completion-code attempts for scheduled bookings now go through the same
 // encrypted, attempt-limited JobOtp path emergency jobs use (jobOtp.service.ts
@@ -66,6 +67,7 @@ const otpLimiter = rateLimit({
   limit: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  store: redisBackedStore('technician-otp'),
   keyGenerator: (req) => req.headers.authorization || req.ip || 'unknown',
   skip: (req) => req.body?.status !== 'COMPLETED',
   message: { error: 'Too many verification attempts. Please wait before trying again.', code: 'RATE_LIMITED' },

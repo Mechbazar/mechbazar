@@ -12,6 +12,7 @@ import {
 } from '../controllers/jobAdmin.controller';
 import { authenticate, authorize } from '../middlewares/auth';
 import { technicianUpload } from '../middlewares/technicianUpload';
+import { redisBackedStore } from '../config/redis';
 import { Role } from '@prisma/client';
 
 const router = Router();
@@ -29,6 +30,7 @@ const createLimiter = rateLimit({
   limit: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  store: redisBackedStore('job-create'),
   keyGenerator: (req) => req.headers.authorization || req.ip || 'unknown',
   message: { error: 'Too many emergency requests. Please wait a few minutes or call support.', code: 'RATE_LIMITED' },
 });
@@ -41,6 +43,7 @@ const otpLimiter = rateLimit({
   limit: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  store: redisBackedStore('job-otp'),
   keyGenerator: (req) => req.headers.authorization || req.ip || 'unknown',
   message: { error: 'Too many verification attempts. Please wait before trying again.', code: 'RATE_LIMITED' },
 });
@@ -52,6 +55,7 @@ const callLimiter = rateLimit({
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  store: redisBackedStore('job-call'),
   keyGenerator: (req) => req.headers.authorization || req.ip || 'unknown',
   message: { error: 'Too many call attempts. Please use chat.', code: 'RATE_LIMITED' },
 });

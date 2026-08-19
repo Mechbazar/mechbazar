@@ -43,7 +43,7 @@ const admins = [Role.ADMIN, Role.SUPER_ADMIN, Role.VENDOR_MANAGER];
 // MB-AUTH-004: matches the per-account lockout admin login already had --
 // this route accepts idToken, email+password, or phone+otp, so key on
 // whichever identifier the request actually used.
-const vendorLoginLimiter = accountLoginLimiter(['email', 'phone']);
+const vendorLoginLimiter = accountLoginLimiter(['email', 'phone'], 'vendor');
 
 // ----------------------------------------------------
 // VENDOR PORTAL APIs (Public/Vendor Auth)

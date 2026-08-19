@@ -29,6 +29,7 @@ import { updateMyDeliveryStatus, generateDeliveryOtp } from '../controllers/orde
 import { authenticate, authorize, requireApprovedRider } from '../middlewares/auth';
 import { accountLoginLimiter } from '../middlewares/accountLoginLimiter';
 import { riderUpload } from '../middlewares/riderUpload';
+import { redisBackedStore } from '../config/redis';
 import { Role } from '@prisma/client';
 
 const router = Router();
@@ -37,7 +38,7 @@ const admins = [Role.ADMIN, Role.SUPER_ADMIN, Role.OPERATIONS_MANAGER];
 const riderOnly = [Role.DELIVERY_PARTNER];
 
 // MB-AUTH-004: matches the per-account lockout admin login already had.
-const riderLoginLimiter = accountLoginLimiter(['phone']);
+const riderLoginLimiter = accountLoginLimiter(['phone'], 'rider');
 
 // Delivery-code attempts are additionally capped per-code in the database
 // (Order.deliveryOtpAttempts). This is the transport-level complement --
@@ -51,6 +52,7 @@ const otpLimiter = rateLimit({
   limit: 30,
   standardHeaders: true,
   legacyHeaders: false,
+  store: redisBackedStore('rider-otp'),
   keyGenerator: (req) => req.headers.authorization || req.ip || 'unknown',
   skip: (req) => req.body?.status !== 'DELIVERED',
   message: { error: 'Too many verification attempts. Please wait before trying again.', code: 'RATE_LIMITED' },

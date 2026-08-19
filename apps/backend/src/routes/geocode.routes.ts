@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { getReverseGeocode, getForwardGeocode, getAutocomplete, getPlaceDetails } from '../controllers/geocode.controller';
+import { redisBackedStore } from '../config/redis';
 
 const router = Router();
 
@@ -16,6 +17,7 @@ const geocodeLimiter = rateLimit({
   limit: 60,
   standardHeaders: true,
   legacyHeaders: false,
+  store: redisBackedStore('geocode'),
 });
 
 router.use(geocodeLimiter);

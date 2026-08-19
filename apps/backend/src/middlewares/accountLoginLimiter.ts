@@ -1,4 +1,5 @@
 import rateLimit from 'express-rate-limit';
+import { redisBackedStore } from '../config/redis';
 
 // Per-account lockout for password/OTP-replay login endpoints, independent of
 // the generic /api/auth IP limiter in index.ts -- that one only slows down a
@@ -10,13 +11,19 @@ import rateLimit from 'express-rate-limit';
 // the request actually carries (phone for OTP-based logins, email for
 // password-based ones), and only counts failed attempts
 // (skipSuccessfulRequests) so a legitimately-logging-in user never trips it.
-export const accountLoginLimiter = (identifierFields: string[]) =>
+//
+// `name` distinguishes this call site's Redis key prefix (each of the 4
+// callers -- admin/customer/technician/rider -- needs its own unshared store
+// and its own counter namespace) so this stays P1-06-ready: single-instance
+// today, Redis-backed the moment REDIS_URL is configured.
+export const accountLoginLimiter = (identifierFields: string[], name: string) =>
   rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 5,
     standardHeaders: true,
     legacyHeaders: false,
     skipSuccessfulRequests: true,
+    store: redisBackedStore(`login-${name}`),
     keyGenerator: (req) => {
       for (const field of identifierFields) {
         const value = req.body?.[field];

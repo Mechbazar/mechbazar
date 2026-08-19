@@ -6,6 +6,7 @@ import morgan from 'morgan';
 import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import { connectDatabase, disconnectDatabase } from './config/prisma';
+import { redisBackedStore } from './config/redis';
 import { notFoundHandler, errorHandler } from './middlewares/errorHandler';
 import { verifyAppCheck } from './middlewares/appCheck';
 import healthRoutes from './routes/health.routes';
@@ -92,6 +93,7 @@ app.use(
     limit: 600,
     standardHeaders: true,
     legacyHeaders: false,
+    store: redisBackedStore('api'),
   })
 );
 app.use(
@@ -101,6 +103,7 @@ app.use(
     limit: 50,
     standardHeaders: true,
     legacyHeaders: false,
+    store: redisBackedStore('api-auth'),
   })
 );
 
@@ -116,6 +119,7 @@ app.use(
     limit: 40,
     standardHeaders: true,
     legacyHeaders: false,
+    store: redisBackedStore('api-upload'),
     keyGenerator: (req, res) => req.headers.authorization || req.ip || 'unknown',
   })
 );
@@ -132,6 +136,7 @@ app.use(
     limit: 30,
     standardHeaders: true,
     legacyHeaders: false,
+    store: redisBackedStore('customers-me'),
     // Falls back to the default IP key when unauthenticated.
     keyGenerator: (req, res) => req.headers.authorization || req.ip || 'unknown',
   })

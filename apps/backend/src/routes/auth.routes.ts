@@ -3,6 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { register, login, switchMode, adminLogin, registerPushToken, clearPushToken, refreshToken, changePassword, forgotPassword, resendVerificationEmail } from '../controllers/auth.controller';
 import { authenticate } from '../middlewares/auth';
 import { accountLoginLimiter } from '../middlewares/accountLoginLimiter';
+import { redisBackedStore } from '../config/redis';
 
 const router = Router();
 
@@ -16,6 +17,7 @@ const forgotPasswordLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  store: redisBackedStore('auth-forgot-password'),
   message: { error: 'Too many password reset requests. Please try again in a few minutes.' },
 });
 
@@ -27,17 +29,18 @@ const resendVerificationLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  store: redisBackedStore('auth-resend-verification'),
   message: { error: 'Too many verification email requests. Please try again in a few minutes.' },
 });
 
 // Per-account lockout for the admin login's legacy password path -- covers
 // the Firebase idToken path too since both share this route, though that
 // path can't be brute-forced the same way.
-const adminLoginLimiter = accountLoginLimiter(['email']);
+const adminLoginLimiter = accountLoginLimiter(['email'], 'admin');
 
 // Customer login supports both a password path (email+password) and a
 // phone/OTP path -- key on whichever the request actually used.
-const customerLoginLimiter = accountLoginLimiter(['email', 'phone']);
+const customerLoginLimiter = accountLoginLimiter(['email', 'phone'], 'customer');
 
 router.post('/register', register);
 router.post('/login', customerLoginLimiter, login);

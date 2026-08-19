@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { subscribeNewsletter } from '../controllers/newsletter.controller';
+import { redisBackedStore } from '../config/redis';
 
 const router = Router();
 
@@ -13,6 +14,7 @@ const subscribeLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  store: redisBackedStore('newsletter-subscribe'),
   message: { error: 'Too many subscription requests. Please try again in a few minutes.' },
 });
 

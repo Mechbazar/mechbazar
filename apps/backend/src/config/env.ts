@@ -62,13 +62,16 @@ export const env = {
   PORT: Number(process.env.PORT) || 5001,
   DATABASE_URL: process.env.DATABASE_URL as string,
   JWT_SECRET: process.env.JWT_SECRET as string,
-  // Optional -- powers only the Socket.IO Redis adapter (realtime/gateway.ts),
-  // for cross-process fan-out when more than one backend container is
-  // running. Nothing else reads this: there is no general-purpose cache layer
+  // Optional -- powers the Socket.IO Redis adapter (realtime/gateway.ts) for
+  // cross-process fan-out, and the rate-limiter stores (config/redis.ts) for
+  // cross-process shared counters, both only when more than one backend
+  // container is running. There is still no general-purpose cache layer
   // (there used to be an OTP cache here; it was migrated to Postgres's
   // PhoneOtp table after Redis proved unreliable in the serverless prod
   // environment, and the standalone cache client was removed as dead code
-  // rather than left half-connected).
+  // rather than left half-connected) -- both of today's uses are designed to
+  // degrade gracefully (single-instance fan-out / in-memory limiting) rather
+  // than depend on Redis being reachable.
   REDIS_URL: process.env.REDIS_URL || '',
   // Optional -- server-side Google Maps Platform key (services/geocoding.service.ts).
   // Distinct from apps/mobile's EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: that one ships in a
