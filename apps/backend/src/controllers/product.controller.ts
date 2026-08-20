@@ -323,6 +323,12 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
       brand = await prisma.brand.create({ data: { name: 'Generic Brand' } });
     }
 
+    // A VENDOR caller here needs the same admin-review gate as addMyProduct
+    // (this route is reachable by VENDOR too, see product.routes.ts's
+    // productWriters) -- an admin/staff caller creating on a vendor's behalf
+    // is the review, so their products still go live immediately.
+    const isAdminCreator = ADMIN_PRODUCT_ROLES.includes(req.user!.role);
+
     const newProduct = await prisma.product.create({
       data: {
         vendorId: vendor.id,
@@ -335,6 +341,7 @@ export const createProduct = async (req: AuthRequest, res: Response) => {
         stock: Number(stock) || 0,
         oemNumber: oem || null,
         vehicleType: resolvedVehicleType,
+        status: isAdminCreator ? 'APPROVED' : 'PENDING',
         b2bPrice: b2bPrice !== undefined && b2bPrice !== '' ? Number(b2bPrice) : null,
         moq: moq !== undefined && moq !== '' ? Math.max(1, parseInt(moq, 10)) : null,
         ...(lowStockThreshold !== undefined && lowStockThreshold !== '' && { lowStockThreshold: Number(lowStockThreshold) }),
@@ -426,6 +433,11 @@ export const bulkCreateProducts = async (req: AuthRequest, res: Response): Promi
       : [];
     const catMap = new Map(allRelevantCats.map(c => [c.name.toLowerCase(), c.id]));
 
+    // Same admin-review gate as createProduct above -- this route is VENDOR-
+    // reachable too, and a bulk CSV import is exactly the kind of bypass the
+    // gate needs to cover, not just the single-product form.
+    const isAdminCreator = ADMIN_PRODUCT_ROLES.includes(req.user!.role);
+
     const productsToInsert = productsArray.map((p: any) => ({
       vendorId: vendor?.id || '',
       brandId: brand?.id || '',
@@ -436,7 +448,7 @@ export const bulkCreateProducts = async (req: AuthRequest, res: Response): Promi
       mrp: Number(p.basePrice) || Number(p.price) || 0,
       stock: Number(p.stock) || 0,
       oemNumber: p.oem || null,
-      status: 'APPROVED' as const
+      status: (isAdminCreator ? 'APPROVED' : 'PENDING') as ProductApprovalStatus
     }));
 
     // Since we need to trigger inventory creation (which might be complex via triggers or middleware),

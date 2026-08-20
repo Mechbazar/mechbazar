@@ -613,7 +613,13 @@ export const addMyProduct = async (req: Request, res: Response): Promise<void> =
         partNumber,
         images: Array.isArray(images) ? images : [],
         vehicleType: category.vehicleType,
-        status: 'APPROVED', // No admin approval required
+        // New vendor listings need an admin review before they're visible to
+        // customers (getProducts/getProductById/getSearchSuggestions/
+        // getRelatedProducts all already filter non-admin callers to
+        // APPROVED-only) -- admin's existing Products.tsx "Pending Review"
+        // queue and Approve action were built for this and, until now, sat
+        // permanently empty because every vendor product bypassed it.
+        status: 'PENDING',
         b2bPrice: b2bPrice !== undefined && b2bPrice !== '' ? Number(b2bPrice) : null,
         moq: moq !== undefined && moq !== '' ? Math.max(1, parseInt(moq, 10)) : null,
         ...(lowStockThreshold !== undefined && lowStockThreshold !== '' && { lowStockThreshold: Number(lowStockThreshold) }),
@@ -1503,7 +1509,13 @@ export const updateMyProduct = async (req: Request, res: Response): Promise<void
         images: Array.isArray(images) ? images : undefined,
         ...categoryFields,
         ...(brandId && { brandId }),
-        status: 'APPROVED', // no approval needed from admin side
+        // status is intentionally left untouched here -- this endpoint used to
+        // force it back to APPROVED on every edit, which meant a vendor could
+        // silently undo an admin's REJECTED/INACTIVE call just by saving a
+        // stock or price tweak, and would have demoted a live product to
+        // PENDING on every trivial edit if this instead force-set PENDING.
+        // Status changes go through admin's updateProductStatus, or the
+        // PENDING gate on creation above.
         b2bPrice: b2bPrice !== undefined ? (b2bPrice === '' ? null : Number(b2bPrice)) : undefined,
         moq: moq !== undefined ? (moq === '' ? null : Math.max(1, parseInt(moq, 10))) : undefined,
         lowStockThreshold: lowStockThreshold !== undefined && lowStockThreshold !== '' ? Number(lowStockThreshold) : undefined,
