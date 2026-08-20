@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, Linking, Alert, Image, TouchableOpacity, Switch, TextInput } from 'react-native';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useIsFocused } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, Typography, Card, Button, Loader, riderService, resolveUploadUrl } from '@mechbazar/shared';
@@ -17,6 +17,7 @@ export const DeliveryDetailScreen = () => {
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
   const { orderId } = route.params;
+  const isFocused = useIsFocused();
 
   const [proofUri, setProofUri] = useState<string | null>(null);
   const [codCollected, setCodCollected] = useState(false);
@@ -32,9 +33,15 @@ export const DeliveryDetailScreen = () => {
     onError: (err: any) => Alert.alert('Error', err.response?.data?.error || err.message),
   });
 
+  // Shares DeliveriesScreen's query key/cache, but that screen's own poll
+  // stops while it's the unfocused screen underneath this one (its
+  // `isFocused ? 30000 : false` gate) -- without an interval of its own here,
+  // a status change made elsewhere (admin escalation, a re-assignment) would
+  // sit stale until the rider navigates back and forward again.
   const { data: deliveries, isLoading } = useQuery<Delivery[]>({
     queryKey: ['rider-deliveries'],
     queryFn: riderService.getMyDeliveries,
+    refetchInterval: isFocused ? 30000 : false,
   });
 
   const order = deliveries?.find((d) => d.id === orderId);
