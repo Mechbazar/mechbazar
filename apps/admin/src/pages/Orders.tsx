@@ -7,6 +7,8 @@ import { motion } from 'framer-motion';
 import type { RootState } from '../store';
 import { Clock, Truck, CheckCircle, MoreVertical, UserPlus, X, Printer } from 'lucide-react';
 import { API_URL, resolveUploadUrl } from '../config/api';
+import { getAdminSocket } from '../services/adminRealtime';
+import { formatINR } from '@mechbazar/shared/web';
 import LocationMapView from '../components/maps/LocationMapView';
 import { Badge, Button, Card, DataTable, EmptyState, Modal, StatCard, Tabs, Icon3D } from '../components/ui';
 import type { Column, TabItem } from '../components/ui';
@@ -55,12 +57,26 @@ export default function Orders() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  // Live refresh -- no push channel on this deployment, so poll instead of
-  // waiting for a manual refresh/navigation to pick up new orders.
+  // Poll as a fallback in case the socket below is disconnected/reconnecting.
   useEffect(() => {
     if (!token) return;
     const interval = setInterval(fetchOrders, ORDERS_POLL_INTERVAL_MS);
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  // The backend already emits admin:order-update on every order status change
+  // (orderState.ts's broadcastOrderStatus) -- mirrors ServiceBookingsPage's
+  // admin:job-update listener so this page refreshes instantly instead of
+  // waiting up to ORDERS_POLL_INTERVAL_MS for the next poll.
+  useEffect(() => {
+    if (!token) return;
+    const socket = getAdminSocket();
+    const onUpdate = () => fetchOrders();
+    socket.on('admin:order-update', onUpdate);
+    return () => {
+      socket.off('admin:order-update', onUpdate);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
@@ -440,7 +456,7 @@ export default function Orders() {
 
             <div className="bg-surface-sunken p-4 rounded-xl flex justify-between items-center mb-6">
               <p className="font-medium text-content-secondary">Total Amount</p>
-              <p className="text-xl font-bold text-content-primary">₹{selectedOrder.finalAmount?.toLocaleString()}</p>
+              <p className="text-xl font-bold text-content-primary">{selectedOrder.finalAmount != null ? formatINR(selectedOrder.finalAmount) : '—'}</p>
             </div>
 
             <div className="bg-surface-sunken p-4 rounded-xl mb-6">
