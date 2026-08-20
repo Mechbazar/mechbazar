@@ -1,21 +1,36 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import {
   getServiceCategories, getServiceCategoryById, createServiceCategory, updateServiceCategory, deleteServiceCategory,
   getServicePackages, getServicePackageById, createServicePackage, updateServicePackage, deleteServicePackage,
   getTimeSlots, createTimeSlot, updateTimeSlot, deleteTimeSlot,
   createBooking, getMyBookings, getBookingById, cancelBooking,
   respondToApproval, uploadBookingImage, getBookingImageFile, getBookingInvoice, createBookingReview,
-  sendBookingMessage, getBookingMessages,
+  sendBookingMessage, getBookingMessages, getBookingOtpForCustomer,
   getAllBookings, assignTechnician, updateAdminBookingStatus, refundBookingPayment, getServiceDashboard,
   getAssignableTechnicians, getBookingTechnicianPhoto,
 } from '../controllers/service.controller';
 import { authenticate, authorize } from '../middlewares/auth';
 import { technicianUpload } from '../middlewares/technicianUpload';
+import { redisBackedStore } from '../config/redis';
 import { Role } from '@prisma/client';
 
 const router = Router();
 
 const admins = [Role.ADMIN, Role.SUPER_ADMIN, Role.OPERATIONS_MANAGER];
+
+// Same shape as job.routes.ts's otpLimiter -- its transport-level complement
+// for scheduled bookings. Redis-backed via P1-06's redisBackedStore, own key
+// prefix so its counter never collides with job-otp's.
+const bookingOtpLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: redisBackedStore('service-booking-otp'),
+  keyGenerator: (req) => req.headers.authorization || req.ip || 'unknown',
+  message: { error: 'Too many OTP requests. Please wait before trying again.', code: 'RATE_LIMITED' },
+});
 
 // Categories
 router.get('/categories', getServiceCategories);
@@ -64,6 +79,11 @@ router.patch('/bookings/:id/refund', authenticate, authorize(admins), refundBook
 // Technician photo -- gated in the controller (owner customer, assigned
 // technician, or admin), same pattern as getBookingImageFile.
 router.get('/bookings/:id/technician-photo', authenticate, getBookingTechnicianPhoto);
+
+// Customer-only completion OTP retrieval (P1-01) -- owner-only in the
+// controller, never the admin/technician roles getBookingImageFile-style
+// endpoints allow.
+router.get('/bookings/:id/otp', authenticate, bookingOtpLimiter, getBookingOtpForCustomer);
 
 // Registered last so it doesn't shadow the more specific routes above.
 router.get('/bookings/:id', authenticate, getBookingById);

@@ -11,7 +11,7 @@ import { broadcastBookingStatus } from '../utils/realtimeBooking';
 import { ASSIGNMENT_RESPONSE_WINDOW_MS, TECHNICIAN_ACTIVE_STATUSES } from '../services/jobState';
 import { isPincodeServiceable } from '../services/serviceability.service';
 import { creditServiceCompletion } from '../services/commission.service';
-import { issueJobOtp, verifyAndConsumeOtp, OtpError } from '../services/jobOtp.service';
+import { issueJobOtp, getOrIssueCustomerOtp, verifyAndConsumeOtp, OtpError } from '../services/jobOtp.service';
 
 // Thrown from inside createBooking's $transaction to carry an intended HTTP
 // status (400/404/409) back out, mirroring order.controller.ts's OrderError.
@@ -818,6 +818,59 @@ export const generateBookingCompletionOtp = async (req: AuthRequest, res: Respon
     }
     console.error('Error generating completion OTP:', error.message);
     res.status(500).json({ error: 'Failed to generate OTP' });
+  }
+};
+
+/**
+ * GET /api/services/bookings/:id/otp
+ * Customer-only -- returns the live completion code for a scheduled booking,
+ * so the customer has an in-app way to read it (the code otherwise only ever
+ * reaches them via a push notification's data payload, which this app never
+ * renders). Mirrors job.controller.ts's getJobOtpForCustomer, the
+ * already-correct equivalent for emergency jobs -- same ownership check, same
+ * "only at the moment it's needed" state gate, same underlying JobOtp
+ * issue/decrypt logic (getOrIssueCustomerOtp), no crypto or verification
+ * logic duplicated here.
+ */
+export const getBookingOtpForCustomer = async (req: AuthRequest, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const booking = await prisma.serviceBooking.findUnique({ where: { id } });
+    // 404 (not 403) for anyone who isn't the owner -- admin and the assigned
+    // technician included, since this code's entire security property is
+    // that only the customer ever holds it. Mirrors getBookingById's own
+    // not-found-for-non-owner shape, so a stranger probing booking ids can't
+    // distinguish "not yours" from "doesn't exist".
+    if (!booking || booking.userId !== req.user!.userId) {
+      res.status(404).json({ error: 'Booking not found' });
+      return;
+    }
+    // Emergency jobs have their own, already-correct customer OTP endpoint
+    // (GET /api/jobs/:id/otp) -- same guard updateMyBookingStatus and
+    // generateBookingCompletionOtp already use to keep the two flows apart.
+    if (booking.isEmergency) {
+      res.status(400).json({ error: 'This is an emergency job -- use the emergency job tracking screen, not this endpoint.' });
+      return;
+    }
+    if (booking.status !== 'WORK_STARTED') {
+      res.status(409).json({
+        error: 'Your completion code appears once the technician has started work.',
+        code: 'NOT_YET',
+      });
+      return;
+    }
+
+    const otp = await getOrIssueCustomerOtp(id, 'COMPLETION');
+    // Minimum data only: the plaintext code (already decrypted inside
+    // getOrIssueCustomerOtp) and its expiry -- never codeEnc, attempts, or any
+    // other JobOtp column.
+    res.status(200).json({ code: otp.code, expiresAt: otp.expiresAt });
+  } catch (error: any) {
+    if (error instanceof OtpError) {
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
+    console.error('Error fetching booking OTP:', error.message);
+    res.status(500).json({ error: 'Failed to fetch OTP' });
   }
 };
 

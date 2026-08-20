@@ -155,6 +155,33 @@ export const fetchBookingById = async (token: string, id: string): Promise<Servi
   }
 };
 
+export interface BookingOtpResult {
+  code?: string;
+  expiresAt?: string;
+  error?: string;
+  errorCode?: string;
+  status?: number;
+}
+
+// The completion code otherwise only ever reaches the customer via a push
+// notification's data payload, which this app doesn't parse -- this is the
+// in-app fallback (and, since generateBookingCompletionOtp never writes it
+// anywhere the client can read, now the *only* app-visible way to see it).
+// Mirrors packages/shared's jobService.getOtp, the equivalent already used
+// by EmergencyTrackingScreen, but this app-local file isn't shared across
+// apps the way that emergency-job client is.
+export const fetchBookingOtp = async (token: string, id: string): Promise<BookingOtpResult> => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/services/bookings/${id}/otp`, { headers: authHeaders(token) });
+    const data = await res.json();
+    if (!res.ok) return { error: data.error || 'Failed to fetch OTP', errorCode: data.code, status: res.status };
+    return { code: data.code, expiresAt: data.expiresAt };
+  } catch (err) {
+    console.error('fetchBookingOtp failed', err);
+    return { error: 'Network error while fetching OTP' };
+  }
+};
+
 export const cancelServiceBooking = async (
   token: string,
   id: string,

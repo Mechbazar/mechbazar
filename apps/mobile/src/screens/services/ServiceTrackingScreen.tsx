@@ -6,7 +6,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { getSocket, subscribeToJob, SERVER_EVENTS, JobStatusEvent } from '@mechbazar/shared';
 import { ServiceBooking, BookingStatus } from '../../types/service';
-import { fetchBookingById, cancelServiceBooking, respondToBookingApproval, fetchTechnicianPhotoDataUri, fetchBookingImageDataUri } from '../../services/service.service';
+import { fetchBookingById, fetchBookingOtp, cancelServiceBooking, respondToBookingApproval, fetchTechnicianPhotoDataUri, fetchBookingImageDataUri } from '../../services/service.service';
 import { confirm, notify } from '../../utils/notify';
 import { HeaderCartButton } from '../../components/HeaderCartButton';
 import { useStableIsDesktopUp } from '../../hooks/useStableIsDesktopUp';
@@ -104,6 +104,9 @@ export default function ServiceTrackingScreen() {
   const [respondingApproval, setRespondingApproval] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [otp, setOtp] = useState<{ code: string; expiresAt: string } | null>(null);
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
 
   const isDesktopUp = useStableIsDesktopUp();
   useFocusEffect(
@@ -139,6 +142,36 @@ export default function ServiceTrackingScreen() {
     const interval = setInterval(refresh, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [token, refresh]);
+
+  // Completion code -- P1-01. The backend never puts this in the booking
+  // payload (see completionOtp's dead-column history), so this is a manual,
+  // on-demand fetch, same UX as EmergencyTrackingScreen's own "Get Completion
+  // Code" button for its COMPLETION purpose (only the START purpose there
+  // auto-loads; scheduled bookings only ever need COMPLETION).
+  const loadOtp = useCallback(async () => {
+    if (!token) return;
+    setOtpLoading(true);
+    setOtpError(null);
+    const res = await fetchBookingOtp(token, bookingId);
+    setOtpLoading(false);
+    if (res.code && res.expiresAt) {
+      setOtp({ code: res.code, expiresAt: res.expiresAt });
+    } else {
+      setOtpError(res.error || 'Failed to load completion code');
+    }
+  }, [token, bookingId]);
+
+  // A stale code from an earlier phase (or a previous booking reused by
+  // React's component instance) must never linger once work is no longer in
+  // progress.
+  useEffect(() => {
+    if (booking?.status !== 'WORK_STARTED') {
+      setOtp(null);
+      setOtpError(null);
+    }
+  }, [booking?.status]);
+
+  const otpExpired = otp != null && new Date(otp.expiresAt).getTime() <= Date.now();
 
   // Booking creation, admin assignment, and mechanic accept/reject all now
   // broadcast over the same job:<bookingId> socket room the emergency flow
@@ -373,11 +406,46 @@ export default function ServiceTrackingScreen() {
               </View>
             )}
 
-            {booking.status === 'WORK_STARTED' && booking.completionOtp && (
+            {booking.status === 'WORK_STARTED' && otp && !otpExpired && (
               <View style={styles.otpCard}>
                 <Text style={styles.otpTitle}>Completion Code</Text>
-                <Text style={styles.otpCode}>{booking.completionOtp}</Text>
+                <Text style={styles.otpCode}>{otp.code}</Text>
                 <Text style={styles.otpHint}>Share this code with your mechanic once the work is done to confirm completion.</Text>
+              </View>
+            )}
+
+            {booking.status === 'WORK_STARTED' && otp && otpExpired && (
+              <View style={styles.otpCard}>
+                <Text style={styles.otpTitle}>Completion Code Expired</Text>
+                <Text style={styles.otpHint}>That code is no longer valid.</Text>
+                <TouchableOpacity style={styles.refreshOtpBtn} onPress={loadOtp} disabled={otpLoading}>
+                  <Text style={styles.refreshOtpText}>{otpLoading ? 'Loading…' : 'Get a new code'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {booking.status === 'WORK_STARTED' && !otp && otpLoading && (
+              <View style={styles.otpCard}>
+                <Text style={styles.otpHint}>Loading your completion code…</Text>
+              </View>
+            )}
+
+            {booking.status === 'WORK_STARTED' && !otp && !otpLoading && otpError && (
+              <View style={styles.otpCard}>
+                <Text style={styles.otpTitle}>Couldn't load completion code</Text>
+                <Text style={styles.otpHint}>{otpError}</Text>
+                <TouchableOpacity style={styles.refreshOtpBtn} onPress={loadOtp}>
+                  <Text style={styles.refreshOtpText}>Try again</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {booking.status === 'WORK_STARTED' && !otp && !otpLoading && !otpError && (
+              <View style={styles.otpCard}>
+                <Text style={styles.otpHint}>Ask your mechanic once the work is done, then get your completion code here.</Text>
+                <TouchableOpacity style={styles.refreshOtpBtn} onPress={loadOtp}>
+                  <Text style={styles.refreshOtpText}>Get Completion Code</Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -512,6 +580,8 @@ const createStyles = (colors: typeof LIGHT_COLORS) => StyleSheet.create({
   otpTitle: { fontSize: 13, fontWeight: '700', color: LIGHT_COLORS.textDark },
   otpCode: { fontSize: 28, fontWeight: '900', color: LIGHT_COLORS.primary, letterSpacing: 4, marginVertical: 6 },
   otpHint: { fontSize: 12, color: LIGHT_COLORS.textMuted, textAlign: 'center' },
+  refreshOtpBtn: { alignSelf: 'center', marginTop: 10 },
+  refreshOtpText: { color: LIGHT_COLORS.primary, fontWeight: '700', fontSize: 13 },
 
   cancelledBanner: { alignItems: 'center', padding: 40 },
   cancelledIcon: { fontSize: 40, color: colors.danger, marginBottom: 12, fontWeight: 'bold' },
