@@ -1,8 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Alert, Modal, ScrollView, TouchableOpacity } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { colors, Typography, Card, Button, Input, Badge, Loader, adminService } from '@mechbazar/shared';
 import { X, MapPin, Star, Navigation as NavigationIcon } from 'lucide-react-native';
+
+const BOOKINGS_POLL_INTERVAL_MS = 20000;
 
 const TABS: { label: string; statuses?: string[] }[] = [
   { label: 'All' },
@@ -56,10 +59,21 @@ export const ServiceBookingsScreen = () => {
   const [candidates, setCandidates] = useState<any[]>([]);
   const [candidatesLoading, setCandidatesLoading] = useState(false);
 
+  // No push channel wired for this screen yet -- poll instead, matching this
+  // app's own OrdersListScreen.tsx, so a status change (mechanic
+  // accept/reject, admin escalation) shows up without a manual pull-to-refresh.
   const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
     queryKey: ['admin-service-bookings'],
     queryFn: () => adminService.getServiceBookings(),
+    refetchOnMount: 'always',
+    refetchInterval: BOOKINGS_POLL_INTERVAL_MS,
   });
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const bookings = Array.isArray(data) ? data : [];
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['admin-service-bookings'] });
