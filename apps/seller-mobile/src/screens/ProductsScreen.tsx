@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Alert, Modal, ScrollView, Image, TouchableOpacity } from 'react-native';
-import { colors, Typography, Card, Button, Input, vendorService, Loader, resolveUploadUrl } from '@mechbazar/shared';
+import { colors, Typography, Card, Button, Input, vendorService, Loader, resolveUploadUrl, formatINR } from '@mechbazar/shared';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Image as ImageIcon, Package, Pencil } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
@@ -202,7 +202,7 @@ export const ProductsScreen = () => {
               <View style={{flex:1, marginLeft: 16}}>
                 <Typography variant="h3">{item.name}</Typography>
                 <Typography variant="body" style={{color: item.stock > 0 ? colors.primary : colors.danger}}>
-                  ₹{item.price} • {item.stock > 0 ? `Stock: ${item.stock}` : 'Out of Stock'}
+                  {formatINR(item.price)} • {item.stock > 0 ? `Stock: ${item.stock}` : 'Out of Stock'}
                 </Typography>
                 <Typography variant="caption" style={{color: item.status==='APPROVED'?colors.success:colors.warning}}>{item.status} · {item.vehicleType === 'BIKE' ? '🏍️ Bike' : '🚗 Car'}</Typography>
               </View>

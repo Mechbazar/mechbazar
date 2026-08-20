@@ -5,7 +5,7 @@ import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navig
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Logo, logoSvgMarkup } from '@mechbazar/shared';
+import { Logo, logoSvgMarkup, formatINR } from '@mechbazar/shared';
 import { notify } from '../utils/notify';
 import { useStableIsDesktopUp } from '../hooks/useStableIsDesktopUp';
 import { setDesktopFullPageScreenActive } from '../navigation/desktopFullPageScreenStore';
@@ -71,18 +71,18 @@ const invoiceHtml = (order: any, shortId: string) => `
         ${(order.items || []).map((oi: any) => `
           <tr>
             <td style="padding: 6px 0;">${oi.product?.name || 'Item'} × ${oi.quantity}</td>
-            <td style="text-align: right;">₹${oi.price * oi.quantity}</td>
+            <td style="text-align: right;">${formatINR(oi.price * oi.quantity)}</td>
           </tr>
         `).join('')}
       </table>
       <hr style="border: none; border-top: 1px solid #E3E6EA; margin: 16px 0;" />
       <table style="width: 100%; border-collapse: collapse;">
-        <tr><td style="padding: 6px 0;">Subtotal</td><td style="text-align: right;">₹${order.totalAmount}</td></tr>
-        ${order.discountAmount ? `<tr><td style="padding: 6px 0;">Discount</td><td style="text-align: right;">-₹${order.discountAmount}</td></tr>` : ''}
-        <tr><td style="padding: 6px 0;">Delivery</td><td style="text-align: right;">₹${order.deliveryFee ?? 0}</td></tr>
+        <tr><td style="padding: 6px 0;">Subtotal</td><td style="text-align: right;">${formatINR(order.totalAmount)}</td></tr>
+        ${order.discountAmount ? `<tr><td style="padding: 6px 0;">Discount</td><td style="text-align: right;">-${formatINR(order.discountAmount)}</td></tr>` : ''}
+        <tr><td style="padding: 6px 0;">Delivery</td><td style="text-align: right;">${formatINR(order.deliveryFee ?? 0)}</td></tr>
       </table>
       <hr style="border: none; border-top: 1px solid #E3E6EA; margin: 16px 0;" />
-      <h2>Total: ₹${order.finalAmount}</h2>
+      <h2>Total: ${formatINR(order.finalAmount)}</h2>
       <p style="color: #6B7480; font-size: 12px; margin-top: 32px;">Thank you for shopping with MechBazar.</p>
     </body>
   </html>
@@ -195,17 +195,17 @@ export default function OrderInvoiceScreen() {
           {(order.items || []).map((oi: any) => (
             <View key={oi.id} style={styles.row}>
               <Text style={styles.label} numberOfLines={1}>{oi.product?.name || t('orderHistory.item')} × {oi.quantity}</Text>
-              <Text style={styles.value}>₹{oi.price * oi.quantity}</Text>
+              <Text style={styles.value}>{formatINR(oi.price * oi.quantity)}</Text>
             </View>
           ))}
 
           <View style={styles.divider} />
 
-          <View style={styles.row}><Text style={styles.label}>{t('orderHistory.subtotal')}</Text><Text style={styles.value}>₹{order.totalAmount}</Text></View>
+          <View style={styles.row}><Text style={styles.label}>{t('orderHistory.subtotal')}</Text><Text style={styles.value}>{formatINR(order.totalAmount)}</Text></View>
           {!!order.discountAmount && (
-            <View style={styles.row}><Text style={styles.label}>{t('orderHistory.discount')}</Text><Text style={styles.value}>-₹{order.discountAmount}</Text></View>
+            <View style={styles.row}><Text style={styles.label}>{t('orderHistory.discount')}</Text><Text style={styles.value}>-{formatINR(order.discountAmount)}</Text></View>
           )}
-          <View style={styles.row}><Text style={styles.label}>{t('orderHistory.delivery')}</Text><Text style={styles.value}>₹{order.deliveryFee ?? 0}</Text></View>
+          <View style={styles.row}><Text style={styles.label}>{t('orderHistory.delivery')}</Text><Text style={styles.value}>{formatINR(order.deliveryFee ?? 0)}</Text></View>
           {order.payment && (
             <View style={styles.row}><Text style={styles.label}>{t('orderInvoice.payment')}</Text><Text style={styles.value}>{order.payment.method} ({order.payment.status})</Text></View>
           )}
@@ -217,7 +217,7 @@ export default function OrderInvoiceScreen() {
 
           <View style={styles.row}>
             <Text style={styles.totalLabel}>{t('orderHistory.total')}</Text>
-            <Text style={styles.totalValue}>₹{order.finalAmount}</Text>
+            <Text style={styles.totalValue}>{formatINR(order.finalAmount)}</Text>
           </View>
         </View>
 

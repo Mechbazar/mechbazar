@@ -11,7 +11,7 @@ import {
   MoreVertical,
   AlertCircle
 } from 'lucide-react';
-import { Badge, Card, Loader } from '@mechbazar/shared/web';
+import { Badge, Card, Loader, formatINR } from '@mechbazar/shared/web';
 import { API_URL } from '../config/api';
 
 const ORDERS_POLL_INTERVAL_MS = 20000;
@@ -211,7 +211,7 @@ export default function Orders() {
                       </td>
                       <td className="p-4">
                         <div className="font-medium text-content-primary">{order.items.length} items</div>
-                        <div className="text-xs text-brand-secondary font-bold">₹{vendorItemsTotal}</div>
+                        <div className="text-xs text-brand-secondary font-bold">{formatINR(vendorItemsTotal)}</div>
                         <div className="mt-1">
                           {order.items.map((item: any) => (
                             <div key={item.id} className="text-xs text-content-secondary truncate max-w-[200px]">

@@ -10,3 +10,4 @@ export { Logo } from './Logo';
 export type { LogoProps, LogoTone } from './Logo';
 export { logoSvgMarkup } from '../../brand/logoSvg';
 export type { LogoSvgOptions } from '../../brand/logoSvg';
+export { formatINR } from '../../utils/currency';

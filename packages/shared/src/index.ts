@@ -8,6 +8,7 @@ export * from './api/geocodeService';
 export * from './api/jobService';
 export * from './api/realtime';
 export * from './api/realtimeEvents';
+export * from './utils/currency';
 
 // Design System
 export * from './theme';
