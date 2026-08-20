@@ -1,15 +1,29 @@
 import React from 'react';
 import { View, StyleSheet, FlatList, RefreshControl, Alert } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors, Typography, Card, Button, vendorService, Loader } from '@mechbazar/shared';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+
+const ORDERS_POLL_INTERVAL_MS = 20000;
 
 export const OrdersScreen = () => {
   const queryClient = useQueryClient();
 
+  // No push channel wired for this app yet -- poll instead, matching
+  // admin-mobile's OrdersListScreen, plus a refetch on screen focus so a
+  // status change made elsewhere shows up as soon as the vendor comes back.
   const { data: orders, isLoading, isError, refetch, isRefetching } = useQuery({
     queryKey: ['vendor-orders'],
     queryFn: vendorService.getOrders,
+    refetchOnMount: 'always',
+    refetchInterval: ORDERS_POLL_INTERVAL_MS,
   });
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) => vendorService.updateOrderStatus(id, status),
